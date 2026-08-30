@@ -11,6 +11,9 @@ erl_crash.dump
 .elixir_ls/
 .lexical/
 
+# Downloaded oracle -- bin/tlc-expected fetches and checksums it on demand
+/.tla/
+
 # macOS
 .DS_Store
 
