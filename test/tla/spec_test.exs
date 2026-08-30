@@ -37,7 +37,7 @@ defmodule TLA.SpecTest do
       spec = Compiled.from_module(Transfer)
       balances = Enum.find(spec.variables, &(&1.name == :balances))
 
-      assert Macro.to_string(balances.type) == "[^accounts ~> 0..^max_balance]"
+      assert Macro.to_string(balances.type) == "[^accounts ~> :nat]"
     end
 
     test "leave a variable with no type: nil rather than inventing one" do

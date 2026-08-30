@@ -16,6 +16,12 @@ defmodule TLA.Spec.DSL do
 
   @reserved [:state, :old, :new]
 
+  # The implicit invariant of §1.5, checked in every reachable state. A declared
+  # one of the same name would either shadow it or be shadowed by it, and a
+  # coverage report naming `type_ok` would then be ambiguous about which was
+  # checked.
+  @reserved_invariants [:type_ok]
+
   @doc """
   Declare a constant parameter. Its value is assigned at model-check time.
   Referenced in blocks as `^name`.
@@ -359,6 +365,7 @@ defmodule TLA.Spec.DSL do
 
   defp state_predicate(caller, attribute, kind, name, opts) do
     check_name!(caller, kind, name)
+    check_reserved_invariant!(caller, kind, name)
     {block, opts} = pop_do!(opts, caller, kind)
     {description, _} = pop_option(opts, :desc, caller, "#{kind} #{inspect(name)}")
 
@@ -450,6 +457,21 @@ defmodule TLA.Spec.DSL do
   end
 
   defp check_reserved!(_caller, _kind, _name), do: :ok
+
+  defp check_reserved_invariant!(caller, "invariant", name) when name in @reserved_invariants do
+    CompileError.raise!(
+      module: caller.module,
+      declaration: "invariant #{inspect(name)}",
+      line: caller.line,
+      problem: "#{inspect(name)} is checked implicitly and cannot be declared",
+      hint:
+        "Types are checked as the invariant `:type_ok` in every reachable state " <>
+          "(02-dsl-semantics.md §1.5). Declare the constraint as `variable :x, type: …` " <>
+          "instead, or give this invariant another name."
+    )
+  end
+
+  defp check_reserved_invariant!(_caller, _kind, _name), do: :ok
 
   defp check_fresh!(caller, name) do
     taken =

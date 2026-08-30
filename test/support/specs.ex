@@ -81,7 +81,10 @@ defmodule TLA.TestSpecs do
     constant :accounts
     constant :max_balance
 
-    variable :balances, type: [^accounts ~> 0..^max_balance]
+    # `:nat`, not `0..^max_balance`: every account starts at ^max_balance, so a
+    # transfer pushes the recipient above it. Conservation is what bounds the
+    # total, and that is an invariant rather than a type.
+    variable :balances, type: [^accounts ~> :nat]
     variable :status, type: [:idle, :transferring, :done, :error]
     variable :pending, type: :set
     variable :log, type: :seq
