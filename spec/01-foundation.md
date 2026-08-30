@@ -78,7 +78,26 @@ Analogous to TLA+ UNCHANGED <<x, y, z>>.
 """
 @spec unchanged?(step(), [variable_name()]) :: boolean()
 def unchanged?({pre, post}, vars)
+
+@doc """
+Assert that every value in the state is deterministically serializable, per
+`02-dsl-semantics.md` §6. Returns the state; raises `TLA.State.InvalidTermError`
+naming the variable and the position inside it.
+"""
+@spec validate!(t()) :: t() | no_return()
+def validate!(state)
 ```
+
+### Reading a variable that is not there
+
+`get/2`, `unchanged?/2` and `prime/3` raise rather than defaulting. This is not
+defensiveness; it is the difference between a bug and a wrong answer. A misspelled
+variable read through `Map.get/2` returns `nil`, `nil` compares unequal to whatever the
+guard expected, the action looks disabled, and the checker explores a smaller state
+space and reports success — with nothing in the output distinguishing that run from a
+sound one. `prime/3` is the same argument in the other direction: a spec's variable set
+is fixed by its `Init`, so priming a variable the state does not have is a typo, and one
+the fingerprint would then faithfully preserve as a distinct state.
 
 ---
 
@@ -478,6 +497,14 @@ defmodule TLA.Config do
   dependency's build and attaching the config dependency to `TLA.Config` instead of
   to the user's module. Inside the quote it expands in the caller, which is where
   both the value and the dependency belong.
+
+  Consequently `mode/0` may only be called from a MODULE BODY: `compile_env/3`
+  raises "cannot be called inside functions". The `@before_compile` hooks in Layers
+  1 and 3 therefore resolve it into a module attribute
+  (`@tla_mode TLA.Config.mode()`) and branch on the attribute when emitting each
+  wrapper. That is the correct shape anyway — the point of compile-time resolution
+  is that `:disabled` emits no wrapper, which is a decision made while the module
+  body is being expanded, not inside a function that has already been emitted.
   """
   defmacro mode do
     default = default_mode()
