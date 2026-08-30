@@ -3,7 +3,9 @@ id: pm-4
 title: "Foundation: TLA.Set and TLA.Function"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 4
+merge_request: 5
 gitlab_synced: true
 ---
 
