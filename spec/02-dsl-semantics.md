@@ -391,6 +391,14 @@ not compile.
 | `param draws from a non-set` | A `params:` entry that is not a constant, range, list, or 1- or 2-arity function |
 | `reserved name` | A `variable`/`constant` named `state`, `old` or `new` (§1.4) |
 | `forbidden state term` | A pid, reference, port, fun or float assigned to a variable (§6) |
+| `already declared` | Two `variable`/`constant` declarations of one name, or two `action`/`invariant`/`terminal`/`temporal`/`action_property` declarations of one name — a second cannot shadow the first, and a name that identifies two things is a name a trace cannot report |
+| `init does not assign` | An `init` block that leaves a declared variable out. The partial state would surface much later, as a `KeyError` from whichever action first read it |
+| `no init block` | A spec with variables and no `init`. Its state space is empty, and checking it would report success over a search of nothing |
+| `require in init` | An `init` block is unconditional; several possible starting states are several `init` blocks |
+| `unexpected statement` | A statement in an `init`/`action` body that is not `require`, `let`, or an assignment (§2) |
+| `param shadows a variable` | A `params:` entry named after a declared variable, which would make a bare use of that name inside the block ambiguous |
+| `constant referenced without ^` | A bare name matching a declared constant — the likeliest typo in the DSL, so it gets its own message rather than falling through to `undeclared variable` (§1.1) |
+| `temporal block is not a single formula` | A `temporal` block with more than one statement. Unlike `invariant`, there is no single state in which to compute an intermediate value: the formula is evaluated over a behavior |
 
 Diagnostics carry the spec module, the declaration name, and the offending line. The
 quality of these messages is most of the difference between a DSL people adopt and one
