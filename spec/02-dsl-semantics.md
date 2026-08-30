@@ -106,10 +106,22 @@ compiles.
 | `{t1, t2, …}` | A tuple of that arity, element-wise |
 | `[dom ~> rng]` | A map (TLA+ function) whose keys are exactly `dom` and whose values are in `rng` |
 | `:set`, `:seq` | Any `MapSet` / any list; element types unconstrained |
+| `:int`, `:nat` | Any integer / any non-negative integer — TLA+'s `Int` and `Nat` |
 
 Two operators are overloaded and a reader should know it: inside `type:`, `~>` is the
 function arrow and `|` is union; inside a `temporal` block `~>` is leads-to. The two
 never occur in the same position, so the macro is never in doubt.
+
+`:set`, `:seq`, `:int` and `:nat` likewise shadow the literal atoms of the same names
+at the top level of a type. Inside a list there is nothing to be ambiguous with, so
+`[:set]` means the literal atom `:set`.
+
+`:int` and `:nat` were added after the implicit `type_ok` invariant refuted §8's own
+worked example: `balances` was typed `[^accounts ~> 0..^max_balance]`, but every account
+starts at `^max_balance` and a transfer pushes the recipient above it. The grammar had
+no way to say "an integer", so the only expressible types for that variable were all
+false. A type language in which the documented example cannot be typed correctly is a
+gap in the language, not a mistake in the example.
 
 Types are checked as an implicit invariant named `:type_ok` in every reachable state
 — which is why the coverage report lists one without the spec declaring it — and
@@ -417,7 +429,7 @@ defmodule Specs.TransferProtocol do
   constant :accounts
   constant :max_balance
 
-  variable :balances, type: [^accounts ~> 0..^max_balance]
+  variable :balances, type: [^accounts ~> :nat]
   variable :status,   type: [:idle, :transferring, :done, :error]
   variable :pending,  type: :set
   variable :log,      type: :seq

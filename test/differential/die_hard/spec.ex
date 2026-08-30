@@ -8,6 +8,10 @@ defmodule TLA.Differential.DieHard do
   """
   use TLA.Spec
 
+  # TypeOK in DieHard.tla is `small \in 0..3 /\ big \in 0..5`. Here it is the
+  # declaration itself: types are checked as the implicit `:type_ok` invariant in
+  # every reachable state (02-dsl-semantics.md §1.5), which is the same check
+  # written once.
   variable :small, type: 0..3
   variable :big, type: 0..5
 
@@ -42,10 +46,6 @@ defmodule TLA.Differential.DieHard do
     let poured = if(big + small > 3, do: 3 - small, else: big)
     big = big - poured
     small = small + poured
-  end
-
-  invariant :type_ok do
-    small >= 0 and small <= 3 and big >= 0 and big <= 5
   end
 
   # Refuted by design. TLC's counterexample is the solution to the puzzle, which

@@ -3,7 +3,9 @@ id: pm-8
 title: "The model checker: StateGraph, BFS, safety, traces — and die_hard agreeing with TLC"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 8
+merge_request: 8
 gitlab_synced: true
 ---
 

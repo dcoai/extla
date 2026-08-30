@@ -58,7 +58,7 @@ defmodule TLA.DifferentialTest do
       end
 
       test "agrees with TLC on every invariant", ctx do
-        spec = TLA.Spec.Compiled.from_module(ctx.entry.module)
+        spec = run_spec(ctx.entry)
 
         for {tlc_name, verdict} <- ctx.expected["invariants"] do
           name = invariant_name!(spec, tlc_name)
@@ -89,7 +89,7 @@ defmodule TLA.DifferentialTest do
 
         if violated do
           {tlc_name, _} = violated
-          spec = TLA.Spec.Compiled.from_module(ctx.entry.module)
+          spec = run_spec(ctx.entry)
           name = invariant_name!(spec, tlc_name)
           result = check(ctx.entry, invariants: [name])
           invariant = Enum.find(spec.invariants, &(&1.name == name))
@@ -108,6 +108,14 @@ defmodule TLA.DifferentialTest do
 
   defp check(entry, opts) do
     ModelChecker.run(entry.module, Map.merge(%{constants: entry.constants}, Map.new(opts)))
+  end
+
+  # The invariants a run actually checks, which includes the implicit `:type_ok`
+  # of §1.5 — TLC's TypeOK is a declared invariant there and a `type:` annotation
+  # here, and the corpus compares the two.
+  defp run_spec(entry) do
+    spec = TLA.Spec.Compiled.from_module(entry.module)
+    %{spec | invariants: TLA.ModelChecker.checked_invariants(spec, entry.constants)}
   end
 
   # The .cfg names an invariant `NotSolved`; the DSL spec names it `:not_solved`.

@@ -16,6 +16,7 @@ defmodule TLA.ModelChecker do
   """
 
   alias TLA.ModelChecker.Safety
+  alias TLA.Spec.Type
   alias TLA.{Fingerprint, Spec, State, StateGraph, Trace}
 
   @type config :: %{
@@ -97,6 +98,9 @@ defmodule TLA.ModelChecker do
     config = Map.merge(@defaults, config)
     reject_unimplemented!(config)
 
+    declared = spec
+    spec = %{spec | invariants: checked_invariants(spec, config.constants)}
+
     started = System.monotonic_time(:millisecond)
     graph = StateGraph.new(spec, config.constants, fingerprint_bits: config.fingerprint_bits)
 
@@ -104,7 +108,7 @@ defmodule TLA.ModelChecker do
 
     result =
       finish(
-        spec,
+        declared,
         config,
         graph,
         outcome,
@@ -113,6 +117,25 @@ defmodule TLA.ModelChecker do
       )
 
     {result, graph}
+  end
+
+  @doc """
+  Every invariant a run will check: the spec's own, preceded by the implicit
+  `:type_ok` of `02-dsl-semantics.md` §1.5 when any variable is typed.
+
+  `type_ok` goes first deliberately. A state outside its declared type makes
+  every other invariant's verdict on that state uninteresting — the useful thing
+  to report is that a variable holds something the spec says it cannot.
+  """
+  @spec checked_invariants(module() | Spec.Compiled.t(), map()) :: [Spec.Compiled.invariant_def()]
+  def checked_invariants(module, constants) when is_atom(module),
+    do: module |> Spec.Compiled.from_module() |> checked_invariants(constants)
+
+  def checked_invariants(%Spec.Compiled{} = spec, constants) do
+    case Type.invariant(spec, constants) do
+      nil -> spec.invariants
+      type_ok -> [type_ok | spec.invariants]
+    end
   end
 
   # ── The search ──────────────────────────────────────────────────────────────
@@ -153,7 +176,7 @@ defmodule TLA.ModelChecker do
   defp admit(spec, config, graph, state, id, :new) do
     case Safety.check_invariants(spec, config.constants, state, config.invariants) do
       {:violation, name} ->
-        {:violation, graph, invariant_trace(graph, id, name)}
+        {:violation, graph, invariant_trace(graph, id, name, spec, config.constants, state)}
 
       :ok ->
         if constrained?(config, state), do: {:ok, graph, :hold}, else: {:ok, graph, :explore}
@@ -306,13 +329,22 @@ defmodule TLA.ModelChecker do
     }
   end
 
-  defp invariant_trace(graph, id, name) do
+  defp invariant_trace(graph, id, name, spec, constants, state) do
     Trace.generate(graph, id,
       type: :safety,
       property: name,
-      message: "invariant #{inspect(name)} does not hold in this state"
+      message: describe_violation(spec, constants, name, state)
     )
   end
+
+  # A type_ok trace says which variable, holding what, against what it declared.
+  # "invariant :type_ok does not hold" would leave the reader to diff the state
+  # against the declarations by eye.
+  defp describe_violation(spec, constants, :type_ok, state),
+    do: "type_ok: " <> Type.explain(spec, constants, state)
+
+  defp describe_violation(_spec, _constants, name, _state),
+    do: "invariant #{inspect(name)} does not hold in this state"
 
   defp action_property_trace(graph, id, name, _old, _new) do
     Trace.generate(graph, id,
