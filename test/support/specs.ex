@@ -272,4 +272,33 @@ defmodule TLA.TestSpecs do
       new.n >= old.n
     end
   end
+
+  defmodule WithDefaults do
+    @moduledoc "Carries its own constant assignment, so `mix tla.check` can run it."
+    use TLA.Spec
+
+    constant :max, default: 3
+
+    variable :n, type: 0..^max
+
+    init do
+      n = 0
+    end
+
+    action :tick do
+      require n < ^max
+      n = n + 1
+    end
+
+    # Never enabled: the guard cannot hold. This is the routine failure the
+    # coverage report exists to find, and what --strict-coverage fails on.
+    action :impossible do
+      require n == 99
+      n = 0
+    end
+
+    terminal :done do
+      n == ^max
+    end
+  end
 end

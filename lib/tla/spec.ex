@@ -165,12 +165,16 @@ defmodule TLA.Spec do
   end
 
   defp compiled_invariants(invariants) do
-    for %{name: name, description: description, fun: fun} <- invariants do
+    for %{name: name, description: description, fun: fun, near_miss_fun: near_miss} <- invariants do
+      near_miss =
+        if near_miss, do: quote(do: &(__MODULE__.unquote(near_miss) / 2)), else: nil
+
       quote do
         %{
           name: unquote(name),
           description: unquote(description),
-          predicate: &(__MODULE__.unquote(fun) / 2)
+          predicate: &(__MODULE__.unquote(fun) / 2),
+          near_miss: unquote(near_miss)
         }
       end
     end

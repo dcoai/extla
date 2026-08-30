@@ -327,6 +327,41 @@ defmodule TLA.Spec.Block do
 
   defp desugar_statement!(statement, _ctx), do: statement
 
+  @doc """
+  The near-miss expression of an invariant, or `nil` when there is none.
+
+  A near miss is a state in which the invariant held only through its
+  non-trivial branch: the left disjunct of a top-level `or` was false, so the
+  right one had to carry it. An invariant with no near misses over a whole run
+  was never pressed against, and is indistinguishable from `true`.
+
+  Only the top-level `or` shape is derived here. For an invariant without one,
+  `nil` means *not measured* — which the coverage report must render differently
+  from zero, since zero is the finding and "not measured" is not.
+  """
+  @spec near_miss(Macro.t()) :: Macro.t() | nil
+  def near_miss(desugared) do
+    {leading, final} = split_final(desugared)
+
+    case final do
+      {op, meta, [left, _right]} when op in [:or, :||] ->
+        rebuild(leading, {:not, meta, [left]})
+
+      _ ->
+        nil
+    end
+  end
+
+  defp split_final({:__block__, _, statements}) do
+    {leading, [final]} = Enum.split(statements, -1)
+    {leading, final}
+  end
+
+  defp split_final(single), do: {[], single}
+
+  defp rebuild([], expression), do: expression
+  defp rebuild(leading, expression), do: {:__block__, [], leading ++ [expression]}
+
   # §1.3: a `let` may shadow nothing. A local named after a declared variable
   # would make every later bare use of that name ambiguous — and the ambiguity
   # would resolve silently, one way in this block and the other way everywhere
