@@ -1,0 +1,387 @@
+# Layer 2a: DSL Semantics (Normative)
+
+The `TLA.Spec` DSL reinterprets Elixir syntax. This document is the **normative
+definition** of that reinterpretation: exactly how a name in a spec block resolves,
+what an action block means, and where nondeterminism comes from.
+
+`04-layer2-model-checker.md` specifies the *checker*. This file specifies the
+*language it checks*. Where the two disagree, this file wins.
+
+Every rule here is enforced at compile time (§7). A spec that violates one does not
+compile — it never reaches the checker.
+
+---
+
+## 1. The three name classes
+
+Inside a spec block, a bare identifier is one of exactly three things. The class is
+determined syntactically, never by inference:
+
+| Syntax | Class | Resolves to |
+|---|---|---|
+| `^name` | **Constant** | The value bound to `constant :name` at model-check time |
+| `name` | **Variable** | The value of `variable :name` in the relevant state |
+| `let name = …` | **Local** | An ordinary Elixir binding, scoped to the block |
+
+Anything else — a function call, an atom literal, a number — is ordinary Elixir and
+is left untouched by the macro.
+
+### 1.1 Constants use the pin operator
+
+An earlier draft of this DSL wrote constants as bare atoms (`:accounts`), which made
+`length(:accounts)` mean "the size of the accounts constant" while `status = :idle`
+meant "the literal atom `:idle`". Those two readings of the same syntax cannot be
+separated in general, so the DSL now marks constants with `^`:
+
+```elixir
+constant :accounts
+constant :max_balance
+
+require balances[from] >= amount               # `balances` is a variable
+require MapSet.member?(^accounts, from)        # `^accounts` is a constant
+let total = ^max_balance * MapSet.size(^accounts)
+status = :idle                                 # `:idle` is a literal atom
+```
+
+The pin operator already means "the value from outside this scope" everywhere else in
+Elixir, so it carries the right connotation, and `^` is unambiguous to the macro:
+constants are the pinned names, atoms are always literals.
+
+Referencing an undeclared constant is a compile error (§7).
+
+### 1.2 Variables are bare, and their meaning depends on the block
+
+A bare identifier matching a declared `variable` resolves against a state. *Which*
+state depends on the block:
+
+| Block | Bare variable reads | Assignment `name = expr` |
+|---|---|---|
+| `init` | — (nothing to read) | Defines the initial value |
+| `action` | The **pre-state** | Defines the **post-state** (§2) |
+| `invariant` | The state being checked | Not permitted |
+| `temporal` | The state at each point in the behavior | Not permitted |
+| `action_property` | **Not permitted** — use `old.` / `new.` (§4) | Not permitted |
+
+### 1.3 Locals use `let`
+
+Because `=` on a declared variable name means "assign the post-state" (§2), an
+intermediate value needs its own form:
+
+```elixir
+action :complete_transfer, params: [t: fn s -> s.pending end] do
+  require status == :transferring
+
+  let {to, amount} = t                        # a local binding
+  balances = update(balances, to, &(&1 + amount))   # a post-state assignment
+  pending  = delete(pending, t)
+end
+```
+
+`let` accepts any Elixir pattern. Locals may shadow nothing: `let` binding a name that
+is a declared variable or constant is a compile error.
+
+### 1.4 Reserved names
+
+`state`, `old` and `new` are implicitly bound in some blocks (§4, and Layer 1's blocks
+in `03-layer1-invariants.md`). Declaring a `variable` or `constant` with one of those names
+is a compile error rather than a subtle capture — the Raft example renames Raft's
+`state` to `srv_state` for exactly this reason.
+
+---
+
+## 2. An action block is a conjunction, not a sequence
+
+This is the rule most likely to surprise an Elixir programmer, and it is the one that
+makes the DSL mean what TLA+ means.
+
+An `action` body is a **simultaneous assignment** — the conjunction of a guard and a
+set of next-state equations — not a sequence of statements. Concretely:
+
+1. **Every right-hand side reads the pre-state.** Assignment order is irrelevant.
+2. **Every left-hand side writes the post-state.** Nothing is visible to another
+   right-hand side in the same block.
+3. **A variable not assigned is implicitly `UNCHANGED`.**
+4. **A variable may be assigned at most once.** Two assignments to one variable is a
+   compile error, not a last-write-wins.
+
+So this action:
+
+```elixir
+action :swap do
+  x = y
+  y = x
+end
+```
+
+swaps `x` and `y`. It does not set both to the old `y`. And this:
+
+```elixir
+action :broken do
+  x = 1
+  x = 2         # compile error: `x` assigned twice in action :broken
+end
+```
+
+does not compile.
+
+`let` bindings *are* sequential — they are ordinary Elixir — and a `let` may read
+earlier `let`s. Only state-variable assignment is simultaneous.
+
+### 2.1 Guards
+
+`require expr` is an enabling condition. All `require`s in a block are conjoined, and
+they are evaluated against the **pre-state** with the action's params bound. An action
+whose guard is false in a state is *not enabled* there and contributes no successor.
+
+`require` may appear anywhere in the block; it is not positional. Guards are always
+evaluated before any assignment, regardless of where they are written.
+
+---
+
+## 3. Nondeterminism comes from `params:`, and only from `params:`
+
+An earlier draft had two nondeterminism mechanisms: `params:` for constant-drawn
+values, and `choose/1,2` inside the block for state-drawn values. That second one was
+both redundant and misnamed — `CHOOSE` in TLA+ is *deterministic* Hilbert choice, so a
+`choose` that forks the search contradicts the notation ExTLA is modeled on. Worse, it
+cannot work: a plain function returning one element cannot produce several successors.
+
+There is now **one** mechanism. A `params:` entry may draw from:
+
+| Form | Meaning | Example |
+|---|---|---|
+| A constant | Each element of the constant set | `from: ^accounts` |
+| A literal range or list | Each element | `amount: 1..10`, `mode: [:a, :b]` |
+| A **state function** | Each element of the set the function returns for the pre-state | `t: fn s -> s.pending end` |
+
+**Params bind left to right**, and a state function may take a second argument
+receiving the params bound before it. This keeps the combinatorial explosion down where
+one param constrains another — filter in the generator rather than generating every
+combination and rejecting most of them in the guard:
+
+```elixir
+# Generates |servers| x |messages| combinations, most rejected by the guard
+params: [s: ^servers, msg: fn st -> st.messages end]
+
+# Generates only the messages actually addressed to `s`
+params: [s: ^servers, msg: fn st, %{s: s} -> Enum.filter(st.messages, &(&1.to == s)) end]
+```
+
+Both are correct; the second is the one to write.
+
+The state-function form is what replaces `choose`. It is evaluated on the pre-state
+before the guard, and the checker generates one successor per element of the returned
+enumerable — the direct encoding of TLA+'s `\E t \in pending : …`:
+
+```elixir
+# Before (did not work — `choose` cannot fork)
+action :complete_transfer do
+  require status == :transferring
+  {to, amount} = choose(pending)
+  …
+end
+
+# After — the branching is in `params:`, the body is deterministic
+action :complete_transfer, params: [t: fn s -> s.pending end] do
+  require status == :transferring
+  let {to, amount} = t
+  …
+end
+```
+
+The payoff is that **an action body is now a pure deterministic function of
+`(pre_state, params)`**. That single property is what makes successor generation,
+enabling checks, symmetry canonicalization (`04-layer2-model-checker.md` §Symmetry) and
+Layer 3's refinement check (`05-layer3-conformance.md` §1) all straightforward. Any
+construct that reintroduces in-body branching must be rejected for the same reason.
+
+A state function returning an empty enumerable disables the action in that state,
+exactly as a false guard would.
+
+### 3.1 `choose/2` keeps its TLA+ meaning
+
+`TLA.Spec.Helpers.choose/2` and `TLA.Set.choose/2` are **deterministic**: they return
+the same element for the same set and predicate, and raise if none satisfies it. That
+is TLA+'s `CHOOSE`. They do not branch, and they are not a nondeterminism mechanism.
+
+---
+
+## 4. `action_property` uses `old` and `new`
+
+An action property constrains a transition, so bare variable names would be ambiguous.
+The block binds two maps and requires explicit qualification:
+
+```elixir
+action_property :money_is_conserved do
+  sum(values(old.balances)) + pending_total(old) ==
+    sum(values(new.balances)) + pending_total(new)
+end
+```
+
+A bare declared-variable name inside `action_property` is a compile error with a
+message naming `old.`/`new.`. Constants are still written `^name` and mean the same
+thing in both states.
+
+This replaces the earlier `fn old, new -> … end` form. `invariant` and
+`action_property` now have **one** shape between Layer 1 and Layer 2 — a bare boolean
+expression — rather than the two shapes the earlier drafts had (`fn state -> … end` in
+Layer 1, a bare expression in Layer 2).
+
+---
+
+## 5. `invariant` and `temporal`
+
+Both take a bare boolean expression over variables and `^constants`.
+
+```elixir
+invariant :no_negative_balance do
+  Enum.all?(values(balances), &(&1 >= 0))
+end
+
+temporal :eventually_done do
+  eventually(always(status == :done))
+end
+```
+
+Inside `temporal`, the operators `always/1`, `eventually/1` and `~>/2` (leads-to) are
+available and compose. Everything else in the block is an ordinary state predicate.
+
+### 5.1 The supported temporal fragment is bounded — say so
+
+ExTLA does **not** implement full LTL. The supported fragment is:
+
+```
+formula  ::= always(formula) | eventually(formula) | pred ~> pred | pred
+pred     ::= any boolean expression over variables and constants
+```
+
+There is no negation, conjunction or disjunction *of formulas* (a `pred` may of course
+contain `not`/`and`/`or`). This is deliberate: the fragment above covers the properties
+people actually write, and it is checkable by SCC analysis without constructing a Büchi
+automaton. A formula outside the fragment is a compile error naming the unsupported
+operator — never a silently weaker check.
+
+If the fragment is ever widened, it is widened here first, in this section, and the
+checker follows.
+
+---
+
+## 6. Terms permitted in state
+
+A spec variable's value MUST be deterministically serializable, because state identity
+is a hash of that value (`01-foundation.md` §`TLA.Fingerprint`). Permitted: atoms,
+integers, binaries, tuples, lists, maps, `MapSet`s, and structs built from those.
+
+**Forbidden in spec state:** pids, references, ports, funs, and floats. The first four
+have no stable identity across runs; floats introduce `-0.0`/`NaN` comparison hazards
+that make two "equal" states hash differently. Assigning one is a runtime error from
+the checker naming the variable, not a silent mis-fingerprint.
+
+---
+
+## 7. Compile-time validation
+
+Every rule above is checked when the spec module compiles, because the DSL already
+accumulates every declaration it needs. A spec either means something precise or does
+not compile.
+
+| Diagnostic | Trigger |
+|---|---|
+| `undeclared variable` | `=` assigns, or an expression reads, a name that is not a `variable` |
+| `undeclared constant` | `^name` where no `constant :name` exists |
+| `variable assigned twice` | Two assignments to one variable in one action (§2) |
+| `assignment in invariant/temporal` | `=` on a variable outside `init`/`action` |
+| `bare variable in action_property` | §4 |
+| `let shadows a declared name` | §1.3 |
+| `unknown action in fairness` | `fairness :weak, [:typo]` |
+| `unsupported temporal operator` | A formula outside the §5.1 fragment |
+| `param draws from a non-set` | A `params:` entry that is not a constant, range, list, or 1- or 2-arity function |
+| `reserved name` | A `variable`/`constant` named `state`, `old` or `new` (§1.4) |
+| `forbidden state term` | A pid, reference, port, fun or float assigned to a variable (§6) |
+
+Diagnostics carry the spec module, the declaration name, and the offending line. The
+quality of these messages is most of the difference between a DSL people adopt and one
+they bounce off; they are a deliverable, not a nicety.
+
+---
+
+## 8. Worked example
+
+The transfer protocol from `04-layer2-model-checker.md`, in the settled syntax:
+
+```elixir
+defmodule Specs.TransferProtocol do
+  use TLA.Spec
+
+  constant :accounts
+  constant :max_balance
+
+  variable :balances, type: [^accounts ~> 0..^max_balance]
+  variable :status,   type: [:idle, :transferring, :done, :error]
+  variable :pending,  type: :set
+  variable :log,      type: :seq
+
+  init do
+    balances = for_each(^accounts, fn _ -> ^max_balance end)
+    status   = :idle
+    pending  = set()
+    log      = seq()
+  end
+
+  action :begin_transfer,
+    params: [from: ^accounts, to: ^accounts, amount: 1..^max_balance] do
+    require from != to
+    require status == :idle
+    require balances[from] >= amount
+
+    balances = update(balances, from, &(&1 - amount))
+    pending  = put(pending, {to, amount})
+    status   = :transferring
+  end
+
+  # `params:` draws from the pre-state — this is `\E t \in pending`
+  action :complete_transfer, params: [t: fn s -> s.pending end] do
+    require status == :transferring
+
+    let {to, amount} = t
+    balances = update(balances, to, &(&1 + amount))
+    pending  = delete(pending, t)
+    status   = if size(delete(pending, t)) == 0, do: :done, else: :transferring
+    log      = append(log, %{to: to, amount: amount})
+  end
+
+  action :fail_transfer do
+    require status == :transferring
+    status  = :error
+    pending = set()
+  end
+
+  action :reset do
+    require status in [:done, :error]
+    status = :idle
+  end
+
+  invariant :conservation_of_money do
+    let total = sum(values(balances)) + sum(pending, fn {_to, amt} -> amt end)
+    total == ^max_balance * MapSet.size(^accounts)
+  end
+
+  action_property :no_phantom_credit do
+    Enum.all?(^accounts, fn a ->
+      new.balances[a] <= old.balances[a] or
+        Enum.any?(old.pending, fn {to, _} -> to == a end)
+    end)
+  end
+
+  temporal :no_stuck_pending do
+    always((status == :transferring) ~> (status in [:done, :error]))
+  end
+
+  fairness :weak, [:complete_transfer, :reset]
+  fairness :strong, [:fail_transfer]
+end
+```
+
+Note that `conservation_of_money` now *fails* — `fail_transfer` discards `pending`
+without refunding it. That is the intended counterexample in
+`04-layer2-model-checker.md`'s trace example, and it is reachable in this spec.
