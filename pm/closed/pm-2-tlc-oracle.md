@@ -3,8 +3,10 @@ id: pm-2
 title: "TLC oracle: bin/tlc-expected, the die_hard corpus entry, and the verify stage"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 2
 gitlab_synced: true
+merge_request: 3
 ---
 
 ## Problem
