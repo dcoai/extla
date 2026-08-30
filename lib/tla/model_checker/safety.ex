@@ -32,10 +32,12 @@ defmodule TLA.ModelChecker.Safety do
   @doc """
   Check all action properties against a transition.
   """
-  @spec check_action_properties(Compiled.t(), map(), State.t(), State.t()) ::
+  @spec check_action_properties(Compiled.t(), map(), State.t(), State.t(), :all | [atom()]) ::
           :ok | {:violation, atom()}
-  def check_action_properties(spec, constants, old_state, new_state) do
-    Enum.find_value(spec.action_properties, :ok, fn property ->
+  def check_action_properties(spec, constants, old_state, new_state, only \\ :all) do
+    spec.action_properties
+    |> selected(only)
+    |> Enum.find_value(:ok, fn property ->
       if property.predicate.(constants, old_state, new_state),
         do: nil,
         else: {:violation, property.name}
@@ -58,11 +60,15 @@ defmodule TLA.ModelChecker.Safety do
   end
 
   @doc """
-  The invariants a run with `only` will actually check.
-  """
-  @spec selected([Compiled.invariant_def()], :all | [atom()]) :: [Compiled.invariant_def()]
-  def selected(invariants, :all), do: invariants
+  The declarations a run with `only` will actually check.
 
-  def selected(invariants, names) when is_list(names),
-    do: Enum.filter(invariants, &(&1.name in names))
+  Selection exists for the differential corpus: TLC halts at the first violation
+  and so does ExTLA, so reproducing TLC's per-invariant report means one run per
+  invariant — and a run measuring the state count has to check nothing at all.
+  """
+  @spec selected([map()], :all | [atom()]) :: [map()]
+  def selected(declarations, :all), do: declarations
+
+  def selected(declarations, names) when is_list(names),
+    do: Enum.filter(declarations, &(&1.name in names))
 end

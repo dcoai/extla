@@ -33,7 +33,8 @@ defmodule TLA.ModelChecker do
           # Which of the spec's invariants to check; `:all` by default. The
           # differential corpus uses it to reproduce TLC's per-invariant reports
           # from one spec, the way a TLC `.cfg` selects INVARIANTs.
-          optional(:invariants) => :all | [atom()]
+          optional(:invariants) => :all | [atom()],
+          optional(:action_properties) => :all | [atom()]
         }
 
   @type result :: %{
@@ -68,7 +69,8 @@ defmodule TLA.ModelChecker do
     verify_symmetry: false,
     state_constraint: nil,
     fingerprint_bits: 64,
-    invariants: :all
+    invariants: :all,
+    action_properties: :all
   }
 
   @doc """
@@ -271,7 +273,13 @@ defmodule TLA.ModelChecker do
 
       run = %{run | graph: StateGraph.count_transition(run.graph), found: run.found + 1}
 
-      case Safety.check_action_properties(run.spec, run.config.constants, state, next) do
+      case Safety.check_action_properties(
+             run.spec,
+             run.config.constants,
+             state,
+             next,
+             run.config.action_properties
+           ) do
         {:violation, name} ->
           {graph, next_id, _} = StateGraph.add_state(run.graph, next, id, action.name, params)
           run = %{run | graph: graph}

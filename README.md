@@ -57,16 +57,26 @@ mix tla.replay   MyApp.Counter     # replay a counterexample against real code
 
 ## Status
 
-**Phase 1 is done: a spec written in the DSL compiles, and its safety properties are
-checked correctly.** `mix tla.check MySpec` explores the state space breadth-first,
-reports the shortest counterexample when it finds one, and prints what the run actually
-exercised.
+**Every Phase 1 component exists; the Phase 1 acceptance gate is half met.**
+`mix tla.check MySpec` explores the state space breadth-first, reports the shortest
+counterexample when it finds one, and prints what the run actually exercised.
 
 The acceptance criterion is not "the tests pass" but [D-9](spec/08-decisions.md): the
-checker must agree with TLC. It does — on `die_hard`, ExTLA and TLC agree on the
-distinct-state count (16), the search depth (8), every invariant, and the shortest
-counterexample, which is the same six-step trace action for action. The oracle landed
-before the checker did, so that agreement has held from the checker's first run.
+checker must agree with TLC on **every** spec in the differential corpus. Three of six
+entries are in, and on all three ExTLA and TLC agree exactly — distinct states, search
+depth, deadlock, every invariant, and for `die_hard` the shortest counterexample, which
+is the same six-step trace action for action.
+
+| Entry | Distinct states | Depth | Agreement |
+|---|---|---|---|
+| `die_hard` | 16 | 8 | ✅ including the counterexample |
+| `two_phase_commit` | 288 | 11 | ✅ |
+| `distributed_lock` | 34 | 7 | ✅ |
+
+Three entries remain. Saying "Phase 1 is done" before they land would be the kind of
+claim this project exists not to make: the oracle landed before the checker so that the
+agreement could be measured rather than assumed, and half a corpus is half a
+measurement.
 
 | Piece | State |
 |---|---|

@@ -3,7 +3,9 @@ id: pm-10
 title: "TLA.Coverage, mix tla.check, TLA.Spec.Test — Phase 1 complete"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 10
+merge_request: 10
 gitlab_synced: true
 ---
 
