@@ -13,3 +13,7 @@ erl_crash.dump
 
 # macOS
 .DS_Store
+
+# Editor backups
+*~
+.*.swp
