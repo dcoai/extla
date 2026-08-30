@@ -60,6 +60,7 @@ state depends on the block:
 | `action` | The **pre-state** | Defines the **post-state** (§2) |
 | `invariant` | The state being checked | Not permitted |
 | `temporal` | The state at each point in the behavior | Not permitted |
+| `terminal` | The state being classified (§5.3) | Not permitted |
 | `action_property` | **Not permitted** — use `old.` / `new.` (§4) | Not permitted |
 
 ### 1.3 Locals use `let`
@@ -86,6 +87,34 @@ is a declared variable or constant is a compile error.
 in `03-layer1-invariants.md`). Declaring a `variable` or `constant` with one of those names
 is a compile error rather than a subtle capture — the Raft example renames Raft's
 `state` to `srv_state` for exactly this reason.
+
+### 1.5 Type annotations
+
+`variable :name, type: t` takes a type expression — a small language of its own,
+distinct from the block DSL. It is **stored quoted** and resolved at model-check time
+against the constant assignments, because nearly every useful type mentions a
+constant (`0..^max_val`, `[^servers ~> :set]`) that has no value when the module
+compiles.
+
+| Form | Meaning |
+|---|---|
+| `:atom`, `0`, `"s"` | Exactly that literal |
+| `[:a, :b]` | One of the listed literals |
+| `a..b` | An integer in the range; either bound may be `^const` |
+| `^name` | Any element of the constant (which must be a set) |
+| `t1 \| t2` | Union — a value of either type |
+| `{t1, t2, …}` | A tuple of that arity, element-wise |
+| `[dom ~> rng]` | A map (TLA+ function) whose keys are exactly `dom` and whose values are in `rng` |
+| `:set`, `:seq` | Any `MapSet` / any list; element types unconstrained |
+
+Two operators are overloaded and a reader should know it: inside `type:`, `~>` is the
+function arrow and `|` is union; inside a `temporal` block `~>` is leads-to. The two
+never occur in the same position, so the macro is never in doubt.
+
+Types are checked as an implicit invariant named `:type_ok` in every reachable state
+— which is why the coverage report lists one without the spec declaring it — and
+they are the domain `TLA.Simulation.Generator` draws from. They do not restrict
+exploration: a state outside its type is a reported violation, not a pruned branch.
 
 ---
 
@@ -252,17 +281,78 @@ ExTLA does **not** implement full LTL. The supported fragment is:
 
 ```
 formula  ::= always(formula) | eventually(formula) | pred ~> pred | pred
+           | Enum.all?(^constant, fn x -> formula end)
 pred     ::= any boolean expression over variables and constants
 ```
 
 There is no negation, conjunction or disjunction *of formulas* (a `pred` may of course
-contain `not`/`and`/`or`). This is deliberate: the fragment above covers the properties
-people actually write, and it is checkable by SCC analysis without constructing a Büchi
-automaton. A formula outside the fragment is a compile error naming the unsupported
-operator — never a silently weaker check.
+contain `not`/`and`/`or`). The one exception is the quantifier on the second line:
+`Enum.all?` over a **constant** with a formula body is `\A x \in C : F(x)`, a
+conjunction of instantiated formulas that the checker checks one at a time — each
+instance is itself in the fragment, so nothing new is needed to check it. Every
+per-process property in `07-examples.md` is written this way. The set must be a
+constant or a literal; a state-dependent set would make the formula's shape depend on
+the state.
+
+This is deliberate: the fragment above covers the properties people actually write,
+and it is checkable by SCC analysis without constructing a Büchi automaton. A formula
+outside the fragment is a compile error naming the unsupported operator — never a
+silently weaker check.
+
+`P ~> Q` already means `always(P implies eventually(Q))`, so `always(P ~> Q)` is
+accepted and means the same thing as `P ~> Q`; the compiler collapses it rather than
+rejecting a form TLA+ users write out of habit.
 
 If the fragment is ever widened, it is widened here first, in this section, and the
 checker follows.
+
+### 5.2 Fairness is declared per action, or per parameter binding
+
+`fairness :weak, [:done]` attaches WF to the whole action: if *some* binding of
+`done` is continuously enabled, *some* binding is eventually taken. That is
+`WF_vars(Done)` and it is too weak for any per-process property — it is consistent
+with one process requesting forever while the others take turns. TLA+ writes
+`\A p \in Procs : WF_vars(Acquire(p))`, and so does ExTLA:
+
+```elixir
+fairness :strong, acquire_lock: [:p]                   # SF for each value of p, separately
+fairness :weak, release_lock: [:p], return_to_idle: [:p]
+fairness :weak, [:done, :reset]                        # whole-action form, unchanged
+```
+
+The named params must be a **prefix** of the action's params and must draw from a
+constant or a literal (§3) — a state-drawn param cannot be quantified over, because
+the set it ranges over changes from state to state. Both are compile errors (§7).
+The checker expands `acquire_lock: [:p]` into `|^processes|` separate constraints
+once the constants are known, each with its own `ENABLED` computed over the
+remaining params (`01-foundation.md` §`TLA.Temporal.enabled?/4`).
+
+Without this form, `no_starvation` in `07-examples.md` Example 1 is unprovable.
+
+### 5.3 Terminal states are declared, not inferred
+
+A reachable state with no enabled action is a **deadlock**, and the checker reports
+it as a violation by default. Some specs terminate on purpose — a bounded producer
+that has produced `^max_items`, an election whose term bound is exhausted. Those
+states are declared:
+
+```elixir
+terminal :all_items_consumed do
+  produced_count == ^max_items and len(buffer) == 0
+end
+```
+
+A successor-less state that satisfies a `terminal` predicate is not a deadlock.
+Nothing else changes: invariants are still checked there, no action is disabled by
+it, and for liveness it is a state that stutters forever — so a leads-to whose
+consequent has not held by then is violated there, which is the correct verdict. A
+`terminal` that admits a state which still has an enabled action is reported by
+coverage as `terminal_but_live`; it is not an error, but it almost always means the
+predicate is broader than the end state it was written for.
+
+`check_deadlock: false` remains available as the blunt instrument. Prefer the
+declaration: it says *which* states are meant to be final, and keeps deadlock
+detection on for all the others.
 
 ---
 
@@ -294,6 +384,9 @@ not compile.
 | `bare variable in action_property` | §4 |
 | `let shadows a declared name` | §1.3 |
 | `unknown action in fairness` | `fairness :weak, [:typo]` |
+| `fairness over a state-drawn param` | `fairness :weak, complete_transfer: [:t]` where `t` draws from a state function (§5.2) |
+| `fairness params not a prefix` | The per-binding params are not a leading prefix of the action's params (§5.2) |
+| `ill-formed type` | A `type:` expression outside the §1.5 grammar |
 | `unsupported temporal operator` | A formula outside the §5.1 fragment |
 | `param draws from a non-set` | A `params:` entry that is not a constant, range, list, or 1- or 2-arity function |
 | `reserved name` | A `variable`/`constant` named `state`, `old` or `new` (§1.4) |
@@ -374,7 +467,7 @@ defmodule Specs.TransferProtocol do
   end
 
   temporal :no_stuck_pending do
-    always((status == :transferring) ~> (status in [:done, :error]))
+    (status == :transferring) ~> (status in [:done, :error])
   end
 
   fairness :weak, [:complete_transfer, :reset]

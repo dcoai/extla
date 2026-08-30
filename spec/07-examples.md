@@ -24,7 +24,7 @@ defmodule Specs.DistributedLock do
 
   variable :owner,   type: [^resources ~> (^processes | :none)]
   variable :waiting, type: [^resources ~> :set]
-  variable :pc,      type: [^processes ~> [:idle, :requesting, :holding, :releasing]]
+  variable :pc,      type: [^processes ~> (:idle | :requesting | {:holding, ^resources} | :releasing)]
 
   init do
     owner   = for_each(^resources, fn _ -> :none end)
@@ -46,11 +46,11 @@ defmodule Specs.DistributedLock do
 
     owner   = update(owner, r, fn _ -> p end)
     waiting = update(waiting, r, &delete(&1, p))
-    pc      = update(pc, p, fn _ -> :holding end)
+    pc      = update(pc, p, fn _ -> {:holding, r} end)
   end
 
   action :release_lock, params: [p: ^processes, r: ^resources] do
-    require pc[p] == :holding
+    require pc[p] == {:holding, r}
     require owner[r] == p
 
     owner = update(owner, r, fn _ -> :none end)
@@ -65,12 +65,15 @@ defmodule Specs.DistributedLock do
 
   # ── Safety ──
 
-  invariant :mutual_exclusion, """
-  At most one process holds any given resource at a time.
-  This is THE critical safety property of a lock service.
-  """ do
+  # Stated over `pc`, which is per PROCESS, so two processes can in principle
+  # both be `{:holding, r}` — that is what gives this invariant content. An
+  # earlier draft counted processes equal to `owner[r]`, a single-valued field,
+  # which can never exceed one: the property was a tautology of the model's
+  # type, and `near_misses` would have reported 0 for it.
+  invariant :mutual_exclusion,
+    desc: "at most one process holds any given resource — THE lock property" do
     Enum.all?(^resources, fn r ->
-      owner[r] == :none or Enum.count(^processes, fn p -> owner[r] == p end) == 1
+      Enum.count(^processes, fn p -> pc[p] == {:holding, r} end) <= 1
     end)
   end
 
@@ -82,7 +85,10 @@ defmodule Specs.DistributedLock do
 
   invariant :holding_means_owner do
     Enum.all?(^processes, fn p ->
-      pc[p] != :holding or Enum.any?(^resources, fn r -> owner[r] == p end)
+      case pc[p] do
+        {:holding, r} -> owner[r] == p
+        _ -> true
+      end
     end)
   end
 
@@ -97,23 +103,26 @@ defmodule Specs.DistributedLock do
 
   # ── Liveness ──
 
-  temporal :no_starvation, """
-  Every requesting process eventually acquires the lock.
-  Requires strong fairness because lock availability is intermittent.
-  """ do
+  temporal :no_starvation,
+    desc: "every requesting process eventually acquires; needs SF per process" do
     Enum.all?(^processes, fn p ->
-      always((pc[p] == :requesting) ~> (pc[p] == :holding))
+      (pc[p] == :requesting) ~> match?({:holding, _}, pc[p])
     end)
   end
 
   temporal :lock_eventually_released do
     Enum.all?(^processes, fn p ->
-      always((pc[p] == :holding) ~> (pc[p] == :idle))
+      match?({:holding, _}, pc[p]) ~> (pc[p] == :idle)
     end)
   end
 
-  fairness :weak, [:acquire_lock, :release_lock, :return_to_idle]
-  fairness :strong, [:request_lock]
+  # PER-BINDING fairness (02-dsl-semantics.md §5.2). Whole-action
+  # `fairness :weak, [:acquire_lock]` only guarantees that SOMEBODY acquires,
+  # which is consistent with p1 requesting forever; `no_starvation` needs the
+  # constraint for each p. Strong, because a lock's availability is
+  # intermittent: it is free, another process takes it, it is free again.
+  fairness :strong, acquire_lock: [:p]
+  fairness :weak, release_lock: [:p], return_to_idle: [:p]
 end
 ```
 
@@ -139,13 +148,14 @@ defmodule MyApp.LockServer do
 
     defp map_process_state(:idle), do: :idle
     defp map_process_state(:waiting), do: :requesting
-    defp map_process_state({:locked, _resource}), do: :holding
+    defp map_process_state({:locked, r}), do: {:holding, r}
     defp map_process_state(:unlocking), do: :releasing
 
-    # The params matter now: `check_step!/5` applies the named action WITH these
-    # params and compares its post-state to the implementation's. An earlier
-    # draft passed `%{}` here, which was harmless only because the action was
-    # never applied.
+    # The params matter: `check_step!/5` applies the named action WITH these
+    # params and compares its post-state to the implementation's. They are fully
+    # bound here because the message carries them; a mapping may leave a param
+    # unbound when the implementation resolves the choice itself, and the check
+    # then searches for a binding (05-layer3-conformance.md §TLA.GenServer.Runtime).
     def abstract_action({:lock, pid, resource}),
       do: {:request_lock, %{p: pid, r: resource}}
     def abstract_action({:unlock, pid, resource}),
@@ -203,7 +213,7 @@ end
 > **This implementation does not refine the spec, and Layer 3 now says so.**
 >
 > `handle_call({:lock, …})` on a free lock goes straight to `{:locked, resource}` —
-> abstractly, `pc[p] = :holding` — in one step. The spec's `request_lock` produces
+> abstractly, `pc[p] = {:holding, r}` — in one step. The spec's `request_lock` produces
 > `pc[p] = :requesting` and requires a separate `acquire_lock`. So `check_step!/5`
 > reports `:diverged` on the very first acquisition, with a diff on `pc` and `owner`.
 >
@@ -227,7 +237,8 @@ defmodule MyApp.LockServerTest do
         processes: MapSet.new([:p1, :p2, :p3]),
         resources: MapSet.new([:r1, :r2])
       },
-      symmetry: [:processes, :resources],   # 3! * 2! fewer states
+      symmetry: [:processes, :resources],   # 3! * 2! fewer states...
+      verify_symmetry: true,                # ...and prove the declaration sound on this model
       check_liveness: false,
       strict_coverage: true
     }
@@ -389,12 +400,17 @@ defmodule Specs.RaftElection do
     voted_for    = update(voted_for, s, fn _ -> :none end)
   end
 
+  # A split vote at `^max_term` with the network drained leaves every server a
+  # candidate with no `timeout` left. That is the model bound, not a Raft
+  # deadlock (02-dsl-semantics.md §5.3).
+  terminal :term_bound_exhausted do
+    size(messages) == 0 and
+      Enum.all?(^servers, fn s -> current_term[s] == ^max_term end)
+  end
+
   # ── Safety ──
 
-  invariant :election_safety, """
-  At most one leader per term. The fundamental safety property of Raft
-  leader election.
-  """ do
+  invariant :election_safety, desc: "at most one leader per term — Raft's fundamental property" do
     Enum.all?(0..^max_term, fn term ->
       Enum.count(^servers, fn s ->
         srv_state[s] == :leader and current_term[s] == term
@@ -435,6 +451,47 @@ Two notes on this spec:
 - `^max_term` is a **model bound**, not part of Raft. The coverage report will show
   `timeout` becoming disabled once every server reaches it; that is the bound working,
   not a bug, and it is why `bounded_by` appears in `TLA.Coverage`.
+- `eventually_elect_leader` is **violated** in this bounded model, and the corpus
+  records it as an expected violation: a split vote at `^max_term` ends in the
+  `term_bound_exhausted` terminal state with no leader. The counterexample is the
+  bound, not Raft — the real protocol times out again. TLC's Raft spec has the same
+  property only under a constraint. The test below checks safety exhaustively and
+  asserts that the liveness counterexample ends in that terminal state, which is more
+  useful than deleting a property the model refutes.
+
+### Tests
+
+```elixir
+defmodule Specs.RaftElectionTest do
+  use ExUnit.Case
+  import TLA.Spec.Test
+
+  @constants %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2}
+
+  test "election safety holds" do
+    assert_spec Specs.RaftElection, %{
+      constants: @constants,
+      symmetry: [:servers],
+      verify_symmetry: true,
+      check_liveness: false,
+      strict_coverage: true
+    }
+  end
+
+  test "leader election is refuted by the term bound, and only by it" do
+    result =
+      TLA.ModelChecker.run(Specs.RaftElection, %{constants: @constants, check_liveness: true})
+
+    assert result.status == :violation
+    assert result.violation.type == :liveness
+    assert result.violation.property == :eventually_elect_leader
+
+    last = List.last(result.violation.states)
+    assert Enum.all?(last.current_term, fn {_s, t} -> t == 2 end)
+    assert MapSet.size(last.messages) == 0
+  end
+end
+```
 
 ---
 
@@ -542,23 +599,44 @@ defmodule Specs.BoundedBuffer do
   end
 
   temporal :consumers_make_progress do
-    always((len(buffer) > 0) ~> (consumed_count > 0))
+    (len(buffer) > 0) ~> (consumed_count > 0)
   end
 
   temporal :no_producer_starvation do
     Enum.all?(^producers, fn p ->
-      always((producer_pc[p] == :waiting) ~> (producer_pc[p] == :ready))
+      (producer_pc[p] == :waiting) ~> (producer_pc[p] == :ready)
     end)
   end
 
+  # The bound shows through here. Once `^max_items` have been produced the
+  # buffer drains and every consumer parks in :waiting for good — correctly, in
+  # the spec's own terms. A starvation-freedom property has to except that end
+  # state, or it is refuted by the model bound rather than by the design.
+  # Compare the Raft example.
   temporal :no_consumer_starvation do
     Enum.all?(^consumers, fn c ->
-      always((consumer_pc[c] == :waiting) ~> (consumer_pc[c] == :ready))
+      (consumer_pc[c] == :waiting) ~>
+        (consumer_pc[c] == :ready or produced_count == ^max_items)
     end)
   end
 
-  fairness :weak, [:produce, :consume, :producer_done, :consumer_done,
-                   :producer_wake, :consumer_wake]
+  # Legitimate end state (02-dsl-semantics.md §5.3): everything produced and
+  # consumed, producers idle, consumers parked. Without this the checker reports
+  # a deadlock — and it would be right to, since the spec had not said this
+  # state was intended.
+  terminal :all_items_consumed do
+    produced_count == ^max_items and consumed_count == ^max_items and
+      Enum.all?(^producers, fn p -> producer_pc[p] == :ready end) and
+      Enum.all?(^consumers, fn c -> consumer_pc[c] == :waiting end)
+  end
+
+  fairness :weak, [:produce, :consume, :producer_done, :consumer_done]
+  # A waiting producer's wake is continuously enabled once the buffer stays
+  # below capacity, which it does after the last item: weak suffices. A waiting
+  # consumer's wake is enabled only while the buffer is non-empty, which the
+  # other consumers keep undoing: strong, per consumer.
+  fairness :weak, producer_wake: [:p]
+  fairness :strong, consumer_wake: [:c]
 end
 ```
 
@@ -661,7 +739,7 @@ defmodule Specs.Counter do
   end
 
   temporal :always_returns_to_ready do
-    always((status == :incrementing) ~> (status == :ready))
+    (status == :incrementing) ~> (status == :ready)
   end
 
   fairness :weak, [:done]

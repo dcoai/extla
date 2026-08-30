@@ -27,20 +27,8 @@ defmodule TLA.State do
 
   @type behavior :: [t(), ...]
 
-  @type trace :: %{
-    states: [t()],
-    length: non_neg_integer(),
-    violation: violation() | nil
-  }
-
-  @type violation :: %{
-    type: :invariant | :action_property | :temporal | :deadlock,
-    name: atom(),
-    message: String.t(),
-    state_index: non_neg_integer(),
-    pre_state: t() | nil,
-    post_state: t() | nil
-  }
+  # A counterexample is `TLA.Trace.t()` (04-layer2-model-checker.md §TLA.Trace).
+  # An earlier draft defined a second `trace` type here; one concept, one type.
 end
 ```
 
@@ -167,14 +155,23 @@ defmodule TLA.Temporal do
   def diamond_action(behavior, action, vars)
 
   @doc """
-  ENABLED: returns true if there exists a post-state such that the
-  action is satisfied from the given pre-state.
+  ENABLED: true if the action has at least one legal successor from this state —
+  some params combination for which every param generator is non-empty and the
+  guard holds (02-dsl-semantics.md §2.1, §3).
 
-  In model checking, this is evaluated against the known state graph.
-  TLA+ equivalent: ENABLED Action
+  Enabledness is a function of the action's params and guard alone. It does NOT
+  consult the state graph — an earlier draft took a `state_graph` argument, but
+  the graph records reachable successors, not enabledness, and a parent-pointer
+  graph (04-layer2-model-checker.md §State Graph) records no successors at all.
+  The liveness checker records the result of this function per state, as a bit
+  per fairness constraint, while the state is materialized during expansion.
+
+  `binding` restricts the check to one binding of the leading params, for
+  per-binding fairness (02-dsl-semantics.md §5.2); `%{}` means any binding.
+  TLA+ equivalent: ENABLED Action, or ENABLED Action(p) with a binding.
   """
-  @spec enabled?(TLA.State.t(), action_predicate(), state_graph :: term()) :: boolean()
-  def enabled?(state, action, state_graph)
+  @spec enabled?(TLA.State.t(), TLA.Spec.Compiled.action_def(), constants :: map(), binding :: map()) :: boolean()
+  def enabled?(state, action, constants, binding \\ %{})
 end
 ```
 
@@ -383,7 +380,7 @@ defmodule TLA.Fingerprint do
   A fingerprint is the truncated SHA-256 of the state's canonical binary encoding.
   """
 
-  @type t :: <<_::64>>
+  @type t :: <<_::64>> | <<_::128>>
 
   @doc """
   Canonical binary encoding of a state.
@@ -470,17 +467,32 @@ defmodule TLA.Config do
      `Mix.env()` evaluated at runtime, which raises `UndefinedFunctionError` in any
      assembled release. Compile-time resolution removes the dependency entirely.
 
-  Changing the mode requires recompilation. That is the intended trade: the production
-  default is zero code, not cheap code.
+  Changing the mode changes what the instrumented modules compile to, and Mix knows
+  it: `compile_env` registers a compile-time dependency on the config key in the
+  CALLING module, so a `config :extla, mode: ...` edit recompiles exactly those
+  modules. That is the intended trade: the production default is zero code, not
+  cheap code.
+
+  The `compile_env` call is inside the `quote`, not in the macro body. In the body
+  it would run once, while ExTLA itself compiles — baking the value into the
+  dependency's build and attaching the config dependency to `TLA.Config` instead of
+  to the user's module. Inside the quote it expands in the caller, which is where
+  both the value and the dependency belong.
   """
-  @spec mode() :: mode()
   defmacro mode do
-    Application.compile_env(:extla, :mode, default_mode())
+    default = default_mode()
+
+    quote do
+      Application.compile_env(:extla, :mode, unquote(default))
+    end
   end
 
-  # Evaluated during compilation of the caller, where Mix is available.
+  # Runs while the CALLER compiles (a macro body executes at expansion time), where
+  # Mix is normally present. `Code.ensure_loaded?/1`, not `function_exported?/3`:
+  # the latter answers false for a module that exists but is not loaded yet, which
+  # would silently select :enabled in a fresh VM.
   defp default_mode do
-    if function_exported?(Mix, :env, 0) and Mix.env() == :prod, do: :disabled, else: :enabled
+    if Code.ensure_loaded?(Mix) and Mix.env() == :prod, do: :disabled, else: :enabled
   end
 
   @doc """

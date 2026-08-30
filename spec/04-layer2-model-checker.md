@@ -49,6 +49,7 @@ defmodule TLA.Spec do
       Module.register_attribute(__MODULE__, :tla_action_properties, accumulate: true)
       Module.register_attribute(__MODULE__, :tla_temporals, accumulate: true)
       Module.register_attribute(__MODULE__, :tla_fairness, accumulate: true)
+      Module.register_attribute(__MODULE__, :tla_terminals, accumulate: true)
 
       @before_compile TLA.Spec
     end
@@ -74,17 +75,16 @@ defmodule TLA.Spec.DSL do
 
   Type annotations are used for:
   1. Documentation
-  2. Bounding the state space during model checking
+  2. The implicit `type_ok` invariant, checked in every reachable state
   3. Deriving StreamData generators (Layer 3)
 
-  ## Type Syntax
-  - Literal values: `:idle`, `0`, `"hello"`
-  - Ranges: `0..100`
-  - Sets: `[:a, :b, :c]` — value must be one of these
-  - Function type: `[domain ~> range]` — map from domain set to range
-  - Set type: `:set` — a MapSet
-  - Sequence type: `:seq` — an ordered list
-  - Reference to a constant: `^name`
+  They do NOT restrict exploration: a state outside its type is a reported
+  violation, not a pruned branch (08-decisions.md D-19).
+
+  The type grammar — literals, ranges, `^constant`, `|` union, tuples,
+  `[dom ~> rng]` functions, `:set`, `:seq` — is normative in
+  `02-dsl-semantics.md` §1.5. Types are stored quoted and resolved at
+  model-check time, because they mention constants.
   """
   defmacro variable(name, opts \\ [])
 
@@ -116,16 +116,26 @@ defmodule TLA.Spec.DSL do
   @doc """
   Define a state invariant (safety property).
   The block is a bare boolean expression over variables and `^constants`.
-  Checked in every reachable state.
+  Checked in every reachable state. `desc:` carries a description; it is an
+  option rather than a positional string for the reason given in
+  `03-layer1-invariants.md` §Macro Specification (08-decisions.md D-18).
   """
-  defmacro invariant(name, description \\ "", do: block)
+  defmacro invariant(name, opts \\ [], do: block)
 
   @doc """
   Define an action property (transition constraint).
   The block is a bare boolean expression; `old` and `new` are implicitly bound.
   A bare variable name is a compile error here — see `02-dsl-semantics.md` §4.
   """
-  defmacro action_property(name, description \\ "", do: block)
+  defmacro action_property(name, opts \\ [], do: block)
+
+  @doc """
+  Declare a legitimate end state (`02-dsl-semantics.md` §5.3). A successor-less
+  state satisfying any `terminal` predicate is not reported as a deadlock.
+  Nothing else changes: invariants are still checked there, and no action is
+  disabled by it.
+  """
+  defmacro terminal(name, opts \\ [], do: block)
 
   @doc """
   Define a temporal property (liveness).
@@ -134,21 +144,31 @@ defmodule TLA.Spec.DSL do
   `02-dsl-semantics.md` §5.1:
 
       formula ::= always(formula) | eventually(formula) | pred ~> pred | pred
+                | Enum.all?(^constant, fn x -> formula end)
 
-  There is no negation, conjunction or disjunction OF FORMULAS. A formula outside the
-  fragment is a compile error naming the unsupported operator — never a silently
-  weaker check.
+  There is no negation, conjunction or disjunction OF FORMULAS, other than the
+  quantifier on the last line — a conjunction of instantiated formulas, each
+  checked on its own. A formula outside the fragment is a compile error naming
+  the unsupported operator — never a silently weaker check.
   """
   defmacro temporal(name, opts \\ [], do: block)
 
   @doc """
-  Declare fairness constraints on actions.
-  - `:weak` — action must fire if continuously enabled
-  - `:strong` — action must fire if repeatedly enabled
+  Declare fairness constraints (`02-dsl-semantics.md` §5.2). Each entry is either
+  an action name — fairness on the action as a whole — or `action: [params]`,
+  fairness for each binding of those leading params separately:
 
-  Naming an action that does not exist is a compile error.
+      fairness :weak, [:done, :reset]                  # WF(Done), WF(Reset)
+      fairness :strong, acquire_lock: [:p]             # \\A p : SF(AcquireLock(p))
+      fairness :weak, release_lock: [:p], return_to_idle: [:p]
+
+  - `:weak` — must fire if continuously enabled
+  - `:strong` — must fire if repeatedly enabled
+
+  Naming an action that does not exist, params that are not a leading prefix of
+  the action's params, or a state-drawn param, is a compile error.
   """
-  defmacro fairness(type, action_names) when type in [:weak, :strong]
+  defmacro fairness(type, entries) when type in [:weak, :strong]
 end
 ```
 
@@ -254,8 +274,15 @@ defmodule TLA.Spec.Compiled do
     invariants: [invariant_def()],
     action_properties: [action_property_def()],
     temporals: [temporal_def()],
-    fairness: %{weak: [atom()], strong: [atom()]}
+    terminals: [terminal_def()],
+    fairness: [fairness_def()]
   }
+
+  @type terminal_def :: %{name: atom(), predicate: (TLA.State.t() -> boolean())}
+
+  # `per: []` is whole-action fairness. `per: [:p]` is one constraint per binding
+  # of `p`, expanded once the constants are known (02-dsl-semantics.md §5.2).
+  @type fairness_def :: %{kind: :weak | :strong, action: atom(), per: [atom()]}
 
   @type constant_def :: %{
     name: atom(),
@@ -268,11 +295,13 @@ defmodule TLA.Spec.Compiled do
     opts: keyword()
   }
 
-  @type type_expr ::
-    atom()                          # :set, :seq, literal atom
-    | Range.t()                     # 0..100
-    | [term()]                      # enumeration
-    | {atom(), type_expr(), type_expr()}  # {:function, domain, range}
+  # Stored QUOTED and resolved at model-check time against the constant
+  # assignments: nearly every real type mentions a constant (`0..^max_val`,
+  # `[^servers ~> :set]`) that has no value when the module compiles. An earlier
+  # draft typed this as concrete values (`Range.t()`, `[term()]`), which none of
+  # the corpus specs could have produced. The grammar is 02-dsl-semantics.md §1.5;
+  # the resolved type is checked as the implicit invariant `:type_ok`.
+  @type type_expr :: Macro.t()
 
   @type init_fn :: (constants :: map() -> TLA.State.t())
 
@@ -323,6 +352,9 @@ defmodule TLA.Spec.Compiled do
     | {:eventually, temporal_formula()}
     | {:leads_to, predicate(), predicate()}
     | {:predicate, (TLA.State.t() -> boolean())}
+    # ∀ over a constant: the set is resolved at check time, the body instantiated
+    # once per element, and each instance checked independently.
+    | {:for_all, (constants :: map() -> Enumerable.t()), (term() -> temporal_formula())}
 
   @doc """
   Extract the compiled spec from a module.
@@ -379,15 +411,17 @@ defmodule TLA.ModelChecker do
     constants: map(),                  # constant assignments
     max_states: pos_integer(),         # state limit (default: 1_000_000)
     workers: pos_integer(),            # parallel workers (default: schedulers)
-    check_deadlock: boolean(),         # check for states with no successors (default: true)
+    check_deadlock: boolean(),         # report a successor-less state that no `terminal`
+                                       # predicate admits (default: true)
     check_liveness: boolean(),         # check temporal properties (default: true)
     symmetry: [atom()] | nil,          # symmetric CONSTANT names (see §Symmetry)
+    verify_symmetry: boolean(),        # also run unreduced and compare (see §Symmetry)
     state_constraint: (TLA.State.t() -> boolean()) | nil, # see §State constraints
     fingerprint_bits: 64 | 128         # state identity width (default: 64)
   }
 
   @type result :: %{
-    status: :ok | :violation | :max_states_reached | :error,
+    status: :ok | :violation | :max_states_reached | :constrained | :error,
     states_found: non_neg_integer(),
     distinct_states: non_neg_integer(),
     transitions: non_neg_integer(),
@@ -476,6 +510,32 @@ defmodule TLA.StateGraph do
   The consequence to be aware of: a spec whose actions are expensive to apply
   pays that cost twice on the failing path. That is the right place for the
   cost to fall.
+
+  ## The liveness graph is a separate, opt-in structure
+
+  Parent pointers are a spanning TREE of the reachable graph: every node has one
+  in-edge, the tree is acyclic by construction, and no cycle of the real graph
+  is visible in it. Liveness checking is cycle detection. So the record above
+  cannot support it — an earlier draft specified `successors/2` as "derived from
+  the parent index" and `sccs/1` over that, which would find only trivial SCCs
+  and report every liveness property as holding.
+
+  When `check_liveness: true`, the checker therefore ALSO records, per state:
+
+      state_id => [{action, params, successor_id}]     # every out-edge
+      state_id => enabled_bits                         # one bit per fairness constraint
+
+  The edge table is what Tarjan runs over. The enabled bits are what fairness
+  needs: WF/SF are conditions on `ENABLED A` at each state of a cycle, which is
+  a function of the state — and the state is discarded. Recording the bits
+  while the state is materialized (`TLA.Temporal.enabled?/4`) costs one guard
+  evaluation per fairness constraint per state and keeps the states out of
+  memory. This is TLC's split too: safety on fingerprints alone, liveness on a
+  second graph paid for only when asked for.
+
+  Cost: roughly 16 bytes per edge plus the bits, on top of the 64-byte node.
+  For a branching factor b that is ~16b bytes per state — still independent of
+  state SIZE, which is the property D-5 exists to keep.
   """
 
   @type state_id :: non_neg_integer()
@@ -486,13 +546,21 @@ defmodule TLA.StateGraph do
     params: map() | nil
   }
 
+  @type edge :: {action :: atom(), params :: map(), successor :: state_id()}
+
   @type t :: %__MODULE__{
     nodes: %{state_id() => node_record()},        # ETS-backed; see 06-architecture.md
     fingerprints: %{TLA.Fingerprint.t() => state_id()},
     initial_states: MapSet.t(state_id()),
-    deadlocked: MapSet.t(state_id()),
+    deadlocked: MapSet.t(state_id()),             # successor-less, no `terminal` admits it
+    terminal: MapSet.t(state_id()),               # successor-less, admitted by a `terminal`
     state_count: non_neg_integer(),
-    transition_count: non_neg_integer()
+    transition_count: non_neg_integer(),
+
+    # Present only when built with check_liveness: true; nil otherwise.
+    edges: %{state_id() => [edge()]} | nil,
+    enabled: %{state_id() => bitstring()} | nil,
+    fairness_index: [{TLA.Spec.Compiled.fairness_def(), binding :: map()}] | nil
   }
 
   @doc """
@@ -503,8 +571,19 @@ defmodule TLA.StateGraph do
     {t(), state_id(), :new | :existing}
   def add_state(graph, state, parent, action, params)
 
-  @doc "Successor IDs of a state (derived from the parent index)."
-  @spec successors(t(), state_id()) :: [{atom(), state_id()}]
+  @doc """
+  Record a state's out-edges and enabled bits. Called once per expanded state
+  when the liveness graph is being built; a no-op otherwise.
+  """
+  @spec add_edges(t(), state_id(), [edge()], enabled :: bitstring()) :: t()
+  def add_edges(graph, state_id, edges, enabled)
+
+  @doc """
+  Successors of a state, from the edge table. Raises `:no_liveness_graph` if
+  the graph was built without `check_liveness: true` — there is no cheaper
+  source, and guessing from parent pointers would be wrong.
+  """
+  @spec successors(t(), state_id()) :: [edge()]
   def successors(graph, state_id)
 
   @doc """
@@ -514,7 +593,7 @@ defmodule TLA.StateGraph do
   @spec path_to(t(), state_id()) :: [{atom(), map()}]
   def path_to(graph, target)
 
-  @doc "All strongly connected components (used for liveness checking)."
+  @doc "All strongly connected components of the edge table (liveness graph only)."
   @spec sccs(t()) :: [[state_id()]]
   def sccs(graph)
 
@@ -562,11 +641,28 @@ choosing the permutation of each symmetric set that minimizes the state's canoni
 binary encoding (`TLA.Fingerprint.canonical/1`). Two symmetric states then share a
 fingerprint by construction.
 
-Symmetry is **unsound in the presence of a spec that can distinguish the elements**
-— an invariant mentioning `^accounts |> Enum.at(0)`, or a constant used as an
-ordering key. The compiler rejects a symmetry declaration when any declared
-constant in the set is used in an order-dependent position, rather than silently
-under-exploring.
+**What it costs.** Canonicalization tries every permutation: *n*! encodings per
+state for one symmetric set of size *n*, and the product for several. A 3-process,
+2-resource model pays 12 encodings per state to explore up to 12x fewer states — a
+wash in wall-clock at best, a clear win at 4-5 elements, and it is what TLC does too.
+The differential corpus measures it; symmetry is a lever to be benchmarked, not
+assumed.
+
+**What it assumes, and who checks it.** Symmetry is sound only if no property and no
+action can tell the elements apart — no `Enum.at(^accounts, 0)`, no `Enum.sort`, no
+`<` on process names, no list-position dependence. **The compiler does not verify
+this.** An earlier draft said it did, and was promising the undecidable: a constant
+flows into arbitrary Elixir, and any conservative syntactic check would reject the
+`Enum.all?(^processes, …)` every corpus spec is built from. Soundness of a
+`symmetry:` declaration is a documented obligation on the author, exactly as it is
+in TLC (08-decisions.md D-17).
+
+What the tool does instead is make a wrong declaration **detectable**:
+`verify_symmetry: true` (`mix tla.check --verify-symmetry`) runs the same model with
+and without the reduction and fails if any verdict, or the distinct-state count after
+un-reducing, differs. That is a cheap dynamic check on a small constant assignment,
+and it is the one to run once per spec before trusting the reduction on the large
+one.
 
 ### View abstraction
 
@@ -607,9 +703,11 @@ defmodule TLA.ModelChecker.Safety do
   def check_action_properties(spec, old_state, new_state)
 
   @doc """
-  Check for deadlock: a non-terminal state with no enabled actions.
+  Classify a state with no enabled action: `:terminal` if a `terminal`
+  predicate admits it (02-dsl-semantics.md §5.3), `:deadlocked` otherwise. A
+  state with an enabled action is `:ok`.
   """
-  @spec check_deadlock(TLA.Spec.Compiled.t(), TLA.State.t()) :: :ok | :deadlocked
+  @spec check_deadlock(TLA.Spec.Compiled.t(), TLA.State.t()) :: :ok | :terminal | :deadlocked
   def check_deadlock(spec, state)
 end
 ```
@@ -627,7 +725,14 @@ defmodule TLA.ModelChecker.Liveness do
   components in the state graph where a required condition never holds.
   This implements a variant of the Emerson-Lei algorithm.
 
-  Liveness checking is significantly more expensive than safety checking.
+  Liveness checking is significantly more expensive than safety checking, and
+  it requires a graph built with `check_liveness: true` — the edge table and
+  enabled bits of §State Graph. Given a safety-only graph it raises rather than
+  run Tarjan over a spanning tree and report every property as holding.
+
+  A terminal state (02-dsl-semantics.md §5.3) is a self-loop for this purpose:
+  stuttering forever there is a legal behavior, so a leads-to whose consequent
+  has not held by then is violated there.
   """
 
   @doc """
@@ -639,28 +744,30 @@ defmodule TLA.ModelChecker.Liveness do
   def check(spec, graph)
 
   @doc """
-  Check weak fairness constraints.
-  An action with weak fairness must not be continuously enabled
-  without being taken in any SCC.
+  Check one weak-fairness constraint — an action, or one binding of an action's
+  leading params (02-dsl-semantics.md §5.2). The constraint must not be
+  continuously enabled (its bit set in every state of an SCC, read from
+  `graph.enabled`) without being taken (an edge for it inside the SCC).
   """
-  @spec check_weak_fairness(TLA.Spec.Compiled.t(), TLA.StateGraph.t(), atom()) ::
+  @spec check_weak_fairness(TLA.Spec.Compiled.t(), TLA.StateGraph.t(),
+                            {TLA.Spec.Compiled.fairness_def(), binding :: map()}) ::
     :ok | {:violation, TLA.Trace.lasso()}
-  def check_weak_fairness(spec, graph, action_name)
+  def check_weak_fairness(spec, graph, constraint)
 
   @doc """
-  Check strong fairness constraints.
-  An action with strong fairness must not be infinitely often enabled
-  without being taken in any SCC.
+  Check one strong-fairness constraint. It must not be enabled in ANY state of
+  an SCC without being taken inside it.
   """
-  @spec check_strong_fairness(TLA.Spec.Compiled.t(), TLA.StateGraph.t(), atom()) ::
+  @spec check_strong_fairness(TLA.Spec.Compiled.t(), TLA.StateGraph.t(),
+                              {TLA.Spec.Compiled.fairness_def(), binding :: map()}) ::
     :ok | {:violation, TLA.Trace.lasso()}
-  def check_strong_fairness(spec, graph, action_name)
+  def check_strong_fairness(spec, graph, constraint)
 end
 ```
 
 ---
 
-## Module: `TLA.Coverage` — what the run actually exercised
+## Coverage and Vacuity — `TLA.Coverage`
 
 A green check mark is only as good as what was behind it. Three ways a run can
 report success while having verified almost nothing:
@@ -695,9 +802,16 @@ defmodule TLA.Coverage do
     # Actions with `enabled_in: 0`. Almost always a guard bug.
     never_enabled: [atom()],
 
-    # Per invariant: states in which it was evaluated, and states in which it
-    # was "close" — its top-level conjunction had at least one false conjunct
-    # without the whole being false. A never-close invariant is suspect.
+    # Per invariant: states in which it was evaluated, and its NEAR MISSES —
+    # states in which it held only through its non-trivial branch. Each
+    # top-level `or` (including the `p != x or q` and `unless` shapes, which
+    # are implications) is a branch; a near miss is a state in which the left
+    # disjunct was false, so the right one had to carry the invariant. For an
+    # invariant with no top-level `or`, a near miss is a state in which some
+    # atomic bound (`x <= n`, `size(s) < k`) held with equality at its edge.
+    # (An earlier draft said "a false conjunct without the whole being false",
+    # which for a conjunction is impossible.) An invariant with no near misses
+    # was never pressed against, and is suspect.
     invariants: %{atom() => %{evaluated_in: non_neg_integer(),
                               near_misses: non_neg_integer()}},
 
@@ -707,6 +821,11 @@ defmodule TLA.Coverage do
 
     # Params combinations that no reachable state ever admitted.
     unreached_params: %{atom() => [map()]},
+
+    # `terminal` predicates that admitted a state which still had an enabled
+    # action. Not an error — nothing is cut — but almost always a predicate
+    # broader than the end state it was written for.
+    terminal_but_live: [atom()],
 
     # Set when `state_constraint` or `max_states` bounded the run — the
     # coverage numbers are then a lower bound, not a census.
@@ -849,8 +968,9 @@ Parallel state exploration using BEAM concurrency.
 defmodule TLA.ModelChecker.Parallel do
   @moduledoc """
   Distributes state exploration across multiple BEAM processes.
-  Uses a shared ETS table for the state graph and a work-stealing
-  queue for BFS frontier management.
+  Uses a shared ETS table for the state graph and a coordinator-managed
+  frontier queue (work sharing — see 06-architecture.md §Concurrency
+  Architecture).
   """
 
   @doc """
@@ -895,6 +1015,8 @@ defmodule Mix.Tasks.Tla.Check do
       --allow-incomplete   Exit 0 even if the state limit was reached.
                            Off by default: see below.
       --fingerprint-bits   64 (default) or 128.
+      --verify-symmetry    Run with and without the symmetry reduction and fail
+                           if they disagree (§Symmetry).
 
   ## Exit codes
 
@@ -953,7 +1075,7 @@ defmodule TLA.Spec.Test do
           #{TLA.Trace.format(result.violation)}
           """)
 
-        :max_states_reached ->
+        status when status in [:max_states_reached, :constrained] ->
           # NOT a pass. An earlier draft warned here and let the test proceed,
           # which is how a suite goes green on a spec that was never verified —
           # the single most misleading thing this library could do.

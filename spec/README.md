@@ -31,8 +31,8 @@ The layers describe **verification power**, not build order. Build order is
 | Document | Content | Status |
 |---|---|---|
 | [01-foundation.md](01-foundation.md) | `TLA.State`, `TLA.Temporal`, `TLA.Set`, `TLA.Function`, `TLA.Fingerprint`, `TLA.Config` | Specified |
+| [02-dsl-semantics.md](02-dsl-semantics.md) | **Normative DSL semantics.** Name resolution, types, action semantics, nondeterminism, fairness, terminal states, compile-time validation | Specified |
 | [03-layer1-invariants.md](03-layer1-invariants.md) | `TLA.Invariant` — runtime invariant checking | Specified |
-| [02-dsl-semantics.md](02-dsl-semantics.md) | **Normative DSL semantics.** Name resolution, action semantics, nondeterminism, compile-time validation | Specified |
 | [04-layer2-model-checker.md](04-layer2-model-checker.md) | `TLA.ModelChecker`, `TLA.StateGraph`, `TLA.Trace`, `TLA.Coverage`, state-space reduction | Specified |
 | [05-layer3-conformance.md](05-layer3-conformance.md) | `TLA.GenServer`, `TLA.Refinement`, `TLA.Replay`, `TLA.Simulation` | Specified |
 | [06-architecture.md](06-architecture.md) | Dependency graph, data flow, storage, phases, non-goals, performance targets | Specified |
