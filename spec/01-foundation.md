@@ -263,6 +263,10 @@ defmodule TLA.Set do
   @doc """
   N-ary Cartesian product.
   TLA+ equivalent: S1 \\X S2 \\X ... \\X Sn
+
+  The product of NO sets is the set containing the empty tuple, not the empty set.
+  That is the answer the DSL needs when an action has no parameters: one binding,
+  binding nothing. The empty set would mean the action can never fire.
   """
   @spec cross_many([MapSet.t()]) :: MapSet.t(tuple())
   def cross_many(sets)
@@ -290,8 +294,16 @@ defmodule TLA.Set do
 
   @doc """
   CHOOSE x ∈ S : P(x) — deterministic selection.
-  Returns the same element for the same inputs.
-  Raises if no element satisfies the predicate.
+
+  Returns the LEAST satisfying element in Erlang term order. TLA+ requires only
+  that CHOOSE be a function of its arguments, not that it pick any particular
+  element, so any total order will do — but it must be an order that does not
+  depend on how the set was built or which OTP release is running. Enumeration
+  order is not such an order, and a CHOOSE that varied between runs would make the
+  reachable state graph vary between runs, defeating the differential corpus.
+
+  Raises if no element satisfies the predicate: CHOOSE is undefined there, and
+  returning nil would put an unspecified value into a state variable.
   TLA+ equivalent: CHOOSE x \\in S : P(x)
   """
   @spec choose(MapSet.t(), (term() -> boolean())) :: term()
@@ -341,9 +353,15 @@ defmodule TLA.Function do
   def construct(domain, mapping)
 
   @doc """
-  Function set: [S → T] — all functions from S to T.
+  Function set: [S → T] — all TOTAL functions from S to T.
   TLA+ equivalent: [S -> T]
-  Warning: |S|^|T| elements. Use with small sets.
+  Warning: |T|^|S| elements — a function fixes a value for each element of the
+  DOMAIN, so the domain is the exponent. (An earlier draft had this backwards.)
+  Use with small sets.
+
+  Two edge cases that differ: an empty DOMAIN gives exactly one function, the
+  empty one; an empty RANGE with a non-empty domain gives none, since no total
+  function into an empty set exists.
   """
   @spec function_set(MapSet.t(), MapSet.t()) :: MapSet.t(map())
   def function_set(domain, range)
@@ -358,6 +376,11 @@ defmodule TLA.Function do
   @doc """
   EXCEPT — update a function at specific points.
   TLA+ equivalent: [f EXCEPT ![a] = v, ![b] = w]
+
+  Raises on a point outside the domain. [f EXCEPT ![a] = v] where a ∉ DOMAIN f is
+  undefined in TLA+, and quietly extending the domain would produce a state no
+  reachable behavior can produce — while still fingerprinting it as if it were one.
+  Same for except_with/3.
   """
   @spec except(map(), [{term(), term()}]) :: map()
   def except(f, updates)
