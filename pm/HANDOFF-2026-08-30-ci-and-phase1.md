@@ -1,5 +1,10 @@
 # HANDOFF — 2026-08-30 — CI setup, then Phase 1 implementation
 
+> **SUPERSEDED by `HANDOFF-2026-08-30-phase1-components.md`.** Everything below
+> was done: the ssh blocker was agent forwarding and is gone, both MRs landed,
+> and Phase 1's components are built. Kept as the record of what the session
+> looked like before any of that.
+
 Written mid-session so work can resume after fixing ssh-agent forwarding and
 restarting Claude. Read this first; it is self-contained.
 
