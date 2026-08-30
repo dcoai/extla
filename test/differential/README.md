@@ -53,7 +53,7 @@ failure of a search that terminated early but happened to reach the same count.
 
 | Entry | Source | TLC oracle | ExTLA `spec.ex` |
 |---|---|---|---|
-| `die_hard` | Lamport, *Specifying Systems* | ✅ | not yet |
+| `die_hard` | Lamport, *Specifying Systems* | ✅ | ✅ |
 | `two_phase_commit` | Lamport, TLA+ examples | not yet | not yet |
 | `distributed_lock` | `spec/07-examples.md` Example 1 | not yet | not yet |
 | `raft_election` | `spec/07-examples.md` Example 2 (safety only; liveness is refuted by the term bound by design) | not yet | not yet |
@@ -79,8 +79,15 @@ against the version pinned at the top of the script. The pin is deliberate: TLC'
 counts are the fixture, so the tool that produces them is part of the fixture, and
 bumping it is a reviewable commit in which every `expected.json` is expected to change.
 
-`mix test test/differential` — to be written with the checker — runs ExTLA on `spec.ex`
-with the same constants and compares against these files.
+`mix test test/differential` runs ExTLA on `spec.ex` with the same constants and
+compares against these files. It is part of the ordinary suite, so the `check` CI stage
+already runs it; the `verify` stage is what keeps `expected.json` honest by regenerating
+it from TLC.
+
+Because TLC halts at the first invariant violation and ExTLA does the same, the
+comparison runs the checker once per invariant — `invariants: [:not_solved]` for the
+violated one, `invariants: []` for the state count — which is the same shape
+`bin/tlc-expected` gets from a single `-continue` run.
 
 ## Why `die_hard` is first
 

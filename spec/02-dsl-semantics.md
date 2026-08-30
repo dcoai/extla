@@ -486,3 +486,11 @@ end
 Note that `conservation_of_money` now *fails* — `fail_transfer` discards `pending`
 without refunding it. That is the intended counterexample in
 `04-layer2-model-checker.md`'s trace example, and it is reachable in this spec.
+
+Note also that this spec's state space is **infinite**: `complete_transfer` appends to
+`log` and `reset` returns to `:idle`, so the log grows without bound. Checking it
+exhaustively is impossible, and checking it at all needs a `state_constraint` bounding
+`len(log)` (`04-layer2-model-checker.md` §State constraints) — for which the result
+reports `:constrained` rather than `:ok`. A worked example that cannot be run as
+written would be a poor advertisement for the tool, so it is said here rather than
+discovered.

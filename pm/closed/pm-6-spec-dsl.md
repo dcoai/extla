@@ -3,7 +3,9 @@ id: pm-6
 title: "The specification DSL: TLA.Spec, TLA.Spec.DSL, TLA.Spec.Compiled, and the §7 validator"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 6
+merge_request: 7
 gitlab_synced: true
 ---
 
