@@ -42,10 +42,8 @@ defmodule BankAccount do
   # resolve a bare name against, and Layer 1 — instrumenting an arbitrary
   # GenServer — has none, so bare-name rewriting there would be guessing.
 
-  invariant :type_ok, """
-  State must contain balance as non-negative integer,
-  owner as string, and status as known atom.
-  """ do
+  invariant :type_ok,
+    desc: "balance is a non-negative integer, owner a string, status a known atom" do
     is_integer(state.balance) and state.balance >= 0 and
       is_binary(state.owner) and
       state.status in [:active, :frozen, :closed]
@@ -80,9 +78,7 @@ defmodule BankAccount do
   # and it binds the arguments for free — an earlier draft named the
   # action with a bare atom and never said how a message mapped to it.
 
-  precondition {:withdraw, amount}, """
-  Cannot withdraw from frozen or closed accounts.
-  """ do
+  precondition {:withdraw, amount}, desc: "cannot withdraw from a frozen or closed account" do
     state.status == :active and
       is_integer(amount) and amount > 0 and
       state.balance >= amount
@@ -135,8 +131,8 @@ defmodule TLA.Invariant do
   defmacro __using__(_opts) do
     quote do
       import TLA.Invariant, only: [
-        invariant: 2, invariant: 3, invariant: 4,
-        action_property: 2, action_property: 3, action_property: 4,
+        invariant: 2, invariant: 3,
+        action_property: 2, action_property: 3,
         precondition: 2, precondition: 3,
         postcondition: 2, postcondition: 3
       ]
@@ -157,24 +153,32 @@ defmodule TLA.Invariant do
 
   ## Parameters
   - `name` — atom identifying this invariant
-  - `description` — optional human-readable description
   - `opts` — see below
   - `block` — a boolean expression
 
   ## Options
+  - `desc: String.t()` — human-readable description, carried into the
+    violation message.
   - `enabled: boolean()` — evaluated at COMPILE time; a false value emits
     no code for this invariant at all. Use for checks too costly to run
     outside of test.
   - `callbacks: [atom()]` — restrict checking to specific callbacks
     (default: all). Reduces cost on hot paths.
+
+  The description is an option, not a positional argument. An earlier draft had
+  `invariant(name, description \\ "", opts \\ [], do: block)`, under which
+  `invariant :x, callbacks: [:handle_cast] do ... end` resolves to the 3-arity
+  clause and binds the keyword list to `description` — two trailing optional
+  positionals cannot be told apart. Every declaration macro in ExTLA, in both
+  Layer 1 and Layer 2, takes `desc:` for the same reason (08-decisions.md D-18).
   """
-  defmacro invariant(name, description \\ "", opts \\ [], do: block)
+  defmacro invariant(name, opts \\ [], do: block)
 
   @doc """
   Define an action property. Checked on every state transition.
-  `old` and `new` are implicitly bound. Same options as `invariant/4`.
+  `old` and `new` are implicitly bound. Same options as `invariant/3`.
   """
-  defmacro action_property(name, description \\ "", opts \\ [], do: block)
+  defmacro action_property(name, opts \\ [], do: block)
 
   @doc """
   Define a precondition, checked before the matching callback runs.
@@ -182,17 +186,17 @@ defmodule TLA.Invariant do
   ## Parameters
   - `pattern` — a PATTERN matched against the incoming message. Its
     bindings are in scope in the block.
-  - `description` — optional
+  - `opts` — `desc:` only
   - `block` — a boolean expression; `state` and the pattern's bindings
     are in scope
   """
-  defmacro precondition(pattern, description \\ "", do: block)
+  defmacro precondition(pattern, opts \\ [], do: block)
 
   @doc """
   Define a postcondition, checked after the matching callback returns.
   `old`, `new` and the pattern's bindings are in scope.
   """
-  defmacro postcondition(pattern, description \\ "", do: block)
+  defmacro postcondition(pattern, opts \\ [], do: block)
 end
 ```
 
@@ -281,23 +285,29 @@ defmodule TLA.Invariant.Runtime do
   def check_action_properties!(module, old_state, new_state)
 
   @doc """
-  Check precondition for a named action.
+  Check every precondition whose pattern matches `message`, for the given
+  callback. A message no pattern matches has no preconditions and passes.
   """
-  @spec check_precondition!(module(), atom(), TLA.State.t(), tuple()) :: :ok | no_return()
-  def check_precondition!(module, action, state, args)
+  @spec check_preconditions!(module(), callback :: atom(), message :: term(), TLA.State.t()) ::
+    :ok | no_return()
+  def check_preconditions!(module, callback, message, state)
 
   @doc """
-  Check postcondition for a named action.
+  Check every postcondition whose pattern matches `message`.
   """
-  @spec check_postcondition!(module(), atom(), TLA.State.t(), TLA.State.t(), tuple()) :: :ok | no_return()
-  def check_postcondition!(module, action, old_state, new_state, args)
+  @spec check_postconditions!(module(), callback :: atom(), message :: term(), TLA.State.t(), TLA.State.t()) ::
+    :ok | no_return()
+  def check_postconditions!(module, callback, message, old_state, new_state)
 
   @doc """
-  Extract the state from a GenServer callback return tuple.
-  Handles {:reply, _, state}, {:noreply, state}, {:stop, _, state}, etc.
+  Extract the post-state from a GenServer callback return value.
+  Handles `{:reply, _, state}`, `{:noreply, state}`, `{:stop, _, state}`,
+  `{:stop, _, _, state}` and the `{..., state, timeout | :hibernate | {:continue, _}}`
+  forms. A return that carries no state (`{:stop, reason}` from `handle_info`)
+  yields `pre_state` — the wrapper text above explains why the fallback is needed.
   """
-  @spec extract_state(tuple()) :: TLA.State.t()
-  def extract_state(callback_result)
+  @spec extract_state(callback_result :: term(), pre_state :: TLA.State.t()) :: TLA.State.t()
+  def extract_state(callback_result, pre_state)
 end
 ```
 

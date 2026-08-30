@@ -88,7 +88,11 @@ defmodule MyApp.TransferServer do
         balances: Map.new(accounts, fn {id, acct} -> {id, acct.balance} end),
         status: map_phase(phase),
         pending: MapSet.new(Enum.map(queue, fn t -> {t.to, t.amount} end)),
-        log: Enum.map(log, fn entry -> %{to: entry.recipient, amount: entry.amount, time: :model_time} end)
+        # Exactly the spec's shape — same keys, same order. The implementation
+        # prepends to `audit_log` while the spec appends, and an earlier draft
+        # added a `time:` key the spec does not have; either is a `:diverged` on
+        # the first completed transfer.
+        log: log |> Enum.reverse() |> Enum.map(&%{to: &1.recipient, amount: &1.amount})
       }
     end
 
@@ -103,6 +107,11 @@ defmodule MyApp.TransferServer do
     """
     def abstract_action({:transfer, from, to, amount}),
       do: {:begin_transfer, %{from: from, to: to, amount: amount}}
+    # PARTIAL params. `complete_transfer` draws `t` from the pre-state's
+    # `pending`, and the implementation resolves that choice itself (it pops
+    # its own queue), so `t` is not recoverable from the message.
+    # `check_step!/5` searches the unbound params for a binding that reproduces
+    # the post-state (§`TLA.GenServer.Runtime`).
     def abstract_action(:process_next),
       do: {:complete_transfer, %{}}
     def abstract_action(:fail),
@@ -263,7 +272,7 @@ end
 | Failure | Meaning |
 |---|---|
 | `:not_enabled` | The action's guard was false on `pre_abstract` — the implementation did something the spec forbids in that state |
-| `:diverged` | The guard held, but the spec's post-state differs from the implementation's. The error diffs them variable by variable |
+| `:diverged` | The guard held under some binding of the params, but no binding reproduces the implementation's post-state. The error diffs the closest one variable by variable |
 | `:unmapped_but_moved` | No action was claimed, yet the abstract state changed — either a missing `abstract_action/1` clause or an unmodeled transition |
 
 `:diverged` is the common one in practice, and it is usually the **refinement mapping**
@@ -333,9 +342,11 @@ defmodule TLA.Refinement do
   3. `abstract_action/1` is total — it has a catch-all clause, so an
      unanticipated message produces `:unmapped` rather than a FunctionClauseError
      inside a callback wrapper.
-  4. Where `concrete_message/2` is defined, it round-trips: for every action and
-     every params combination reachable in the spec,
-     `abstract_action(concrete_message(a, p)) == {a, p}`.
+  4. Where `concrete_message/2` is defined, it round-trips modulo partial params:
+     for every action and every params combination reachable in the spec,
+     `abstract_action(concrete_message(a, p))` is `{a, p'}` with `p'` agreeing
+     with `p` on every key `p'` has. A mapping that names a param must name it
+     correctly; one that omits it is deferring to the search in `check_step!/5`.
   5. Every spec action is named by at least one `abstract_action/1` clause.
      An action the mapping can never produce is dead in this implementation, and
      is reported the way `TLA.Coverage` reports a never-enabled action.
@@ -712,17 +723,13 @@ defmodule Specs.SupervisedTransfer do
 
   # ── Liveness Properties ────────────────────────────────────────
 
-  temporal :recovery, """
-  After any crash, the system eventually returns to a ready state.
-  """ do
+  temporal :recovery, desc: "after any crash, the system eventually returns to ready" do
     always(
       (not alive?(:coordinator)) ~> (alive?(:coordinator) and coordinator_state.phase == :ready)
     )
   end
 
-  temporal :crash_doesnt_block_progress, """
-  Even if workers crash, transfers eventually complete.
-  """ do
+  temporal :crash_doesnt_block_progress, desc: "even if workers crash, transfers complete" do
     always(
       (coordinator_state.phase == :in_progress) ~> (coordinator_state.phase in [:complete, :ready])
     )
@@ -746,10 +753,21 @@ defmodule TLA.GenServer.Runtime do
   THE refinement check. Applies the named spec action to `pre_abstract` and
   compares the result with what the implementation produced.
 
-  Fails with `:not_enabled` if the action's guard was false on `pre_abstract`,
-  or `:diverged` if the guard held but the post-states differ. A `:diverged`
-  error carries a variable-by-variable diff — that message is the layer's
-  primary output, and it is worth the effort to make it precise.
+  `params` may be PARTIAL. An implementation frequently resolves the spec's
+  nondeterminism itself — it pops its own queue, picks its own message — so the
+  binding is not in the message and `abstract_action/1` cannot supply it. For
+  each param the mapping leaves unbound, the generator is evaluated on
+  `pre_abstract` (02-dsl-semantics.md §3) and the step is legal if ANY resulting
+  binding reproduces `post_abstract`. That is still refinement — the spec
+  permits the step via that binding — and it is what makes `validate!/2`'s
+  round-trip rule satisfiable. The search is bounded by the params' generators,
+  which are small by construction; a fully-bound params map is one application.
+
+  Fails with `:not_enabled` if the guard is false on `pre_abstract` under every
+  candidate binding, or `:diverged` if some binding is enabled but none
+  reproduces the post-state. A `:diverged` error carries a variable-by-variable
+  diff against the closest candidate — that message is the layer's primary
+  output, and it is worth the effort to make it precise.
   """
   @spec check_step!(module(), atom(), map(), TLA.State.t(), TLA.State.t()) ::
     :ok | no_return()

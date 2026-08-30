@@ -27,13 +27,25 @@ defmodule Specs.Counter do
     status = :incrementing
   end
 
+  action :done do
+    require status == :incrementing
+    status = :ready
+  end
+
+  action :reset do
+    require status == :ready
+    count = 0
+  end
+
   invariant :in_bounds do
     count >= 0 and count <= ^max_val
   end
 
   temporal :always_returns_to_ready do
-    always((status == :incrementing) ~> (status == :ready))
+    (status == :incrementing) ~> (status == :ready)
   end
+
+  fairness :weak, [:done]
 end
 ```
 
@@ -46,7 +58,9 @@ mix tla.replay   MyApp.Counter     # replay a counterexample against real code
 ## Status
 
 **Design stage. No implementation yet.** The specification is complete and the build
-order is settled; Phase 1 has not started.
+order is settled; Phase 1 has not started. The repository holds a `mix.exs` skeleton,
+CI, and the differential-corpus layout so that Phase 1 has an oracle from its first
+commit ([D-9](spec/08-decisions.md)).
 
 See [spec/README.md](spec/README.md) for the full specification, and
 [spec/08-decisions.md](spec/08-decisions.md) for why it is shaped the way it is.
@@ -84,3 +98,8 @@ probabilistic extensions.
 | `spec/` | The specification. `NN-name.md` in dependency order; `README.md` is the index |
 | `pm/` | Offline proposal/work-item tracker, used when GitLab is unreachable |
 | `research/` | Background reading, including a TLA+ primer |
+| `test/differential/` | The TLC differential corpus — paired TLA+ and ExTLA specs the checker must agree with TLC on |
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -108,6 +108,15 @@ right place for it to fall.
 
 See `04-layer2-model-checker.md` §State Graph.
 
+**Amended 2026-08-30.** Parent pointers form a spanning tree, which has no cycles, so
+this record alone cannot support liveness checking — the original entry did not say
+so, and `04` specified `sccs/1` over it. Under `check_liveness: true` the graph
+additionally records each state's out-edges and one ENABLED bit per fairness
+constraint, both captured while the state is materialized. States are still never
+stored; per-state memory grows by ~16 bytes per edge and stays independent of state
+size, which is the property this decision exists to keep. This is the split TLC makes.
+See `04-layer2-model-checker.md` §State Graph, "The liveness graph".
+
 ---
 
 ## D-6 — Layer 3 checks step legality, not just invariants
@@ -128,6 +137,14 @@ Affordable because of D-2/D-3: one function application and one comparison, chea
 the invariants evaluated beside it.
 
 See `05-layer3-conformance.md` §What conformance means here.
+
+**Amended 2026-08-30.** `check_step!/5` accepts PARTIAL params and searches the unbound
+ones. An implementation routinely resolves the spec's nondeterminism itself — it pops
+its own queue — so the binding is not in the message and the mapping cannot supply
+it; "one application, one comparison" was only true for fully-bound actions, and
+`validate!/2`'s round-trip rule was unsatisfiable for any other. A step is legal if
+some binding reproduces the post-state, which is still refinement.
+See `05-layer3-conformance.md` §`TLA.GenServer.Runtime`.
 
 ---
 
@@ -227,6 +244,11 @@ and it covers what people write. The alternative failure — accepting a formula
 checking something weaker than it says — is the kind of quiet unsoundness this project
 cannot afford. Widening the fragment starts with §5.1, not with the checker.
 
+**Amended 2026-08-30.** The fragment includes `Enum.all?(^constant, fn x -> formula end)`
+— quantification over a constant, which every per-process property in the corpus
+needs, and which is a conjunction of in-fragment instances checked independently.
+`always(P ~> Q)` is accepted as a spelling of `P ~> Q`.
+
 ---
 
 ## D-13 — Non-goals are written down
@@ -260,3 +282,103 @@ ignored or mean something unspecified.
 **Revisit if:** a spec genuinely needs to vary the formula — no fairness at all, or
 refinement of another spec. That is a new declaration with defined semantics, added to
 `02-dsl-semantics.md` before the checker.
+
+---
+
+## D-15 — Fairness is per action or per parameter binding
+
+**Decided.** `fairness :strong, acquire_lock: [:p]` declares one constraint per binding
+of the named leading params — `\A p \in P : SF_vars(AcquireLock(p))`. The bare
+`fairness :weak, [:acquire_lock]` form remains and means whole-action fairness.
+
+**Replaced:** whole-action fairness only.
+
+**Why:** whole-action WF guarantees that *some* binding fires, which is consistent with
+one process requesting forever while the others take turns. Every starvation-freedom
+property in `07-examples.md` was unprovable under it. The per-binding form is what TLA+
+writes, and the primer under `research/` already documented it. State-drawn params
+cannot be quantified over — the set changes per state — so they are a compile error in
+this position.
+
+**Cost:** one ENABLED bit per binding per state in the liveness graph (D-5, amended).
+
+See `02-dsl-semantics.md` §5.2.
+
+---
+
+## D-16 — Terminal states are declared with `terminal`
+
+**Decided.** A `terminal :name do pred end` block names legitimate end states. A
+successor-less state a `terminal` admits is not a deadlock; nothing else changes.
+
+**Replaced:** `check_deadlock: false` as the only way to accept a terminating spec.
+
+**Why:** two corpus specs terminate by design — the bounded buffer once `^max_items`
+are consumed, Raft election once the term bound is exhausted — and both were reported
+as deadlocks by their own acceptance tests. Turning deadlock detection off to pass them
+would have hidden real deadlocks elsewhere in the same spec. TLC users add a
+`Terminating` disjunct to `Next`; a declaration is the same idea without a stuttering
+action showing up in coverage.
+
+**Guard against misuse:** a `terminal` that admits a state with an enabled action is
+reported by coverage as `terminal_but_live`.
+
+See `02-dsl-semantics.md` §5.3.
+
+---
+
+## D-17 — Symmetry soundness is the author's obligation, verified dynamically
+
+**Decided.** The compiler does not check that a `symmetry:` declaration is sound.
+`--verify-symmetry` runs the model with and without the reduction on request and fails
+on any disagreement.
+
+**Replaced:** a promised compile-time rejection of order-dependent uses of a symmetric
+constant.
+
+**Why:** the promise was undecidable — a constant flows into arbitrary Elixir — and any
+conservative approximation rejects the `Enum.all?(^processes, …)` every corpus spec is
+built from. A verification tool that claims a check it cannot perform violates design
+principle 6 more badly than one that names the obligation. The dynamic check is cheap
+on a small constant assignment and catches exactly the failure the static check was
+for. The *n*! canonicalization cost is now stated alongside, so the reduction is
+benchmarked rather than assumed.
+
+See `04-layer2-model-checker.md` §Symmetry.
+
+---
+
+## D-18 — Descriptions are a `desc:` option, never a positional string
+
+**Decided.** Every declaration macro in Layers 1 and 2 takes `desc:` in its options
+keyword list.
+
+**Replaced:** `invariant(name, description \\ "", opts \\ [], do: block)` and the same
+shape on `precondition`, `postcondition` and `action_property`.
+
+**Why:** two trailing optional positionals cannot be told apart —
+`invariant :x, callbacks: [...] do … end` bound the keyword list to `description`.
+Layer 2's `temporal` already took `opts` while the examples passed it a heredoc, so the
+two layers had drifted on the one API shape the spec said they shared.
+
+See `03-layer1-invariants.md` §Macro Specification.
+
+---
+
+## D-19 — Type annotations are stored quoted and checked as `type_ok`
+
+**Decided.** `type:` expressions are kept as quoted Elixir, resolved against the
+constants at model-check time, and checked as an implicit invariant `:type_ok` in every
+reachable state. The grammar — including `|` union, tuples and the `[d ~> r]` function
+form — is written down.
+
+**Replaced:** a `type_expr` typed as concrete values (`Range.t()`, `[term()]`) that
+none of the corpus's constant-dependent types (`0..^max_val`) could have produced,
+alongside `~>`/`|` type syntax used throughout the examples but specified nowhere.
+
+**Why:** a type that mentions a constant has no value at compile time; the only honest
+representation is the expression itself. Checking types as an invariant rather than
+using them to prune makes a type error a reported violation rather than a silently
+narrower search.
+
+See `02-dsl-semantics.md` §1.5.
