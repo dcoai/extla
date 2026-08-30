@@ -3,7 +3,8 @@ id: pm-1
 title: "Verification ledger: drift-gated coverage golden + spec-version stamps"
 labels: [Proposal]
 created: 2026-08-29
-gitlab_synced: false
+gitlab_issue: 1
+gitlab_synced: true
 ---
 
 ## Problem
