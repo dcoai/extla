@@ -841,8 +841,11 @@ defmodule TLA.Coverage do
     # (An earlier draft said "a false conjunct without the whole being false",
     # which for a conjunction is impossible.) An invariant with no near misses
     # was never pressed against, and is suspect.
+    # `near_misses: nil` means NOT MEASURED, which the report renders differently
+    # from zero. Only the top-level-`or` shape is derived; zero near misses is a
+    # finding, and "we did not look" is not.
     invariants: %{atom() => %{evaluated_in: non_neg_integer(),
-                              near_misses: non_neg_integer()}},
+                              near_misses: non_neg_integer() | nil}},
 
     # Temporal properties whose antecedent never held anywhere.
     vacuous: [%{property: atom(), reason: :antecedent_never_held
@@ -856,14 +859,24 @@ defmodule TLA.Coverage do
     # broader than the end state it was written for.
     terminal_but_live: [atom()],
 
-    # Set when `state_constraint` or `max_states` bounded the run — the
-    # coverage numbers are then a lower bound, not a census.
-    bounded_by: :none | :state_constraint | :max_states
+    # Set when `state_constraint` or `max_states` bounded the run, or when it
+    # stopped at a counterexample mid-expansion — the coverage numbers are then a
+    # lower bound, not a census.
+    bounded_by: :none | :state_constraint | :max_states | :violation
   }
 
-  @doc "Compute coverage from a completed run."
-  @spec compute(TLA.Spec.Compiled.t(), TLA.StateGraph.t()) :: t()
-  def compute(spec, graph)
+  # Accumulated WHILE the search runs, not computed from the finished graph: the
+  # graph deliberately retains neither states nor per-action counts (D-5), so
+  # there is nothing in it to compute these from. This costs no additional
+  # exploration, which is what "computed from the completed state graph" was
+  # protecting.
+  @doc "A fresh accumulator for a run."
+  @spec init(TLA.Spec.Compiled.t(), constants(), [invariant_def()]) :: t()
+  def init(spec, constants, invariants)
+
+  @doc "Finish the accumulator into the report."
+  @spec finalize(t(), :none | :state_constraint | :max_states | :violation) :: t()
+  def finalize(coverage, bounded_by)
 
   @doc """
   Render for terminal output. Silent when everything was exercised; loud about
@@ -1036,6 +1049,20 @@ defmodule Mix.Tasks.Tla.Check do
       mix tla.check Specs.TransferProtocol --max-states 100000 --workers 8
       mix tla.check Specs.TransferProtocol --safety-only
       mix tla.check Specs.TransferProtocol --graph dot --output transfer.dot
+
+  ## Where the constants come from
+
+  A spec cannot be checked without an assignment for each of its constants, and
+  an earlier draft of this section specified the task without saying where they
+  come from. In order of precedence:
+
+  1. application config — `config :extla, Specs.X, constants: %{accounts: ...}`
+  2. `constant :accounts, default: MapSet.new([...])` beside the declaration
+
+  A constant with neither is an error naming both places it could be supplied.
+  The `default:` form is the one that needs no second file, and
+  `TLA.ModelChecker.run/2` ignores it entirely -- a test that passes its own
+  constants is unaffected by what the task would have used.
 
   ## Options affecting the VERDICT
 

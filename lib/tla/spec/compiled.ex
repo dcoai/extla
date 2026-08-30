@@ -54,6 +54,18 @@ defmodule TLA.Spec.Compiled do
 
   @type constant_def :: %{name: atom(), opts: keyword()}
 
+  @doc """
+  The constant assignments declared with `default:`, for a run that was given
+  none of its own.
+  """
+  @spec default_constants(t()) :: map()
+  def default_constants(%__MODULE__{constants: constants}) do
+    for %{name: name, opts: opts} <- constants,
+        Keyword.has_key?(opts, :default),
+        into: %{},
+        do: {name, Keyword.fetch!(opts, :default)}
+  end
+
   @type variable_def :: %{name: atom(), type: type_expr(), opts: keyword()}
 
   # Stored QUOTED and resolved at model-check time against the constant
@@ -94,7 +106,15 @@ defmodule TLA.Spec.Compiled do
   @type invariant_def :: %{
           name: atom(),
           description: String.t(),
-          predicate: predicate()
+          predicate: predicate(),
+
+          # A state in which the invariant held only through its non-trivial
+          # branch — the left disjunct of a top-level `or` was false, so the
+          # right one had to carry it. `nil` when the invariant has no such
+          # shape, which the coverage report renders as "not measured" rather
+          # than as zero: zero near misses is a finding, and not having looked
+          # is not.
+          near_miss: predicate() | nil
         }
 
   @type action_property_def :: %{

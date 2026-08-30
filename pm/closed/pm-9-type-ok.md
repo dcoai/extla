@@ -3,7 +3,9 @@ id: pm-9
 title: "The implicit type_ok invariant, and the two type forms §1.5 was missing"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 9
+merge_request: 9
 gitlab_synced: true
 ---
 

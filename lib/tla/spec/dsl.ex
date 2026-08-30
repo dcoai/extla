@@ -25,6 +25,14 @@ defmodule TLA.Spec.DSL do
   @doc """
   Declare a constant parameter. Its value is assigned at model-check time.
   Referenced in blocks as `^name`.
+
+  ## Options
+
+  - `default:` — the assignment `mix tla.check` uses when nothing else supplies
+    one. `04-layer2-model-checker.md` specified the task without saying where a
+    run's constants come from, and a checker cannot start without them; a default
+    beside the declaration is the answer that needs no second file. Application
+    config still overrides it, and `TLA.ModelChecker.run/2` ignores it entirely.
   """
   defmacro constant(name, opts \\ []) do
     caller = __CALLER__
@@ -379,20 +387,44 @@ defmodule TLA.Spec.DSL do
         block: block
       })
 
-    body = block |> Block.desugar_predicate!(ctx) |> Rewriter.rewrite(ctx)
+    desugared = Block.desugar_predicate!(block, ctx)
+    body = Rewriter.rewrite(desugared, ctx)
     fun = :"__tla_#{kind}_#{name}__"
+
+    near_miss = if kind == "invariant", do: Block.near_miss(desugared)
+    near_miss_fun = if near_miss, do: :"__tla_invariant_#{name}_near_miss__"
 
     entry =
       case kind do
-        "invariant" -> %{name: name, description: description || "", fun: fun, line: caller.line}
-        "terminal" -> %{name: name, fun: fun, line: caller.line}
+        "invariant" ->
+          %{
+            name: name,
+            description: description || "",
+            fun: fun,
+            near_miss_fun: near_miss_fun,
+            line: caller.line
+          }
+
+        "terminal" ->
+          %{name: name, fun: fun, line: caller.line}
       end
 
     put(caller, attribute, entry)
 
+    near_miss_def =
+      if near_miss do
+        quote generated: true do
+          @doc false
+          def unquote(near_miss_fun)(unquote(constants), unquote(state)),
+            do: unquote(Rewriter.rewrite(near_miss, ctx))
+        end
+      end
+
     quote generated: true do
       @doc false
       def unquote(fun)(unquote(constants), unquote(state)), do: unquote(body)
+
+      unquote(near_miss_def)
     end
   end
 

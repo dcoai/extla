@@ -57,10 +57,31 @@ mix tla.replay   MyApp.Counter     # replay a counterexample against real code
 
 ## Status
 
-**Design stage. No implementation yet.** The specification is complete and the build
-order is settled; Phase 1 has not started. The repository holds a `mix.exs` skeleton,
-CI, and the differential-corpus layout so that Phase 1 has an oracle from its first
-commit ([D-9](spec/08-decisions.md)).
+**Phase 1 is done: a spec written in the DSL compiles, and its safety properties are
+checked correctly.** `mix tla.check MySpec` explores the state space breadth-first,
+reports the shortest counterexample when it finds one, and prints what the run actually
+exercised.
+
+The acceptance criterion is not "the tests pass" but [D-9](spec/08-decisions.md): the
+checker must agree with TLC. It does — on `die_hard`, ExTLA and TLC agree on the
+distinct-state count (16), the search depth (8), every invariant, and the shortest
+counterexample, which is the same six-step trace action for action. The oracle landed
+before the checker did, so that agreement has held from the checker's first run.
+
+| Piece | State |
+|---|---|
+| `TLA.State`, `TLA.Config`, `TLA.Fingerprint`, `TLA.Set`, `TLA.Function` | ✅ |
+| `TLA.Spec` DSL + the §7 compile-time validator | ✅ |
+| `TLA.StateGraph`, breadth-first `TLA.ModelChecker`, `TLA.Trace` | ✅ |
+| The implicit `type_ok` invariant | ✅ |
+| `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
+| Differential corpus vs TLC | `die_hard`; five entries to go |
+| Liveness, fairness, symmetry (Phase 2) | not yet |
+| Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
+| Parallel exploration (Phase 4) | not yet |
+
+Asking for something a later phase brings — `check_liveness: true`, `symmetry:` —
+raises rather than quietly checking something weaker.
 
 See [spec/README.md](spec/README.md) for the full specification, and
 [spec/08-decisions.md](spec/08-decisions.md) for why it is shaped the way it is.

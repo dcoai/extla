@@ -17,7 +17,7 @@ defmodule TLA.ModelChecker do
 
   alias TLA.ModelChecker.Safety
   alias TLA.Spec.Type
-  alias TLA.{Fingerprint, Spec, State, StateGraph, Trace}
+  alias TLA.{Coverage, Fingerprint, Spec, State, StateGraph, Trace}
 
   @type config :: %{
           optional(:constants) => map(),
@@ -50,6 +50,10 @@ defmodule TLA.ModelChecker do
           deadlock: boolean(),
           duration_ms: non_neg_integer(),
           violation: Trace.t() | nil,
+
+          # What the run actually exercised. A green check mark is only as good
+          # as what was behind it.
+          coverage: Coverage.t(),
           warnings: [String.t()],
           fingerprint_bits: pos_integer(),
           collision_estimate: float()
@@ -98,25 +102,20 @@ defmodule TLA.ModelChecker do
     config = Map.merge(@defaults, config)
     reject_unimplemented!(config)
 
-    declared = spec
+    # `type_ok` joins the invariants for the run, so it is checked, selectable
+    # with `invariants:`, and counted in the coverage report alongside the
+    # declared ones — which is why a report lists an invariant the spec never
+    # declared.
     spec = %{spec | invariants: checked_invariants(spec, config.constants)}
 
     started = System.monotonic_time(:millisecond)
     graph = StateGraph.new(spec, config.constants, fingerprint_bits: config.fingerprint_bits)
 
-    {graph, outcome, states_found} = search(spec, config, graph)
+    run = search(spec, config, graph)
 
-    result =
-      finish(
-        declared,
-        config,
-        graph,
-        outcome,
-        states_found,
-        System.monotonic_time(:millisecond) - started
-      )
+    result = finish(run, System.monotonic_time(:millisecond) - started)
 
-    {result, graph}
+    {result, run.graph}
   end
 
   @doc """
@@ -140,104 +139,173 @@ defmodule TLA.ModelChecker do
 
   # ── The search ──────────────────────────────────────────────────────────────
 
-  defp search(spec, config, graph) do
-    {graph, frontier, outcome, found} = seed(spec, config, graph)
-
-    case outcome do
-      :ok -> expand_frontier(spec, config, graph, :queue.from_list(frontier), found)
-      _ -> {graph, outcome, found}
-    end
+  defmodule Run do
+    @moduledoc false
+    # Everything the search threads through itself. A struct rather than a
+    # widening tuple, because coverage made it a five-tuple and the next phase
+    # adds the liveness graph.
+    defstruct [:spec, :config, :graph, :coverage, :frontier, :found, :outcome, :invariants]
   end
 
-  defp seed(spec, config, graph) do
-    spec.init
-    |> Enum.with_index()
-    |> Enum.reduce_while({graph, [], :ok, 0}, fn {init_fn, index}, {graph, frontier, _, found} ->
-      state = config.constants |> init_fn.() |> State.validate!()
-      {graph, id, status} = StateGraph.add_state(graph, state, nil, index, nil)
-      found = found + 1
+  defp search(spec, config, graph) do
+    invariants = Safety.selected(spec.invariants, config.invariants)
 
-      case admit(spec, config, graph, state, id, status) do
-        {:ok, graph, :explore} -> {:cont, {graph, frontier ++ [{id, state}], :ok, found}}
-        {:ok, graph, :hold} -> {:cont, {graph, frontier, :ok, found}}
-        {:violation, graph, trace} -> {:halt, {graph, {:violation, trace}, found}}
+    run = %Run{
+      spec: spec,
+      config: config,
+      graph: graph,
+      coverage: Coverage.init(spec, config.constants, invariants),
+      invariants: invariants,
+      frontier: :queue.new(),
+      found: 0,
+      outcome: :ok
+    }
+
+    run = seed(run)
+    if run.outcome == :ok, do: expand_frontier(run), else: run
+  end
+
+  defp seed(run) do
+    run.spec.init
+    |> Enum.with_index()
+    |> Enum.reduce_while(run, fn {init_fn, index}, run ->
+      state = run.config.constants |> init_fn.() |> State.validate!()
+      {graph, id, status} = StateGraph.add_state(run.graph, state, nil, index, nil)
+      run = %{run | graph: graph, found: run.found + 1} |> note_universes(state)
+
+      case admit(run, state, id, status) do
+        {:ok, run, :explore} -> {:cont, %{run | frontier: :queue.in({id, state}, run.frontier)}}
+        {:ok, run, :hold} -> {:cont, run}
+        {:violation, run, trace} -> {:halt, %{run | outcome: {:violation, trace}}}
       end
     end)
-    |> case do
-      {graph, frontier, :ok, found} -> {graph, frontier, :ok, found}
-      {graph, outcome, found} -> {graph, [], outcome, found}
+  end
+
+  # The universe of parameter combinations is a property of the constants, not of
+  # any one state, so it is enumerated once — on the first initial state, which
+  # is a real state rather than a stand-in.
+  defp note_universes(run, state) do
+    if Enum.any?(Map.values(run.coverage.param_universe), &(&1 == :unknown)) do
+      coverage =
+        Enum.reduce(run.spec.actions, run.coverage, fn action, coverage ->
+          Coverage.observe_universe(coverage, action, run.config.constants, state)
+        end)
+
+      %{run | coverage: coverage}
+    else
+      run
     end
   end
 
-  # A newly discovered state is checked, then either queued for expansion or
-  # held back by the state constraint. A state already seen is neither.
-  defp admit(_spec, _config, graph, _state, _id, :existing), do: {:ok, graph, :hold}
+  # A newly discovered state is checked, then either queued for expansion or held
+  # back by the state constraint. A state already seen is neither: its invariants
+  # were evaluated when it was first found.
+  defp admit(run, _state, _id, :existing), do: {:ok, run, :hold}
 
-  defp admit(spec, config, graph, state, id, :new) do
-    case Safety.check_invariants(spec, config.constants, state, config.invariants) do
+  defp admit(run, state, id, :new) do
+    coverage = Coverage.observe_state(run.coverage, run.invariants, run.config.constants, state)
+    run = %{run | coverage: coverage}
+
+    case Safety.check_invariants(run.spec, run.config.constants, state, run.config.invariants) do
       {:violation, name} ->
-        {:violation, graph, invariant_trace(graph, id, name, spec, config.constants, state)}
+        {:violation, run, invariant_trace(run, id, name, state)}
 
       :ok ->
-        if constrained?(config, state), do: {:ok, graph, :hold}, else: {:ok, graph, :explore}
+        if constrained?(run.config, state), do: {:ok, run, :hold}, else: {:ok, run, :explore}
     end
   end
 
-  defp expand_frontier(spec, config, graph, frontier, found) do
-    case :queue.out(frontier) do
+  defp expand_frontier(run) do
+    case :queue.out(run.frontier) do
       {:empty, _} ->
-        {graph, :ok, found}
+        run
 
       {{:value, {id, state}}, rest} ->
-        if graph.state_count > config.max_states do
-          {graph, :max_states_reached, found}
-        else
-          case expand(spec, config, graph, id, state, rest, found) do
-            {:ok, graph, frontier, found} ->
-              expand_frontier(spec, config, graph, frontier, found)
+        run = %{run | frontier: rest}
 
-            {:violation, graph, trace, found} ->
-              {graph, {:violation, trace}, found}
+        if run.graph.state_count > run.config.max_states do
+          %{run | outcome: :max_states_reached}
+        else
+          case expand(run, id, state) do
+            {:ok, run} -> expand_frontier(run)
+            {:violation, run, trace} -> %{run | outcome: {:violation, trace}}
           end
         end
     end
   end
 
-  defp expand(spec, config, graph, id, state, frontier, found) do
-    successors = successors(spec, config, state)
+  defp expand(run, id, state) do
+    run.spec.actions
+    |> Enum.reduce_while({:ok, run, false}, fn action, {:ok, run, live?} ->
+      bindings = enabled_bindings(action, run.config.constants, state)
 
-    if successors == [] do
-      {:ok, mark_stuck(spec, config, graph, id, state), frontier, found}
-    else
-      Enum.reduce_while(successors, {:ok, graph, frontier, found}, fn
-        {action, params, next}, {:ok, graph, frontier, found} ->
-          next = State.validate!(next)
-          graph = StateGraph.count_transition(graph)
-          found = found + 1
+      case take_action(run, action, bindings, id, state) do
+        {:ok, run} -> {:cont, {:ok, run, live? or bindings != []}}
+        {:violation, run, trace} -> {:halt, {:violation, run, trace}}
+      end
+    end)
+    |> case do
+      {:ok, run, false} ->
+        {:ok, mark_stuck(run, id, state)}
 
-          case Safety.check_action_properties(spec, config.constants, state, next) do
-            {:violation, name} ->
-              {graph, next_id, _} = StateGraph.add_state(graph, next, id, action, params)
+      {:ok, run, true} ->
+        coverage =
+          Coverage.observe_live_terminal(run.coverage, run.spec, run.config.constants, state)
 
-              {:halt,
-               {:violation, graph, action_property_trace(graph, next_id, name, state, next),
-                found}}
+        {:ok, %{run | coverage: coverage}}
 
-            :ok ->
-              {graph, next_id, status} = StateGraph.add_state(graph, next, id, action, params)
+      {:violation, run, trace} ->
+        {:violation, run, trace}
+    end
+  end
 
-              case admit(spec, config, graph, next, next_id, status) do
-                {:ok, graph, :explore} ->
-                  {:cont, {:ok, graph, :queue.in({next_id, next}, frontier), found}}
+  defp take_action(run, _action, [], _id, _state), do: {:ok, run}
 
-                {:ok, graph, :hold} ->
-                  {:cont, {:ok, graph, frontier, found}}
+  defp take_action(run, action, bindings, id, state) do
+    bindings
+    |> Enum.reduce_while({:ok, run, 0, 0}, fn params, {:ok, run, generated, distinct} ->
+      next =
+        run.config.constants
+        |> action.transition.(state, params)
+        |> State.validate!()
 
-                {:violation, graph, trace} ->
-                  {:halt, {:violation, graph, trace, found}}
-              end
+      run = %{run | graph: StateGraph.count_transition(run.graph), found: run.found + 1}
+
+      case Safety.check_action_properties(run.spec, run.config.constants, state, next) do
+        {:violation, name} ->
+          {graph, next_id, _} = StateGraph.add_state(run.graph, next, id, action.name, params)
+          run = %{run | graph: graph}
+          {:halt, {:violation, run, action_property_trace(run, next_id, name)}}
+
+        :ok ->
+          {graph, next_id, status} =
+            StateGraph.add_state(run.graph, next, id, action.name, params)
+
+          run = %{run | graph: graph}
+          distinct = if status == :new, do: distinct + 1, else: distinct
+
+          case admit(run, next, next_id, status) do
+            {:ok, run, :explore} ->
+              run = %{run | frontier: :queue.in({next_id, next}, run.frontier)}
+              {:cont, {:ok, run, generated + 1, distinct}}
+
+            {:ok, run, :hold} ->
+              {:cont, {:ok, run, generated + 1, distinct}}
+
+            {:violation, run, trace} ->
+              {:halt, {:violation, run, trace}}
           end
-      end)
+      end
+    end)
+    |> case do
+      {:ok, run, generated, distinct} ->
+        coverage =
+          Coverage.observe_action(run.coverage, action.name, bindings, generated, distinct)
+
+        {:ok, %{run | coverage: coverage}}
+
+      {:violation, run, trace} ->
+        {:violation, run, trace}
     end
   end
 
@@ -251,22 +319,33 @@ defmodule TLA.ModelChecker do
   deterministic — a checker whose state graph varied between runs could not be
   compared to TLC.
   """
-  @spec successors(Spec.Compiled.t(), config(), State.t()) :: [{atom(), map(), State.t()}]
-  def successors(spec, config, state) do
+  @spec successors(Spec.Compiled.t(), map(), State.t()) :: [{atom(), map(), State.t()}]
+  def successors(spec, %{constants: constants}, state), do: successors(spec, constants, state)
+
+  def successors(spec, constants, state) when is_map(constants) do
     Enum.flat_map(spec.actions, fn action ->
       action
-      |> bindings(config.constants, state)
-      |> Enum.filter(&action.guard.(config.constants, state, &1))
-      |> Enum.map(&{action.name, &1, action.transition.(config.constants, state, &1)})
+      |> enabled_bindings(constants, state)
+      |> Enum.map(&{action.name, &1, action.transition.(constants, state, &1)})
     end)
   end
 
   @doc """
-  Every parameter binding of an action in a state.
+  Every parameter binding of an action whose guard holds in a state.
 
   Params bind left to right and each generator receives the bindings made before
   it, so a later param can be constrained by an earlier one. A generator that
   returns nothing disables the action here, exactly as a false guard would.
+  """
+  @spec enabled_bindings(Spec.Compiled.action_def(), map(), State.t()) :: [map()]
+  def enabled_bindings(action, constants, state) do
+    action
+    |> bindings(constants, state)
+    |> Enum.filter(&action.guard.(constants, state, &1))
+  end
+
+  @doc """
+  Every parameter binding of an action in a state, guard or no guard.
   """
   @spec bindings(Spec.Compiled.action_def(), map(), State.t()) :: [map()]
   def bindings(action, constants, state) do
@@ -277,11 +356,14 @@ defmodule TLA.ModelChecker do
     end)
   end
 
-  defp mark_stuck(spec, config, graph, id, state) do
-    case Safety.classify_stuck(spec, config.constants, state) do
-      :terminal -> StateGraph.mark_terminal(graph, id)
-      :deadlocked -> StateGraph.mark_deadlocked(graph, id)
-    end
+  defp mark_stuck(run, id, state) do
+    graph =
+      case Safety.classify_stuck(run.spec, run.config.constants, state) do
+        :terminal -> StateGraph.mark_terminal(run.graph, id)
+        :deadlocked -> StateGraph.mark_deadlocked(run.graph, id)
+      end
+
+    %{run | graph: graph}
   end
 
   defp constrained?(%{state_constraint: nil}, _state), do: false
@@ -289,11 +371,13 @@ defmodule TLA.ModelChecker do
 
   # ── Results ─────────────────────────────────────────────────────────────────
 
-  defp finish(spec, config, graph, outcome, states_found, duration) do
+  defp finish(run, duration) do
+    graph = run.graph
+    config = run.config
     deadlock? = MapSet.size(graph.deadlocked) > 0
 
     {status, violation} =
-      case outcome do
+      case run.outcome do
         {:violation, trace} ->
           {:violation, trace}
 
@@ -302,38 +386,41 @@ defmodule TLA.ModelChecker do
 
         :ok ->
           cond do
-            config.check_deadlock and deadlock? ->
-              {:violation, deadlock_trace(graph)}
-
-            config.state_constraint != nil ->
-              {:constrained, nil}
-
-            true ->
-              {:ok, nil}
+            config.check_deadlock and deadlock? -> {:violation, deadlock_trace(run)}
+            config.state_constraint != nil -> {:constrained, nil}
+            true -> {:ok, nil}
           end
       end
 
+    coverage = Coverage.finalize(run.coverage, bounded_by(status, config))
+
     %{
       status: status,
-      states_found: states_found,
+      states_found: run.found,
       distinct_states: graph.state_count,
       transitions: graph.transition_count,
       diameter: graph.diameter,
       deadlock: deadlock?,
       duration_ms: duration,
       violation: violation,
-      warnings: warnings(spec, config, status),
+      coverage: coverage,
+      warnings: warnings(run.spec, config, status) ++ Coverage.warnings(coverage),
       fingerprint_bits: config.fingerprint_bits,
       collision_estimate:
         Fingerprint.collision_estimate(graph.state_count, config.fingerprint_bits)
     }
   end
 
-  defp invariant_trace(graph, id, name, spec, constants, state) do
-    Trace.generate(graph, id,
+  defp bounded_by(:max_states_reached, _config), do: :max_states
+  defp bounded_by(:violation, _config), do: :violation
+  defp bounded_by(_status, %{state_constraint: nil}), do: :none
+  defp bounded_by(_status, _config), do: :state_constraint
+
+  defp invariant_trace(run, id, name, state) do
+    Trace.generate(run.graph, id,
       type: :safety,
       property: name,
-      message: describe_violation(spec, constants, name, state)
+      message: describe_violation(run.spec, run.config.constants, name, state)
     )
   end
 
@@ -346,18 +433,18 @@ defmodule TLA.ModelChecker do
   defp describe_violation(_spec, _constants, name, _state),
     do: "invariant #{inspect(name)} does not hold in this state"
 
-  defp action_property_trace(graph, id, name, _old, _new) do
-    Trace.generate(graph, id,
+  defp action_property_trace(run, id, name) do
+    Trace.generate(run.graph, id,
       type: :safety,
       property: name,
       message: "action property #{inspect(name)} does not hold over the last step"
     )
   end
 
-  defp deadlock_trace(graph) do
-    id = graph.deadlocked |> Enum.sort() |> hd()
+  defp deadlock_trace(run) do
+    id = run.graph.deadlocked |> Enum.sort() |> hd()
 
-    Trace.generate(graph, id,
+    Trace.generate(run.graph, id,
       type: :deadlock,
       property: nil,
       message:
