@@ -3,7 +3,9 @@ id: pm-3
 title: "Foundation: TLA.State, TLA.Config, TLA.Fingerprint"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 3
+merge_request: 4
 gitlab_synced: true
 ---
 
