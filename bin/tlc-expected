@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+# Regenerate (or verify) the TLC side of the differential corpus.
+#
+#   bin/tlc-expected                 regenerate expected.json for every entry
+#   bin/tlc-expected die_hard        regenerate one entry
+#   bin/tlc-expected --check         re-run TLC and fail on any drift (CI)
+#
+# expected.json is what TLC reported, never hand-edited: it is the oracle ExTLA
+# is measured against (spec/08-decisions.md D-9), so a human editing it to make a
+# test pass would be editing the definition of "correct".
+set -euo pipefail
+
+readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly CORPUS="$ROOT/test/differential"
+
+# Pinned rather than "latest": TLC's state counts are the fixture, so the tool
+# that produces them is part of the fixture. Bumping this is a reviewable commit
+# in which every expected.json is expected to change.
+readonly TLA_TOOLS_VERSION="v1.7.4"
+readonly TLA_TOOLS_SHA256="936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
+readonly TLA_TOOLS_URL="https://github.com/tlaplus/tlaplus/releases/download/${TLA_TOOLS_VERSION}/tla2tools.jar"
+readonly JAR="$ROOT/.tla/tla2tools.jar"
+
+die() { echo "tlc-expected: $*" >&2; exit 1; }
+
+ensure_jar() {
+  if [[ -f "$JAR" ]] && echo "$TLA_TOOLS_SHA256  $JAR" | sha256sum --check --status; then
+    return
+  fi
+  echo "==> fetching tla2tools.jar $TLA_TOOLS_VERSION"
+  mkdir -p "$(dirname "$JAR")"
+  curl --fail --silent --show-error --location --output "$JAR" "$TLA_TOOLS_URL"
+  echo "$TLA_TOOLS_SHA256  $JAR" | sha256sum --check --status \
+    || die "checksum mismatch on $TLA_TOOLS_URL -- refusing to trust the oracle"
+}
+
+# TLC's stdout, for one entry. `-continue` is what makes a single run enough:
+# without it TLC halts at the first invariant violation and never reports the
+# state count, so the two things the corpus compares could not come from the
+# same search. `-workers 1` keeps the run deterministic.
+run_tlc() {
+  local dir="$1" module="$2"
+  ( cd "$dir" && java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC \
+      -continue -workers 1 -cleanup "$module" 2>&1 ) || true
+}
+
+# TLC reports a violation as
+#
+#   Error: Invariant NotSolved is violated.
+#   Error: The behavior up to this point is:
+#   State 1: <Initial predicate>
+#   ...
+#   State 7: <BigToSmall ...>
+#
+# so the trace length is the highest `State N:` before the next violation
+# report -- blank lines separate states inside one trace and do not end it. TLC
+# searches breadth-first, so the FIRST report for an invariant is the shortest
+# counterexample; later ones are other states at the same or greater depth.
+parse_violations() {
+  awk '
+    function flush() {
+      if (inv != "" && depth > 0 && !(inv in seen)) { seen[inv] = depth; order[++k] = inv }
+      inv = ""; depth = 0
+    }
+    /^Error: Invariant .* is violated\.$/ { flush(); inv = $3; next }
+    /^Error: Deadlock reached\.$/         { flush(); next }
+    /^[0-9]+ states generated/            { flush(); next }
+    inv != "" && /^State [0-9]+:/ {
+      n = $2; sub(/:$/, "", n); if (n + 0 > depth) depth = n + 0
+    }
+    END { flush(); for (i = 1; i <= k; i++) print order[i], seen[order[i]] }
+  '
+}
+
+# Every invariant the .cfg asked TLC to check, in declaration order, so an
+# invariant that holds is recorded as holding rather than merely absent.
+declared_invariants() {
+  awk '
+    /^[[:space:]]*INVARIANTS?[[:space:]]*$/ { mode = 1; next }
+    /^[[:space:]]*INVARIANTS?[[:space:]]+/  { mode = 1; $1 = ""; print; next }
+    /^[[:space:]]*(SPECIFICATION|INIT|NEXT|CONSTANTS?|PROPERTIES|PROPERTY|SYMMETRY|CONSTRAINT|VIEW)([[:space:]]|$)/ { mode = 0 }
+    mode { print }
+  ' "$1" | tr -s ' \t' '\n\n' | grep -v '^$' || true
+}
+
+# CONSTANT assignments, echoed into expected.json so a corpus entry records the
+# model it was checked at and not just the module it came from.
+declared_constants() {
+  awk '
+    /^[[:space:]]*CONSTANTS?[[:space:]]*$/ { mode = 1; next }
+    /^[[:space:]]*CONSTANTS?[[:space:]]+/  { mode = 1; $1 = ""; print; next }
+    /^[[:space:]]*(SPECIFICATION|INIT|NEXT|INVARIANTS?|PROPERTIES|PROPERTY|SYMMETRY|CONSTRAINT|VIEW)([[:space:]]|$)/ { mode = 0 }
+    mode { print }
+  ' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' || true
+}
+
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+generate() {
+  local name="$1" out="$2"
+  local dir="$CORPUS/$name"
+  [[ -d "$dir" ]] || die "no such corpus entry: $name"
+
+  local tla cfg module
+  tla="$(find "$dir" -maxdepth 1 -name '*.tla' | sort | head -1)"
+  [[ -n "$tla" ]] || die "$name: no .tla module"
+  module="$(basename "$tla" .tla)"
+  cfg="$dir/$module.cfg"
+  [[ -f "$cfg" ]] || die "$name: no $module.cfg"
+
+  echo "==> $name"
+  local output; output="$(run_tlc "$dir" "$module")"
+
+  # TLC prints "Model checking completed. No error has been found." even under
+  # -continue with violations reported above it, so completion is read from the
+  # state-count line instead -- its absence means the search did not finish.
+  local distinct
+  distinct="$(printf '%s\n' "$output" | sed -n 's/.*, \([0-9]*\) distinct states found.*/\1/p' | tail -1)"
+  if [[ -z "$distinct" ]]; then
+    printf '%s\n' "$output" >&2
+    die "$name: TLC did not complete a search (no distinct-state count above)"
+  fi
+
+  local diameter
+  diameter="$(printf '%s\n' "$output" | sed -n 's/.*complete state graph search is \([0-9]*\).*/\1/p' | tail -1)"
+
+  local deadlock=false
+  printf '%s\n' "$output" | grep -q '^Error: Deadlock reached\.' && deadlock=true
+
+  local violations; violations="$(printf '%s\n' "$output" | parse_violations)"
+  local tlc_version
+  tlc_version="$(printf '%s\n' "$output" | sed -n 's/^TLC2 Version \([0-9.]*\) .*/\1/p' | head -1)"
+
+  {
+    echo '{'
+    echo "  \"generated_by\": \"bin/tlc-expected\","
+    echo "  \"tla_tools_version\": \"$TLA_TOOLS_VERSION\","
+    echo "  \"tlc_version\": \"$tlc_version\","
+    echo "  \"module\": \"$module\","
+
+    printf '  "constants": {'
+    local first=1 line lhs rhs
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      lhs="${line%%=*}"; rhs="${line#*=}"
+      lhs="$(echo "$lhs" | sed 's/[[:space:]]*$//')"
+      rhs="$(echo "$rhs" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+      [[ $first -eq 1 ]] || printf ','
+      printf '\n    "%s": "%s"' "$(json_escape "$lhs")" "$(json_escape "$rhs")"
+      first=0
+    done < <(declared_constants "$cfg")
+    [[ $first -eq 1 ]] && echo '},' || printf '\n  },\n'
+
+    echo "  \"distinct_states\": $distinct,"
+    echo "  \"diameter\": ${diameter:-null},"
+    echo "  \"deadlock\": $deadlock,"
+
+    printf '  "invariants": {'
+    first=1
+    local inv depth
+    while IFS= read -r inv; do
+      [[ -n "$inv" ]] || continue
+      depth="$(printf '%s\n' "$violations" | awk -v i="$inv" '$1 == i { print $2; exit }')"
+      [[ $first -eq 1 ]] || printf ','
+      if [[ -n "$depth" ]]; then
+        printf '\n    "%s": {"violated_at": %s}' "$(json_escape "$inv")" "$depth"
+      else
+        printf '\n    "%s": "holds"' "$(json_escape "$inv")"
+      fi
+      first=0
+    done < <(declared_invariants "$cfg")
+    [[ $first -eq 1 ]] && echo '}' || printf '\n  }\n'
+
+    echo '}'
+  } > "$out"
+}
+
+main() {
+  local check=0 names=()
+  for arg in "$@"; do
+    case "$arg" in
+      --check) check=1 ;;
+      -*) die "unknown option: $arg" ;;
+      *) names+=("$arg") ;;
+    esac
+  done
+
+  if [[ ${#names[@]} -eq 0 ]]; then
+    while IFS= read -r d; do names+=("$(basename "$d")"); done \
+      < <(find "$CORPUS" -mindepth 1 -maxdepth 1 -type d | sort)
+  fi
+  [[ ${#names[@]} -gt 0 ]] || die "corpus is empty"
+
+  ensure_jar
+
+  local status=0
+  for name in "${names[@]}"; do
+    local committed="$CORPUS/$name/expected.json"
+    if [[ $check -eq 1 ]]; then
+      local tmp; tmp="$(mktemp)"
+      generate "$name" "$tmp"
+      [[ -f "$committed" ]] || die "$name: no expected.json to check against"
+      if ! diff -u "$committed" "$tmp"; then
+        echo "!!! $name: TLC no longer reports what expected.json records" >&2
+        status=1
+      fi
+      rm -f "$tmp"
+    else
+      generate "$name" "$committed"
+    fi
+  done
+
+  [[ $check -eq 1 && $status -eq 0 ]] && echo "==> corpus agrees with TLC"
+  return $status
+}
+
+main "$@"

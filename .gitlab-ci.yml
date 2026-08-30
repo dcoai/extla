@@ -1,13 +1,16 @@
 # Runs on the `DCOTek` runner (unprivileged, docker executor). ExTLA has no
-# native NIFs and publishes no image, so `check` is the whole pipeline for now.
+# native NIFs and publishes no image.
 #
-# A `verify` stage running the TLC differential corpus (test/differential/README.md)
-# is the Phase 1 acceptance gate (spec/08-decisions.md D-9). It needs a JVM and
-# tla2tools.jar, and lands with the first corpus entry -- an empty job that pulls
-# a JDK to echo a message is not a gate.
+# `check` builds and tests the Elixir side. `verify` runs the TLC differential
+# corpus (test/differential/README.md), the Phase 1 acceptance gate
+# (spec/08-decisions.md D-9). Until the checker exists, `verify` pins the oracle:
+# it re-runs TLC and fails if TLC no longer reports what the committed
+# expected.json records. Once ExTLA can check a spec, comparing its answers to
+# those same files is one more job in this stage.
 
 stages:
   - check
+  - verify
 
 variables:
   # Pinned to the versions in .tool-versions, so CI and a developer's asdf
@@ -56,3 +59,24 @@ test:
   stage: check
   script:
     - mix test
+
+# The oracle side of the corpus. This job is the reason expected.json can be
+# trusted as a fixture: it is regenerated from TLC on every pipeline and diffed
+# against what is committed, so a hand-edit that makes a future ExTLA test pass
+# fails here instead.
+tlc-corpus:
+  stage: verify
+  image: eclipse-temurin:21-jre
+  variables:
+    # Bumped together with TLA_TOOLS_VERSION in bin/tlc-expected; the key change
+    # is what forces the new jar to be fetched rather than read from cache.
+    TLA_TOOLS_VERSION: v1.7.4
+  cache:
+    key: tla2tools-$TLA_TOOLS_VERSION
+    paths:
+      - .tla
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends curl ca-certificates
+  script:
+    - bin/tlc-expected --check
