@@ -1,0 +1,16 @@
+{
+  "generated_by": "bin/tlc-expected",
+  "tla_tools_version": "v1.7.4",
+  "tlc_version": "2.19",
+  "module": "TwoPhaseCommit",
+  "constants": {
+    "RM": "{r1, r2, r3}"
+  },
+  "distinct_states": 288,
+  "diameter": 11,
+  "deadlock": false,
+  "invariants": {
+    "TPTypeOK": "holds",
+    "TPConsistent": "holds"
+  }
+}

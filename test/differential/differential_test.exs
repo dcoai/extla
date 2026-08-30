@@ -20,8 +20,29 @@ defmodule TLA.DifferentialTest do
 
   # Each entry names its ExTLA spec module and the constants TLC was run with.
   # `die_hard` has none: the jugs are in the module.
+  #
+  # `names` maps a TLC invariant to its ExTLA counterpart where underscoring is
+  # not enough. TLA+ modules prefix by convention (`TPTypeOK`), and ExTLA's
+  # implicit type invariant is always `:type_ok` -- so the mapping is stated per
+  # entry rather than guessed, which also means an invariant that goes missing
+  # from the DSL spec is reported instead of silently skipped.
   @entries [
-    %{name: "die_hard", module: TLA.Differential.DieHard, constants: %{}}
+    %{name: "die_hard", module: TLA.Differential.DieHard, constants: %{}, names: %{}},
+    %{
+      name: "two_phase_commit",
+      module: TLA.Differential.TwoPhaseCommit,
+      constants: %{rms: MapSet.new([:r1, :r2, :r3])},
+      names: %{"TPTypeOK" => :type_ok}
+    },
+    %{
+      name: "distributed_lock",
+      module: TLA.Differential.DistributedLock,
+      constants: %{
+        processes: MapSet.new([:p1, :p2]),
+        resources: MapSet.new([:r1, :r2])
+      },
+      names: %{}
+    }
   ]
 
   for entry <- @entries do
@@ -38,7 +59,7 @@ defmodule TLA.DifferentialTest do
       end
 
       test "explores the same number of distinct states as TLC", ctx do
-        result = check(ctx.entry, invariants: [])
+        result = check(ctx.entry, nothing_checked())
 
         assert result.distinct_states == ctx.expected["distinct_states"]
       end
@@ -46,13 +67,13 @@ defmodule TLA.DifferentialTest do
       # Catches the narrower failure of a search that stopped early but
       # coincidentally reached the same state count.
       test "reaches the same search depth as TLC", ctx do
-        result = check(ctx.entry, invariants: [])
+        result = check(ctx.entry, nothing_checked())
 
         assert result.diameter == ctx.expected["diameter"]
       end
 
       test "agrees with TLC about deadlock", ctx do
-        result = check(ctx.entry, invariants: [])
+        result = check(ctx.entry, nothing_checked())
 
         assert result.deadlock == ctx.expected["deadlock"]
       end
@@ -61,8 +82,8 @@ defmodule TLA.DifferentialTest do
         spec = run_spec(ctx.entry)
 
         for {tlc_name, verdict} <- ctx.expected["invariants"] do
-          name = invariant_name!(spec, tlc_name)
-          result = check(ctx.entry, invariants: [name])
+          name = invariant_name!(spec, tlc_name, ctx.entry)
+          result = check(ctx.entry, invariants: [name], action_properties: [])
 
           case verdict do
             "holds" ->
@@ -90,8 +111,8 @@ defmodule TLA.DifferentialTest do
         if violated do
           {tlc_name, _} = violated
           spec = run_spec(ctx.entry)
-          name = invariant_name!(spec, tlc_name)
-          result = check(ctx.entry, invariants: [name])
+          name = invariant_name!(spec, tlc_name, ctx.entry)
+          result = check(ctx.entry, invariants: [name], action_properties: [])
           invariant = Enum.find(spec.invariants, &(&1.name == name))
 
           states = result.violation.states
@@ -105,6 +126,11 @@ defmodule TLA.DifferentialTest do
       end
     end
   end
+
+  # The state-count comparison must run with nothing selected on either side.
+  # An ExTLA action property that TLC's module does not have would otherwise halt
+  # the search early and make the counts differ for a reason that is not a bug.
+  defp nothing_checked, do: [invariants: [], action_properties: []]
 
   defp check(entry, opts) do
     ModelChecker.run(entry.module, Map.merge(%{constants: entry.constants}, Map.new(opts)))
@@ -122,8 +148,12 @@ defmodule TLA.DifferentialTest do
   # Resolving through the compiled spec rather than String.to_existing_atom/1
   # also catches the case worth catching: an invariant TLC checked that the
   # ExTLA spec does not have, which would otherwise pass by not being compared.
-  defp invariant_name!(spec, tlc_name) do
-    underscored = Macro.underscore(tlc_name)
+  defp invariant_name!(spec, tlc_name, entry) do
+    underscored =
+      case Map.fetch(entry.names, tlc_name) do
+        {:ok, mapped} -> Atom.to_string(mapped)
+        :error -> Macro.underscore(tlc_name)
+      end
 
     case Enum.find(spec.invariants, &(Atom.to_string(&1.name) == underscored)) do
       nil ->

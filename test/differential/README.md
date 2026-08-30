@@ -54,8 +54,8 @@ failure of a search that terminated early but happened to reach the same count.
 | Entry | Source | TLC oracle | ExTLA `spec.ex` |
 |---|---|---|---|
 | `die_hard` | Lamport, *Specifying Systems* | ✅ | ✅ |
-| `two_phase_commit` | Lamport, TLA+ examples | not yet | not yet |
-| `distributed_lock` | `spec/07-examples.md` Example 1 | not yet | not yet |
+| `two_phase_commit` | Lamport, TLA+ examples | ✅ | ✅ |
+| `distributed_lock` | `spec/07-examples.md` Example 1 | ✅ | ✅ |
 | `raft_election` | `spec/07-examples.md` Example 2 (safety only; liveness is refuted by the term bound by design) | not yet | not yet |
 | `bounded_buffer` | `spec/07-examples.md` Example 3 | not yet | not yet |
 | `paxos` | Lamport, *Paxos Made Simple* TLA+ | not yet | not yet |
@@ -65,6 +65,28 @@ Each row also carries the `--verify-symmetry` result where a `SYMMETRY` is decla
 The oracle column is filled in ahead of the ExTLA column deliberately: with the expected
 answers already in the repository, every piece of the checker is measured against truth
 from the day it is written, rather than against its own output a phase later.
+
+## Writing an entry
+
+Two things bite when translating a spec into TLA+ for TLC.
+
+**Use model values, not strings, for tags.** TLC compares strings strictly and
+*raises* on `"idle" = <<"holding", r>>` rather than returning FALSE, so a spec whose
+control state is sometimes a tag and sometimes a tuple will not run. Declaring
+`CONSTANTS idle, requesting, holding` and assigning `idle = idle` in the `.cfg` makes
+them model values, which are simply unequal to anything they are not — and reads as
+what they translate to on the ExTLA side: atoms.
+
+**State the invariant-name mapping.** TLA+ modules prefix by convention (`TPTypeOK`)
+and ExTLA's implicit type invariant is always `:type_ok`, so the differential test
+carries a per-entry `names` map. It is stated rather than guessed, which also means an
+invariant that goes missing from the DSL spec is *reported* rather than silently
+skipped.
+
+The state-count comparison runs with nothing selected on either side —
+`invariants: [], action_properties: []`. An ExTLA action property that the TLA+ module
+does not have would otherwise halt the search early and make the counts differ for a
+reason that is not a bug.
 
 ## Running
 
