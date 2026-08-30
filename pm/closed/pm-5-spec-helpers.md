@@ -3,7 +3,9 @@ id: pm-5
 title: "TLA.Spec.Helpers — the vocabulary available inside spec blocks"
 labels: [In-Progress]
 created: 2026-08-30
+closed: 2026-08-30
 gitlab_issue: 5
+merge_request: 6
 gitlab_synced: true
 ---
 

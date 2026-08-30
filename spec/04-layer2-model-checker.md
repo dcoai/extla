@@ -37,25 +37,33 @@ The three rules from that file that shape everything here:
 
 ```elixir
 defmodule TLA.Spec do
+  # Registered in the macro BODY, not inside the quote, and the DSL macros
+  # likewise call Module.put_attribute/3 in their bodies rather than emitting
+  # `@tla_...`. Elixir expands an entire defmodule body before evaluating any of
+  # it, so an attribute written by GENERATED code is not visible to the
+  # expansion of a later macro -- and `action` has to know, while it expands,
+  # which names are declared variables. Accumulating at expansion time is what
+  # makes that work.
   defmacro __using__(_opts) do
+    for attribute <- @attributes do
+      Module.register_attribute(__CALLER__.module, attribute, accumulate: true)
+    end
+
     quote do
       import TLA.Spec.DSL
-
-      Module.register_attribute(__MODULE__, :tla_constants, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_variables, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_inits, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_actions, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_invariants, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_action_properties, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_temporals, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_fairness, accumulate: true)
-      Module.register_attribute(__MODULE__, :tla_terminals, accumulate: true)
+      import TLA.Spec.Helpers
 
       @before_compile TLA.Spec
     end
   end
 end
 ```
+
+**Every block macro takes `(name, opts \\ [], block)`, not `(name, opts \\ [], do: block)`.**
+`invariant :x, desc: "…" do … end` passes the block as a *third* argument, while
+`invariant :x, desc: "…", do: block` folds it into the second; a `do: block`
+parameter pattern matches only the second shape. The macros merge the two and
+pop `:do`, so both call forms work.
 
 ```elixir
 defmodule TLA.Spec.DSL do
@@ -278,7 +286,7 @@ defmodule TLA.Spec.Compiled do
     fairness: [fairness_def()]
   }
 
-  @type terminal_def :: %{name: atom(), predicate: (TLA.State.t() -> boolean())}
+  @type terminal_def :: %{name: atom(), predicate: (constants(), TLA.State.t() -> boolean())}
 
   # `per: []` is whole-action fairness. `per: [:p]` is one constraint per binding
   # of `p`, expanded once the constants are known (02-dsl-semantics.md §5.2).
@@ -303,7 +311,18 @@ defmodule TLA.Spec.Compiled do
   # the resolved type is checked as the implicit invariant `:type_ok`.
   @type type_expr :: Macro.t()
 
-  @type init_fn :: (constants :: map() -> TLA.State.t())
+  # EVERY compiled function takes the constant assignments as its first
+  # argument. An earlier draft gave them to `init_fn` and the param generators
+  # but not to guards, transitions or predicates -- while 02-dsl-semantics.md
+  # §1.1 lets any block reference `^constants`, and the worked example's
+  # `conservation_of_money` compares against `^max_balance`. Those functions had
+  # no way to evaluate what the DSL lets an author write. Threading constants
+  # uniformly is the smallest fix that keeps them out of the state, where they
+  # would be fingerprinted and would inflate the state space by a value that
+  # never changes.
+  @type constants :: map()
+
+  @type init_fn :: (constants() -> TLA.State.t())
 
   @type action_def :: %{
     name: atom(),
@@ -316,30 +335,40 @@ defmodule TLA.Spec.Compiled do
     # returning the set to draw from — so a later param can be constrained by an
     # earlier one, and nondeterminism has exactly one home
     # (02-dsl-semantics.md §3).
-    params: [{atom(), (map(), TLA.State.t(), map() -> Enumerable.t())}],
+    params: [{atom(), (constants(), TLA.State.t(), map() -> Enumerable.t())}],
 
-    guard: (TLA.State.t(), params :: map() -> boolean()),
+    # Where each param's set comes from. Recorded because §5.2's per-binding
+    # fairness may only quantify over a constant- or literal-drawn param, and
+    # the §7 diagnostic "fairness over a state-drawn param" cannot be produced
+    # without it.
+    param_sources: [{atom(), :constant | :literal | :state}],
+
+    guard: (constants(), TLA.State.t(), params :: map() -> boolean()),
 
     # Pure and deterministic in (pre_state, params). This is the property the
     # checker, symmetry canonicalization and Layer 3's refinement check all
     # depend on; nothing in an action body may violate it.
-    transition: (TLA.State.t(), params :: map() -> TLA.State.t())
+    transition: (constants(), TLA.State.t(), params :: map() -> TLA.State.t())
   }
 
   @type invariant_def :: %{
     name: atom(),
     description: String.t(),
-    predicate: (TLA.State.t() -> boolean())
+    predicate: (constants(), TLA.State.t() -> boolean())
   }
 
   @type action_property_def :: %{
     name: atom(),
-    predicate: (TLA.State.t(), TLA.State.t() -> boolean())
+    description: String.t(),
+    predicate: (constants(), old :: TLA.State.t(), new :: TLA.State.t() -> boolean())
   }
 
+  # A FUNCTION of the constants, not a value: a `for_all` ranges over a constant
+  # set and every predicate inside it may mention `^constants`, neither of which
+  # has a value until a run assigns one.
   @type temporal_def :: %{
     name: atom(),
-    formula: temporal_formula(),
+    formula: (constants() -> temporal_formula()),
     opts: keyword()
   }
 
@@ -354,7 +383,7 @@ defmodule TLA.Spec.Compiled do
     | {:predicate, (TLA.State.t() -> boolean())}
     # ∀ over a constant: the set is resolved at check time, the body instantiated
     # once per element, and each instance checked independently.
-    | {:for_all, (constants :: map() -> Enumerable.t()), (term() -> temporal_formula())}
+    | {:for_all, (constants() -> Enumerable.t()), (term() -> temporal_formula())}
 
   @doc """
   Extract the compiled spec from a module.
