@@ -190,4 +190,83 @@ defmodule TLA.TestSpecs do
     fairness(:strong, acquire: [:p])
     fairness(:weak, release: [:p], request: [:p])
   end
+
+  defmodule Terminating do
+    @moduledoc "A spec that ends on purpose (§5.3): the end state is declared."
+    use TLA.Spec
+
+    constant :max
+
+    variable :produced, type: 0..^max
+
+    init do
+      produced = 0
+    end
+
+    action :produce do
+      require produced < ^max
+      produced = produced + 1
+    end
+
+    terminal :all_produced do
+      produced == ^max
+    end
+  end
+
+  defmodule Deadlocking do
+    @moduledoc "The same shape with no `terminal`, so the end state is a deadlock."
+    use TLA.Spec
+
+    constant :max
+
+    variable :produced, type: 0..^max
+
+    init do
+      produced = 0
+    end
+
+    action :produce do
+      require produced < ^max
+      produced = produced + 1
+    end
+  end
+
+  defmodule Unbounded do
+    @moduledoc "An unbounded counter, for state constraints and max_states."
+    use TLA.Spec
+
+    variable :n
+
+    init do
+      n = 0
+    end
+
+    action :tick do
+      n = n + 1
+    end
+  end
+
+  defmodule Broken do
+    @moduledoc "An invariant that a reachable state refutes, and at a known depth."
+    use TLA.Spec
+
+    variable :n
+
+    init do
+      n = 0
+    end
+
+    action :tick do
+      require n < 5
+      n = n + 1
+    end
+
+    invariant :below_three do
+      n < 3
+    end
+
+    action_property :never_decreases do
+      new.n >= old.n
+    end
+  end
 end

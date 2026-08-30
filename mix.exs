@@ -20,7 +20,7 @@ defmodule ExTLA.MixProject do
 
   def application, do: [extra_applications: [:logger, :crypto]]
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/differential"]
   defp elixirc_paths(_), do: ["lib"]
 
   # spec/06-architecture.md §Dependencies. Zero runtime dependencies.
