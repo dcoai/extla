@@ -1,0 +1,173 @@
+defmodule TLA.Spec.Helpers do
+  @moduledoc """
+  Functions available inside `action`, `init`, `invariant`, `terminal` and
+  `action_property` blocks.
+
+  Every one of these is a thin, total, deterministic wrapper over a standard
+  Elixir function. That is the whole design: an action body must be a pure
+  deterministic function of `(pre_state, params)` (`02-dsl-semantics.md` §3), so
+  nothing here may branch the search, read the clock, or depend on anything but
+  its arguments.
+
+  They exist for readability rather than capability — `len(buffer)` and
+  `sum(values(balances))` read as the TLA+ they translate, and a spec author
+  writing `MapSet.size/1` directly gets the same result.
+
+  Where a name would silently produce a wrong answer on a missing key, it
+  raises instead: `update/3`, `head/1` and `tail/1` all fail loudly, for the
+  reason set out in `01-foundation.md` §Reading a variable that is not there.
+  """
+
+  # ── Set operations ──
+
+  @doc "The empty set. TLA+: `{}`."
+  @spec set() :: MapSet.t()
+  def set, do: MapSet.new()
+
+  @doc "A set from an enumerable. TLA+: `{a, b, c}`."
+  @spec set(Enumerable.t()) :: MapSet.t()
+  def set(elements), do: MapSet.new(elements)
+
+  @doc "TLA+: `S \\\\cup {e}`."
+  @spec put(MapSet.t(), term()) :: MapSet.t()
+  def put(set, elem), do: MapSet.put(set, elem)
+
+  @doc "TLA+: `S \\\\ {e}`."
+  @spec delete(MapSet.t(), term()) :: MapSet.t()
+  def delete(set, elem), do: MapSet.delete(set, elem)
+
+  @doc "TLA+: `e \\\\in S`."
+  @spec member?(MapSet.t(), term()) :: boolean()
+  def member?(set, elem), do: MapSet.member?(set, elem)
+
+  @doc "TLA+: `Cardinality(S)`."
+  @spec size(MapSet.t()) :: non_neg_integer()
+  def size(set), do: MapSet.size(set)
+
+  @doc "TLA+: `IsFiniteSet(S)` — here, whether the term is a set at all."
+  @spec is_set(term()) :: boolean()
+  def is_set(term), do: is_struct(term, MapSet)
+
+  @doc "TLA+: `S \\\\cup T`."
+  @spec union(MapSet.t(), MapSet.t()) :: MapSet.t()
+  def union(a, b), do: MapSet.union(a, b)
+
+  @doc "TLA+: `S \\\\cap T`."
+  @spec intersection(MapSet.t(), MapSet.t()) :: MapSet.t()
+  def intersection(a, b), do: MapSet.intersection(a, b)
+
+  @doc "TLA+: `S \\\\ T`."
+  @spec difference(MapSet.t(), MapSet.t()) :: MapSet.t()
+  def difference(a, b), do: MapSet.difference(a, b)
+
+  @doc "TLA+: `S \\\\subseteq T`."
+  @spec subset?(MapSet.t(), MapSet.t()) :: boolean()
+  def subset?(a, b), do: MapSet.subset?(a, b)
+
+  # ── Sequence operations ──
+  #
+  # A TLA+ sequence is 1-indexed, which is why `subseq/3` subtracts one and
+  # nothing else here takes an index.
+
+  @doc "The empty sequence. TLA+: `<<>>`."
+  @spec seq() :: []
+  def seq, do: []
+
+  @doc "A sequence from a list. TLA+: `<<a, b, c>>`."
+  @spec seq(list()) :: list()
+  def seq(elements), do: elements
+
+  @doc "TLA+: `Append(s, e)`."
+  @spec append(list(), term()) :: list()
+  def append(seq, elem), do: seq ++ [elem]
+
+  @doc "TLA+: `Head(s)`. Raises on the empty sequence, where `Head` is undefined."
+  @spec head(nonempty_list()) :: term()
+  def head(seq), do: hd(seq)
+
+  @doc "TLA+: `Tail(s)`. Raises on the empty sequence, where `Tail` is undefined."
+  @spec tail(nonempty_list()) :: list()
+  def tail(seq), do: tl(seq)
+
+  @doc "TLA+: `Len(s)`."
+  @spec len(list()) :: non_neg_integer()
+  def len(seq), do: length(seq)
+
+  @doc """
+  TLA+: `SubSeq(s, m, n)` — elements `m` through `n` inclusive, **1-indexed**.
+
+      iex> TLA.Spec.Helpers.subseq([:a, :b, :c, :d], 2, 3)
+      [:b, :c]
+  """
+  @spec subseq(list(), pos_integer(), integer()) :: list()
+  def subseq(seq, m, n), do: Enum.slice(seq, m - 1, n - m + 1)
+
+  # ── Function (map) operations ──
+
+  @doc """
+  TLA+: `[x \\\\in S |-> f(x)]`.
+
+      iex> TLA.Spec.Helpers.for_each(MapSet.new([:a, :b]), fn _ -> 0 end)
+      %{a: 0, b: 0}
+  """
+  @spec for_each(Enumerable.t(), (term() -> term())) :: map()
+  def for_each(domain, f), do: Map.new(domain, fn k -> {k, f.(k)} end)
+
+  @doc """
+  TLA+: `[f EXCEPT ![k] = g(@)]`.
+
+  Raises on a key outside the domain — see `TLA.Function` for why extending it
+  instead would be worse than failing.
+  """
+  @spec update(map(), term(), (term() -> term())) :: map()
+  def update(map, key, f), do: Map.update!(map, key, f)
+
+  @doc "The values of a function, as a list."
+  @spec values(map()) :: list()
+  def values(map), do: Map.values(map)
+
+  @doc "The keys of a function, as a list."
+  @spec keys(map()) :: list()
+  def keys(map), do: Map.keys(map)
+
+  @doc "TLA+: `DOMAIN f`, as a set."
+  @spec domain(map()) :: MapSet.t()
+  def domain(map), do: MapSet.new(Map.keys(map))
+
+  # ── Arithmetic ──
+
+  @doc "The sum of an enumerable of numbers; 0 when empty."
+  @spec sum(Enumerable.t()) :: number()
+  def sum(enum), do: Enum.sum(enum)
+
+  @doc """
+  The sum of `f` over an enumerable.
+
+      iex> TLA.Spec.Helpers.sum([{:a, 1}, {:b, 2}], fn {_, n} -> n end)
+      3
+  """
+  @spec sum(Enumerable.t(), (term() -> number())) :: number()
+  def sum(enum, f), do: enum |> Enum.map(f) |> Enum.sum()
+
+  # ── Deterministic choice ──
+
+  @doc """
+  `CHOOSE x \\\\in S : P(x)` — deterministically select an element satisfying the
+  predicate. Returns the same element for the same set and predicate; raises if
+  none satisfies it.
+
+  It does NOT branch. Nondeterminism comes from `params:` only
+  (`02-dsl-semantics.md` §3) — an earlier draft gave this function branching
+  semantics, which both contradicts the TLA+ operator it is named for and cannot
+  be implemented: a function returning one element cannot produce several
+  successors.
+
+  Delegates to `TLA.Set.choose/2`, which fixes the choice as the least satisfying
+  element in Erlang term order.
+
+      iex> TLA.Spec.Helpers.choose(MapSet.new([3, 1, 2]), &(&1 > 1))
+      2
+  """
+  @spec choose(MapSet.t(), (term() -> boolean())) :: term()
+  defdelegate choose(set, predicate \\ fn _ -> true end), to: TLA.Set
+end
