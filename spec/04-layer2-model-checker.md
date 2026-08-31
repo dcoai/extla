@@ -438,6 +438,14 @@ defmodule TLA.ModelChecker do
 
   @type config :: %{
     constants: map(),                  # constant assignments
+    # A budget, checked before expanding each state: the search stops once the
+    # graph has PASSED the limit, so the final count exceeds it by the successors
+    # of the state that crossed it. `:max_states_reached` reports the count
+    # actually reached, never the limit -- the same honesty the status itself
+    # exists for. Under `workers:` the rule is unchanged: each worker checks the
+    # shared table rather than its own accumulator, so the overshoot is what the
+    # other workers had in flight (tens of states, measured) rather than a whole
+    # BFS level (thousands).
     max_states: pos_integer(),         # state limit (default: 1_000_000)
     # Implemented: `TLA.ModelChecker.Parallel`, level-synchronous BFS over N
     # workers sharing one ETS graph. Refused together with `check_liveness:`,

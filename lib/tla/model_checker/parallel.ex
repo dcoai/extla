@@ -50,6 +50,19 @@ defmodule TLA.ModelChecker.Parallel do
   similar reason: the edge table and ENABLED bits are per-struct maps, so a parallel run
   would answer from a graph missing the edges other workers found.
 
+  ## `max_states` means the same thing here as on one process
+
+  The limit is checked by each worker, before each state, against the count in the shared
+  fingerprint table (`StateGraph.live_state_count/1`) rather than against its own
+  accumulator — which holds only that worker's fragment while a level is in flight. So the
+  rule is the single-threaded one: the search stops once the graph has passed the budget,
+  and what it reports is the count it actually reached rather than the limit it was given.
+
+  The overshoot is what the other workers had in flight at that moment, bounded by the
+  batch. Checking once per level instead would have been simpler and would have made the
+  overshoot a whole BFS level — thousands of states on `raft` — and a budget that can be
+  exceeded twentyfold is not a budget.
+
   ## What comes back, and why summing it is exact
 
   A worker returns its own accumulators — counts, the marked-state sets, and a
@@ -63,7 +76,7 @@ defmodule TLA.ModelChecker.Parallel do
   its batch). Nothing is counted twice because nothing is *done* twice.
   """
 
-  alias TLA.{Coverage, ModelChecker}
+  alias TLA.{Coverage, ModelChecker, StateGraph}
 
   @doc """
   Explore from a seeded run — one whose `frontier` holds the initial states — and return
@@ -81,16 +94,10 @@ defmodule TLA.ModelChecker.Parallel do
   defp levels(run, []), do: run
 
   defp levels(run, level) do
-    # Checked once per level rather than once per state, which makes `max_states` a limit
-    # the coordinator enforces at a batch boundary. The count reported is still the count
-    # actually reached — `finish/2` reads the merged graph, not the limit.
-    if run.graph.state_count > run.config.max_states do
-      %{run | outcome: :max_states_reached}
-    else
-      case dispatch(run, level) do
-        {:violation, run} -> run
-        {:ok, run, next} -> levels(run, next)
-      end
+    case dispatch(run, level) do
+      {:violation, run} -> run
+      {:ok, %{outcome: :max_states_reached} = run, _next} -> run
+      {:ok, run, next} -> levels(run, next)
     end
   end
 
@@ -106,9 +113,14 @@ defmodule TLA.ModelChecker.Parallel do
       # Halting closes the stream, which shuts down the workers still running. A violation
       # anywhere in the level ends the level: every state in it has the same depth, so no
       # worker still running could report a shorter counterexample than this one.
+      #
+      # `:max_states_reached` does NOT halt here. It is a budget rather than a finding, and
+      # every worker in this level has already hit the same shared count — collecting them
+      # costs nothing and keeps the reported totals complete for the work that was done.
+      # `levels/2` stops on the merged outcome.
       case worker.outcome do
         {:violation, _trace} -> {:halt, {:violation, merge(run, worker)}}
-        :ok -> {:cont, {:ok, merge(run, worker), :queue.to_list(worker.frontier) ++ next}}
+        _ -> {:cont, {:ok, merge(run, worker), :queue.to_list(worker.frontier) ++ next}}
       end
     end)
   end
@@ -144,9 +156,19 @@ defmodule TLA.ModelChecker.Parallel do
     }
 
     Enum.reduce_while(batch, run, fn {id, state}, run ->
-      case ModelChecker.expand_one(run, id, state) do
-        {:ok, run} -> {:cont, run}
-        {:violation, run, trace} -> {:halt, %{run | outcome: {:violation, trace}}}
+      # `max_states` is checked here, before each state, against the count in the SHARED
+      # table — so it means on eight processes what it means on one: the search stops once
+      # the graph has passed the budget, and the overshoot is whatever the other workers
+      # had in flight when it did. Checking once per level instead would have made the
+      # overshoot a whole BFS level, which on `raft` is thousands of states — a budget that
+      # can be exceeded twentyfold is not a budget.
+      if StateGraph.live_state_count(run.graph) > run.config.max_states do
+        {:halt, %{run | outcome: :max_states_reached}}
+      else
+        case ModelChecker.expand_one(run, id, state) do
+          {:ok, run} -> {:cont, run}
+          {:violation, run, trace} -> {:halt, %{run | outcome: {:violation, trace}}}
+        end
       end
     end)
   end

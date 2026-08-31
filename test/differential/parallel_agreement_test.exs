@@ -114,6 +114,62 @@ defmodule TLA.Differential.ParallelAgreementTest do
     end
   end
 
+  describe "max_states under workers" do
+    # The reading, by name: `max_states` is a budget checked BEFORE expanding each state,
+    # against the count in the shared table — so the search stops once the graph has passed
+    # the budget, exactly as it does on one process, and the overshoot is what the other
+    # workers had in flight at that moment.
+    @tag timeout: 300_000
+    test "stops past the budget and reports the count it actually reached" do
+      limit = 1_000
+
+      for workers <- [1 | @worker_counts] do
+        {result, graph} =
+          ModelChecker.explore(@raft.module, %{
+            constants: @raft.constants,
+            workers: workers,
+            max_states: limit,
+            invariants: [],
+            action_properties: []
+          })
+
+        assert result.status == :max_states_reached
+        assert result.coverage.bounded_by == :max_states
+
+        # The count is a fact about the run, not the limit it was given — the same honesty
+        # `:max_states_reached` exists for one level up, where "we ran out of budget" must
+        # not be returned as "it holds".
+        assert result.distinct_states == :ets.info(graph.fingerprints, :size),
+               "at #{workers} workers the reported count is not the graph's"
+
+        assert result.distinct_states >= limit
+        assert result.distinct_states < 58_359, "the limit did nothing at #{workers} workers"
+
+        # Measured at 2 to 25 across worker counts. The bound is generous; what it
+        # discriminates against is checking the limit once per LEVEL, which on `raft` at
+        # this budget would overshoot by thousands rather than by tens.
+        assert result.distinct_states - limit <= 200,
+               "overshoot of #{result.distinct_states - limit} at #{workers} workers is a " <>
+                 "level rather than a batch"
+      end
+    end
+
+    test "a state space smaller than the budget is not bounded at any worker count" do
+      for workers <- [1 | @worker_counts] do
+        result =
+          ModelChecker.run(TLA.TestSpecs.Cube, %{
+            workers: workers,
+            max_states: 1_000,
+            check_deadlock: false
+          })
+
+        assert result.status == :ok, "the budget fired early at #{workers} workers"
+        assert result.distinct_states == 8
+        assert result.coverage.bounded_by == :none
+      end
+    end
+  end
+
   describe "shapes that are not a full level" do
     # `Broken` is a chain: one state per BFS level, six levels. With eight workers every
     # level has fewer states than workers, so most workers are handed no batch at all —

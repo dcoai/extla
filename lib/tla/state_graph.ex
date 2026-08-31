@@ -352,6 +352,23 @@ defmodule TLA.StateGraph do
   end
 
   @doc """
+  How many distinct states are registered *right now*, read from the shared fingerprint
+  table rather than from this struct's `state_count`.
+
+  The two agree on a single-threaded search. They do not agree inside a worker: under
+  `workers:` each process accumulates its own `state_count` so that the coordinator can
+  sum the contributions (D-27), and that field therefore holds a fragment while the level
+  is in flight. A worker asking whether the run has passed `max_states` is asking about
+  the whole graph, which is what this answers.
+
+  `:ets.info/2` with `:size` is O(1) — it reads a counter the table maintains, not the
+  table — so this is affordable per expanded state, which is where the limit is checked.
+  """
+  @spec live_state_count(t()) :: non_neg_integer()
+  def live_state_count(%__MODULE__{fingerprints: fingerprints}),
+    do: :ets.info(fingerprints, :size)
+
+  @doc """
   The node record for a state id.
   """
   @spec node_record(t(), state_id()) :: node_record()
