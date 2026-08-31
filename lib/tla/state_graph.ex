@@ -354,6 +354,84 @@ defmodule TLA.StateGraph do
 
   def successors(%__MODULE__{edges: edges}, id), do: Map.get(edges, id, [])
 
+  @doc """
+  Every strongly connected component of the edge table, as sets of state ids.
+
+  Tarjan's algorithm, in ids order so a run's components — and therefore any
+  counterexample read off them — are the same every time.
+
+  A component is *maximal*: it is every state mutually reachable from every other. That
+  says nothing on its own about whether a behaviour can cycle in it, which is a question
+  about the spec's fairness and belongs to `TLA.ModelChecker.Liveness`. A state with no
+  out-edges comes back as a component of one, and whether stuttering there forever counts
+  as a cycle is the same kind of question (`02-dsl-semantics.md` §5.3).
+  """
+  @spec sccs(t()) :: [MapSet.t(state_id())]
+  def sccs(%__MODULE__{} = graph), do: sccs(graph, MapSet.new(0..(graph.state_count - 1)//1))
+
+  @doc """
+  The same, over a subset of the states — the edges to anything outside it are ignored.
+
+  Liveness checking asks this of the subgraph where a property is false, and again of
+  smaller subgraphs as strong fairness rules components out
+  (`04-layer2-model-checker.md` §`TLA.ModelChecker.Liveness`).
+  """
+  @spec sccs(t(), MapSet.t(state_id())) :: [MapSet.t(state_id())]
+  def sccs(%__MODULE__{edges: nil}, _region), do: raise(no_liveness_graph())
+
+  def sccs(graph, region) do
+    region
+    |> Enum.sort()
+    |> Enum.reduce(
+      %{index: 0, indices: %{}, low: %{}, stack: [], on: MapSet.new(), out: []},
+      fn id, acc ->
+        if Map.has_key?(acc.indices, id), do: acc, else: connect(graph, region, id, acc)
+      end
+    )
+    |> Map.fetch!(:out)
+    |> Enum.reverse()
+  end
+
+  defp connect(graph, region, v, acc) do
+    acc = %{
+      acc
+      | indices: Map.put(acc.indices, v, acc.index),
+        low: Map.put(acc.low, v, acc.index),
+        index: acc.index + 1,
+        stack: [v | acc.stack],
+        on: MapSet.put(acc.on, v)
+    }
+
+    acc =
+      graph
+      |> successors(v)
+      |> Enum.reduce(acc, fn {_action, _params, w}, acc ->
+        cond do
+          not MapSet.member?(region, w) ->
+            acc
+
+          not Map.has_key?(acc.indices, w) ->
+            acc = connect(graph, region, w, acc)
+            %{acc | low: Map.put(acc.low, v, min(acc.low[v], acc.low[w]))}
+
+          MapSet.member?(acc.on, w) ->
+            %{acc | low: Map.put(acc.low, v, min(acc.low[v], acc.indices[w]))}
+
+          true ->
+            acc
+        end
+      end)
+
+    if acc.low[v] == acc.indices[v], do: pop_component(acc, v), else: acc
+  end
+
+  defp pop_component(acc, v) do
+    {above, [^v | rest]} = Enum.split_while(acc.stack, &(&1 != v))
+    component = MapSet.new([v | above])
+
+    %{acc | stack: rest, on: MapSet.difference(acc.on, component), out: [component | acc.out]}
+  end
+
   defp no_liveness_graph do
     %ArgumentError{
       message:

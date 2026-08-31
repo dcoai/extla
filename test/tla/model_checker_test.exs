@@ -517,6 +517,44 @@ defmodule TLA.ModelCheckerTest do
       end
     end
 
+    # Specified on the graph rather than hidden in the checker (§State Graph): it is a
+    # fact about the edge table, and the checker's question — can a behaviour cycle here
+    # forever — is a further one about fairness.
+    test "sccs/1 finds the components of the edge table" do
+      {_result, graph} = explore_live(Counter, %{max: 2})
+
+      # (0,f) → (1,f) → (2,f) → (2,t), and `reset` closes the loop, so all four states
+      # are mutually reachable and the graph is one component.
+      assert StateGraph.sccs(graph) == [MapSet.new([0, 1, 2, 3])]
+    end
+
+    # Tarjan pops a component when its root is done, so the order is reverse-topological
+    # — sinks first. It is stated here because it is stable, and a counterexample read off
+    # the first fair component must not move between runs.
+    test "sccs/2 ignores the edges that leave the region it was given" do
+      {_result, graph} = explore_live(Counter, %{max: 2})
+
+      region = MapSet.new([0, 1])
+
+      assert StateGraph.sccs(graph, region) == [MapSet.new([1]), MapSet.new([0])]
+      assert StateGraph.sccs(graph, region) == StateGraph.sccs(graph, region)
+    end
+
+    test "a spec that ends has a component per state and no cycle" do
+      {_result, graph} = explore_live(Terminating, %{max: 3})
+
+      components = StateGraph.sccs(graph)
+
+      assert length(components) == graph.state_count
+      assert Enum.all?(components, &(MapSet.size(&1) == 1))
+    end
+
+    test "sccs raises on a graph that has no edge table" do
+      {_result, graph} = ModelChecker.explore(Counter, %{constants: %{max: 2}})
+
+      assert_raise ArgumentError, ~r/spanning tree/, fn -> StateGraph.sccs(graph) end
+    end
+
     test "changes nothing about the safety answer" do
       config = %{constants: @processes}
 

@@ -96,6 +96,27 @@ defmodule TLA.Trace do
   end
 
   @doc """
+  A trace or a lasso as the behaviour it describes, with the index its cycle returns to.
+
+  `nil` for a plain trace and for a lasso with no cycle: those are prefixes of something
+  longer, and `TLA.Temporal`'s operators will say `:inconclusive` where the states do not
+  reach far enough to settle a question.
+
+  A lasso's cycle ends where it began, so the repeated final state is dropped — the
+  behaviour lists each state of the cycle once and `lasso_start` says where to loop back
+  to. A cycle of one state is a `terminal` stuttering forever (`02-dsl-semantics.md`
+  §5.3), and comes back as the prefix with `lasso_start` on its last state.
+  """
+  @spec to_behavior(t() | lasso()) :: {TLA.State.behavior(), non_neg_integer() | nil}
+  def to_behavior(%__MODULE__{states: states}), do: {states, nil}
+
+  def to_behavior(%{prefix: prefix, cycle: nil}), do: {prefix.states, nil}
+
+  def to_behavior(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do
+    {prefix.states ++ (cycle.states |> tl() |> Enum.drop(-1)), length(prefix.states) - 1}
+  end
+
+  @doc """
   Export a trace as a sequence of state diffs, for programmatic consumption.
   """
   @spec to_diffs(t()) :: [%{action: atom(), params: map(), changed: map(), state: TLA.State.t()}]
