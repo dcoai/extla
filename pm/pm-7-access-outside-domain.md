@@ -1,7 +1,7 @@
 ---
 id: pm-7
 title: "`f[x]` outside the domain is silently nil, where TLA+ leaves it undefined"
-labels: [Proposal]
+labels: [In-Progress]
 created: 2026-08-30
 gitlab_issue: 7
 gitlab_synced: true
@@ -84,7 +84,41 @@ function's domain must be rejected or must raise, and `die_hard` and the `07-exa
 specs must still agree with TLC. This lands before the guard evaluation path is
 exercised in anger by the model checker, so it is worth deciding early.
 
+## Decision — option 3, the rule without exceptions
+
+**Taken: `[]` is TLA+ function application everywhere inside a spec block.** It compiles
+to `TLA.Spec.Helpers.at/3`, which raises `TLA.Spec.DomainError` outside the domain — for
+a map, for a sequence (1-indexed), and for a term that is neither. Written up as D-20 and
+`02-dsl-semantics.md` §1.6.
+
+Option 2 — strict on spec variables, lax on `old.`/`new.` and on a generator's state
+argument — was rejected on inspection of where the hole would then remain. Those two are
+exactly the places where a spec reaches into a collection it did not build: `old.owner[r]`
+and `st.current_term[s]` are reads of a state the block did not construct, which is where
+a key that is not there is *most* likely and least visible. A rule with exceptions is
+also one an author has to remember the shape of, and this one's exceptions would have had
+no principle behind them beyond "harder to implement".
+
+Option 1 (`at/2` as an explicit helper, `[]` a compile error) was rejected for what it
+costs the documents: every `pc[p]` in `07-examples.md` and §8 would become `at(pc, p)`,
+which is a worse-reading spec in exchange for the same guarantee.
+
+The cost of option 3, stated: a keyword list indexed by its key raises inside a block,
+because a list is a sequence and `:mode` is not an index. In a spec that is the right
+answer — state is maps and sequences.
+
+## What it took
+
+- `TLA.Spec.Helpers.at/2,3` and `TLA.Spec.DomainError`, whose message names the
+  expression as the spec wrote it (`balances[:carol]`) and the domain it is not in.
+  `Map.fetch!/2` cannot do that, which is why this is not a one-line delegation.
+- One clause in `TLA.Spec.Rewriter`, intercepting the `Access.get` node before the
+  generic walk and carrying `Macro.to_string(collection)` along for the message.
+- Nothing else. **All six corpus entries still agree with TLC exactly**, which is the
+  acceptance this proposal asked for: no spec was relying on the `nil`, and the state
+  counts are unchanged.
+
 ## Related
 
 `[[pm-6-spec-dsl]]`, `01-foundation.md` §Reading a variable that is not there,
-`02-dsl-semantics.md` §8.
+`02-dsl-semantics.md` §1.6 and §8, `08-decisions.md` D-20.

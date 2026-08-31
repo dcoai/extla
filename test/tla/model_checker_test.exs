@@ -2,7 +2,16 @@ defmodule TLA.ModelCheckerTest do
   use ExUnit.Case, async: true
 
   alias TLA.{ModelChecker, StateGraph, Trace}
-  alias TLA.TestSpecs.{Broken, Counter, Deadlocking, Terminating, Transfer, Unbounded}
+
+  alias TLA.TestSpecs.{
+    Broken,
+    Counter,
+    Deadlocking,
+    OutsideDomain,
+    Terminating,
+    Transfer,
+    Unbounded
+  }
 
   describe "exhaustive search" do
     test "finds every reachable state and no more" do
@@ -205,6 +214,26 @@ defmodule TLA.ModelCheckerTest do
 
     test "a spec with no temporal properties warns about nothing" do
       assert ModelChecker.run(Unbounded, %{max_states: 5}).warnings == []
+    end
+  end
+
+  describe "reading outside a domain" do
+    # D-20. Under `Access.get/2` this run reported success over a state space
+    # the spec does not describe: the guard `balances[:carol] >= 1` was
+    # `nil >= 1`, which is true, so `pay_carol` fired and its post-states were
+    # explored. Raising is the only outcome that does not hide that.
+    test "a guard that applies a function outside its domain raises, naming it" do
+      constants = %{accounts: MapSet.new([:alice, :bob])}
+
+      error =
+        assert_raise TLA.Spec.DomainError, fn ->
+          ModelChecker.run(OutsideDomain, %{constants: constants})
+        end
+
+      message = Exception.message(error)
+
+      assert message =~ "balances[:carol]"
+      assert message =~ "not in the domain [:alice, :bob]"
     end
   end
 

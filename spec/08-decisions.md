@@ -382,3 +382,36 @@ using them to prune makes a type error a reported violation rather than a silent
 narrower search.
 
 See `02-dsl-semantics.md` §1.5.
+
+---
+
+## D-20 — `f[x]` is strict function application, everywhere in a spec block
+
+**Decided.** Inside a spec block, `f[x]` compiles to `TLA.Spec.Helpers.at/3`, which
+raises `TLA.Spec.DomainError` outside the domain of `f` — for a map, for a sequence
+(1-indexed, as in TLA+), and for anything that is neither. The rule has no exceptions:
+it holds for a variable, a local, an `action_property`'s `old.`/`new.`, and a `params:`
+generator's own state argument.
+
+**Replaced:** `Access.get/2`, which is what `f[x]` means in ordinary Elixir.
+
+**Why:** `Access.get/2` returns `nil` outside the domain, and `nil` is not an error.
+Erlang's term order makes every comparison between types total and sorts atoms above
+integers, so §8's own `require balances[from] >= amount` is **`true`** for an account
+that does not exist. The guard succeeds, the action fires from a state where it was
+never enabled, and the checker explores a state space the spec does not describe —
+reporting success over it. That is precisely the failure `01-foundation.md` rules out
+for `TLA.State.get/2`, `prime/3` and `TLA.Function.except/2`, and `[]` was the last
+remaining hole in the syntax the worked example uses.
+
+**Cost:** a keyword list indexed by its key inside a block now raises, since a list is a
+sequence and `:mode` is not an index. That is the intended reading in a spec, where
+state is maps and sequences.
+
+**Why the rule has no exceptions:** the narrower version — strict on spec variables,
+lax on `old.`/`new.` and on a generator's state argument — was rejected. Those are
+exactly the places where a spec reaches into a collection it did not build itself, so
+they are where the hole would be worth the most; and a rule an author has to remember
+the shape of is one they will guess wrong.
+
+See `02-dsl-semantics.md` §1.6 and `TLA.Spec.DomainError`.

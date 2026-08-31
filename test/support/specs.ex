@@ -302,6 +302,32 @@ defmodule TLA.TestSpecs do
     end
   end
 
+  defmodule OutsideDomain do
+    @moduledoc """
+    A guard that reads a function outside its domain — D-20's failure, as a spec.
+
+    `:carol` is not an account. Under `Access.get/2` this guard was `nil >= 1`,
+    which is `true` under Erlang term order, so the action fired from a state it
+    was never enabled in and the checker explored a state space this spec does
+    not describe.
+    """
+    use TLA.Spec
+
+    constant :accounts, default: MapSet.new([:alice, :bob])
+
+    variable :balances, type: [^accounts ~> :nat]
+
+    init do
+      balances = for_each(^accounts, fn _ -> 1 end)
+    end
+
+    action :pay_carol do
+      require balances[:carol] >= 1
+
+      balances = update(balances, :alice, &(&1 - 1))
+    end
+  end
+
   defmodule LetScopes do
     @moduledoc """
     A `let` that only the guard reads, and one that only an assignment reads.

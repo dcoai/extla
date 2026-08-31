@@ -90,7 +90,9 @@ def validate!(state)
 
 ### Reading a variable that is not there
 
-`get/2`, `unchanged?/2` and `prime/3` raise rather than defaulting. This is not
+`get/2`, `unchanged?/2` and `prime/3` raise rather than defaulting. So does `f[x]`
+inside a spec block, for the same reason and by the same argument
+(`02-dsl-semantics.md` §1.6, D-20). This is not
 defensiveness; it is the difference between a bug and a wrong answer. A misspelled
 variable read through `Map.get/2` returns `nil`, `nil` compares unequal to whatever the
 guard expected, the action looks disabled, and the checker explores a smaller state

@@ -18,6 +18,51 @@ defmodule TLA.Spec.Helpers do
   reason set out in `01-foundation.md` §Reading a variable that is not there.
   """
 
+  # ── Function application ──
+
+  @doc """
+  TLA+: `f[x]` — function application, which is what `f[x]` compiles to inside
+  every spec block (`02-dsl-semantics.md` §1.6, D-20).
+
+  A TLA+ function is undefined outside its domain, and a sequence is a function
+  on `1..Len(s)`, so both raise here rather than returning `nil`:
+
+      iex> TLA.Spec.Helpers.at(%{alice: 3, bob: 0}, :alice)
+      3
+
+      iex> TLA.Spec.Helpers.at([:a, :b, :c], 2)
+      :b
+
+  `Access.get/2`, which `f[x]` compiles to in ordinary Elixir, returns `nil`
+  outside the domain instead — and `nil >= amount` is `true` under Erlang term
+  order, so a guard reading a key it does not have would silently enable its
+  action and the checker would explore a state space the spec does not describe.
+  """
+  @spec at(map() | list(), term()) :: term()
+  def at(collection, key), do: at(collection, key, nil)
+
+  @doc """
+  `at/2`, plus the source text of the collection expression for the message. The
+  rewriter has that text; a spec author calling `at/2` by hand does not.
+  """
+  @spec at(map() | list(), term(), String.t() | nil) :: term()
+  def at(f, key, where) when is_map(f) and not is_struct(f) do
+    case Map.fetch(f, key) do
+      {:ok, value} -> value
+      :error -> raise TLA.Spec.DomainError, collection: f, key: key, where: where
+    end
+  end
+
+  def at(seq, index, where) when is_list(seq) and is_integer(index) and index >= 1 do
+    case Enum.fetch(seq, index - 1) do
+      {:ok, value} -> value
+      :error -> raise TLA.Spec.DomainError, collection: seq, key: index, where: where
+    end
+  end
+
+  def at(collection, key, where),
+    do: raise(TLA.Spec.DomainError, collection: collection, key: key, where: where)
+
   # ── Set operations ──
 
   @doc "The empty set. TLA+: `{}`."

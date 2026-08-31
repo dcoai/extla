@@ -5,6 +5,45 @@ defmodule TLA.Spec.HelpersTest do
 
   alias TLA.Spec.Helpers, as: H
 
+  describe "at/2 — function application" do
+    test "applies a function and a sequence" do
+      assert H.at(%{alice: 3, bob: 0}, :bob) == 0
+      assert H.at([:a, :b, :c], 1) == :a
+      assert H.at([:a, :b, :c], 3) == :c
+    end
+
+    # The failure D-20 exists to close: Access.get/2 returns nil here, and
+    # `nil >= 2` is true under Erlang term order, so the guard that reads a key
+    # it does not have enables its action anyway.
+    test "raises outside the domain of a function" do
+      error =
+        assert_raise TLA.Spec.DomainError, fn -> H.at(%{alice: 3}, :carol, "balances") end
+
+      message = Exception.message(error)
+
+      assert message =~ "balances[:carol]"
+      assert message =~ "not in the domain [:alice]"
+    end
+
+    test "raises outside the domain of a sequence, which is 1..Len" do
+      assert_raise TLA.Spec.DomainError, fn -> H.at([:a, :b], 0) end
+      assert_raise TLA.Spec.DomainError, fn -> H.at([:a, :b], 3) end
+      assert_raise TLA.Spec.DomainError, fn -> H.at([], 1) end
+    end
+
+    test "raises on a term that is neither a function nor a sequence" do
+      error = assert_raise TLA.Spec.DomainError, fn -> H.at(MapSet.new([1]), 1) end
+
+      assert Exception.message(error) =~ "neither a function nor a sequence"
+    end
+
+    # A keyword list is a list, so its key is not an index. Inside a spec block
+    # that is the right answer: state is maps and sequences.
+    test "raises on a keyword list indexed by its key" do
+      assert_raise TLA.Spec.DomainError, fn -> H.at([mode: :fast], :mode) end
+    end
+  end
+
   describe "set operations" do
     test "build and query sets" do
       assert H.set() == MapSet.new()

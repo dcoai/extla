@@ -82,6 +82,26 @@ defmodule TLA.Spec.Rewriter do
     {:=, meta, [lhs, walk(rhs, ctx)]}
   end
 
+  # `f[x]` is TLA+ function application, not `Access.get/2` (D-20). The rule has
+  # no exceptions inside a spec block -- it holds for a variable, for a local,
+  # for `old.`/`new.` and for a `params:` generator's own state argument --
+  # because a rule with exceptions is one an author has to remember the shape of,
+  # and `nil` where a domain error belongs is the failure this closes.
+  #
+  # The source text goes along for the error message: `balances[:carol]` names
+  # the function the way the spec wrote it, which `Map.fetch!/2` cannot.
+  defp walk({{:., _, [Access, :get]}, meta, [collection, key]}, ctx) do
+    where = Macro.to_string(collection)
+
+    quote line: line_of(meta, ctx) do
+      TLA.Spec.Helpers.at(
+        unquote(walk(collection, ctx)),
+        unquote(walk(key, ctx)),
+        unquote(where)
+      )
+    end
+  end
+
   defp walk({form, meta, args}, ctx) when is_list(args) do
     {walk(form, ctx), meta, Enum.map(args, &walk(&1, ctx))}
   end
@@ -230,6 +250,8 @@ defmodule TLA.Spec.Rewriter do
       "Declared: " <> (set |> Enum.sort() |> Enum.map_join(", ", &inspect/1)) <> "."
     end
   end
+
+  defp line_of(meta, ctx), do: (is_list(meta) && Keyword.get(meta, :line)) || ctx.line || 0
 
   defp bad!(ctx, meta, problem, extra) do
     CompileError.raise!(
