@@ -1,5 +1,9 @@
 # HANDOFF — 2026-08-31 — Phase 1 shipped; start here for Phase 2
 
+> **SUPERSEDED by `HANDOFF-2026-08-31-phase2-done.md`.** Everything planned below was
+> built: the temporal oracle, the liveness graph, the checker, and symmetry. Slice 4 was
+> absorbed into slice 3. Kept as the record of the plan the phase was run to.
+
 Supersedes `HANDOFF-2026-08-31-phase1-done.md`. Self-contained; read it first.
 
 **The next piece of work is Phase 2 — liveness.** The plan is at the bottom, and its
