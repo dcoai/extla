@@ -240,6 +240,13 @@ defmodule TLA.StateGraph do
 
   `parent` is `nil` for an initial state, in which case `action` is the index of
   the `init` block that produced it.
+
+  **A newly discovered state is validated here** (`TLA.State.validate!/1`, the §6
+  restriction on pids, references, ports, funs and floats), and a state already seen is
+  not — it was validated when it was first found. This is the graph's job rather than the
+  caller's because §6 exists *for* fingerprinting: the terms it rejects are exactly those
+  whose encoding does not identify a state. Callers may assume that a state which has
+  entered the graph is one the checker has vetted.
   """
   @spec add_state(t(), State.t(), state_id() | nil, atom() | non_neg_integer(), map() | nil) ::
           {t(), state_id(), :new | :existing}
@@ -274,6 +281,20 @@ defmodule TLA.StateGraph do
   # The id it allocated is then unused, so ids have gaps under contention. Nothing reads
   # them as a range — they are keys — and an id is never reused, which is the property
   # that matters: a trace names states by id.
+  #
+  # `State.validate!/1` runs HERE, on the miss, and so exactly once per distinct state
+  # rather than once per transition into it (#33). Two things make that sound:
+  #
+  #   * It happens before the state is used. Nothing has read `state` yet — the node
+  #     record is written after this line, and the caller's invariant and action-property
+  #     checks all run after `add_state/5` returns. Validation preceding *use* is what
+  #     §6 requires; preceding the *hash* is not achievable, since newness is only
+  #     knowable from the fingerprint.
+  #   * A forbidden term cannot hide behind a hit. Its encoding does not recur — that is
+  #     the whole reason §6 rejects pids, references, ports, funs and floats — so a state
+  #     carrying one cannot dedup against an earlier state, always misses, and is always
+  #     validated on its first discovery. `term_to_binary/2` encodes such terms without
+  #     complaint, so reaching this line is guaranteed rather than lucky.
   defp insert(graph, state, record) do
     fingerprint = fingerprint(graph, state)
 
@@ -282,6 +303,7 @@ defmodule TLA.StateGraph do
         {graph, id, :existing}
 
       [] ->
+        State.validate!(state)
         claim(graph, fingerprint, record)
     end
   end

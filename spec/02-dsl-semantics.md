@@ -425,6 +425,13 @@ have no stable identity across runs; floats introduce `-0.0`/`NaN` comparison ha
 that make two "equal" states hash differently. Assigning one is a runtime error from
 the checker naming the variable, not a silent mis-fingerprint.
 
+**When the check runs:** once per distinct state, as the state enters the state graph,
+and before anything else in the checker looks at it. Not once per transition into it —
+a state reached five ways is checked once. The guarantee is unaffected, and for a reason
+worth stating: a forbidden term is exactly a term whose encoding does not recur, so a
+state carrying one can never be mistaken for a state already seen, and is always checked
+on the path that reaches it first (D-26).
+
 ---
 
 ## 7. Compile-time validation
