@@ -478,6 +478,37 @@ defmodule TLA.Spec.DiagnosticsTest do
     end
   end
 
+  describe "warnings" do
+    # `let` binds a name, and a name the compiled function never reads is an
+    # unused-variable warning the spec author cannot silence: they cannot
+    # underscore it, because the OTHER function does read it. So the block
+    # compiler drops what each function does not read.
+    test "a let read by only one of the two compiled functions warns in neither" do
+      warnings =
+        capture_io(:stderr, fn ->
+          Code.compile_string(
+            source("""
+            variable :n, type: 0..3
+            variable :log, type: :seq
+            init do
+              n = 0
+              log = seq()
+            end
+            action :bump do
+              let room = 3 - n
+              require room > 0
+              let entry = %{was: n}
+              n = n + 1
+              log = append(log, entry)
+            end
+            """)
+          )
+        end)
+
+      refute warnings =~ "unused"
+    end
+  end
+
   describe "diagnostic shape" do
     test "carries the module, the line and the declaration" do
       error =

@@ -14,7 +14,7 @@ defmodule TLA.Spec.Type do
   |---|---|
   | `:atom`, `0`, `"s"` | Exactly that literal |
   | `[:a, :b]` | One of the listed literals |
-  | `a..b` | An integer in the range; either bound may be `^const` |
+  | `a..b` | An integer in the range; either bound may be `^const`, and either may be negative |
   | `^name` | Any element of the constant (which must be a set) |
   | `t1 \\| t2` | Union — a value of either type |
   | `{t1, t2, …}` | A tuple of that arity, element-wise |
@@ -65,7 +65,7 @@ defmodule TLA.Spec.Type do
     check!(right, constants, opts)
   end
 
-  # `a..b` and `a..b//step` — an integer range. Bounds may be `^const`.
+  # `a..b` and `a..b//step` — an integer range. A bound may be `^const` or negative.
   defp check!({:.., _meta, [lo, hi]}, constants, opts) do
     check_bound!(lo, constants, opts)
     check_bound!(hi, constants, opts)
@@ -118,7 +118,7 @@ defmodule TLA.Spec.Type do
 
           :atom | 0 | "s"       a literal
           [:a, :b]              one of the listed literals
-          a..b                  an integer range; a bound may be ^const
+          a..b                  an integer range; a bound may be ^const or negative
           ^name                 any element of a constant set
           t1 | t2               union
           {t1, t2}              a tuple, element-wise
@@ -133,6 +133,12 @@ defmodule TLA.Spec.Type do
        do: check!(pinned, constants, opts)
 
   defp check_bound!(bound, _constants, _opts) when is_integer(bound), do: :ok
+
+  # `-1` is not an integer literal in the AST: Elixir parses it as unary minus
+  # applied to 1. A range whose low bound is negative is ordinary enough --
+  # Paxos's `maxBal` is `-1` until the acceptor promises something -- that
+  # rejecting it would be rejecting the type the spec actually has.
+  defp check_bound!({:-, _meta, [bound]}, _constants, _opts) when is_integer(bound), do: :ok
 
   defp check_bound!(other, _constants, opts) do
     bad!(
@@ -280,6 +286,8 @@ defmodule TLA.Spec.Type do
   end
 
   defp bound!(bound, _constants, _where) when is_integer(bound), do: bound
+
+  defp bound!({:-, _meta, [bound]}, _constants, _where) when is_integer(bound), do: -bound
 
   @doc """
   Whether a value inhabits a resolved type.

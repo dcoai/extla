@@ -2,7 +2,7 @@ defmodule TLA.SpecTest do
   use ExUnit.Case, async: true
 
   alias TLA.Spec.Compiled
-  alias TLA.TestSpecs.{Counter, PerBinding, Swap, Transfer}
+  alias TLA.TestSpecs.{Counter, LetScopes, PerBinding, Swap, Transfer}
 
   describe "from_module/1" do
     test "returns the compiled spec" do
@@ -106,6 +106,26 @@ defmodule TLA.SpecTest do
       swap = Swap |> Compiled.from_module() |> Compiled.action(:swap)
 
       assert swap.transition.(%{}, %{x: 1, y: 2}, %{}) == %{x: 2, y: 1}
+    end
+  end
+
+  describe "let" do
+    setup do
+      %{action: LetScopes |> Compiled.from_module() |> Compiled.action(:bump)}
+    end
+
+    # The guard reads `room` and the transition reads `entry`; neither reads the
+    # other's. Both functions are compiled from the same block, so each has to
+    # keep what it reads and drop what it does not -- a binding nothing reads is
+    # dead code in a pure block, and emitting it costs a warning the spec author
+    # cannot silence.
+    test "a binding only the guard reads still guards", %{action: bump} do
+      assert bump.guard.(%{}, %{n: 0, log: []}, %{})
+      refute bump.guard.(%{}, %{n: 3, log: []}, %{})
+    end
+
+    test "a binding only an assignment reads is still available to it", %{action: bump} do
+      assert bump.transition.(%{}, %{n: 1, log: []}, %{}) == %{n: 2, log: [%{was: 1}]}
     end
   end
 

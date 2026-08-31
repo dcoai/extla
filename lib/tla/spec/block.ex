@@ -141,6 +141,10 @@ defmodule TLA.Spec.Block do
       last ->
         classified
         |> Enum.take(last + 1)
+        |> prune_dead_lets(fn
+          {:guard, expr, _meta} -> expr
+          _assign -> nil
+        end)
         |> Enum.reverse()
         |> Enum.reduce(true, fn
           {:guard, expr, _meta}, rest ->
@@ -156,6 +160,53 @@ defmodule TLA.Spec.Block do
             rest
         end)
     end
+  end
+
+  # A `let` that the rest of the compiled function never reads is dead: the
+  # block is pure (§3), so dropping the binding changes nothing but the warning
+  # it would otherwise produce. Both functions need this, in opposite
+  # directions — the guard drops what only the assignments read, and the
+  # transition drops what only a `require` read, which the guard has already
+  # computed anyway.
+  #
+  # `reader` says what a non-`let` statement reads; `nil` for the ones the
+  # function being built ignores.
+  defp prune_dead_lets(classified, reader) do
+    {kept, _read} =
+      classified
+      |> Enum.reverse()
+      |> Enum.reduce({[], MapSet.new()}, fn
+        {:let, pattern, rhs, _meta} = binding, {kept, read} ->
+          if MapSet.disjoint?(Rewriter.pattern_names(pattern), read) do
+            {kept, read}
+          else
+            {[binding | kept], MapSet.union(read, names_in(rhs))}
+          end
+
+        statement, {kept, read} ->
+          case reader.(statement) do
+            nil -> {[statement | kept], read}
+            expr -> {[statement | kept], MapSet.union(read, names_in(expr))}
+          end
+      end)
+
+    kept
+  end
+
+  # Every name an expression mentions. Over-approximate on purpose: a name that
+  # is not really a variable reference only keeps a binding alive, and keeping
+  # one is the harmless direction.
+  defp names_in(expr) do
+    {_ast, names} =
+      Macro.prewalk(expr, MapSet.new(), fn
+        {name, _meta, context} = node, acc when is_atom(name) and is_atom(context) ->
+          {node, MapSet.put(acc, name)}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    names
   end
 
   defp last_guard_index(classified) do
@@ -176,7 +227,12 @@ defmodule TLA.Spec.Block do
   @spec transition_body([tuple()], Rewriter.t(), Macro.t()) :: Macro.t()
   def transition_body(classified, ctx, state_ast) do
     {steps, updates} =
-      Enum.flat_map_reduce(classified, [], fn
+      classified
+      |> prune_dead_lets(fn
+        {:assign, _name, rhs, _meta} -> rhs
+        _guard -> nil
+      end)
+      |> Enum.flat_map_reduce([], fn
         {:let, pattern, rhs, _meta}, updates ->
           step =
             quote generated: true do

@@ -66,13 +66,21 @@ failure of a search that terminated early but happened to reach the same count.
 | `distributed_lock` | `spec/07-examples.md` Example 1 | ✅ | ✅ |
 | `raft_election` | `spec/07-examples.md` Example 2 (safety only; liveness is refuted by the term bound by design) | ✅ | ✅ |
 | `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | ✅ |
-| `paxos` | Lamport, *Paxos Made Simple* TLA+ | not yet | not yet |
+| `paxos` | Lamport, *Paxos Made Simple* TLA+ | ✅ | ✅ |
 
 Each row also carries the `--verify-symmetry` result where a `SYMMETRY` is declared.
 
 The oracle column is filled in ahead of the ExTLA column deliberately: with the expected
 answers already in the repository, every piece of the checker is measured against truth
 from the day it is written, rather than against its own output a phase later.
+
+All six agree, which is what D-9 asks of Phase 1. Each entry was chosen for a different
+way the checker could be wrong: `die_hard` for the shortest counterexample,
+`two_phase_commit` for a state count too large to eyeball, `distributed_lock` for a
+product of param sets and a tuple in state, `raft_election` for params drawn from the
+pre-state and an end state that is not a deadlock, `bounded_buffer` for a sequence,
+where order distinguishes states a set would not, and `paxos` for a guard that
+quantifies over a subset of the messages in flight.
 
 ## Writing an entry
 

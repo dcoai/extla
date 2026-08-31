@@ -43,6 +43,23 @@ entries = [
     names: %{}
   },
   %{
+    name: "paxos",
+    module: TLA.Differential.Paxos,
+    constants: %{
+      acceptors: MapSet.new([:a1, :a2, :a3]),
+      values: MapSet.new([:v1, :v2]),
+      max_ballot: 1,
+      quorums:
+        MapSet.new([
+          MapSet.new([:a1, :a2]),
+          MapSet.new([:a1, :a3]),
+          MapSet.new([:a2, :a3]),
+          MapSet.new([:a1, :a2, :a3])
+        ])
+    },
+    names: %{}
+  },
+  %{
     name: "bounded_buffer",
     module: TLA.Differential.BoundedBuffer,
     constants: %{
