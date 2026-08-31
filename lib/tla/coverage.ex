@@ -236,6 +236,15 @@ defmodule TLA.Coverage do
       credited exactly once — and its split across them is not. That is a property of the
       quantity, not of this merge; a single-threaded run redistributes it too if the
       actions are declared in a different order.
+
+      And none of them is exact when the run **halted**. A search that stops at a
+      counterexample stops mid-expansion, so every count is a lower bound rather than a
+      census — which is what `bounded_by: :violation` records. Under workers the bound is
+      looser and varies between runs: the coordinator starts a whole level at once and
+      halts on the first violation it receives, so how much of that level was already
+      merged depends on which worker finished when. Two runs of the same violating spec at
+      different worker counts agree on the verdict and on the counterexample's length, and
+      need not agree on the counts.
     * **Sets union, and predicates fold.** `ever` is a disjunction over reachable states,
       `always` a conjunction; splitting the states across workers and combining with `or`
       and `and` is the same computation in a different order.

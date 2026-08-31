@@ -113,10 +113,16 @@ defmodule TLA.StateGraph do
           initial_states: MapSet.t(state_id()),
           deadlocked: MapSet.t(state_id()),
           terminal: MapSet.t(state_id()),
-          # These six are still per-struct, and deliberately (#31). Each worker would
-          # accumulate its own and they would have to be merged, which is a decision the
-          # COORDINATOR makes — and there is no coordinator yet to constrain the answer.
-          # Phase 4 moves them, or decides not to.
+          # These stay per-struct, and Phase 4 decided it rather than inherited it (#31
+          # left the question open for a coordinator to answer; D-27 is the answer). Under
+          # `workers:` each worker accumulates its own and `TLA.ModelChecker.Parallel`
+          # merges them — counts add, `diameter` is a max, the sets union.
+          #
+          # Summing is exact rather than approximate, and that is a property of
+          # `insert_new/2` below rather than of arithmetic: a state is claimed by exactly
+          # one worker and a `{state, action}` pair expanded by exactly one worker, so
+          # nothing is counted twice because nothing is done twice. Moving them into
+          # shared counters would buy nothing and cost an atomic per transition.
           state_count: non_neg_integer(),
           transition_count: non_neg_integer(),
           diameter: non_neg_integer(),

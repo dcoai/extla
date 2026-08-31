@@ -169,8 +169,14 @@ defmodule TLA.ModelChecker.Parallel do
   # because nothing is *claimed* twice. Transitions partition the same way — each worker
   # generates its own batch's successors and no other's.
   #
-  # `diameter` is a max. Under level-synchrony it is also just the level number, but it is
-  # taken as a max anyway so that this does not silently depend on that.
+  # `diameter` is a max of what the workers report, and NOT the coordinator's level
+  # counter — which under level-synchrony would give the same answer, and was considered
+  # and rejected (#39). The graph's own `record.depth` is `depth(parent) + 1`, computed in
+  # `claim/3` from the parent pointer, so a max over it is the same quantity the
+  # single-threaded search reports and is derived from the same place. Reading the level
+  # counter instead would make the reported depth a fact about the coordinator's
+  # bookkeeping rather than about the graph — a second source of truth for a number the
+  # differential corpus compares against TLC.
   defp merge(run, worker) do
     graph = run.graph
     from = worker.graph

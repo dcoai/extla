@@ -651,4 +651,113 @@ defmodule TLA.TestSpecs do
       c = 1
     end
   end
+
+  defmodule Unreachable do
+    @moduledoc """
+    A spec built out of the coverage report's structural corner cases, so a run over it
+    exercises every merge rule at once (#39).
+
+    `switch` can never fire — its guard wants `n == 99` and `n` never leaves 0..4 — so it
+    is an action with `enabled_in: 0`, which is what `never_enabled` is derived from.
+    `small_or_even` holds only through its second disjunct at `n = 4`, so `near_misses` is
+    a countable 1 rather than `nil`. `step` has a param universe a run exhausts and `m`
+    one it never reaches, so `unreached_params` has both an empty and a non-empty entry.
+
+    The steps are 2 and 4 rather than 1 and 2 so that `n = 3` is unreachable and the
+    invariant HOLDS. A spec whose invariant is refuted halts the search mid-expansion, and
+    its coverage counts are then a lower bound rather than a census (`bounded_by:
+    :violation`) — which is exactly the thing not to build a fixture for when the point is
+    to compare two complete censuses.
+    """
+    use TLA.Spec
+
+    constant :modes
+
+    variable :n, type: 0..4
+    variable :mode
+
+    init do
+      n = 0
+      mode = :a
+    end
+
+    action :tick, params: [step: [2, 4]] do
+      require n + step <= 4
+      n = n + step
+    end
+
+    action :switch, params: [m: ^modes] do
+      require m != mode
+      require n == 99
+      mode = m
+    end
+
+    invariant :small_or_even do
+      n < 3 or rem(n, 2) == 0
+    end
+  end
+
+  defmodule NoBranch do
+    @moduledoc """
+    An invariant with no top-level `or`, so it has no measurable branch and its
+    `near_misses` is `nil` rather than a count.
+
+    The distinction is load-bearing where coverage accumulators are combined: `nil + nil`
+    raises, and coercing `nil` to `0` would report "never at risk" — a finding
+    `TLA.Coverage.warnings/1` makes — about an invariant that never made it.
+    """
+    use TLA.Spec
+
+    variable :n
+
+    init do
+      n = 0
+    end
+
+    action :tick do
+      require n < 6
+      n = n + 1
+    end
+
+    invariant :non_negative do
+      n >= 0
+    end
+  end
+
+  defmodule Violating do
+    @moduledoc """
+    `Unreachable`'s shape with the steps that make `n = 3` reachable, so `small_or_even` is
+    refuted there and the search halts mid-expansion.
+
+    Its counterpart exists because the two cases are genuinely different: a complete run
+    produces a census that two worker counts must agree on exactly, and a halted one
+    produces a lower bound that they need not.
+    """
+    use TLA.Spec
+
+    constant :modes
+
+    variable :n, type: 0..4
+    variable :mode
+
+    init do
+      n = 0
+      mode = :a
+    end
+
+    action :tick, params: [step: [1, 2]] do
+      require n + step <= 4
+      n = n + step
+    end
+
+    action :switch, params: [m: ^modes] do
+      require m != mode
+      require n == 99
+      mode = m
+    end
+
+    invariant :small_or_even do
+      n < 3 or rem(n, 2) == 0
+    end
+  end
 end
