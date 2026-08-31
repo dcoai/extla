@@ -172,6 +172,31 @@ defmodule TLA.Spec.Compiled do
   end
 
   @doc """
+  The constant assignments for a run, from application config over the declared defaults.
+
+  `{:error, missing}` names the constants nothing assigned, rather than letting a run
+  proceed on a spec with holes in it. Both `mix tla.check` and Layer 3's conformance
+  checking resolve constants HERE rather than each their own way: a specification model
+  checked with one assignment and an implementation checked against another are two
+  different specifications, and a verdict from each is not a verdict about the same thing.
+  """
+  @spec resolve_constants(t()) :: {:ok, map()} | {:error, [atom()]}
+  def resolve_constants(%__MODULE__{} = spec) do
+    configured =
+      :extla
+      |> Application.get_env(spec.module, [])
+      |> Keyword.get(:constants, %{})
+      |> Map.new()
+
+    constants = Map.merge(default_constants(spec), configured)
+
+    case constant_names(spec) -- Map.keys(constants) do
+      [] -> {:ok, constants}
+      missing -> {:error, missing}
+    end
+  end
+
+  @doc """
   The declared variable names, in declaration order.
   """
   @spec variable_names(t()) :: [atom()]

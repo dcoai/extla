@@ -328,7 +328,8 @@ rather than ahead of it.
   not vacuously true
 - `TLA.Refinement` with `validate!/2` at compile time
 - `TLA.GenServer`, `TLA.GenServer.Runtime` — including `check_step!/5`, the
-  refinement check that is the point of the layer
+  refinement check that is the point of the layer, and `TLA.GenServer.Violation`,
+  whose `:diverged` diff is the layer's primary output
 - `TLA.Replay` — counterexample replay and captured-trace validation
 - `TLA.Simulation`, `TLA.Simulation.Generator`
 - `Mix.Tasks.Tla.Simulate`, `Mix.Tasks.Tla.Replay`

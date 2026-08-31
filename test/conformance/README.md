@@ -19,7 +19,7 @@ everything agrees with the conforming half of every entry and fails every mutant
 test/conformance/<name>/
   spec.ex          the specification, from spec/07-examples.md, verbatim
   refinements.ex   the mapping that conforms, and the mapping mutants
-  impl.ex          the GenServer that conforms, and the step mutants   (slice 3)
+  impl.ex          the GenServer that conforms, and the step mutants
 ```
 
 Verbatim from `07-examples.md` is deliberate, and the same rule the differential corpus
@@ -30,7 +30,7 @@ example in the docs does not behave the way the docs say, that is the bug worth 
 
 | Entry | Source | Mapping mutants | Step mutants |
 |---|---|---|---|
-| `counter` | Example 4 | ✅ 6 | slice 3 |
+| `counter` | Example 4 | ✅ 6 | ✅ 3 |
 
 ## `counter` — the mapping mutants
 
@@ -50,11 +50,12 @@ The last one deliberately does not `use TLA.Refinement`: with the behaviour decl
 compiler already warns, so what is left to catch is a module handed to `refinement:`
 without ever claiming to be one.
 
-## `counter` — the step mutants, recorded for slice 3
+## `counter` — the step mutants
 
-These need `TLA.GenServer.Runtime.check_step!/5`, and are written down now for the reason
-the TLC oracle landed before the checker: an answer with nothing to compare it against is
-a claim.
+Written down before the checker existed, for the reason the TLC oracle landed before the
+model checker: an answer with nothing to compare it against is a claim. Each is now
+checked by `TLA.GenServer.Runtime.check_step!/5` through a running server, in
+`step_test.exs`.
 
 | Mutant | Fault | Must be reported as |
 |---|---|---|
@@ -62,6 +63,14 @@ a claim.
 | `MovesWhileUnmapped` | `:get` changes the abstract state | `:unmapped_but_moved` |
 | `IgnoresTheGuard` | increments from `status: :incrementing`, which the spec's guard forbids | `:not_enabled` |
 | `Conforming` | — | no violation |
+
+All three are caught, and each is named as written. `CollapsesTwoSteps` reports
+`:diverged` with the one-variable diff `status: spec :incrementing, implementation
+:ready`; `MovesWhileUnmapped` reports `:unmapped_but_moved` with `count: 0 -> 1`;
+`IgnoresTheGuard` reports `:not_enabled` on `%{count: 0, status: :incrementing}`. The
+second assertion in the `CollapsesTwoSteps` test is the one that matters most: it checks
+the spec's invariants against the post-state the mutant produced and they *pass*, which is
+what a Layer 3 without a step check would have reported.
 
 `CollapsesTwoSteps` is the entry that justifies the layer. **Every invariant in the spec
 still holds in its post-state** — `in_bounds` is satisfied by `count: 1` — so a Layer 3
