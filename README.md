@@ -57,26 +57,34 @@ mix tla.replay   MyApp.Counter     # replay a counterexample against real code
 
 ## Status
 
-**Every Phase 1 component exists; the Phase 1 acceptance gate is half met.**
+**Every Phase 1 component exists; five of the six acceptance entries are in.**
 `mix tla.check MySpec` explores the state space breadth-first, reports the shortest
 counterexample when it finds one, and prints what the run actually exercised.
 
 The acceptance criterion is not "the tests pass" but [D-9](spec/08-decisions.md): the
-checker must agree with TLC on **every** spec in the differential corpus. Three of six
-entries are in, and on all three ExTLA and TLC agree exactly — distinct states, search
-depth, deadlock, every invariant, and for `die_hard` the shortest counterexample, which
-is the same six-step trace action for action.
+checker must agree with TLC on **every** spec in the differential corpus. On all five
+entries ExTLA and TLC agree exactly — distinct states, search depth, where the search
+stops, every invariant, and for `die_hard` the shortest counterexample, which is the
+same six-step trace action for action.
 
 | Entry | Distinct states | Depth | Agreement |
 |---|---|---|---|
 | `die_hard` | 16 | 8 | ✅ including the counterexample |
 | `two_phase_commit` | 288 | 11 | ✅ |
 | `distributed_lock` | 34 | 7 | ✅ |
+| `raft_election` | 58,359 | 19 | ✅ including where it ends |
+| `bounded_buffer` | 4,460 | 29 | ✅ including where it ends |
 
-Three entries remain. Saying "Phase 1 is done" before they land would be the kind of
-claim this project exists not to make: the oracle landed before the checker so that the
-agreement could be measured rather than assumed, and half a corpus is half a
-measurement.
+`paxos` remains. Saying "Phase 1 is done" before it lands would be the kind of claim
+this project exists not to make: the oracle landed before the checker so that the
+agreement could be measured rather than assumed, and five sixths of a corpus is five
+sixths of a measurement.
+
+The corpus has already paid for itself once. `raft_election` is
+[Example 2](spec/07-examples.md) of this repository's own documentation, and TLC refuted
+its headline safety property — a candidate that timed out twice counted a vote granted
+in the *earlier* term, and two servers reached `leader` in the same term. The example
+now carries the term check that Raft has and it did not.
 
 | Piece | State |
 |---|---|
@@ -85,7 +93,7 @@ measurement.
 | `TLA.StateGraph`, breadth-first `TLA.ModelChecker`, `TLA.Trace` | ✅ |
 | The implicit `type_ok` invariant | ✅ |
 | `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
-| Differential corpus vs TLC | `die_hard`; five entries to go |
+| Differential corpus vs TLC | five of six entries; `paxos` to go |
 | Liveness, fairness, symmetry (Phase 2) | not yet |
 | Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
 | Parallel exploration (Phase 4) | not yet |

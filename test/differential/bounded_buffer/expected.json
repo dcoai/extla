@@ -1,0 +1,25 @@
+{
+  "generated_by": "bin/tlc-expected",
+  "tla_tools_version": "v1.7.4",
+  "tlc_version": "2.19",
+  "module": "BoundedBuffer",
+  "constants": {
+    "Producers": "{p1, p2}",
+    "Consumers": "{c1, c2}",
+    "BufferSize": "3",
+    "MaxItems": "6",
+    "ready": "ready",
+    "waiting": "waiting",
+    "producing": "producing",
+    "consuming": "consuming"
+  },
+  "distinct_states": 4460,
+  "diameter": 29,
+  "deadlock": true,
+  "invariants": {
+    "TypeOK": "holds",
+    "BufferBounded": "holds",
+    "CountsConsistent": "holds",
+    "NoOverConsumption": "holds"
+  }
+}

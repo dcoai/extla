@@ -34,14 +34,18 @@ ensure_jar() {
     || die "checksum mismatch on $TLA_TOOLS_URL -- refusing to trust the oracle"
 }
 
-# TLC's stdout, for one entry. `-continue` is what makes a single run enough:
-# without it TLC halts at the first invariant violation and never reports the
-# state count, so the two things the corpus compares could not come from the
+# TLC's stdout, for one entry. `-continue` is what keeps an invariant violation
+# from ending the search: without it TLC halts at the first one and never reports
+# the state count, so the two things the corpus compares could not come from the
 # same search. `-workers 1` keeps the run deterministic.
+#
+# `-continue` does NOT cover deadlock: a reached deadlock ends the search whatever
+# else is set, leaving states on the queue. Passing `-deadlock` turns that check
+# off, which is the second pass below.
 run_tlc() {
-  local dir="$1" module="$2"
+  local dir="$1" module="$2" extra="${3:-}"
   ( cd "$dir" && java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC \
-      -continue -workers 1 -cleanup "$module" 2>&1 ) || true
+      -continue $extra -workers 1 -cleanup "$module" 2>&1 ) || true
 }
 
 # TLC reports a violation as
@@ -111,6 +115,19 @@ generate() {
   echo "==> $name"
   local output; output="$(run_tlc "$dir" "$module")"
 
+  # A spec with a legitimate end state (`02-dsl-semantics.md` §5.3) deadlocks
+  # under TLC by construction, and that first report stops the search with states
+  # still on the queue -- so its counts describe part of the state space. Whether
+  # a deadlock exists comes from this pass; the counts and the invariant verdicts
+  # then come from a second one with the check turned off, which is the only pass
+  # that searched everything.
+  local deadlock=false
+  if printf '%s\n' "$output" | grep -q '^Error: Deadlock reached\.'; then
+    deadlock=true
+    echo "    deadlock reached; re-running with -deadlock for the complete search"
+    output="$(run_tlc "$dir" "$module" -deadlock)"
+  fi
+
   # TLC prints "Model checking completed. No error has been found." even under
   # -continue with violations reported above it, so completion is read from the
   # state-count line instead -- its absence means the search did not finish.
@@ -123,9 +140,6 @@ generate() {
 
   local diameter
   diameter="$(printf '%s\n' "$output" | sed -n 's/.*complete state graph search is \([0-9]*\).*/\1/p' | tail -1)"
-
-  local deadlock=false
-  printf '%s\n' "$output" | grep -q '^Error: Deadlock reached\.' && deadlock=true
 
   local violations; violations="$(printf '%s\n' "$output" | parse_violations)"
   local tlc_version

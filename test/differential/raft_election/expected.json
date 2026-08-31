@@ -1,0 +1,25 @@
+{
+  "generated_by": "bin/tlc-expected",
+  "tla_tools_version": "v1.7.4",
+  "tlc_version": "2.19",
+  "module": "RaftElection",
+  "constants": {
+    "Servers": "{s1, s2, s3}",
+    "MaxTerm": "2",
+    "follower": "follower",
+    "candidate": "candidate",
+    "leader": "leader",
+    "none": "none",
+    "requestVote": "requestVote",
+    "voteResponse": "voteResponse"
+  },
+  "distinct_states": 58359,
+  "diameter": 19,
+  "deadlock": true,
+  "invariants": {
+    "TypeOK": "holds",
+    "ElectionSafety": "holds",
+    "VoteIntegrity": "holds",
+    "LeaderHasQuorum": "holds"
+  }
+}
