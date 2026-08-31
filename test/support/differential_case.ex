@@ -116,12 +116,10 @@ defmodule TLA.DifferentialCase do
         end
       end
 
-      # Nothing compares these verdicts yet -- `check_liveness: true` still
-      # raises -- so until Phase 2's checker exists, the only thing keeping the
-      # two sides' liveness declarations from drifting apart is that they name
-      # the same properties. A `temporal` added to `spec.ex` and not to the
-      # module would otherwise sit there unchecked and unnoticed, and the whole
-      # reason the oracle lands first is that it is checked from day one.
+      # The verdicts are compared below; this is the check that the two sides are
+      # comparing the same LIST. A `temporal` added to `spec.ex` and not to the
+      # module would otherwise sit there unchecked, and the verdict comparison
+      # would pass by not looking at it.
       test "declares the temporal properties TLC was given, and no others", ctx do
         spec = TLA.Spec.Compiled.from_module(@entry.module)
 
@@ -138,6 +136,43 @@ defmodule TLA.DifferentialCase do
                  inspect(Enum.sort(MapSet.difference(declared, checked))) <>
                  ", only in #{ctx.expected["module"]}.cfg: " <>
                  inspect(Enum.sort(MapSet.difference(checked, declared)))
+      end
+
+      # The same shape as the invariant comparison, for the same reasons. A run that
+      # checks several properties TLC says hold and comes back :ok has established every
+      # one of them, because nothing stopped it early; a violated one needs a run of its
+      # own, because both checkers halt at the first.
+      test "agrees with TLC on every temporal property", ctx do
+        spec = TLA.Spec.Compiled.from_module(@entry.module)
+
+        {holding, violated} =
+          Enum.split_with(ctx.expected["properties"], fn {_, verdict} -> verdict == "holds" end)
+
+        if holding != [] do
+          names =
+            Enum.map(holding, fn {tlc_name, _} ->
+              TLA.DifferentialCase.temporal_name!(spec, tlc_name, @entry)
+            end)
+
+          result = TLA.DifferentialCase.check_liveness(@entry, names)
+
+          assert result.status == :ok,
+                 "every one of #{inspect(names)} holds under TLC, but ExTLA refuted " <>
+                   inspect(TLA.DifferentialCase.refuted(result))
+        end
+
+        # The row that distinguishes a working liveness checker from one that answers
+        # "holds" to everything.
+        for {tlc_name, "violated"} <- violated do
+          name = TLA.DifferentialCase.temporal_name!(spec, tlc_name, @entry)
+          result = TLA.DifferentialCase.check_liveness(@entry, [name])
+
+          assert result.status == :violation,
+                 "TLC refutes #{tlc_name}, but ExTLA reported #{inspect(result.status)}"
+
+          assert TLA.DifferentialCase.refuted(result) == name
+          assert result.violation.prefix.length > 0
+        end
       end
 
       test "the counterexample replays to the state that violates the invariant", ctx do
@@ -174,6 +209,19 @@ defmodule TLA.DifferentialCase do
   def check(entry, opts), do: entry |> explore(opts) |> elem(0)
 
   @doc """
+  Check `names` as temporal properties with nothing else selected — the same isolation the
+  invariant comparison uses, so a difference is about the property and not about something
+  the TLA+ module does not have.
+  """
+  def check_liveness(entry, names) do
+    check(entry, invariants: [], action_properties: [], check_liveness: true, temporals: names)
+  end
+
+  @doc "The property a liveness violation refuted, or `nil`."
+  def refuted(%{violation: %{prefix: prefix}}), do: prefix.property
+  def refuted(_result), do: nil
+
+  @doc """
   The invariants a run actually checks, which includes the implicit `:type_ok`
   of §1.5 — TLC's TypeOK is a declared invariant there and a `type:` annotation
   here, and the corpus compares the two.
@@ -204,6 +252,28 @@ defmodule TLA.DifferentialCase do
 
       invariant ->
         invariant.name
+    end
+  end
+
+  @doc """
+  The ExTLA name of a TLC temporal property.
+
+  Resolved through the compiled spec for the reason `invariant_name!/3` is: a property TLC
+  checked that the ExTLA spec does not declare would otherwise pass by not being compared.
+  """
+  def temporal_name!(spec, tlc_name, entry) do
+    underscored = dsl_name(tlc_name, entry)
+
+    case Enum.find(spec.temporals, &(Atom.to_string(&1.name) == underscored)) do
+      nil ->
+        raise ExUnit.AssertionError,
+          message:
+            "TLC checked the temporal property #{tlc_name}, but #{inspect(spec.module)} " <>
+              "declares no `temporal #{underscored}`. Declared: " <>
+              Enum.map_join(spec.temporals, ", ", &inspect(&1.name)) <> "."
+
+      temporal ->
+        temporal.name
     end
   end
 

@@ -32,13 +32,16 @@ defmodule Mix.Tasks.Tla.Check do
   ## Other options
 
       --max-states         State limit for the run.
-      --safety-only        Skip liveness. (Phase 1 checks only safety anyway.)
+      --safety-only        Skip liveness. Liveness is checked whenever the spec
+                           declares a `temporal`; this turns it off, and with it the
+                           liveness graph the check needs.
       --format             human (default) or json.
 
   ## Exit codes
 
       0  verified
-      1  violation (a counterexample was printed)
+      1  violation (a counterexample was printed — a trace, or a lasso where a
+         temporal property was refuted)
       2  incomplete — the state limit or a state constraint bounded the run, so
          the spec was NOT verified
       3  coverage failure (with --strict-coverage)
@@ -94,7 +97,12 @@ defmodule Mix.Tasks.Tla.Check do
   defp config(spec, opts) do
     constants = constants!(spec)
 
-    %{constants: constants}
+    # A spec that declares a `temporal` is asking for it to be checked, so the default
+    # is to check it. A spec that declares none pays nothing: the liveness graph is only
+    # built when there is a question for it to answer.
+    check_liveness? = spec.temporals != [] and not Keyword.get(opts, :safety_only, false)
+
+    %{constants: constants, check_liveness: check_liveness?}
     |> maybe_put(:max_states, opts[:max_states])
     |> maybe_put(:fingerprint_bits, opts[:fingerprint_bits])
   end
@@ -152,6 +160,10 @@ defmodule Mix.Tasks.Tla.Check do
   end
 
   defp verdict(%{status: :ok}), do: "verified"
+
+  defp verdict(%{status: :violation, violation: %{prefix: prefix}}),
+    do: "LIVENESS: #{prefix.property}"
+
   defp verdict(%{status: :violation, violation: %{property: nil}}), do: "DEADLOCK"
   defp verdict(%{status: :violation, violation: %{property: name}}), do: "VIOLATION: #{name}"
   defp verdict(%{status: :max_states_reached}), do: "INCOMPLETE (state limit)"
@@ -188,6 +200,16 @@ defmodule Mix.Tasks.Tla.Check do
   end
 
   defp violation_json(nil), do: nil
+
+  defp violation_json(%{prefix: prefix, cycle: cycle}) do
+    %{
+      type: :liveness,
+      property: prefix.property,
+      message: prefix.message,
+      prefix: violation_json(prefix),
+      cycle: violation_json(cycle)
+    }
+  end
 
   defp violation_json(trace) do
     %{

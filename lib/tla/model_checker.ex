@@ -10,12 +10,17 @@ defmodule TLA.ModelChecker do
   shortest counterexample. A depth-first search would report *a* counterexample,
   which is a much less useful thing to hand someone.
 
-  Liveness (`check_liveness: true`), parallel exploration, symmetry reduction and
-  the `type_ok` invariant arrive in later phases; asking for one raises rather
-  than quietly checking something weaker.
+  `check_liveness: true` adds Phase 2's temporal checking: the search also builds the
+  liveness graph, and `TLA.ModelChecker.Liveness` looks for the fair cycle that refutes a
+  temporal property. It is off by default because the graph is not free
+  (`bench/liveness_graph.exs`), and because a spec that declares no `temporal` has nothing
+  to gain from it.
+
+  Parallel exploration and symmetry reduction arrive in later phases; asking for one
+  raises rather than quietly checking something weaker.
   """
 
-  alias TLA.ModelChecker.Safety
+  alias TLA.ModelChecker.{Liveness, Safety}
   alias TLA.Spec.Type
   alias TLA.Temporal
   alias TLA.Temporal.Fairness
@@ -29,10 +34,8 @@ defmodule TLA.ModelChecker do
           optional(:check_liveness) => boolean(),
 
           # Build the liveness graph — the edge table and the ENABLED bits of
-          # `TLA.StateGraph` — without checking anything with it. It exists so the
-          # structure could land, be measured and be tested on its own;
-          # `check_liveness: true` is the option to reach for, and it will imply this
-          # once `TLA.ModelChecker.Liveness` exists.
+          # `TLA.StateGraph` — without checking anything with it. `check_liveness: true`
+          # implies it; on its own it is for measuring and testing the structure.
           optional(:liveness_graph) => boolean(),
           optional(:symmetry) => [atom()] | nil,
           optional(:verify_symmetry) => boolean(),
@@ -43,7 +46,8 @@ defmodule TLA.ModelChecker do
           # differential corpus uses it to reproduce TLC's per-invariant reports
           # from one spec, the way a TLC `.cfg` selects INVARIANTs.
           optional(:invariants) => :all | [atom()],
-          optional(:action_properties) => :all | [atom()]
+          optional(:action_properties) => :all | [atom()],
+          optional(:temporals) => :all | [atom()]
         }
 
   @type result :: %{
@@ -59,7 +63,11 @@ defmodule TLA.ModelChecker do
           diameter: non_neg_integer(),
           deadlock: boolean(),
           duration_ms: non_neg_integer(),
-          violation: Trace.t() | nil,
+
+          # A safety violation is a trace to the state that breaks it. A liveness
+          # violation is a lasso — a prefix and the cycle it repeats forever — because
+          # what refutes a temporal property is a behaviour, not a state.
+          violation: Trace.t() | Trace.lasso() | nil,
 
           # What the run actually exercised. A green check mark is only as good
           # as what was behind it.
@@ -80,7 +88,8 @@ defmodule TLA.ModelChecker do
     state_constraint: nil,
     fingerprint_bits: 64,
     invariants: :all,
-    action_properties: :all
+    action_properties: :all,
+    temporals: :all
   }
 
   @doc """
@@ -111,7 +120,7 @@ defmodule TLA.ModelChecker do
     do: explore(Spec.Compiled.from_module(module), config)
 
   def explore(%Spec.Compiled{} = spec, config) do
-    config = Map.merge(@defaults, config)
+    config = @defaults |> Map.merge(config) |> imply_liveness_graph()
     reject_unimplemented!(config)
 
     # `type_ok` joins the invariants for the run, so it is checked, selectable
@@ -123,7 +132,7 @@ defmodule TLA.ModelChecker do
     started = System.monotonic_time(:millisecond)
     graph = StateGraph.new(spec, config.constants, fingerprint_bits: config.fingerprint_bits)
 
-    run = search(spec, config, graph)
+    run = spec |> search(config, graph) |> check_temporals()
 
     result = finish(run, System.monotonic_time(:millisecond) - started)
 
@@ -156,7 +165,17 @@ defmodule TLA.ModelChecker do
     # Everything the search threads through itself. A struct rather than a
     # widening tuple, because coverage made it a five-tuple and the next phase
     # adds the liveness graph.
-    defstruct [:spec, :config, :graph, :coverage, :frontier, :found, :outcome, :invariants]
+    defstruct [
+      :spec,
+      :config,
+      :graph,
+      :coverage,
+      :frontier,
+      :found,
+      :outcome,
+      :invariants,
+      :liveness
+    ]
   end
 
   defp search(spec, config, graph) do
@@ -170,7 +189,8 @@ defmodule TLA.ModelChecker do
       invariants: invariants,
       frontier: :queue.new(),
       found: 0,
-      outcome: :ok
+      outcome: :ok,
+      liveness: nil
     }
 
     run = seed(run)
@@ -454,6 +474,30 @@ defmodule TLA.ModelChecker do
     %{run | graph: graph}
   end
 
+  # Liveness runs over the finished graph, and only over a finished graph: a search cut
+  # short by a violation or a bound has explored part of the state space, and a temporal
+  # verdict over part of it would be a claim about behaviours nobody looked at. Nor is it
+  # asked when the spec deadlocks — a deadlock is a safety failure, and answering a
+  # liveness question about a spec that has one answers the wrong question.
+  defp check_temporals(%{config: %{check_liveness: false}} = run), do: run
+  defp check_temporals(%{outcome: outcome} = run) when outcome != :ok, do: run
+
+  defp check_temporals(run) do
+    if run.config.check_deadlock and MapSet.size(run.graph.deadlocked) > 0 do
+      run
+    else
+      case Liveness.check(run.spec, run.graph, run.config.temporals) do
+        :ok -> run
+        {:violation, name, lasso} -> %{run | liveness: {name, lasso}}
+      end
+    end
+  end
+
+  defp imply_liveness_graph(%{check_liveness: true} = config),
+    do: %{config | liveness_graph: true}
+
+  defp imply_liveness_graph(config), do: config
+
   defp constrained?(%{state_constraint: nil}, _state), do: false
   defp constrained?(%{state_constraint: constraint}, state), do: not constraint.(state)
 
@@ -464,7 +508,7 @@ defmodule TLA.ModelChecker do
     config = run.config
     deadlock? = MapSet.size(graph.deadlocked) > 0
 
-    {status, violation} =
+    {safety_status, safety_violation} =
       case run.outcome do
         {:violation, trace} ->
           {:violation, trace}
@@ -480,7 +524,15 @@ defmodule TLA.ModelChecker do
           end
       end
 
-    coverage = Coverage.finalize(run.coverage, bounded_by(status, config))
+    # A refuted temporal property does not cut the search short — the graph was complete
+    # before the question was asked — so coverage is bounded by what the SAFETY pass did.
+    {status, violation} =
+      case {safety_status, run.liveness} do
+        {:ok, {_name, lasso}} -> {:violation, lasso}
+        _ -> {safety_status, safety_violation}
+      end
+
+    coverage = Coverage.finalize(run.coverage, bounded_by(safety_status, config))
 
     %{
       status: status,
@@ -492,7 +544,7 @@ defmodule TLA.ModelChecker do
       duration_ms: duration,
       violation: violation,
       coverage: coverage,
-      warnings: warnings(run.spec, config, status) ++ Coverage.warnings(coverage),
+      warnings: warnings(run.spec, config, safety_status) ++ Coverage.warnings(coverage),
       fingerprint_bits: config.fingerprint_bits,
       collision_estimate:
         Fingerprint.collision_estimate(graph.state_count, config.fingerprint_bits)
@@ -553,7 +605,7 @@ defmodule TLA.ModelChecker do
       [
         "#{length(spec.temporals)} temporal " <>
           "#{if length(spec.temporals) == 1, do: "property was", else: "properties were"} " <>
-          "declared and not checked: liveness arrives in Phase 2."
+          "declared and not checked: pass `check_liveness: true`."
       ]
   end
 
@@ -572,15 +624,6 @@ defmodule TLA.ModelChecker do
   # ── Phase boundaries ────────────────────────────────────────────────────────
 
   defp reject_unimplemented!(config) do
-    if config.check_liveness do
-      raise ArgumentError,
-            "check_liveness: true is not implemented yet. The liveness graph it needs — the " <>
-              "edge table and the per-state ENABLED bits — is built by `liveness_graph: true`, " <>
-              "but nothing checks a temporal property with it yet (spec/06-architecture.md). " <>
-              "Returning :ok from a run that was asked to check liveness and checked none " <>
-              "would be the silent-unsoundness this project exists to avoid."
-    end
-
     if config.symmetry not in [nil, []] or config.verify_symmetry do
       raise ArgumentError,
             "symmetry reduction is not implemented yet; it arrives in Phase 2 " <>

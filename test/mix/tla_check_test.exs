@@ -58,6 +58,24 @@ defmodule Mix.Tasks.Tla.CheckTest do
       assert output =~ "State 4 [VIOLATION]"
     end
 
+    # A spec that declares a `temporal` is asking for it to be checked, so the task
+    # checks it — and prints a lasso rather than a trace when one is refuted.
+    test "a refuted temporal property exits 1 and prints the lasso" do
+      {output, code} = check(["TLA.TestSpecs.IdlingUnfair"])
+
+      assert code == 1
+      assert output =~ "LIVENESS: eventually_two"
+      assert output =~ "↺ back to state 1"
+    end
+
+    test "--safety-only leaves the temporal properties unchecked, and says so" do
+      {output, code} = check(["TLA.TestSpecs.IdlingUnfair", "--safety-only"])
+
+      assert code == 0
+      assert output =~ "verified"
+      assert output =~ "declared and not checked"
+    end
+
     test "a deadlock is reported as one" do
       Application.put_env(:extla, TLA.TestSpecs.Deadlocking, constants: %{max: 2})
       on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Deadlocking) end)

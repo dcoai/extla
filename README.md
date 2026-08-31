@@ -81,11 +81,22 @@ regenerates it from TLC on every pipeline, and a corpus entry that drifts fails 
 build. The oracle landed before the checker precisely so this column could be measured
 rather than assumed.
 
-The corpus now also records TLC's verdict on each entry's **temporal** properties,
-ahead of any liveness checking on the ExTLA side — the same ordering, for the same
-reason. `raft_election`'s `EventuallyElectLeader` comes back *violated*, refuted by the
-model's term bound by design, and that is the entry that will tell a working liveness
-checker from one that answers "holds" to everything.
+The corpus also records TLC's verdict on each entry's **temporal** properties, and
+`check_liveness: true` now agrees with all seven — including the one that matters:
+`raft_election`'s `eventually_elect_leader` comes back *violated*, refuted by the model's
+term bound by design, with a seven-state prefix that ends in the split vote and stutters
+there forever. That row is what distinguishes a working liveness checker from one that
+answers "holds" to everything.
+
+| Entry | Property | TLC | ExTLA |
+|---|---|---|---|
+| `distributed_lock` | `no_starvation`, `lock_eventually_released` | holds | holds |
+| `bounded_buffer` | all four | holds | holds |
+| `raft_election` | `eventually_elect_leader` | **violated** | **violated** |
+
+`no_starvation` holds only under *per-binding* strong fairness — `\A p : SF(Acquire(p))`,
+not `SF(\E p : Acquire(p))`. The same spec with weak fairness is refuted, with p1 waiting
+while p2 takes the lock and gives it back forever.
 
 The corpus paid for itself along the way. `raft_election` is
 [Example 2](spec/07-examples.md) of this repository's own documentation, and TLC refuted
@@ -105,13 +116,14 @@ that `f[x]` outside a function's domain was `nil` rather than an error.
 | `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
 | Differential corpus vs TLC | ✅ all six entries |
 | TLC's temporal verdicts in the corpus | ✅ oracle only; nothing checks them yet |
-| The liveness graph — `TLA.Temporal`, the edge table and ENABLED bits | ✅ built on request; nothing runs over it yet |
-| Liveness, fairness, symmetry (Phase 2) | not yet |
+| The liveness graph — `TLA.Temporal`, the edge table and ENABLED bits | ✅ |
+| `check_liveness: true` — temporal properties, weak and strong fairness | ✅ |
+| Symmetry reduction (Phase 2) | not yet |
 | Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
 | Parallel exploration (Phase 4) | not yet |
 
-Asking for something a later phase brings — `check_liveness: true`, `symmetry:` —
-raises rather than quietly checking something weaker.
+Asking for something a later phase brings — `symmetry:` — raises rather than quietly
+checking something weaker.
 
 See [spec/README.md](spec/README.md) for the full specification, and
 [spec/08-decisions.md](spec/08-decisions.md) for why it is shaped the way it is.

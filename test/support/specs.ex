@@ -194,6 +194,155 @@ defmodule TLA.TestSpecs do
     fairness(:weak, release: [:p], request: [:p])
   end
 
+  defmodule WeaklyFair do
+    @moduledoc """
+    `PerBinding` with acquiring only WEAKLY fair, which is what §5.2 says is not
+    enough: a competitor takes the lock and gives it back, so `acquire(p)` is
+    enabled infinitely often and continuously enabled never, and weak fairness
+    lets p wait forever.
+    """
+    use TLA.Spec
+
+    constant :processes
+
+    variable :pc, type: [^processes ~> [:idle, :waiting, :holding]]
+    variable :owner
+
+    init do
+      pc = for_each(^processes, fn _ -> :idle end)
+      owner = nil
+    end
+
+    action :request, params: [p: ^processes] do
+      require pc[p] == :idle
+      pc = update(pc, p, fn _ -> :waiting end)
+    end
+
+    action :acquire, params: [p: ^processes] do
+      require pc[p] == :waiting
+      require owner == nil
+      pc = update(pc, p, fn _ -> :holding end)
+      owner = p
+    end
+
+    action :release, params: [p: ^processes] do
+      require owner == p
+      pc = update(pc, p, fn _ -> :idle end)
+      owner = nil
+    end
+
+    temporal :no_starvation do
+      Enum.all?(^processes, fn p ->
+        (pc[p] == :waiting) ~> (pc[p] == :holding)
+      end)
+    end
+
+    fairness(:weak, acquire: [:p])
+    fairness(:weak, release: [:p], request: [:p])
+  end
+
+  defmodule Idling do
+    @moduledoc """
+    A cycle that only fairness rules out (§5.2): `spin` flips a bit forever while
+    `advance` sits enabled beside it, so WF(advance) is what makes `eventually_two`
+    hold. `IdlingUnfair` is the same spec with the declaration removed.
+    """
+    use TLA.Spec
+
+    variable :n, type: 0..2
+    variable :spinning, type: [false, true]
+
+    init do
+      n = 0
+      spinning = false
+    end
+
+    action :spin do
+      require n == 0
+      spinning = not spinning
+    end
+
+    action :advance do
+      require n < 2
+      n = n + 1
+    end
+
+    temporal :eventually_two do
+      eventually(n == 2)
+    end
+
+    temporal :never_two do
+      always(n < 2)
+    end
+
+    terminal :arrived do
+      n == 2
+    end
+
+    fairness(:weak, [:advance])
+  end
+
+  defmodule IdlingUnfair do
+    @moduledoc "`Idling` with no fairness at all, so spinning forever is a behaviour."
+    use TLA.Spec
+
+    variable :n, type: 0..2
+    variable :spinning, type: [false, true]
+
+    init do
+      n = 0
+      spinning = false
+    end
+
+    action :spin do
+      require n == 0
+      spinning = not spinning
+    end
+
+    action :advance do
+      require n < 2
+      n = n + 1
+    end
+
+    temporal :eventually_two do
+      eventually(n == 2)
+    end
+
+    terminal :arrived do
+      n == 2
+    end
+  end
+
+  defmodule Stalls do
+    @moduledoc """
+    A spec that ends (§5.3) before its temporal property is satisfied. Stuttering
+    there forever is a legal behaviour, so `eventually_done` is refuted by the end
+    state itself — the shape that refutes `raft_election`.
+    """
+    use TLA.Spec
+
+    variable :phase, type: [:start, :stuck, :done]
+
+    init do
+      phase = :start
+    end
+
+    action :give_up do
+      require phase == :start
+      phase = :stuck
+    end
+
+    temporal :eventually_done do
+      eventually(phase == :done)
+    end
+
+    terminal :gave_up do
+      phase == :stuck
+    end
+
+    fairness(:weak, [:give_up])
+  end
+
   defmodule Terminating do
     @moduledoc "A spec that ends on purpose (§5.3): the end state is declared."
     use TLA.Spec
