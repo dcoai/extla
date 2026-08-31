@@ -229,17 +229,26 @@ def handle_call(msg, from, state) do
   # 4. Postconditions whose pattern matches
   TLA.Invariant.Runtime.check_postconditions!(__MODULE__, :handle_call, msg, state, new_state)
 
-  # 5. Invariants on the post-state
-  TLA.Invariant.Runtime.check_invariants!(__MODULE__, new_state)
+  # 5. Invariants on the post-state -- BY NAME, resolved from `callbacks:` here
+  TLA.Invariant.Runtime.check_invariants!(__MODULE__, [:in_bounds], new_state)
 
   # 6. Action properties on the transition
-  TLA.Invariant.Runtime.check_action_properties!(__MODULE__, state, new_state)
+  TLA.Invariant.Runtime.check_action_properties!(__MODULE__, [:no_free_money], state, new_state)
 
   result
 end
 ```
 
-Two consequences worth stating:
+**Only the callbacks the module's own author defined are wrapped**, and they are
+identified with `@on_definition` rather than `Module.defines?/2`. `use GenServer`
+injects defaults for `handle_call/3`, `handle_cast/2` and `handle_info/2` before
+`use TLA.Invariant` runs, `Module.defines?/2` cannot tell those from the author's,
+and calling `super` on a GenServer default is deprecated besides — quite apart from
+its being a transition nobody wrote. This is why `use TLA.Invariant` belongs
+directly after `use GenServer` and before the callbacks: `@on_definition` sees a
+definition only once it is installed.
+
+Two more consequences worth stating:
 
 - A callback that does not change state still runs the invariant checks. That is
   correct — a stuttering step must preserve invariants — but it is also why
@@ -247,6 +256,9 @@ Two consequences worth stating:
 - `extract_state/2` takes the pre-state as a fallback, because not every return tuple
   carries one (`{:stop, reason, reply, state}` does; a bare `{:stop, reason}` from
   `handle_info` does not).
+- `init/1` is wrapped for invariants only. Its result IS the first state, so there is
+  no pre-state for an action property or a postcondition to compare against, and no
+  earlier message for a precondition to be about.
 
 ### `:disabled` emits nothing
 
@@ -273,16 +285,33 @@ defmodule TLA.Invariant.Runtime do
   """
 
   @doc """
-  Check all registered invariants against the given state.
-  """
-  @spec check_invariants!(module(), TLA.State.t()) :: :ok | no_return()
-  def check_invariants!(module, state)
+  Check the NAMED invariants against the given state.
 
-  @doc """
-  Check all registered action properties against a state transition.
+  Amended from `check_invariants!(module, state)`. The `callbacks:` option is
+  resolved when the wrapper is generated, so a hot callback in a module with nine
+  invariants is emitted with a call naming the two that apply — rather than nine
+  names and a runtime filter, which is the cost the option exists to avoid. Where a
+  callback ends up with nothing to check, no call is emitted for it at all.
+
+  The four-argument form is the one a module compiled under
+  `config :extla, telemetry: :verbose` calls; it times each check and emits
+  `:checked`. The three-argument form contains no timing and no success event to
+  skip, which is what "unemitted" has to mean (§Telemetry Integration).
   """
-  @spec check_action_properties!(module(), TLA.State.t(), TLA.State.t()) :: :ok | no_return()
-  def check_action_properties!(module, old_state, new_state)
+  @spec check_invariants!(module(), [atom()], TLA.State.t()) :: :ok | no_return()
+  def check_invariants!(module, names, state)
+
+  @spec check_invariants!(module(), [atom()], TLA.State.t(), :verbose) :: :ok | no_return()
+  def check_invariants!(module, names, state, :verbose)
+
+  @doc "Check the named action properties against a state transition."
+  @spec check_action_properties!(module(), [atom()], TLA.State.t(), TLA.State.t()) ::
+    :ok | no_return()
+  def check_action_properties!(module, names, old_state, new_state)
+
+  @spec check_action_properties!(module(), [atom()], TLA.State.t(), TLA.State.t(), :verbose) ::
+    :ok | no_return()
+  def check_action_properties!(module, names, old_state, new_state, :verbose)
 
   @doc """
   Check every precondition whose pattern matches `message`, for the given
