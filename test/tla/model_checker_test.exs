@@ -223,11 +223,16 @@ defmodule TLA.ModelCheckerTest do
       assert message =~ "max_states:"
     end
 
+    # Everything but `duration_ms`, which is a measurement of the run rather than a fact
+    # about the model — comparing whole results made this test pass only when the two runs
+    # landed in the same millisecond.
     test "and one worker is what the checker does, so it is not refused" do
       config = %{constants: %{max: 2}}
 
-      assert ModelChecker.run(Counter, Map.put(config, :workers, 1)) ==
-               ModelChecker.run(Counter, config)
+      one = ModelChecker.run(Counter, Map.put(config, :workers, 1))
+      none = ModelChecker.run(Counter, config)
+
+      assert Map.delete(one, :duration_ms) == Map.delete(none, :duration_ms)
     end
 
     test "a spec with unchecked temporal properties says so in the warnings" do
