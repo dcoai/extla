@@ -100,14 +100,28 @@ defmodule TLA.StateGraph.Export do
     end
   end
 
-  defp refuse_if_large!(graph, max_states, flag) do
+  @doc false
+  # The size rule, as a message rather than as a raise, so that `mix tla.visualize` can
+  # present it as a `Mix.Error` beside its other refusals instead of letting an
+  # `ArgumentError` out with a stack trace. One threshold and one wording, two surfaces —
+  # the alternative is the task re-implementing the comparison and the two drifting.
+  #
+  # Returns `nil` when the graph is small enough.
+  @spec refusal(StateGraph.t(), pos_integer(), String.t()) :: String.t() | nil
+  def refusal(graph, max_states, flag \\ ":max_states") do
     if graph.state_count > max_states do
-      raise ArgumentError,
-            "this graph has #{graph.state_count} states and the limit is #{max_states}. " <>
-              "Rendering it would produce a file no layout engine turns into a picture " <>
-              "anyone can read, and every node's label costs a replay from `init` " <>
-              "(states are not retained). Raise `#{flag}` if you meant it, or reduce the " <>
-              "model — smaller constants, or a `state_constraint`."
+      "this graph has #{graph.state_count} states and the limit is #{max_states}. " <>
+        "Rendering it would produce a file no layout engine turns into a picture " <>
+        "anyone can read, and every node's label costs a replay from `init` " <>
+        "(states are not retained). Raise `#{flag}` if you meant it, or reduce the " <>
+        "model — smaller constants, or a `state_constraint`."
+    end
+  end
+
+  defp refuse_if_large!(graph, max_states, flag) do
+    case refusal(graph, max_states, flag) do
+      nil -> :ok
+      message -> raise ArgumentError, message
     end
   end
 

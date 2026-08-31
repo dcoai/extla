@@ -1095,21 +1095,29 @@ end
 
 ### `mix tla.visualize`
 
+> **DOT only.** This section advertised `--format html` and `--format mermaid` until
+> `mix tla.visualize` was built. `06-architecture.md` §Phase 4 says "DOT only" and
+> §Deferred defers the HTML/D3 visualizer explicitly — "DOT is enough, and a bespoke
+> viewer is a maintenance sink" — so §06 wins and this is corrected to agree. Both
+> formats are **refused** by the task with a message naming that decision, rather than
+> quietly ignored. Graphviz renders whatever else is wanted: `dot -Tsvg`, `-Tpng`, `-Tpdf`.
+
 ```elixir
 defmodule Mix.Tasks.Tla.Visualize do
   @moduledoc """
-  Generate a visualization of the state graph.
+  Render a spec's state graph as DOT, for Graphviz.
 
   ## Usage
 
-      # DOT format (for Graphviz)
-      mix tla.visualize Specs.TransferProtocol --format dot
+      mix tla.visualize Specs.TransferProtocol
+      mix tla.visualize Specs.TransferProtocol --output graph.dot
+      mix tla.visualize Specs.TransferProtocol --max-states 2000
 
-      # Interactive HTML (using D3.js)
-      mix tla.visualize Specs.TransferProtocol --format html
+  ## Options
 
-      # Mermaid diagram
-      mix tla.visualize Specs.TransferProtocol --format mermaid
+      --output       Write here instead of to stdout.
+      --max-states   Refuse past this many states, naming the true count.
+      --format       dot, and only dot.
   """
   use Mix.Task
 
@@ -1117,3 +1125,10 @@ defmodule Mix.Tasks.Tla.Visualize do
   def run(args)
 end
 ```
+
+It builds the graph with `liveness_graph: true`, because the edge table is what a
+rendering needs — parent pointers are a spanning tree, and `TLA.StateGraph.to_dot/2`
+refuses to draw one as though it were the transition relation
+(`04-layer2-model-checker.md` §State Graph). A spec whose invariant is refuted is drawn
+with its counterexample emphasised, and the task says that the graph covers only what the
+search reached before stopping.

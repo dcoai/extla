@@ -1,0 +1,14 @@
+digraph "TLA.TestSpecs.WithDefaults" {
+  rankdir=LR;
+  node [shape=box, fontname="monospace", fontsize=10];
+  edge [fontname="monospace", fontsize=9];
+
+  0 [label="0\nn = 0", peripheries=2];
+  1 [label="1\nn = 1"];
+  2 [label="2\nn = 2"];
+  3 [label="3\nn = 3", shape=doubleoctagon];
+
+  0 -> 1 [label="tick"];
+  1 -> 2 [label="tick"];
+  2 -> 3 [label="tick"];
+}

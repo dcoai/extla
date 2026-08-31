@@ -60,6 +60,7 @@ defmodule Mix.Tasks.Tla.Check do
 
   use Mix.Task
 
+  alias TLA.Mix.SpecTarget
   alias TLA.{Coverage, ModelChecker, Spec, Trace}
 
   @switches [
@@ -78,7 +79,7 @@ defmodule Mix.Tasks.Tla.Check do
     Mix.Task.run("app.start")
 
     {opts, names} = OptionParser.parse!(args, strict: @switches)
-    modules = resolve_modules(names)
+    modules = SpecTarget.resolve!(names)
 
     if modules == [] do
       Mix.raise("no TLA.Spec modules found. Name one, or `use TLA.Spec` in a module.")
@@ -108,7 +109,7 @@ defmodule Mix.Tasks.Tla.Check do
   end
 
   defp config(spec, opts) do
-    constants = constants!(spec)
+    constants = SpecTarget.constants!(spec)
 
     symmetry = symmetry(spec)
 
@@ -188,27 +189,6 @@ defmodule Mix.Tasks.Tla.Check do
   # The resolution itself lives on `Spec.Compiled`, so that Layer 3's conformance checking
   # resolves constants the same way rather than a second way. What is here is the Mix
   # flavour of the failure.
-  defp constants!(spec) do
-    case Spec.Compiled.resolve_constants(spec) do
-      {:ok, constants} ->
-        constants
-
-      {:error, missing} ->
-        Mix.raise("""
-        #{inspect(spec.module)} has no assignment for \
-        #{Enum.map_join(missing, ", ", &inspect/1)}.
-
-        Supply them either beside the declaration:
-
-            constant #{inspect(hd(missing))}, default: …
-
-        or in config/config.exs:
-
-            config :extla, #{inspect(spec.module)}, constants: %{#{hd(missing)}: …}
-        """)
-    end
-  end
-
   # ── Reporting ───────────────────────────────────────────────────────────────
 
   defp report({module, {:unsound_symmetry, error}}) do
@@ -317,34 +297,5 @@ defmodule Mix.Tasks.Tla.Check do
       true ->
         :ok
     end
-  end
-
-  # ── Discovery ───────────────────────────────────────────────────────────────
-
-  defp resolve_modules([]) do
-    Mix.Project.config()
-    |> Keyword.fetch!(:app)
-    |> :application.get_key(:modules)
-    |> case do
-      {:ok, modules} -> Enum.filter(modules, &spec?/1)
-      :undefined -> []
-    end
-    |> Enum.sort()
-  end
-
-  defp resolve_modules(names) do
-    Enum.map(names, fn name ->
-      module = Module.concat([name])
-
-      unless spec?(module) do
-        Mix.raise("#{inspect(module)} is not a TLA spec: it does not `use TLA.Spec`.")
-      end
-
-      module
-    end)
-  end
-
-  defp spec?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :__tla_spec__, 0)
   end
 end
