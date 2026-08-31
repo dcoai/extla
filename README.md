@@ -86,7 +86,9 @@ The corpus paid for itself along the way. `raft_election` is
 its headline safety property — a candidate that timed out twice counted a vote granted
 in the *earlier* term, and two servers reached `leader` in the same term. The example
 now carries the term check that Raft has and it did not. Writing the entries also found
-four gaps in the DSL and the harness, each fixed where it was found.
+six gaps in the DSL and the harness, each fixed where it was found — most recently that
+four entries were typing a variable *weaker* than the TLA+ they are checked against, and
+that `f[x]` outside a function's domain was `nil` rather than an error.
 
 | Piece | State |
 |---|---|

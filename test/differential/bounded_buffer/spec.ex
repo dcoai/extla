@@ -9,11 +9,6 @@ defmodule TLA.Differential.BoundedBuffer do
   canonicalises a set would collapse states that differ only in what is at the
   head, and the state count is where that shows up.
 
-  One deliberate weakening, the same one `two_phase_commit` records: §1.5's
-  `:seq` cannot constrain the elements, so TLA+'s `buffer[i] \\in Item` has no
-  counterpart here. Both hold, so the comparison is unaffected — the gap is
-  filed as its own proposal.
-
   TLC checks the safety half. The temporal properties and the fairness
   constraints are declared and unchecked in Phase 1.
   """
@@ -24,7 +19,9 @@ defmodule TLA.Differential.BoundedBuffer do
   constant :buffer_size, default: 3
   constant :max_items, default: 6
 
-  variable :buffer, type: :seq
+  # TLA+'s `Item`, element for element; the bound is one short of `^max_items`
+  # because the first item produced is numbered 0.
+  variable :buffer, type: seq(%{producer: ^producers, seq: 0..(^max_items - 1)})
   variable :produced_count, type: 0..^max_items
   variable :consumed_count, type: 0..^max_items
   variable :producer_pc, type: [^producers ~> [:ready, :waiting, :producing]]

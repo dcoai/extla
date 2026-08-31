@@ -10,11 +10,6 @@ defmodule TLA.Differential.RaftElection do
   also the first entry that ends somewhere — the split vote at `^max_term` is a
   `terminal`, not a deadlock.
 
-  One deliberate weakening, the same one `two_phase_commit` records: §1.5 cannot
-  type the elements of a collection, so TLA+'s `messages \\subseteq Message` and
-  `votesGranted \\in [Servers -> SUBSET Servers]` have no counterpart here. Both
-  hold, so the comparison is unaffected — the gap is filed as its own proposal.
-
   TLC checks the safety half. The temporal properties and the fairness
   constraints are declared and unchecked in Phase 1; the run says so in its
   warnings.
@@ -27,8 +22,21 @@ defmodule TLA.Differential.RaftElection do
   variable :current_term, type: [^servers ~> 0..^max_term]
   variable :voted_for, type: [^servers ~> (^servers | :none)]
   variable :srv_state, type: [^servers ~> [:follower, :candidate, :leader]]
-  variable :votes_granted, type: [^servers ~> :set]
-  variable :messages, type: :set
+  variable :votes_granted, type: [^servers ~> set(^servers)]
+
+  # TLA+'s `Message`, element for element.
+  variable :messages,
+    type:
+      set(
+        %{type: :request_vote, term: 0..^max_term, from: ^servers, to: ^servers}
+        | %{
+            type: :vote_response,
+            term: 0..^max_term,
+            from: ^servers,
+            to: ^servers,
+            granted: [true, false]
+          }
+      )
 
   init do
     current_term = for_each(^servers, fn _ -> 0 end)

@@ -415,3 +415,34 @@ they are where the hole would be worth the most; and a rule an author has to rem
 the shape of is one they will guess wrong.
 
 See `02-dsl-semantics.md` §1.6 and `TLA.Spec.DomainError`.
+
+---
+
+## D-21 — Collections are element-typed with `set(t)` / `seq(t)`, and records with `%{k: t}`
+
+**Decided.** §1.5 gains three forms: `set(t)` and `seq(t)` for a collection whose
+elements are all of type `t`, and `%{k: t, …}` for a record — a map with exactly those
+keys, each value of its type. Range bounds gain arithmetic (`0..(^max_items - 1)`) and
+negatives (`-1..^max_ballot`).
+
+**Replaced:** bare `:set` and `:seq`, which say nothing about what a collection holds.
+They keep that meaning; the new forms are additions.
+
+**Why:** the differential corpus found four entries typing a variable weaker than the
+TLA+ they are checked against. `msgs \subseteq Message` in `two_phase_commit` and
+`paxos`, `messages \subseteq Message` and `votesGranted \in [Servers -> SUBSET Servers]`
+in `raft_election`, `buffer[i] \in Item` in `bounded_buffer` — all `:set` or `:seq` on
+the ExTLA side. Both sides held, so no comparison was wrong; but the corpus is the
+project's only oracle, and an entry that checks *less* than its oracle can agree with it
+for the wrong reason. All four now check what TLC checks.
+
+**Why a call form:** `{:set, t}` is terser and collides — it is already a legal tuple
+type of the literal atom `:set` and a `t`. `[t]` collides with "one of these literals"
+whenever the list has one element. `set(t)` reads like the `TLA.Spec.Helpers`
+constructor of the same name and costs one grammar rule.
+
+**Why records came too:** a set of records is what a message set is. `set(t)` with no
+way to write `t` for a message would have closed the gap for `set(^servers)` and left
+every message set where it was.
+
+See `02-dsl-semantics.md` §1.5.

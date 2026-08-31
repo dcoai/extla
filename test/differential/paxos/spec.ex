@@ -13,10 +13,6 @@ defmodule TLA.Differential.Paxos do
 
   Message-type tags are model values on the TLC side and atoms here:
   `phase1a`/`:phase_1a` and so on, per the corpus README.
-
-  One deliberate weakening, the same one the other message-passing entries
-  record: §1.5 cannot type the elements of a collection, so TLA+'s
-  `msgs \\subseteq Message` has no counterpart here.
   """
   use TLA.Spec
 
@@ -39,7 +35,21 @@ defmodule TLA.Differential.Paxos do
   variable :max_bal, type: [^acceptors ~> -1..^max_ballot]
   variable :max_v_bal, type: [^acceptors ~> -1..^max_ballot]
   variable :max_val, type: [^acceptors ~> (^values | :none)]
-  variable :msgs, type: :set
+  # TLA+'s `Message`, element for element.
+  variable :msgs,
+    type:
+      set(
+        %{type: :phase_1a, bal: 0..^max_ballot}
+        | %{
+            type: :phase_1b,
+            acc: ^acceptors,
+            bal: 0..^max_ballot,
+            mbal: -1..^max_ballot,
+            mval: ^values | :none
+          }
+        | %{type: :phase_2a, bal: 0..^max_ballot, val: ^values}
+        | %{type: :phase_2b, acc: ^acceptors, bal: 0..^max_ballot, val: ^values}
+      )
 
   init do
     max_bal = for_each(^acceptors, fn _ -> -1 end)

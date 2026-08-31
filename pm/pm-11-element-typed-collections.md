@@ -1,7 +1,7 @@
 ---
 id: pm-11
 title: "The §1.5 grammar cannot type the elements of a set or a sequence"
-labels: [Proposal]
+labels: [In-Progress]
 created: 2026-08-30
 gitlab_issue: 11
 gitlab_synced: true
@@ -63,6 +63,41 @@ Option 3 is the one to take unless something better appears. It also extends nat
 entry still agreeing with TLC. A test that a malformed element is reported as a
 `type_ok` violation naming the variable, the element and the expected element type.
 
+## Decision — option 3, plus the record form it needs
+
+**Taken: `set(t)` and `seq(t)` as call forms**, exactly as this proposal argued.
+`{:set, t}` collides with the tuple type, `[t]` collides with "one of these literals",
+and the call form reads like the `TLA.Spec.Helpers` constructor of the same name.
+
+**Plus `%{k: t, …}` for a record**, which the proposal did not anticipate and which the
+first entry needed. `msgs \subseteq Message` is a set of *records*; `set(t)` with no way
+to write `t` for a message would have closed the gap for `set(^servers)` and left every
+message set exactly where it was. TLA+ writes the same thing as a record set,
+`[type : {"Prepared"}, rm : RM]`, so the correspondence is direct.
+
+**Plus arithmetic range bounds.** `bounded_buffer`'s items are numbered from zero, so
+TLC's `Item` is `[producer : Producers, seq : 0..(MaxItems - 1)]`. A bound grammar that
+could not say `0..(^max_items - 1)` would have forced the ExTLA type one element wider
+than the TLA+ one — the same "weaker than the oracle" problem, one level down.
+
+Recorded as D-21; the grammar table in §1.5 now carries all three.
+
+## What changed in the corpus
+
+Four entries now check what TLC checks:
+
+| Entry | Was | Is |
+|---|---|---|
+| `two_phase_commit` | `msgs :set`, `tm_prepared :set` | `set(%{type: :prepared, rm: ^rms} \| %{type: [:commit, :abort], rm: :tm})`, `set(^rms)` |
+| `raft_election` | `messages :set`, `votes_granted :set` | the two-record union, and `set(^servers)` |
+| `bounded_buffer` | `buffer :seq` | `seq(%{producer: ^producers, seq: 0..(^max_items - 1)})` |
+| `paxos` | `msgs :set` | the four-record union |
+| `distributed_lock` | `waiting :set` | `set(^processes)` |
+
+All six entries still agree with TLC exactly — the same state counts and diameters, now
+established against a `type_ok` that is no weaker than the `TypeOK` it is compared to.
+
 ## Related
 
-`[[pm-9-type-ok]]`, `02-dsl-semantics.md` §1.5, `08-decisions.md` D-19.
+`[[pm-9-type-ok]]`, `[[pm-13-corpus-raft-and-buffer]]`, `[[pm-14-corpus-paxos]]`,
+`02-dsl-semantics.md` §1.5, `08-decisions.md` D-19 and D-21.

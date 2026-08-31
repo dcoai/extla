@@ -14,7 +14,7 @@ defmodule TLA.Differential.DistributedLock do
   constant :resources, default: MapSet.new([:r1, :r2])
 
   variable :owner, type: [^resources ~> (^processes | :none)]
-  variable :waiting, type: [^resources ~> :set]
+  variable :waiting, type: [^resources ~> set(^processes)]
 
   variable :pc,
     type: [^processes ~> (:idle | :requesting | {:holding, ^resources} | :releasing)]

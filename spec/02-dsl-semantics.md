@@ -105,8 +105,14 @@ compiles.
 | `t1 \| t2` | Union — a value of either type |
 | `{t1, t2, …}` | A tuple of that arity, element-wise |
 | `[dom ~> rng]` | A map (TLA+ function) whose keys are exactly `dom` and whose values are in `rng` |
+| `%{k: t, …}` | A record: a map with exactly these keys, each value of its type — TLA+'s `[k : T, …]` |
 | `:set`, `:seq` | Any `MapSet` / any list; element types unconstrained |
+| `set(t)`, `seq(t)` | A `MapSet` / list whose every element is of type `t` — TLA+'s `SUBSET T` and `Seq(T)` |
 | `:int`, `:nat` | Any integer / any non-negative integer — TLA+'s `Int` and `Nat` |
+
+A range bound may be an integer, a `^constant`, or arithmetic over them
+(`0..(^max_items - 1)`), and it may be negative: Paxos's `maxBal` is `-1` until the
+acceptor promises something.
 
 Two operators are overloaded and a reader should know it: inside `type:`, `~>` is the
 function arrow and `|` is union; inside a `temporal` block `~>` is leads-to. The two
@@ -115,6 +121,15 @@ never occur in the same position, so the macro is never in doubt.
 `:set`, `:seq`, `:int` and `:nat` likewise shadow the literal atoms of the same names
 at the top level of a type. Inside a list there is nothing to be ambiguous with, so
 `[:set]` means the literal atom `:set`.
+
+`set(t)` and `seq(t)` are call forms rather than `{:set, t}` because the tuple form
+collides: `{:set, :nat}` is already a legal tuple type of the literal atom `:set` and a
+natural. They arrived when the differential corpus found four entries typing a variable
+*weaker* than the TLA+ they are checked against — `msgs`, `messages`, `votes_granted`
+and `buffer` were all `:set` or `:seq` where TLC checked `msgs \subseteq Message`. An
+entry that checks less than its oracle can agree with it for the wrong reason. The
+record form arrived with them, because a set of records is what a message set is, and
+`set(t)` had nothing useful to say without it.
 
 `:int` and `:nat` were added after the implicit `type_ok` invariant refuted §8's own
 worked example: `balances` was typed `[^accounts ~> 0..^max_balance]`, but every account
