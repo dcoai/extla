@@ -88,13 +88,14 @@ defmodule TLA.State.JsonTest do
     end
 
     # The atom table is never collected, so a decoder that creates atoms from a file lets
-    # a large one exhaust it.
-    test "an atom the system does not already have, naming it" do
-      error =
-        assert_raise Json.Error, fn -> Json.decode!(%{"a" => "no_such_atom_in_this_system"}) end
-
-      assert Exception.message(error) =~ "no_such_atom_in_this_system"
-      assert Exception.message(error) =~ "did not exist in this system"
+    # a large one exhaust it. The failure is `String.to_existing_atom/1`'s own: an earlier
+    # version measured the atom table so the message could name the atom, and that answer
+    # depends on what other processes are doing — CI, running its tests concurrently,
+    # refuted it.
+    test "an atom the system does not already have" do
+      assert_raise ArgumentError, ~r/not an already existing atom/, fn ->
+        Json.decode!(%{"a" => "no_such_atom_in_this_system"})
+      end
     end
   end
 end

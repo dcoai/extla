@@ -26,8 +26,11 @@ defmodule TLA.State.Json do
   A trace file is data from outside the program, and the atom table is never collected, so
   a decoder that creates atoms from a file lets a large one exhaust it. Every atom a real
   trace mentions exists already: the spec module that named it is loaded before its trace
-  is read. One that does not is an error naming the atom — which is also the honest
-  diagnostic for a trace belonging to a different specification.
+  is read.
+
+  One that does not raises `ArgumentError` — *"not an already existing atom"*, from
+  `String.to_existing_atom/1`. The usual cause is a trace belonging to a different
+  specification than the module it is being replayed against.
   """
 
   defmodule Error do
@@ -106,26 +109,14 @@ defmodule TLA.State.Json do
     end)
   end
 
-  # `String.to_existing_atom/1` raises "not an already existing atom" without saying
-  # WHICH, and a trace file naming one atom the system does not have is exactly the case
-  # that needs naming. Rather than catch that error to improve it — this codebase does not
-  # rescue — the atom table is measured across the conversion: an atom that already
-  # existed does not grow it.
+  # `String.to_existing_atom/1`, whose failure is Elixir's own "not an already existing
+  # atom" — which does not name the atom, and this codebase does not rescue an error to
+  # improve its message.
   #
-  # The bound this leaves: a file full of unknown atoms creates ONE of them, because the
-  # decode stops at the first. That is a bounded cost for an unbounded input, which is the
-  # property that matters — the atom table is never collected.
-  defp atom!(name) do
-    before = :erlang.system_info(:atom_count)
-    atom = String.to_atom(name)
-
-    if :erlang.system_info(:atom_count) > before do
-      raise Error,
-            "the atom #{inspect(name)} did not exist in this system before this file was " <>
-              "read. A trace is read after the spec that produced it is loaded, so an " <>
-              "unknown atom usually means the trace belongs to a different specification."
-    end
-
-    atom
-  end
+  # A first version measured the atom table across the conversion to name it, and CI
+  # refuted that: `:erlang.system_info(:atom_count)` is global, so any atom another process
+  # creates between the two readings looks like this one. It reported atoms that plainly
+  # existed, on a machine running its tests concurrently. A check whose answer depends on
+  # what an unrelated process did is not a check.
+  defp atom!(name), do: String.to_existing_atom(name)
 end

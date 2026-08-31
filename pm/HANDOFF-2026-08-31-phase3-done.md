@@ -133,9 +133,12 @@ bin/tlc-expected --check                           # the oracle gate; CI runs it
   the implementation for a mistake in the mapping.
 - **`:not_followed` is not a conformance failure either.** The spec permits a behaviour the
   code does not take, and which of the two is wrong is not something a checker can decide.
-- **Never create atoms from a trace file.** The table is not collected. `TLA.State.Json`
-  measures the atom table across the conversion rather than catching
-  `String.to_existing_atom/1`'s error, which does not name the atom that failed.
+- **Never create atoms from a trace file.** The table is not collected, so `TLA.State.Json`
+  decodes with `String.to_existing_atom/1`. Its message does not name the atom that failed;
+  an earlier version measured `:erlang.system_info(:atom_count)` across the conversion so
+  that it could, and CI refuted it — the count is global, so an atom another process
+  creates between the two readings looks like this one. A check whose answer depends on
+  what an unrelated process did is not a check.
 - **A liveness verdict needs a complete graph** (unchanged): `Liveness.check/3` raises
   rather than answer from a partial edge table. A Layer 3 trace has no lasso, so the
   temporal properties needing one are `:inconclusive` by construction.
