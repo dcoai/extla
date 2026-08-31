@@ -21,5 +21,8 @@
     "ElectionSafety": "holds",
     "VoteIntegrity": "holds",
     "LeaderHasQuorum": "holds"
+  },
+  "properties": {
+    "EventuallyElectLeader": "violated"
   }
 }

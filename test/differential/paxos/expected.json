@@ -21,5 +21,6 @@
     "TypeOK": "holds",
     "Consistency": "holds",
     "AcceptedWasProposed": "holds"
-  }
+  },
+  "properties": {}
 }

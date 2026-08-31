@@ -20,5 +20,9 @@
     "MutualExclusion": "holds",
     "OwnerIsValid": "holds",
     "HoldingMeansOwner": "holds"
+  },
+  "properties": {
+    "NoStarvation": "holds",
+    "LockEventuallyReleased": "holds"
   }
 }

@@ -5,6 +5,9 @@
 #   bin/tlc-expected die_hard        regenerate one entry
 #   bin/tlc-expected --check         re-run TLC and fail on any drift (CI)
 #
+# It records the safety verdicts (state counts, deadlock, invariants) and, from
+# a run of its own per property, TLC's verdict on each temporal property.
+#
 # expected.json is what TLC reported, never hand-edited: it is the oracle ExTLA
 # is measured against (spec/08-decisions.md D-9), so a human editing it to make a
 # test pass would be editing the definition of "correct".
@@ -22,6 +25,11 @@ readonly TLA_TOOLS_URL="https://github.com/tlaplus/tlaplus/releases/download/${T
 readonly JAR="$ROOT/.tla/tla2tools.jar"
 
 die() { echo "tlc-expected: $*" >&2; exit 1; }
+
+# The derived .cfgs below live here rather than beside the module: a stray
+# .cfg in a corpus directory is one a later run could pick up.
+readonly WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
 ensure_jar() {
   if [[ -f "$JAR" ]] && echo "$TLA_TOOLS_SHA256  $JAR" | sha256sum --check --status; then
@@ -42,10 +50,20 @@ ensure_jar() {
 # `-continue` does NOT cover deadlock: a reached deadlock ends the search whatever
 # else is set, leaving states on the queue. Passing `-deadlock` turns that check
 # off, which is the second pass below.
+#
+# Nor does it cover a temporal violation. TLC checks temporal properties DURING
+# the search and stops at the first one it refutes, wherever the search happens
+# to have got to -- two runs of `raft_election` stopped at 20,253 and 20,291
+# distinct states. So the pass that produces the counts runs from a .cfg with
+# the PROPERTIES section removed, and every property gets a run of its own.
 run_tlc() {
   local dir="$1" module="$2" extra="${3:-}"
   ( cd "$dir" && java -XX:+UseParallelGC -cp "$JAR" tlc2.TLC \
       -continue $extra -workers 1 -cleanup "$module" 2>&1 ) || true
+  # `-cleanup` removes TLC's scratch directory when the run ends normally, and a
+  # refuted temporal property is not that: it leaves `states/<timestamp>/` behind
+  # in the corpus. Nothing here ever reads it, so remove it either way.
+  rm -rf "$dir/states"
 }
 
 # TLC reports a violation as
@@ -98,6 +116,41 @@ declared_constants() {
   ' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' || true
 }
 
+# Every temporal property the .cfg asked TLC to check, in declaration order --
+# the same reason `declared_invariants` exists: a property that holds is
+# recorded as holding rather than merely absent.
+declared_properties() {
+  awk '
+    /^[[:space:]]*(PROPERTIES|PROPERTY)[[:space:]]*$/ { mode = 1; next }
+    /^[[:space:]]*(PROPERTIES|PROPERTY)[[:space:]]+/  { mode = 1; $1 = ""; print; next }
+    /^[[:space:]]*(SPECIFICATION|INIT|NEXT|CONSTANTS?|INVARIANTS?|SYMMETRY|CONSTRAINT|VIEW)([[:space:]]|$)/ { mode = 0 }
+    mode
+  ' "$1" | tr -s ' \t' '\n\n' | grep -v '^$' || true
+}
+
+# The committed .cfg with its PROPERTIES section dropped: the safety pass.
+cfg_without_properties() {
+  awk '
+    /^[[:space:]]*(PROPERTIES|PROPERTY)([[:space:]]|$)/ { mode = 1; next }
+    /^[[:space:]]*(SPECIFICATION|INIT|NEXT|CONSTANTS?|INVARIANTS?|SYMMETRY|CONSTRAINT|VIEW)([[:space:]]|$)/ { mode = 0 }
+    !mode
+  ' "$1"
+}
+
+# The committed .cfg with exactly one property and no invariants: one temporal
+# pass. TLC names no property when it reports "Temporal properties were
+# violated", so a run that checks several of them cannot say which one failed --
+# hence one run each. The invariants go too: TLC halts on a violated invariant
+# before it ever gets to the liveness check, and `die_hard` has one on purpose.
+cfg_one_property() {
+  awk '
+    /^[[:space:]]*(INVARIANTS?|PROPERTIES|PROPERTY)([[:space:]]|$)/ { mode = 1; next }
+    /^[[:space:]]*(SPECIFICATION|INIT|NEXT|CONSTANTS?|SYMMETRY|CONSTRAINT|VIEW)([[:space:]]|$)/ { mode = 0 }
+    !mode
+  ' "$1"
+  echo "PROPERTY $2"
+}
+
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 generate() {
@@ -113,7 +166,11 @@ generate() {
   [[ -f "$cfg" ]] || die "$name: no $module.cfg"
 
   echo "==> $name"
-  local output; output="$(run_tlc "$dir" "$module")"
+
+  local safety_cfg="$WORK/$name-safety.cfg"
+  cfg_without_properties "$cfg" > "$safety_cfg"
+
+  local output; output="$(run_tlc "$dir" "$module" "-config $safety_cfg")"
 
   # A spec with a legitimate end state (`02-dsl-semantics.md` §5.3) deadlocks
   # under TLC by construction, and that first report stops the search with states
@@ -125,8 +182,13 @@ generate() {
   if printf '%s\n' "$output" | grep -q '^Error: Deadlock reached\.'; then
     deadlock=true
     echo "    deadlock reached; re-running with -deadlock for the complete search"
-    output="$(run_tlc "$dir" "$module" -deadlock)"
+    output="$(run_tlc "$dir" "$module" "-config $safety_cfg -deadlock")"
   fi
+
+  # Every pass from here on searches the same state space, so a spec that ends
+  # somewhere needs the deadlock check off in all of them.
+  local deadlock_flag=""
+  if [[ $deadlock == true ]]; then deadlock_flag=" -deadlock"; fi
 
   # TLC prints "Model checking completed. No error has been found." even under
   # -continue with violations reported above it, so completion is read from the
@@ -142,6 +204,30 @@ generate() {
   diameter="$(printf '%s\n' "$output" | sed -n 's/.*complete state graph search is \([0-9]*\).*/\1/p' | tail -1)"
 
   local violations; violations="$(printf '%s\n' "$output" | parse_violations)"
+
+  # One pass per temporal property. The verdict is `holds` or `violated` and
+  # nothing more: TLC's counter-example is a lasso, but its lasso is not
+  # canonical the way a breadth-first shortest counter-example is, so two
+  # correct checkers can hand back different cycles. A fixture the checker
+  # cannot be expected to match is worse than no fixture.
+  local verdicts="" prop prop_cfg prop_out
+  while IFS= read -r prop; do
+    [[ -n "$prop" ]] || continue
+    prop_cfg="$WORK/$name-$prop.cfg"
+    cfg_one_property "$cfg" "$prop" > "$prop_cfg"
+    echo "    property $prop"
+    prop_out="$(run_tlc "$dir" "$module" "-config $prop_cfg$deadlock_flag")"
+
+    if printf '%s\n' "$prop_out" | grep -q '^Error: Temporal properties were violated\.'; then
+      verdicts+="$prop violated"$'\n'
+    elif printf '%s\n' "$prop_out" | grep -q ' distinct states found'; then
+      verdicts+="$prop holds"$'\n'
+    else
+      printf '%s\n' "$prop_out" >&2
+      die "$name: TLC neither refuted $prop nor finished a search for it"
+    fi
+  done < <(declared_properties "$cfg")
+
   local tlc_version
   tlc_version="$(printf '%s\n' "$output" | sed -n 's/^TLC2 Version \([0-9.]*\) .*/\1/p' | head -1)"
 
@@ -183,6 +269,18 @@ generate() {
       fi
       first=0
     done < <(declared_invariants "$cfg")
+    [[ $first -eq 1 ]] && echo '},' || printf '\n  },\n'
+
+    printf '  "properties": {'
+    first=1
+    local verdict
+    while IFS= read -r prop; do
+      [[ -n "$prop" ]] || continue
+      verdict="$(printf '%s\n' "$verdicts" | awk -v p="$prop" '$1 == p { print $2; exit }')"
+      [[ $first -eq 1 ]] || printf ','
+      printf '\n    "%s": "%s"' "$(json_escape "$prop")" "$verdict"
+      first=0
+    done < <(declared_properties "$cfg")
     [[ $first -eq 1 ]] && echo '}' || printf '\n  }\n'
 
     echo '}'

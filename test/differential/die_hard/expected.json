@@ -10,5 +10,6 @@
   "invariants": {
     "TypeOK": "holds",
     "NotSolved": {"violated_at": 7}
-  }
+  },
+  "properties": {}
 }

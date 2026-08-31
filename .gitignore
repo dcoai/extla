@@ -14,6 +14,10 @@ erl_crash.dump
 # Downloaded oracle -- bin/tlc-expected fetches and checksums it on demand
 /.tla/
 
+# TLC's scratch directory, per corpus entry. bin/tlc-expected removes it after
+# every run; this is in case a hand-run of TLC does not.
+/test/differential/*/states/
+
 # macOS
 .DS_Store
 

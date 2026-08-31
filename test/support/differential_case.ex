@@ -116,6 +116,30 @@ defmodule TLA.DifferentialCase do
         end
       end
 
+      # Nothing compares these verdicts yet -- `check_liveness: true` still
+      # raises -- so until Phase 2's checker exists, the only thing keeping the
+      # two sides' liveness declarations from drifting apart is that they name
+      # the same properties. A `temporal` added to `spec.ex` and not to the
+      # module would otherwise sit there unchecked and unnoticed, and the whole
+      # reason the oracle lands first is that it is checked from day one.
+      test "declares the temporal properties TLC was given, and no others", ctx do
+        spec = TLA.Spec.Compiled.from_module(@entry.module)
+
+        checked =
+          ctx.expected["properties"]
+          |> Map.keys()
+          |> MapSet.new(&TLA.DifferentialCase.dsl_name(&1, @entry))
+
+        declared = MapSet.new(spec.temporals, &Atom.to_string(&1.name))
+
+        assert MapSet.equal?(declared, checked),
+               "the two sides declare different temporal properties -- only in " <>
+                 "#{inspect(@entry.module)}: " <>
+                 inspect(Enum.sort(MapSet.difference(declared, checked))) <>
+                 ", only in #{ctx.expected["module"]}.cfg: " <>
+                 inspect(Enum.sort(MapSet.difference(checked, declared)))
+      end
+
       test "the counterexample replays to the state that violates the invariant", ctx do
         violated = Enum.find(ctx.expected["invariants"], fn {_, verdict} -> is_map(verdict) end)
 
@@ -168,11 +192,7 @@ defmodule TLA.DifferentialCase do
   spec does not have, which would otherwise pass by not being compared.
   """
   def invariant_name!(spec, tlc_name, entry) do
-    underscored =
-      case Map.fetch(entry.names, tlc_name) do
-        {:ok, mapped} -> Atom.to_string(mapped)
-        :error -> Macro.underscore(tlc_name)
-      end
+    underscored = dsl_name(tlc_name, entry)
 
     case Enum.find(spec.invariants, &(Atom.to_string(&1.name) == underscored)) do
       nil ->
@@ -184,6 +204,19 @@ defmodule TLA.DifferentialCase do
 
       invariant ->
         invariant.name
+    end
+  end
+
+  @doc """
+  The ExTLA name of a TLC declaration, as a string.
+
+  `Macro.underscore/1` unless the entry's `names` map says otherwise, which is
+  where the conventions that underscoring cannot bridge are stated.
+  """
+  def dsl_name(tlc_name, entry) do
+    case Map.fetch(entry.names, tlc_name) do
+      {:ok, mapped} -> Atom.to_string(mapped)
+      :error -> Macro.underscore(tlc_name)
     end
   end
 
