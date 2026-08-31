@@ -128,6 +128,37 @@ Types are checked as an implicit invariant named `:type_ok` in every reachable s
 they are the domain `TLA.Simulation.Generator` draws from. They do not restrict
 exploration: a state outside its type is a reported violation, not a pruned branch.
 
+### 1.6 `f[x]` is function application, and it is strict
+
+Inside a spec block, `f[x]` means TLA+ function application, **not** `Access.get/2`.
+It compiles to `TLA.Spec.Helpers.at/3`, which raises `TLA.Spec.DomainError` when `x`
+is outside the domain of `f`:
+
+| `f` | `f[x]` | Outside the domain |
+|---|---|---|
+| A map | The value at `x` | Raises |
+| A list (a TLA+ sequence, **1-indexed**) | The `x`th element | Raises |
+| Anything else | — | Raises |
+
+Ordinary Elixir returns `nil` there, and `nil` is not an error: Erlang's term order
+makes every comparison total, and an atom sorts above every integer, so
+`balances[:carol] >= amount` is **`true`** for an account that does not exist. The
+guard succeeds, the action fires from a state it was never enabled in, and the checker
+explores a state space the spec does not describe — reporting success over it. That is
+the same failure `01-foundation.md` rules out for reading a variable that is not there,
+and it is ruled out here for the same reason (D-20).
+
+The rule has no exceptions inside a block. It holds for a variable (`pc[p]`), a local
+(`let q = …; q[k]`), an `action_property`'s `old.`/`new.` (`old.owner[r]`), and a
+`params:` generator's own state argument (`st.current_term[s]`). A rule with exceptions
+is one an author has to remember the shape of, and the exceptions would be exactly the
+places a spec reaches into a collection it did not build.
+
+One consequence worth stating: a keyword list indexed by its key — `opts[:mode]` — is a
+list applied to a non-integer, so it raises. Inside a spec block that is the right
+answer; state is maps and sequences, and a keyword list in a spec is either a mistake or
+a map written the wrong way.
+
 ---
 
 ## 2. An action block is a conjunction, not a sequence
