@@ -234,7 +234,7 @@ defmodule TLA.ModelChecker do
     run.spec.init
     |> Enum.with_index()
     |> Enum.reduce_while(run, fn {init_fn, index}, run ->
-      state = run.config.constants |> init_fn.() |> State.validate!()
+      state = init_fn.(run.config.constants)
       {graph, id, status} = StateGraph.add_state(run.graph, state, nil, index, nil)
 
       run =
@@ -394,12 +394,20 @@ defmodule TLA.ModelChecker do
     bindings
     |> Enum.reduce_while({:ok, run, 0, 0, []}, fn params,
                                                   {:ok, run, generated, distinct, edges} ->
-      next =
-        run.config.constants
-        |> action.transition.(state, params)
-        |> State.validate!()
+      next = action.transition.(run.config.constants, state, params)
 
       run = %{run | graph: StateGraph.count_transition(run.graph), found: run.found + 1}
+
+      # Registering the successor comes FIRST, and the order is load-bearing rather than
+      # tidying. `add_state/5` is what validates `next` (§6, once per distinct state
+      # rather than once per transition — #33), and an action property must never be
+      # handed a state the checker has not vetted: a forbidden term would then surface
+      # from inside a user's predicate instead of from the diagnostic naming the
+      # variable. It also leaves one call site where there were two, on both branches of
+      # a check that has to register the successor either way — a violation still needs
+      # the successor's id to point its trace at.
+      {graph, next_id, status} = StateGraph.add_state(run.graph, next, id, action.name, params)
+      run = %{run | graph: graph}
 
       case Safety.check_action_properties(
              run.spec,
@@ -409,15 +417,9 @@ defmodule TLA.ModelChecker do
              run.config.action_properties
            ) do
         {:violation, name} ->
-          {graph, next_id, _} = StateGraph.add_state(run.graph, next, id, action.name, params)
-          run = %{run | graph: graph}
           {:halt, {:violation, run, action_property_trace(run, next_id, name)}}
 
         :ok ->
-          {graph, next_id, status} =
-            StateGraph.add_state(run.graph, next, id, action.name, params)
-
-          run = %{run | graph: graph}
           distinct = if status == :new, do: distinct + 1, else: distinct
 
           # Recorded whether or not the successor is new: an edge back into a state

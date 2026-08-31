@@ -540,4 +540,115 @@ defmodule TLA.TestSpecs do
       log = append(log, entry)
     end
   end
+
+  defmodule Tainted do
+    @moduledoc """
+    §6's restriction reached from an *action* rather than from `init`.
+
+    `taint` is enabled from both `(a: 1, b: 0)` and `(a: 0, b: 1)` and produces the same
+    successor from either, so the forbidden state has two distinct in-paths. That is the
+    case that decides whether validating at discovery (#33) can let a bad term through on
+    the path that dedups: it cannot, because a forbidden term's encoding does not recur,
+    so its state always misses the fingerprint table and is always validated.
+    """
+    use TLA.Spec
+
+    variable :a
+    variable :b
+    variable :mark
+
+    init do
+      a = 0
+      b = 0
+      mark = :clean
+    end
+
+    action :bump_a do
+      require a == 0
+      a = 1
+    end
+
+    action :bump_b do
+      require b == 0
+      b = 1
+    end
+
+    action :taint do
+      require a + b == 1
+      a = 1
+      b = 1
+      mark = 1.5
+    end
+  end
+
+  defmodule TaintedWithProperty do
+    @moduledoc """
+    A forbidden term in a state that an `action_property` also refutes.
+
+    The two verdicts are distinguishable, which is what makes this spec worth having: if
+    the property were evaluated before the successor was validated, a run would report a
+    `never_fractional` violation. §6 requires the checker to raise instead, naming the
+    variable — a diagnostic about the spec being outside the language, not about the
+    property being false.
+    """
+    use TLA.Spec
+
+    variable :n
+
+    init do
+      n = 0
+    end
+
+    action :tick do
+      require n == 0
+      n = 1
+    end
+
+    action :taint do
+      require n == 0
+      n = 0.5
+    end
+
+    action_property :never_fractional do
+      new.n == old.n + 1
+    end
+  end
+
+  defmodule Cube do
+    @moduledoc """
+    Three independent bits, so the reachable graph is a 3-cube: 8 distinct states joined
+    by 12 transitions.
+
+    The gap between those two numbers is the point. In a chain-shaped spec like `Counter`
+    they are equal, and a checker that validated every successor would be
+    indistinguishable from one that validated every newly discovered state. Here the two
+    answers differ by half.
+    """
+    use TLA.Spec
+
+    variable :a
+    variable :b
+    variable :c
+
+    init do
+      a = 0
+      b = 0
+      c = 0
+    end
+
+    action :bump_a do
+      require a == 0
+      a = 1
+    end
+
+    action :bump_b do
+      require b == 0
+      b = 1
+    end
+
+    action :bump_c do
+      require c == 0
+      c = 1
+    end
+  end
 end

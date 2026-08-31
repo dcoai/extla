@@ -550,3 +550,48 @@ declaration to named OTP callbacks and the caller's function is not one — it r
 checked transition.
 
 See `03-layer1-invariants.md` §An `Agent`'s checks cannot be compiled away.
+
+---
+
+## D-26 — §6's term check runs at discovery, inside the state graph
+
+**Decided.** `TLA.State.validate!/1` is called by `TLA.StateGraph.add_state/5`, on the
+branch where the state's fingerprint is absent from the table — so once per **distinct**
+state. The caller does not validate, and the successor is registered *before* its action
+properties are evaluated.
+
+**Replaced:** validation in `TLA.ModelChecker.take_action/6`, on every generated
+successor. On `TLA.Differential.RaftElection` at the corpus constants that was 255,270
+validations where 58,359 would do, and 77.9% of a 23.4 s search.
+
+**Why it is sound, which is the part worth recording.** Validating only new states
+necessarily happens *after* the state has been hashed, since newness is knowable only from
+the fingerprint — so the ordering §6 appears to demand (validate before you fingerprint)
+is not achievable. It is also not the ordering that matters. What matters is that
+validation precedes any *use* of the state, and the guarantee survives for a reason
+specific to the terms §6 rejects: a pid, reference, port, fun or float is precisely a term
+whose encoding does not recur. A state carrying one therefore cannot dedup against an
+earlier state, always misses the table, and is always validated on the path that reaches
+it first. `:erlang.term_to_binary/2` encodes such terms without complaint, so reaching the
+check is guaranteed rather than lucky.
+
+**Why the graph and not the checker.** §6 exists *for* fingerprinting — the terms it
+forbids are exactly those whose encoding does not identify a state. Putting the check
+where the fingerprint is taken keeps the rule beside its reason, and lets every caller
+assume that a state which has entered the graph is one the checker has vetted.
+
+**What this forced.** `add_state/5` now runs before `Safety.check_action_properties/5`
+rather than after. Left in the old order, a user's action property would be handed a state
+§6 had not yet rejected, and a forbidden term would surface from inside that predicate
+instead of from a diagnostic naming the variable — a worse error about a different thing.
+The hoist also collapsed two `add_state/5` call sites into one.
+
+**Measured:** 2.65x on `raft` (25.2 s to 9.5 s) and 1.62x on `buffer`, interleaved on one
+machine, minima compared. Validation itself fell 4.47x against the 4.37x that the
+transition-to-state ratio predicts.
+
+**Revisit if:** a term is ever added to §6's permitted set whose encoding *can* recur
+while still being forbidden. The soundness argument above depends on the forbidden terms
+being exactly the non-recurring ones, and would have to be rebuilt.
+
+See `02-dsl-semantics.md` §6, `bench/search_profile.baseline.md`.

@@ -125,26 +125,21 @@ profile = fn spec, constants ->
                 next = action.transition.(constants, state, binding)
                 totals = Map.update!(totals, :transition, &(&1 + now.() - t2))
 
-                # Every successor is validated against §6's permitted terms, whether or not
-                # it is new — a phase that is easy to forget and is not small.
-                t3 = now.()
-                State.validate!(next)
-                totals = Map.update!(totals, :validate, &(&1 + now.() - t3))
-
-                t4 = now.()
-                Safety.check_action_properties(spec, constants, state, next, :all)
-                totals = Map.update!(totals, :properties, &(&1 + now.() - t4))
-
-                # Fingerprinting happens INSIDE `add_state`, so it cannot be timed
-                # separately without doing it twice. It is done twice here deliberately and
-                # reported as a sub-line rather than summed: it is the phase a parallel
-                # implementation parallelises freely, where the ETS write beside it is the
-                # one that contends, and a profile that could not tell them apart would not
-                # answer the question this bench exists for.
+                # Fingerprinting and §6 validation both happen INSIDE `add_state`, so
+                # neither can be timed separately without doing it twice. Both are done
+                # twice here deliberately and reported as sub-lines rather than summed.
+                #
+                # Fingerprinting is the phase a parallel implementation parallelises
+                # freely, where the ETS write beside it is the one that contends, and a
+                # profile that could not tell them apart would not answer the question
+                # this bench exists for.
                 t5 = now.()
                 Fingerprint.compute(next, bits: graph.fingerprint_bits)
                 totals = Map.update!(totals, :fingerprint, &(&1 + now.() - t5))
 
+                # Registering the successor comes before the action-property check, as it
+                # does in `take_action/6` and for the reason given there: a property must
+                # never be handed a state §6 has not vetted.
                 t6 = now.()
 
                 {graph, next_id, status} =
@@ -152,7 +147,19 @@ profile = fn spec, constants ->
 
                 totals = Map.update!(totals, :graph, &(&1 + now.() - t6))
 
+                t4 = now.()
+                Safety.check_action_properties(spec, constants, state, next, :all)
+                totals = Map.update!(totals, :properties, &(&1 + now.() - t4))
+
                 if status == :new do
+                  # Validation is per DISTINCT state since #33, not per transition — the
+                  # single change that shape made, and the reason this line is now a
+                  # fraction of what it was. It is timed on the `:new` branch because that
+                  # is the branch `add_state` itself validates on.
+                  t3 = now.()
+                  State.validate!(next)
+                  totals = Map.update!(totals, :validate, &(&1 + now.() - t3))
+
                   # `admit/4` observes the state for coverage — including each invariant's
                   # near miss — before checking it. Both are per new state.
                   t7 = now.()
@@ -206,7 +213,7 @@ for {name, module, override} <- selected do
   wall_ns = wall_us * 1000
 
   {_graph, totals} = profile.(spec, constants)
-  sum = totals |> Map.delete(:fingerprint) |> Map.values() |> Enum.sum()
+  sum = totals |> Map.drop([:fingerprint, :validate]) |> Map.values() |> Enum.sum()
   residual = wall_ns - sum
 
   IO.puts("#{name} — #{inspect(module)}, constants #{inspect(constants, limit: 4)}")
@@ -226,9 +233,8 @@ for {name, module, override} <- selected do
   [
     {"parameter generation + guards", totals.params},
     {"transition application", totals.transition},
-    {"state validation (§6)", totals.validate},
     {"action properties", totals.properties},
-    {"graph: fingerprint + ETS", totals.graph},
+    {"graph: fingerprint + §6 + ETS", totals.graph},
     {"invariant checking (incl. type_ok)", totals.invariants},
     {"coverage bookkeeping", totals.coverage}
   ]
@@ -246,6 +252,22 @@ for {name, module, override} <- selected do
 
   IO.puts("      a second time, so NOT counted in the sum. It is the half a worker")
   IO.puts("      parallelises freely; the ETS write beside it is the half that contends.")
+
+  IO.puts(
+    "      also of the graph line, §6 validation is #{ms.(totals.validate)}ms " <>
+      "(#{pct.(totals.validate, totals.graph)}% of it, #{pct.(totals.validate, wall_ns)}% of wall)"
+  )
+
+  IO.puts("      — since #33 it runs once per DISTINCT state rather than once per")
+  IO.puts("      transition. Measured a second time, so NOT counted in the sum either.")
+
+  IO.puts(
+    "      what is left of the graph line after both is the ETS lookup and insert, " <>
+      "#{ms.(totals.graph - totals.fingerprint - totals.validate)}ms"
+  )
+
+  IO.puts("      — a difference of three larger numbers, so read it as an order of")
+  IO.puts("      magnitude and not a measurement. #31 timed the tables directly.")
 
   IO.puts(
     "    #{String.pad_trailing("(residual)", 34)} #{String.pad_leading("#{ms.(residual)}ms", 9)}  #{pct.(residual, wall_ns)}%"
