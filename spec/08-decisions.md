@@ -492,3 +492,61 @@ holds only the states that happened, so no function of the observed steps can an
 the original three-argument signature was not implementable as specified.
 
 See `01-foundation.md` §`TLA.Temporal`.
+
+---
+
+## D-24 — A state machine's state is the `{state_name, data}` pair, and its message is the event content
+
+**Decided.** In a module instrumented through `handle_event/4`, `invariant` and
+`action_property` bind `state`, `old` and `new` to the `{state_name, data}` pair, and a
+`precondition` or `postcondition` pattern matches the event **content** — not
+`{event_type, content}`, and not the data alone.
+
+**Why the pair:** `:gen_statem` splits what TLA+ calls the state across two callback
+arguments, and neither half is the state. A machine in `:red` with a corrupt counter is in
+a bad state, and so is one whose counter is fine and whose colour is not a colour. Binding
+the pair also keeps §03's `TrafficLight` — which destructures `{name, data} = state` in
+the block — exactly as specified, and keeps one meaning of `state` across the behaviours.
+
+**Why the content:** so that `precondition {:withdraw, amount}` is the same declaration
+whichever behaviour carries it. The event type is OTP's transport — call, cast, info,
+timeout — and a property of a specification is not about how the message arrived. A
+pattern that needed to know would have to be rewritten when a call became a cast, which is
+a refactoring that changes no state at all.
+
+**Consequences:** a module defining `handle_event/4` is instrumented as a state machine
+throughout, including its `init/1` (`{:ok, name, data}`, not `{:ok, state, extra}`); and
+`:gen_statem`'s returns need their own extraction, because `{:stop, reason, data}` and a
+GenServer's `{:stop, reason, state}` are the same shape carrying different things.
+`:state_functions` mode is out of scope — its transitions are functions named after the
+states, which `@on_definition` cannot recognise.
+
+See `03-layer1-invariants.md` §What a state machine's `state` is.
+
+---
+
+## D-25 — An `Agent`'s checks are runtime-dispatched, and `:disabled` is not free for them
+
+**Decided.** `TLA.Invariant.Agent`'s entry points are **functions**, and they ask the
+declaring module at runtime whether it carries predicates. Under `mode: :disabled` a
+checked `Agent` call costs one export lookup and then does what the plain `Agent` function
+does — not nothing.
+
+**Why:** everywhere else in Layer 1 the mode is resolved where the instrumented module
+compiles, and `:disabled` emits no code at all. An `Agent` call site is not that place.
+The transition is a function the *caller* passes in, the module whose declarations apply
+is an argument, and `Application.compile_env/3` — the only way the mode is read — does not
+expand inside a function body. These were macros in a first draft for exactly that reason,
+and the draft does not compile.
+
+The alternative was to leave `Agent` unsupported, which §03's §Supported OTP Behaviors
+does not permit. So the cost is stated instead of hidden: an `Agent` is the one place in
+Layer 1 where turning checking off leaves something behind, and it is one `function_exported?/3`
+per transition, in code the author wrote explicitly rather than code a hook injected.
+
+**Also settled here:** `callbacks:` has no meaning for an `Agent`. It restricts a
+declaration to named OTP callbacks and the caller's function is not one — it runs inside
+`Agent`'s own `handle_call/3`. Every declaration in the named module applies to every
+checked transition.
+
+See `03-layer1-invariants.md` §An `Agent`'s checks cannot be compiled away.

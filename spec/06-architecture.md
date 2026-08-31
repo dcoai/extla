@@ -322,6 +322,10 @@ Layer 1 is small once the runtime checking engine exists; it ships alongside Lay
 rather than ahead of it.
 
 - `TLA.Invariant`, `TLA.Invariant.Runtime`, `TLA.Invariant.Violation`
+- `TLA.Invariant.Agent` — Layer 1 for a behaviour with no callback module of its own
+- `TLA.Invariant.Test` — the ExUnit helpers of `03-layer1-invariants.md` §Testing
+  Integration, including `refute_invariant/3`, which is the only evidence an invariant is
+  not vacuously true
 - `TLA.Refinement` with `validate!/2` at compile time
 - `TLA.GenServer`, `TLA.GenServer.Runtime` — including `check_step!/5`, the
   refinement check that is the point of the layer

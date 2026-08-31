@@ -63,12 +63,28 @@ defmodule TLA.Invariant do
   costly to run outside a particular environment.
   """
 
-  @callbacks [init: 1, handle_call: 3, handle_cast: 2, handle_info: 2, handle_continue: 2]
+  @callbacks [
+    init: 1,
+    handle_call: 3,
+    handle_cast: 2,
+    handle_info: 2,
+    handle_continue: 2,
+    handle_event: 4
+  ]
 
   # The state argument's position in each callback, and whether there is a pre-state to
   # compare against. `init/1` has none: its result IS the first state, so its invariants
-  # are checked and its action properties cannot be.
-  @state_position %{init: nil, handle_call: 2, handle_cast: 1, handle_info: 1, handle_continue: 1}
+  # are checked and its action properties cannot be. `handle_event/4` has no single
+  # position — a state machine's state is the `{state_name, data}` pair, built in
+  # `state_expression/2` from two arguments.
+  @state_position %{
+    init: nil,
+    handle_call: 2,
+    handle_cast: 1,
+    handle_info: 1,
+    handle_continue: 1,
+    handle_event: :statem
+  }
 
   defmacro __using__(_opts) do
     quote do
@@ -301,6 +317,15 @@ defmodule TLA.Invariant do
       @doc false
       def __tla_conditions__(:precondition), do: unquote(indexed(preconditions))
       def __tla_conditions__(:postcondition), do: unquote(indexed(postconditions))
+
+      # Every declared name, unfiltered by `callbacks:`. The wrappers do not use this —
+      # they are emitted with the names that apply to them — but a caller with no callback
+      # to speak of does: `TLA.Invariant.Agent`, whose transitions run inside somebody
+      # else's process, and `TLA.Invariant.Test`, which has to name every invariant that
+      # failed rather than the first.
+      @doc false
+      def __tla_names__(:invariant), do: unquote(Enum.map(invariants, & &1.name))
+      def __tla_names__(:action_property), do: unquote(Enum.map(action_properties, & &1.name))
     end
   end
 
@@ -323,70 +348,85 @@ defmodule TLA.Invariant do
   defp wrappers(env, invariants, action_properties, preconditions, postconditions, telemetry) do
     wrapped = env.module |> Module.get_attribute(:tla_wrapped, []) |> Enum.uniq()
 
+    context = %{
+      invariants: invariants,
+      action_properties: action_properties,
+      preconditions: preconditions,
+      postconditions: postconditions,
+      telemetry: telemetry,
+      # A module that defines `handle_event/4` is a state machine, and that decides how
+      # its `init/1` is read too: a GenServer's returns `{:ok, state}`, a state machine's
+      # returns `{:ok, state_name, data}`, and the shared `extract_state/2` would take the
+      # name for the whole state.
+      statem?: {:handle_event, 4} in wrapped
+    }
+
     for {callback, arity} <- @callbacks, {callback, arity} in wrapped do
-      wrapper(
-        callback,
-        arity,
-        invariants,
-        action_properties,
-        preconditions,
-        postconditions,
-        telemetry
-      )
+      wrapper(callback, arity, context)
     end
   end
 
-  defp wrapper(
-         callback,
-         arity,
-         invariants,
-         action_properties,
-         preconditions,
-         postconditions,
-         telemetry
-       ) do
-    names = applicable(invariants, callback)
-    properties = applicable(action_properties, callback)
+  defp wrapper(callback, arity, context) do
+    names = applicable(context.invariants, callback)
+    properties = applicable(context.action_properties, callback)
 
     # `init/1` has no pre-state — its result is the first state — so it can carry
     # invariants and cannot carry the three things that compare two states.
     pre_state? = @state_position[callback] != nil
 
-    if names == [] and properties == [] and (preconditions == [] or not pre_state?) and
-         (postconditions == [] or not pre_state?) do
-      quote do
-      end
-    else
-      emit_wrapper(
-        callback,
-        arity,
-        names,
-        properties,
-        preconditions,
-        postconditions,
-        pre_state?,
-        telemetry
-      )
+    context =
+      Map.merge(context, %{names: names, properties: properties, pre_state?: pre_state?})
+
+    cond do
+      not pre_state? and names == [] -> quote(do: nil)
+      pre_state? and nothing_to_check?(context) -> quote(do: nil)
+      not pre_state? -> emit_init_wrapper(arity, context)
+      true -> emit_wrapper(callback, arity, context)
     end
   end
 
-  defp emit_wrapper(
-         callback,
-         arity,
-         names,
-         properties,
-         preconditions,
-         postconditions,
-         pre_state?,
-         telemetry
-       ) do
-    verbose = if telemetry == :verbose, do: [:verbose], else: []
+  defp nothing_to_check?(context) do
+    context.names == [] and context.properties == [] and context.preconditions == [] and
+      context.postconditions == []
+  end
+
+  # `init/1`, which carries invariants and nothing else — and only when it produced a
+  # state at all. `:ignore` and a bare `{:stop, reason}` are refusals to start, not first
+  # states, and checking an invariant against the absence of one would report a violation
+  # of a predicate that was never given anything to be about.
+  defp emit_init_wrapper(arity, context) do
     args = Macro.generate_arguments(arity, __MODULE__)
-    message = hd(args)
-    state = if pre_state?, do: Enum.at(args, @state_position[callback]), else: nil
+    verbose = verbose(context.telemetry)
+
+    shape = if context.statem?, do: :statem, else: :genserver
+
+    quote do
+      defoverridable [{:init, unquote(arity)}]
+
+      def init(unquote_splicing(args)) do
+        tla_result = super(unquote_splicing(args))
+
+        TLA.Invariant.Runtime.check_initial_invariants!(
+          __MODULE__,
+          unquote(context.names),
+          tla_result,
+          unquote(shape),
+          unquote_splicing(verbose)
+        )
+
+        tla_result
+      end
+    end
+  end
+
+  defp emit_wrapper(callback, arity, context) do
+    verbose = verbose(context.telemetry)
+    args = Macro.generate_arguments(arity, __MODULE__)
+    message = message_expression(callback, args)
+    state = state_expression(callback, args)
 
     pre =
-      if pre_state? and preconditions != [] do
+      if context.preconditions != [] do
         quote do
           TLA.Invariant.Runtime.check_preconditions!(
             __MODULE__,
@@ -398,7 +438,7 @@ defmodule TLA.Invariant do
       end
 
     post =
-      if pre_state? and postconditions != [] do
+      if context.postconditions != [] do
         quote do
           TLA.Invariant.Runtime.check_postconditions!(
             __MODULE__,
@@ -411,11 +451,11 @@ defmodule TLA.Invariant do
       end
 
     invariant_check =
-      if names != [] do
+      if context.names != [] do
         quote do
           TLA.Invariant.Runtime.check_invariants!(
             __MODULE__,
-            unquote(names),
+            unquote(context.names),
             var!(tla_new_state),
             unquote_splicing(verbose)
           )
@@ -423,11 +463,11 @@ defmodule TLA.Invariant do
       end
 
     property_check =
-      if pre_state? and properties != [] do
+      if context.properties != [] do
         quote do
           TLA.Invariant.Runtime.check_action_properties!(
             __MODULE__,
-            unquote(properties),
+            unquote(context.properties),
             unquote(state),
             var!(tla_new_state),
             unquote_splicing(verbose)
@@ -435,21 +475,52 @@ defmodule TLA.Invariant do
         end
       end
 
-    fallback = if pre_state?, do: state, else: quote(do: nil)
-
     quote do
       defoverridable [{unquote(callback), unquote(arity)}]
 
       def unquote(callback)(unquote_splicing(args)) do
         unquote(pre)
         tla_result = super(unquote_splicing(args))
-        var!(tla_new_state) = TLA.Invariant.Runtime.extract_state(tla_result, unquote(fallback))
+        var!(tla_new_state) = unquote(extraction(callback, state))
         unquote(post)
         unquote(invariant_check)
         unquote(property_check)
         tla_result
       end
     end
+  end
+
+  defp verbose(:verbose), do: [:verbose]
+  defp verbose(_telemetry), do: []
+
+  # A state machine's state is the `{state_name, data}` pair, which is what `invariant`
+  # and `action_property` bind — §03's `TrafficLight` destructures it in the block. The
+  # pair is built here rather than passed as two arguments so that every declaration is
+  # written against one `state`, whatever behaviour the module implements.
+  defp state_expression(:handle_event, args) do
+    quote do: {unquote(Enum.at(args, 2)), unquote(Enum.at(args, 3))}
+  end
+
+  defp state_expression(callback, args), do: Enum.at(args, @state_position[callback])
+
+  # For a GenServer the message a precondition matches is the callback's first argument.
+  # For a state machine it is the event *content* — not `{event_type, content}` — so that
+  # a `precondition {:withdraw, amount}` is the same declaration whichever behaviour
+  # carries it, and so that a pattern does not have to know whether the message arrived as
+  # a call, a cast or an info.
+  defp message_expression(:handle_event, args), do: Enum.at(args, 1)
+  defp message_expression(_callback, args), do: hd(args)
+
+  # `:gen_statem`'s returns are a different language from a GenServer's, and one of them
+  # collides: `{:stop, reason, new_data}` carries DATA where a GenServer's carries the
+  # whole state. So the state machine gets its own extraction rather than more clauses on
+  # the shared one.
+  defp extraction(:handle_event, fallback) do
+    quote do: TLA.Invariant.Runtime.extract_statem_state(tla_result, unquote(fallback))
+  end
+
+  defp extraction(_callback, fallback) do
+    quote do: TLA.Invariant.Runtime.extract_state(tla_result, unquote(fallback))
   end
 
   defp applicable(declarations, callback) do

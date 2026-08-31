@@ -188,6 +188,167 @@ defmodule TLA.Invariant.Runtime do
   def extract_state({:ok, state, _extra}, _pre), do: state
   def extract_state(_result, pre_state), do: pre_state
 
+  @doc """
+  The post-state carried by a `:gen_statem` callback's return value.
+
+  A state machine's state is the `{state_name, data}` pair, so `pre` is both the fallback
+  and the source of the name a `:keep_state` return leaves alone. This cannot be more
+  clauses on `extract_state/2`: `{:stop, reason, new_data}` is a `:gen_statem` return
+  carrying DATA, and the identically shaped `{:stop, reason, state}` is a GenServer return
+  carrying the whole state. One function cannot answer both.
+
+  `:gen_statem`'s `:state_functions` callback mode is not instrumented — its transitions
+  live in functions named after the states, which `@on_definition` cannot recognise. §03
+  specifies `handle_event/4`, which is the `:handle_event_function` mode.
+  """
+  @spec extract_statem_state(term(), {term(), term()}) :: {term(), term()}
+  def extract_statem_state(result, pre)
+
+  def extract_statem_state({:next_state, name, data}, _pre), do: {name, data}
+  def extract_statem_state({:next_state, name, data, _actions}, _pre), do: {name, data}
+  def extract_statem_state({:keep_state, data}, {name, _}), do: {name, data}
+  def extract_statem_state({:keep_state, data, _actions}, {name, _}), do: {name, data}
+  def extract_statem_state({:repeat_state, data}, {name, _}), do: {name, data}
+  def extract_statem_state({:repeat_state, data, _actions}, {name, _}), do: {name, data}
+  def extract_statem_state({:stop, _reason, data}, {name, _}), do: {name, data}
+
+  def extract_statem_state({:stop_and_reply, _reason, _replies, data}, {name, _}),
+    do: {name, data}
+
+  def extract_statem_state(_result, pre), do: pre
+
+  @doc """
+  Check the named invariants against the state an `init/1` produced, if it produced one.
+
+  The tag test lives here rather than in the emitted wrapper for a reason worth recording:
+  inside a particular module, `super(arg)` has a known return type, so a `case` on
+  `initial_state/1`'s tag has a clause the compiler can prove unreachable — and Elixir's
+  type system says so, as a warning, in the user's module, about code the user did not
+  write. Behind a function taking `term()` there is nothing to prove.
+  """
+  @spec check_initial_invariants!(module(), [atom()], term(), :genserver | :statem) ::
+          :ok | no_return()
+  def check_initial_invariants!(module, names, result, shape) do
+    case initial(result, shape) do
+      {:ok, state} -> check_invariants!(module, names, state)
+      :none -> :ok
+    end
+  end
+
+  @doc "The same, under `:verbose`."
+  @spec check_initial_invariants!(module(), [atom()], term(), :genserver | :statem, :verbose) ::
+          :ok | no_return()
+  def check_initial_invariants!(module, names, result, shape, :verbose) do
+    case initial(result, shape) do
+      {:ok, state} -> check_invariants!(module, names, state, :verbose)
+      :none -> :ok
+    end
+  end
+
+  defp initial(result, :genserver), do: initial_state(result)
+  defp initial(result, :statem), do: initial_statem_state(result)
+
+  @doc """
+  The first state an `init/1` produced, or `:none`.
+
+  `:ignore` and a bare `{:stop, reason}` are refusals to start: there is no first state,
+  and an invariant checked against its absence would report a violation of a predicate
+  that was never given anything to be about. The `init/1` wrapper checks nothing in that
+  case — which is why this returns a tag rather than a state and a fallback.
+  """
+  @spec initial_state(term()) :: {:ok, term()} | :none
+  def initial_state(result)
+
+  def initial_state({:ok, state}), do: {:ok, state}
+  def initial_state({:ok, state, _extra}), do: {:ok, state}
+  def initial_state(_result), do: :none
+
+  @doc """
+  The same for a `:gen_statem`, whose `init/1` returns `{:ok, state_name, data}`.
+
+  A module is read as a state machine when it defines `handle_event/4`. Without this the
+  shared `initial_state/1` would take `{:ok, :red, data}` for `{:ok, state, extra}` and
+  check the invariants against the state NAME — which is not the state, and which a
+  declaration written as `{name, data} = state` would refuse with a `MatchError` naming
+  neither the invariant nor the reason.
+  """
+  @spec initial_statem_state(term()) :: {:ok, {term(), term()}} | :none
+  def initial_statem_state(result)
+
+  def initial_statem_state({:ok, name, data}), do: {:ok, {name, data}}
+  def initial_statem_state({:ok, name, data, _actions}), do: {:ok, {name, data}}
+  def initial_statem_state(_result), do: :none
+
+  @doc """
+  Check a transition that no wrapper produced: an `Agent` update.
+
+  An `Agent`'s transitions are functions its *callers* pass in, so there is no callback to
+  wrap and no compile-time place to resolve `callbacks:` — which is why this takes every
+  declared name and why `callbacks:` is documented as meaningless for an `Agent`
+  (§03 §Supported OTP Behaviors). Returns the new state, so it can stand in the middle of
+  the `Agent.update/3` function it is called from.
+  """
+  @spec check_agent_step!(module(), term(), term()) :: term()
+  def check_agent_step!(module, old_state, new_state) do
+    if instrumented?(module), do: agent_step!(module, old_state, new_state), else: new_state
+  end
+
+  defp agent_step!(module, old_state, new_state) do
+    verbose = verbose(module)
+    invariants = module.__tla_names__(:invariant)
+    properties = module.__tla_names__(:action_property)
+
+    apply(__MODULE__, :check_invariants!, [module, invariants, new_state] ++ verbose)
+
+    apply(
+      __MODULE__,
+      :check_action_properties!,
+      [module, properties, old_state, new_state] ++ verbose
+    )
+
+    new_state
+  end
+
+  @doc """
+  Check the invariants of a state an `Agent` was read at, and return it.
+
+  A read is a stuttering step: nothing moved, so there is no action property to check, but
+  the invariants must still hold — the same reason a GenServer callback that returns its
+  state unchanged is still checked.
+  """
+  @spec check_agent_state!(module(), term()) :: term()
+  def check_agent_state!(module, state) do
+    if instrumented?(module), do: agent_state!(module, state), else: state
+  end
+
+  defp agent_state!(module, state) do
+    apply(
+      __MODULE__,
+      :check_invariants!,
+      [module, module.__tla_names__(:invariant), state] ++ verbose(module)
+    )
+
+    state
+  end
+
+  # Under `mode: :disabled` the declaring module carries no predicates, and an `Agent`
+  # call site cannot be compiled away the way a callback can: `Application.compile_env/3`
+  # does not expand inside a function body, so the mode is not readable where the call is
+  # written. `:disabled` therefore costs an export lookup here rather than nothing — which
+  # is the honest price of a transition whose module is an argument. (§03 §Supported OTP
+  # Behaviors.)
+  defp instrumented?(module) do
+    Code.ensure_loaded?(module) and function_exported?(module, :__tla_names__, 1)
+  end
+
+  # The wrappers choose the arity when they are emitted. An `Agent` call site cannot: the
+  # module whose declarations apply is an argument, so `:verbose` is a property of a value
+  # rather than of the code being compiled, and one lookup per transition is what that
+  # costs.
+  defp verbose(module) do
+    if module.__tla_telemetry__() == :verbose, do: [:verbose], else: []
+  end
+
   # ── Reporting ───────────────────────────────────────────────────────────────
 
   # A `:checked` event carries how long the predicate took, which is the only number that
