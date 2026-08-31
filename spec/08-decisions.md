@@ -637,6 +637,15 @@ field is order-independent and must match a single-threaded run exactly — a re
 an action as never enabled when it was is a false statement about the model, and
 `--strict-coverage` fails a build on it.
 
+**With one boundary: a run that halted.** A search that stops at a counterexample stops
+mid-expansion, so its counts are a lower bound rather than a census — already recorded as
+`bounded_by: :violation`. Under workers the bound is looser and varies between runs,
+because the coordinator starts a whole level at once and halts on the first violation it
+receives; how much of that level was merged first depends on which worker finished when.
+Two runs of the same violating spec at different worker counts agree on the verdict and on
+the counterexample's **length** — which is what D-9 compares — and need not agree on the
+counts. Asserting that they did would make a flaky test out of correct behaviour.
+
 **Why the default is 1**, against §04's stated `System.schedulers_online()`. A parallel
 search is exhaustive exactly as a single-threaded one is, so the cores buy speed and not a
 better answer — and how much of a machine to spend on a run is a decision about the
