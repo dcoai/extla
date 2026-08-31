@@ -1,5 +1,9 @@
 # HANDOFF — 2026-08-31 — Phase 1 done, and both open proposals closed
 
+> **SUPERSEDED by `HANDOFF-2026-08-31-phase2-start.md`**, which carries the same
+> state plus the Phase 2 plan. Kept as the record of the session that finished
+> the corpus and closed #7 and #11.
+
 Supersedes `HANDOFF-2026-08-30-phase1-components.md`, which left three corpus
 entries to write. All three are in, and the two proposals that were open when
 they landed are closed. This file is self-contained; read it first.
