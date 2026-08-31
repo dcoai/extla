@@ -47,10 +47,16 @@ module that named it is loaded before its trace is read.
 `String.to_existing_atom/1` raises "not an already existing atom" **without saying which**,
 and the name is exactly what the message needs — a trace belonging to a different
 specification is the common cause. Catching that error to improve it is not something this
-codebase does, so the atom table is measured across the conversion instead: an atom that
-already existed does not grow it. A file full of unknown atoms creates one of them, because
-the decode stops at the first — a bounded cost for an unbounded input, which is the
-property that matters.
+codebase does, so a first version measured the atom table across the conversion instead:
+an atom that already existed does not grow it.
+
+**CI refuted that, and the refutation is worth keeping.** `:erlang.system_info(:atom_count)`
+is global, so any atom another process creates between the two readings looks like this
+one — and a suite running its tests concurrently creates plenty. The check reported atoms
+that plainly existed. A check whose answer depends on what an unrelated process did is not
+a check, so the decoder uses `String.to_existing_atom/1` and lets its error stand: the atom
+is still never created, which is the property that mattered, and the moduledoc says what
+the message means.
 
 ## `--captured` needs less than `--trace`, and the task says so
 
