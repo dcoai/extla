@@ -33,6 +33,9 @@ defmodule TLA.ModelChecker do
   @type config :: %{
           optional(:constants) => map(),
           optional(:max_states) => pos_integer(),
+          # Specified, unimplemented, and REFUSED rather than ignored: `workers: n` for
+          # n > 1 raises until `TLA.ModelChecker.Parallel` exists (Phase 4). See
+          # `reject_unimplemented!/1`.
           optional(:workers) => pos_integer(),
           optional(:check_deadlock) => boolean(),
           optional(:check_liveness) => boolean(),
@@ -694,6 +697,22 @@ defmodule TLA.ModelChecker do
               "graph can have cycles the real state space does not, and a cycle is what a " <>
               "liveness verdict is read off. Check safety under `symmetry:`, and liveness " <>
               "without it."
+    end
+
+    # `workers:` is specified (§04's config type) and unimplemented. Exploring on one
+    # process and answering `:ok` would report a single-threaded run as though it had
+    # honoured a request for eight — the same failure `max_states_reached` exists to
+    # prevent one level up, where "we ran out of budget" must not be returned as "it
+    # holds". So it refuses until `TLA.ModelChecker.Parallel` exists to honour it.
+    if Map.get(config, :workers, 1) > 1 do
+      raise ArgumentError,
+            "workers: #{Map.get(config, :workers)} — parallel exploration is not built. " <>
+              "`TLA.ModelChecker.Parallel` is Phase 4 (06-architecture.md), and this " <>
+              "option is refused rather than ignored: a single-threaded run reported as " <>
+              "though it had used #{Map.get(config, :workers)} processes is a wrong " <>
+              "answer about the run. What does reduce the cost of a search today is " <>
+              "`symmetry:` (a smaller state space) and `max_states:` (a smaller budget, " <>
+              "reported as `:max_states_reached` rather than as success)."
     end
 
     :ok

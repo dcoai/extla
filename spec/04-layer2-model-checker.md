@@ -439,6 +439,12 @@ defmodule TLA.ModelChecker do
   @type config :: %{
     constants: map(),                  # constant assignments
     max_states: pos_integer(),         # state limit (default: 1_000_000)
+    # Specified, unimplemented, and REFUSED rather than ignored: `workers: n`
+    # for n > 1 raises until `TLA.ModelChecker.Parallel` exists (Phase 4). A
+    # single-threaded run reported as though it had honoured a request for eight
+    # is a wrong answer about the run -- the failure `max_states_reached` exists
+    # to prevent one level up. The default the eventual implementation will
+    # derive is `System.schedulers_online()`, in `TLA.Config.workers/0`.
     workers: pos_integer(),            # parallel workers (default: schedulers)
     check_deadlock: boolean(),         # report a successor-less state that no `terminal`
                                        # predicate admits (default: true)
@@ -478,9 +484,12 @@ defmodule TLA.ModelChecker do
           max_balance: 5
         },
         max_states: 500_000,
-        workers: 4,
         check_liveness: true
       })
+
+  The example carried `workers: 4` until parallel exploration was specified,
+  unimplemented and refused. It raises today, and an example that raises is a
+  worse thing for a specification to carry than one option fewer.
   """
   @spec run(module(), config()) :: result()
   def run(spec_module, config)
@@ -1097,9 +1106,14 @@ defmodule Mix.Tasks.Tla.Check do
 
       mix tla.check                                 # every spec in the project
       mix tla.check Specs.TransferProtocol
-      mix tla.check Specs.TransferProtocol --max-states 100000 --workers 8
+      mix tla.check Specs.TransferProtocol --max-states 100000
       mix tla.check Specs.TransferProtocol --safety-only
       mix tla.check Specs.TransferProtocol --graph dot --output transfer.dot
+
+  `--workers` and `--graph`/`--output` are NOT flags of the task: the first waits
+  on `TLA.ModelChecker.Parallel` and the second on `mix tla.visualize`, both
+  Phase 4. `OptionParser` is strict, so either is refused by name rather than
+  accepted and dropped.
 
   ## Where the constants come from
 

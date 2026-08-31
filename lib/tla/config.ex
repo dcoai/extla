@@ -62,6 +62,12 @@ defmodule TLA.Config do
 
   @doc """
   Number of workers for parallel state exploration.
+
+  Derived rather than asked for: the number of schedulers is a property of the machine, so
+  the system holds the knowledge and the default answers it. **Nothing reads this yet.**
+  Parallel exploration is `TLA.ModelChecker.Parallel`, which is Phase 4
+  (`06-architecture.md`), and until it exists `TLA.ModelChecker`'s `workers:` option
+  refuses rather than quietly running on one process.
   """
   @spec workers() :: pos_integer()
   def workers do
