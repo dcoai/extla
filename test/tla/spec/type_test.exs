@@ -60,6 +60,18 @@ defmodule TLA.Spec.TypeTest do
         resolve(quote(do: 0..^cap), %{cap: :five})
       end
     end
+
+    # `-1` is unary minus applied to 1 in the AST, not an integer literal, so
+    # this had to be spelled out. Paxos's `maxBal` is -1 until the acceptor
+    # promises something, and a grammar that cannot say so cannot type the spec.
+    test "a bound may be negative" do
+      type = resolve(quote(do: -1..^cap), %{cap: 2})
+
+      assert Type.member?(type, -1)
+      assert Type.member?(type, 2)
+      refute Type.member?(type, -2)
+      refute Type.member?(type, 3)
+    end
   end
 
   describe "constants" do

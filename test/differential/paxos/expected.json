@@ -1,0 +1,25 @@
+{
+  "generated_by": "bin/tlc-expected",
+  "tla_tools_version": "v1.7.4",
+  "tlc_version": "2.19",
+  "module": "Paxos",
+  "constants": {
+    "Acceptors": "{a1, a2, a3}",
+    "Values": "{v1, v2}",
+    "Quorums": "{{a1, a2}, {a1, a3}, {a2, a3}, {a1, a2, a3}}",
+    "MaxBallot": "1",
+    "phase1a": "phase1a",
+    "phase1b": "phase1b",
+    "phase2a": "phase2a",
+    "phase2b": "phase2b",
+    "none": "none"
+  },
+  "distinct_states": 3921,
+  "diameter": 17,
+  "deadlock": false,
+  "invariants": {
+    "TypeOK": "holds",
+    "Consistency": "holds",
+    "AcceptedWasProposed": "holds"
+  }
+}

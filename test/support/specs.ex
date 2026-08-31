@@ -301,4 +301,33 @@ defmodule TLA.TestSpecs do
       n == ^max
     end
   end
+
+  defmodule LetScopes do
+    @moduledoc """
+    A `let` that only the guard reads, and one that only an assignment reads.
+
+    Each compiled function keeps the bindings it reads and drops the others: the
+    block is pure, so a binding nothing reads is dead code — and emitting it
+    anyway would cost the spec author an unused-variable warning they cannot
+    silence.
+    """
+    use TLA.Spec
+
+    variable :n, type: 0..3
+    variable :log, type: :seq
+
+    init do
+      n = 0
+      log = seq()
+    end
+
+    action :bump do
+      let room = 3 - n
+      require room > 0
+      let entry = %{was: n}
+
+      n = n + 1
+      log = append(log, entry)
+    end
+  end
 end
