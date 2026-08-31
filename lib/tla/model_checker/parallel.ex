@@ -125,14 +125,31 @@ defmodule TLA.ModelChecker.Parallel do
     end)
   end
 
-  # One batch per worker, dealt round-robin rather than in contiguous chunks. States
-  # adjacent in a level are often adjacent in the spec's structure too — the same action
-  # from neighbouring states — so contiguous chunks tend to give one worker all the
-  # expensive states and another all the cheap ones. Dealing spreads that.
+  # Eight batches per worker, dealt round-robin rather than cut into contiguous chunks.
+  #
+  # Round-robin because states adjacent in a level are often adjacent in the spec's
+  # structure too — the same action from neighbouring states — so contiguous chunks tend
+  # to hand one worker all the expensive states and another all the cheap ones.
+  #
+  # Eight rather than one because it was measured (#41). `Task.async_stream` hands a
+  # worker its next batch as soon as it finishes one, so cutting a level finer lets the
+  # workers that drew cheap states absorb the stragglers instead of idling at the barrier.
+  # On `raft_election` at 8 workers, interleaved and compared on minima: x1 1.00, x8 1.04,
+  # x16 1.05, x32 1.00 — it pays until the per-batch overhead outgrows the rebalancing,
+  # which it does before x32. Eight sits on the plateau and keeps the task count down on
+  # small levels.
+  #
+  # Nothing is asked for. The count is derived from the workers, and `group_by/3` caps it
+  # at the level's own size: a level with fewer states than parts yields one state per
+  # batch rather than empty ones.
+  @batches_per_worker 8
+
   defp batches(level, workers) do
+    parts = workers * @batches_per_worker
+
     level
     |> Enum.with_index()
-    |> Enum.group_by(fn {_state, index} -> rem(index, workers) end, fn {state, _} -> state end)
+    |> Enum.group_by(fn {_state, index} -> rem(index, parts) end, fn {state, _} -> state end)
     |> Map.values()
   end
 

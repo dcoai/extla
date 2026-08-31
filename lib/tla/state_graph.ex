@@ -227,13 +227,24 @@ defmodule TLA.StateGraph do
       # changes. It is also free — measured at 0.97x of protected on a single-writer
       # insert-and-lookup loop, which is noise.
       #
-      # `write_concurrency` is NOT set, and that is a measurement rather than an oversight.
-      # It costs 1.39x on that same loop (`:auto` costs 1.68x), and buys nothing until
-      # there are concurrent writers — while `bench/search_profile.baseline.md` puts the
-      # ETS lookup and insert at 0.2% of the raft search. What lock granularity a
-      # coordinator wants depends on how it batches and shards its writes, which is a
-      # Phase 4 decision with no consumer here to constrain it. Setting it now would be
-      # paying 39% on the one structure the profile says is already free.
+      # `write_concurrency` is NOT set. #31 measured it at 1.39x on that single-writer
+      # loop (`:auto` 1.68x) and deferred the decision to whoever knew how a coordinator
+      # would batch its writes. There is one now, and it has been re-measured under eight
+      # real concurrent writers (#41, `raft_election`, interleaved, minima):
+      #
+      #   unset 1.00x      true 1.03x      :auto 0.13x
+      #
+      # So `true` is a wash where it was supposed to pay, and it stays unset for a reason
+      # the parallel path itself supplies: `workers: 1` is the DEFAULT (D-27), so setting
+      # it would charge every single-threaded run 39% to buy 3% — inside the run-to-run
+      # spread — on a path a caller has to opt into.
+      #
+      # `:auto` is not a wash but a catastrophe, and the mechanism is worth naming because
+      # it is an interaction rather than a constant: it decentralises the table's counters,
+      # so `:ets.info/2` with `:size` must SUM them rather than read one. Measured at
+      # 1,832ns against 105ns for every other setting — 17x — and `max_states` reads that
+      # size before every expanded state (`live_state_count/1`). Two decisions taken apart
+      # meet here.
       nodes: :ets.new(:tla_nodes, [:set, :public, read_concurrency: true]),
       fingerprints: :ets.new(:tla_fingerprints, [:set, :public, read_concurrency: true]),
       ids: :atomics.new(1, signed: false)

@@ -1,9 +1,12 @@
 # Search profile — baseline
 
-The number `TLA.ModelChecker.Parallel` has to beat, and the breakdown saying which phase
-it would have to speed up to do it. Regenerate with `mix run bench/search_profile.exs`;
-see that file's header for what each phase is and why the residual is reported rather than
-distributed.
+Where the search spends its time, and what parallelising it bought.
+
+Two halves. The **phase profile** below says which phase a change would have to speed up —
+regenerate with `mix run bench/search_profile.exs`; see that file's header for what each
+phase is and why the residual is reported rather than distributed. The **worker sweep** at
+the end says what `workers:` actually delivers, and at what — regenerate with
+`mix run bench/search_profile.exs workers`.
 
 **Taken on** 2026-08-31 — AMD Ryzen 7 1700 (8 cores / 16 threads), Debian 13,
 Elixir 1.20.4, Erlang/OTP 29 (erts-17.0.5, jit). A number without the machine it was taken
@@ -136,3 +139,92 @@ validation the largest single phase — and fingerprinting is per-successor comp
 no shared state, which is exactly the part that parallelises freely. Eight cores against
 this shape is a better trade than eight cores against the old one, where most of the
 parallelism would have gone on work #33 has since deleted.
+
+---
+
+# The worker sweep
+
+`mix run bench/search_profile.exs workers [entry]`. Three rounds, every worker count run
+once per round with the order rotated, minima compared — for the reasons the phase profile
+above gives and this document repeats below.
+
+## `raft` — 58,359 states, 255,270 transitions, diameter 19
+
+Taken at load 3.2 on the machine named at the top of this file.
+
+| workers | min | speedup | all three rounds |
+|---|---|---|---|
+| 1 | 8,897 ms | — | 8,897 / 9,632 / 9,848 |
+| 2 | 4,925 ms | **1.81x** | 4,925 / 5,002 / 5,120 |
+| 4 | 2,623 ms | **3.39x** | 2,661 / 2,623 / 2,695 |
+| 8 | 1,647 ms | **5.40x** | 1,704 / 1,745 / 1,647 |
+
+Identical state count, transition count, diameter and status at every worker count — the
+sweep prints them per run rather than only summarising, because a sweep whose counts drift
+between arms is measuring two different searches and that has to be visible in the output.
+
+**5.4x on 8 cores of a 16-thread machine.** The gap from linear is the barrier: the search
+is level-synchronous (D-27), so every round costs the slowest worker in it, and `raft` has
+19 rounds. That is the price of comparing counterexample *length* against TLC, which is
+D-9's acceptance criterion.
+
+**Compounded with #33, `raft` has gone from 23.4 s to 1.65 s — 14x.**
+
+## `buffer` — the sweep says nothing here, and that is the finding
+
+4,460 states over 29 levels is about 150 states a level, and 29 barriers. Run-to-run
+spread on this entry is roughly 90% (198 ms to 382 ms for the same arm), which swamps any
+difference between arms: one sweep put 8 workers at 1.93x and the next at 0.89x. Neither
+number means anything.
+
+Reported rather than dropped, because "too small to parallelise" is a real answer and the
+alternative — quoting whichever run looked better — is how a benchmark starts lying. The
+entry stays in the sweep as a smoke check that it runs.
+
+## Batch size, derived rather than asked for
+
+A level is cut into `workers * 8` batches, dealt round-robin, and `Task.async_stream`
+hands a worker its next batch as it finishes one — so workers that drew cheap states
+absorb the stragglers instead of idling at the barrier. On `raft` at 8 workers,
+interleaved, minima:
+
+| batches per worker | 1 | 2 | 4 | 8 | 16 | 32 |
+|---|---|---|---|---|---|---|
+| speedup | 1.00x | 1.02x | 1.01x | 1.04x | **1.05x** | 1.00x |
+
+It pays until the per-batch overhead outgrows the rebalancing, which happens before 32.
+Eight sits on the plateau and keeps the task count down on small levels. It is not a knob:
+the count is derived from the workers, and the grouping caps it at the level's own size, so
+a level with fewer states than parts yields one state per batch rather than empty ones.
+
+The effect is 4-5% — worth taking, and worth stating at that size rather than as a
+headline. On `buffer` the same comparison is inside the noise, as everything on `buffer` is.
+
+## `write_concurrency`, re-measured with real concurrent writers
+
+#31 measured it single-writer (1.39x slower, `:auto` 1.68x) and deferred the decision to
+whoever knew how a coordinator would batch its writes. There is one now. `raft` at 8
+workers, interleaved, six rounds, minima:
+
+| | unset | `true` | `:auto` |
+|---|---|---|---|
+| speedup | 1.00x | 1.03x | **0.13x** |
+
+**It stays unset.** `true` is a wash where it was supposed to pay — 3% is inside the
+run-to-run spread — and `workers: 1` is the default (D-27), so setting it would charge
+every single-threaded run 39% to buy nothing measurable on a path a caller has to opt into.
+
+**`:auto` is 7.6x slower, and the mechanism is an interaction rather than a constant.** It
+decentralises the table's counters, so `:ets.info/2` with `:size` has to sum them instead
+of reading one:
+
+| table | `:ets.info(t, :size)` |
+|---|---|
+| protected | 112 ns |
+| public | 105 ns |
+| public + `write_concurrency: true` | 110 ns |
+| public + `write_concurrency: :auto` | **1,832 ns** |
+
+`max_states` reads that size before every expanded state (`StateGraph.live_state_count/1`,
+#40). Two decisions taken separately meet on this line, which is why the number is recorded
+beside both.
