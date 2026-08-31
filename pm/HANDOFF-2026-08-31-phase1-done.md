@@ -1,7 +1,8 @@
-# HANDOFF — 2026-08-31 — Phase 1 done: the corpus is complete and agrees with TLC
+# HANDOFF — 2026-08-31 — Phase 1 done, and both open proposals closed
 
 Supersedes `HANDOFF-2026-08-30-phase1-components.md`, which left three corpus
-entries to write. All three are in. This file is self-contained; read it first.
+entries to write. All three are in, and the two proposals that were open when
+they landed are closed. This file is self-contained; read it first.
 
 ---
 
@@ -21,8 +22,9 @@ invariant, and for `die_hard` the shortest counterexample.
 | `bounded_buffer` | 4,460 | 29 | A sequence, where order distinguishes states a set would not |
 | `paxos` | 3,921 | 17 | A guard quantifying over a subset of the messages in flight |
 
-Every one agreed on the first run. 322 tests, all green, ~47s (the corpus is
-most of it). CI green on `main`: `check` (format / compile with
+Every one agreed on the first run, and they still agree after two changes to
+what a spec means (see below). 338 tests, all green, ~48s (the corpus is most of
+it). CI green on `main`: `check` (format / compile with
 warnings-as-errors / test) and `verify` (regenerates every `expected.json` from
 TLC and fails on drift).
 
@@ -33,8 +35,9 @@ symmetry (`symmetry:`, `verify_symmetry:`), parallel exploration, Layers 1 and 3
 
 ## WHAT THIS SESSION CHANGED
 
-Two MRs, both merged: !13 (`raft_election` + `bounded_buffer`, issue #13) and
-!14 (`paxos`, issue #14).
+Five MRs, all merged: !13 (`raft_election` + `bounded_buffer`, issue #13), !14
+(`paxos`, issue #14), !15 (this handoff), !16 (strict `f[x]`, issue #7) and !17
+(element-typed collections, issue #11).
 
 **Four bugs found by writing the entries, each fixed where it was found.**
 
@@ -97,27 +100,40 @@ entry; CI runs it on every pipeline.
 
 ---
 
+## THE TWO PROPOSALS THAT WERE OPEN ARE CLOSED
+
+Both landed after the corpus did, in that order deliberately: with six entries
+agreeing with TLC, a change to what a spec *means* has a regression net that did
+not exist when either was filed.
+
+**#7 — `f[x]` is strict function application now (!16, D-20, §1.6).** It compiled
+to `Access.get/2`, which returns `nil` outside the domain, and `nil` is not an
+error: Erlang's term order sorts atoms above integers, so §8's own
+`require balances[from] >= amount` was **`true`** for an account that does not
+exist. `f[x]` now compiles to `TLA.Spec.Helpers.at/3` and raises
+`TLA.Spec.DomainError`, naming the expression as the spec wrote it and the domain
+it is not in. The rule has no exceptions inside a block — variable, local,
+`old.`/`new.`, and a `params:` generator's state argument alike — because the
+last two are exactly where a spec reaches into a collection it did not build.
+
+**#11 — collections are element-typed now (!17, D-21).** §1.5 gained `set(t)`,
+`seq(t)`, the record form `%{k: t, …}`, and range bounds that may be negative or
+arithmetic. Four entries had been typing a variable weaker than the TLA+ they are
+checked against; all four now check what TLC checks.
+
+Neither moved a single state count.
+
 ## OPEN PROPOSALS
 
 - **#1 / `pm-1-verification-ledger.md`** — drift-gated coverage golden and
   spec-version stamps. Its Phase 1 items (`TLA.Spec.version/1`, the coverage
   golden, the JSON schema) are buildable now: `TLA.Coverage` exists and
-  `mix tla.check --format json` emits structured output.
-- **#7 / `pm-7-access-outside-domain.md`** — `balances[from]` compiles to
-  `Access.get/2`, so `f[x]` outside the domain is `nil`, and `nil >= amount` is
-  silently `true` under Erlang term order. TLA+ leaves it undefined. It can change
-  spec semantics, so deciding it earlier costs less.
-- **#11 / `pm-11-element-typed-collections.md`** — §1.5 cannot type the elements
-  of a set or a sequence. Four of the six entries now want it: `msgs`,
-  `messages`, `votes_granted` and `buffer` are all typed weaker here than in the
-  TLA+ they are checked against, which means each of those entries can agree with
-  TLC on `type_ok` for the wrong reason.
+  `mix tla.check --format json` emits structured output. It is the last open
+  item that is not Phase 2.
 
 ---
 
 ## RESUME HERE
-
-The choice is Phase 2 or the proposals above.
 
 **Phase 2** (`spec/06-architecture.md`) is liveness, and it is a bigger piece
 than anything in Phase 1: the opt-in edge table and per-fairness-constraint
@@ -128,12 +144,18 @@ entries already have the liveness answers written down and unchecked —
 design, and `bounded_buffer`'s `no_consumer_starvation` excepts the drained end
 state — so Phase 2 has its first two tests waiting for it.
 
-**#7 is the cheapest thing to decide first**, because it is the one that could
-change what existing specs mean.
+Two things to know before starting it:
 
-If Phase 2 starts with liveness in the corpus, note that TLC checks temporal
-properties with `PROPERTIES` in the `.cfg` and reports them differently from
-invariants; `bin/tlc-expected` parses invariant violations only, and would need
-to learn the temporal report shape.
+- TLC checks temporal properties with `PROPERTIES` in the `.cfg` and reports them
+  differently from invariants. `bin/tlc-expected` parses invariant violations
+  only, and would need to learn the temporal report shape before a liveness
+  answer can be part of the oracle rather than a claim.
+- The liveness graph is opt-in for a reason (D-5): the parent-pointer graph is a
+  spanning tree, so it is acyclic and an SCC search over it would find nothing.
+  Recording out-edges and ENABLED bits has to happen while a state is
+  materialized, which is the part of the change that touches the hot path.
+
+**#1 is the smaller alternative**, and it is the one that makes the coverage
+report as drift-gated as `expected.json` already is.
 
 The user asked for this to run **as autonomously as possible**.
