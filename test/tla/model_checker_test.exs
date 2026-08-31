@@ -305,7 +305,71 @@ defmodule TLA.ModelCheckerTest do
     end
   end
 
-  describe "the state graph" do
+  describe "the state graph, as a thing a second process could write to" do
+    # #31. Not parallel exploration — that is Phase 4 — but the three things that make it
+    # impossible: a protected table a worker cannot write to at all, a lookup-then-insert
+    # that two writers both win, and an id allocated from a field of an immutable struct.
+    test "its tables are public, and deliberately not write_concurrency" do
+      graph = StateGraph.new(TLA.Spec.Compiled.from_module(Counter), %{max: 2})
+
+      for table <- [graph.nodes, graph.fingerprints] do
+        # The impossibility: a non-owner cannot write to a `:protected` table at all.
+        assert :ets.info(table, :protection) == :public
+        assert :ets.info(table, :read_concurrency) == true
+
+        # Not an oversight — a measurement. `write_concurrency` costs 1.39x on a
+        # single-writer insert-and-lookup loop and buys nothing until there are concurrent
+        # writers, while the profile puts ETS at 0.2% of the raft search. Which lock
+        # granularity a coordinator wants depends on how it batches its writes, and there
+        # is no coordinator yet to ask.
+        assert :ets.info(table, :write_concurrency) == false
+      end
+    end
+
+    test "the same state registered from many processes at once gets exactly one id" do
+      graph = StateGraph.new(TLA.Spec.Compiled.from_module(Counter), %{max: 2})
+      state = %{count: 0, status: :ready}
+      me = self()
+
+      # Every process holds its own copy of the struct — it is an immutable term — so what
+      # is shared is exactly the ETS side, which is the side under test.
+      for _ <- 1..24 do
+        spawn(fn ->
+          {_graph, id, status} = StateGraph.add_state(graph, state, nil, 0, nil)
+          send(me, {:registered, id, status})
+        end)
+      end
+
+      results = for _ <- 1..24, do: assert_receive({:registered, _id, _status})
+      ids = results |> Enum.map(fn {:registered, id, _} -> id end) |> Enum.uniq()
+      news = Enum.count(results, fn {:registered, _, status} -> status == :new end)
+
+      assert length(ids) == 1, "the same state was given #{length(ids)} ids: #{inspect(ids)}"
+      assert news == 1, "#{news} processes were told the state was new"
+      assert :ets.info(graph.fingerprints, :size) == 1
+    end
+
+    test "distinct states registered concurrently get distinct ids, and none is reused" do
+      graph = StateGraph.new(TLA.Spec.Compiled.from_module(Counter), %{max: 2})
+      me = self()
+
+      for n <- 1..24 do
+        spawn(fn ->
+          {_graph, id, status} =
+            StateGraph.add_state(graph, %{count: n, status: :ready}, nil, 0, nil)
+
+          send(me, {:registered, id, status})
+        end)
+      end
+
+      results = for _ <- 1..24, do: assert_receive({:registered, _id, _status})
+      ids = Enum.map(results, fn {:registered, id, _} -> id end)
+
+      assert Enum.uniq(ids) == ids
+      assert Enum.all?(results, fn {:registered, _, status} -> status == :new end)
+      assert :ets.info(graph.fingerprints, :size) == 24
+    end
+
     test "deduplicates by fingerprint" do
       {result, graph} = ModelChecker.explore(Counter, %{constants: %{max: 2}})
 

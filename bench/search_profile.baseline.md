@@ -36,6 +36,26 @@ insert are the remaining 1.2%, which is **0.2% of the search**.
 12,911 states/s. Same shape, less extreme: validation 51.6%, graph 21.4% (fingerprinting
 83.7% of it), coverage 9.9%, params+guards 9.0%, invariants 4.8%.
 
+## Re-measured after #31
+
+#31 made the tables `:public`, insertion race-free and the id atomic. Interleaved A/B on
+the `buffer` entry — alternating the two versions so both arms see the same machine load,
+15 runs each, minima compared — gave 368/395 ms before and 373/372 ms after: no measurable
+change, which is what a refactor of the 0.2% should look like.
+
+**Read wall times here with the load average beside them.** A `raft` run measured at
+23.4 s on a quiet machine came out at 26.1 s and then 30.5 s while the box was at load 7,
+with the *phase* numbers moving less than 8% — the measured work barely changed and the
+wall swung 30%. The phase proportions are the durable part of this document; the absolute
+wall is only comparable against a run taken under the same conditions.
+
+**`write_concurrency` is not set, and that is a measurement.** On a single-writer
+insert-and-lookup loop over 255,270 keys: `:protected` 195 ms, `:public` 190 ms (0.97x —
+free), `:public, write_concurrency: true` 272 ms (1.39x), `write_concurrency: :auto`
+328 ms (1.68x). It buys nothing until there are concurrent writers, and what lock
+granularity a coordinator wants depends on how it batches and shards its writes. Setting
+it now would pay 39% on the one structure this profile says is already free.
+
 ## What this says about Phase 4
 
 **The contended structure is 0.2% of the search.** §06 §Concurrency Architecture worries

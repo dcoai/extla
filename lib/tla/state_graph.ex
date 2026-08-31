@@ -105,13 +105,21 @@ defmodule TLA.StateGraph do
           symmetry: [Symmetry.mapping()] | nil,
           nodes: :ets.table(),
           fingerprints: :ets.table(),
+
+          # The id allocator, as an atomic rather than a counter in this struct: a second
+          # process cannot allocate from a field of an immutable term. `:atomics` is the
+          # smallest thing that is shared and race-free.
+          ids: :atomics.atomics_ref(),
           initial_states: MapSet.t(state_id()),
           deadlocked: MapSet.t(state_id()),
           terminal: MapSet.t(state_id()),
+          # These six are still per-struct, and deliberately (#31). Each worker would
+          # accumulate its own and they would have to be merged, which is a decision the
+          # COORDINATOR makes — and there is no coordinator yet to constrain the answer.
+          # Phase 4 moves them, or decides not to.
           state_count: non_neg_integer(),
           transition_count: non_neg_integer(),
           diameter: non_neg_integer(),
-          next_id: state_id(),
 
           # Present only when built with check_liveness: true; nil otherwise.
           edges: %{state_id() => [edge()]} | nil,
@@ -119,12 +127,13 @@ defmodule TLA.StateGraph do
           fairness_index: [{TLA.Spec.Compiled.fairness_def(), map()}] | nil
         }
 
-  @enforce_keys [:spec, :constants, :nodes, :fingerprints]
+  @enforce_keys [:spec, :constants, :nodes, :fingerprints, :ids]
   defstruct [
     :spec,
     :constants,
     :nodes,
     :fingerprints,
+    :ids,
     fingerprint_bits: 64,
     symmetry: nil,
     initial_states: MapSet.new(),
@@ -133,7 +142,6 @@ defmodule TLA.StateGraph do
     state_count: 0,
     transition_count: 0,
     diameter: 0,
-    next_id: 0,
     edges: nil,
     enabled: nil,
     fairness_index: nil
@@ -208,8 +216,21 @@ defmodule TLA.StateGraph do
       constants: constants,
       fingerprint_bits: Keyword.get(opts, :fingerprint_bits, 64),
       symmetry: Keyword.get(opts, :symmetry),
-      nodes: :ets.new(:tla_nodes, [:set, :protected, read_concurrency: true]),
-      fingerprints: :ets.new(:tla_fingerprints, [:set, :protected, read_concurrency: true])
+      # `:public`, not `:protected`: a process that is not the owner cannot write to a
+      # protected table AT ALL, so parallel exploration is impossible before this line
+      # changes. It is also free — measured at 0.97x of protected on a single-writer
+      # insert-and-lookup loop, which is noise.
+      #
+      # `write_concurrency` is NOT set, and that is a measurement rather than an oversight.
+      # It costs 1.39x on that same loop (`:auto` costs 1.68x), and buys nothing until
+      # there are concurrent writers — while `bench/search_profile.baseline.md` puts the
+      # ETS lookup and insert at 0.2% of the raft search. What lock granularity a
+      # coordinator wants depends on how it batches and shards its writes, which is a
+      # Phase 4 decision with no consumer here to constrain it. Setting it now would be
+      # paying 39% on the one structure the profile says is already free.
+      nodes: :ets.new(:tla_nodes, [:set, :public, read_concurrency: true]),
+      fingerprints: :ets.new(:tla_fingerprints, [:set, :public, read_concurrency: true]),
+      ids: :atomics.new(1, signed: false)
     }
   end
 
@@ -244,6 +265,15 @@ defmodule TLA.StateGraph do
     })
   end
 
+  # Race-free by construction rather than by being single-threaded. The lookup is still
+  # first because it is the common case and it is cheap; what makes the insertion safe is
+  # `insert_new/2`, which is atomic: two processes that both miss the lookup do not both
+  # get to claim the fingerprint. The loser reads the winner's id and reports `:existing`,
+  # which is exactly what it would have reported had the lookup found it.
+  #
+  # The id it allocated is then unused, so ids have gaps under contention. Nothing reads
+  # them as a range — they are keys — and an id is never reused, which is the property
+  # that matters: a trace names states by id.
   defp insert(graph, state, record) do
     fingerprint = fingerprint(graph, state)
 
@@ -252,23 +282,31 @@ defmodule TLA.StateGraph do
         {graph, id, :existing}
 
       [] ->
-        id = graph.next_id
-        :ets.insert(graph.fingerprints, {fingerprint, id})
-        :ets.insert(graph.nodes, {id, record})
+        claim(graph, fingerprint, record)
+    end
+  end
 
-        graph = %{
-          graph
-          | next_id: id + 1,
-            state_count: graph.state_count + 1,
-            diameter: max(graph.diameter, record.depth),
-            initial_states:
-              if(record.parent == nil,
-                do: MapSet.put(graph.initial_states, id),
-                else: graph.initial_states
-              )
-        }
+  defp claim(graph, fingerprint, record) do
+    id = :atomics.add_get(graph.ids, 1, 1) - 1
 
-        {graph, id, :new}
+    if :ets.insert_new(graph.fingerprints, {fingerprint, id}) do
+      :ets.insert(graph.nodes, {id, record})
+
+      graph = %{
+        graph
+        | state_count: graph.state_count + 1,
+          diameter: max(graph.diameter, record.depth),
+          initial_states:
+            if(record.parent == nil,
+              do: MapSet.put(graph.initial_states, id),
+              else: graph.initial_states
+            )
+      }
+
+      {graph, id, :new}
+    else
+      [{^fingerprint, winner}] = :ets.lookup(graph.fingerprints, fingerprint)
+      {graph, winner, :existing}
     end
   end
 
