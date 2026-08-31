@@ -57,15 +57,16 @@ mix tla.replay   MyApp.Counter     # replay a counterexample against real code
 
 ## Status
 
-**Phase 1 is done, on the terms the project set for itself.**
-`mix tla.check MySpec` explores the state space breadth-first, reports the shortest
-counterexample when it finds one, and prints what the run actually exercised.
+**Phases 1 and 2 are done, on the terms the project set for itself.**
+`mix tla.check MySpec` explores the state space breadth-first, checks the invariants and
+the temporal properties, reports the shortest counterexample — or the lasso — when it
+finds one, and prints what the run actually exercised.
 
 The acceptance criterion is not "the tests pass" but [D-9](spec/08-decisions.md): the
 checker must agree with TLC on **every** spec in the differential corpus. It does, on
-all six — distinct states, search depth, where the search stops, every invariant, and
-for `die_hard` the shortest counterexample, which is the same six-step trace action for
-action.
+all six — distinct states, search depth, where the search stops, every invariant, every
+temporal property, and for `die_hard` the shortest counterexample, which is the same
+six-step trace action for action.
 
 | Entry | Distinct states | Depth | Agreement |
 |---|---|---|---|
@@ -129,7 +130,7 @@ that `f[x]` outside a function's domain was `nil` rather than an error.
 | The implicit `type_ok` invariant | ✅ |
 | `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
 | Differential corpus vs TLC | ✅ all six entries |
-| TLC's temporal verdicts in the corpus | ✅ oracle only; nothing checks them yet |
+| TLC's temporal verdicts in the corpus | ✅ compared, not just recorded |
 | The liveness graph — `TLA.Temporal`, the edge table and ENABLED bits | ✅ |
 | `check_liveness: true` — temporal properties, weak and strong fairness | ✅ |
 | `symmetry:` / `verify_symmetry:` — symmetry reduction | ✅ |
