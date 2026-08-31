@@ -32,6 +32,11 @@ defmodule TLA.ModelChecker do
 
   @type config :: %{
           optional(:constants) => map(),
+
+          # A budget, checked before expanding each state: the search stops once the graph
+          # has PASSED the limit, so the final count exceeds it rather than stopping on it.
+          # `:max_states_reached` reports the count reached, never the limit. `workers:`
+          # does not change that rule — see `TLA.ModelChecker.Parallel`.
           optional(:max_states) => pos_integer(),
           # Parallel state exploration: `TLA.ModelChecker.Parallel`. Defaults to 1 —
           # `TLA.Config.workers/0` derives the machine's answer for a caller who wants it,
