@@ -368,6 +368,11 @@ defmodule Specs.RaftElection do
     messages = messages |> delete(msg) |> put(response)
   end
 
+  # The term check is what makes `election_safety` hold, and it is the thing an
+  # earlier draft of this example left out: without it a candidate that timed
+  # out twice counts a vote granted in the EARLIER term towards its current
+  # candidacy, and two servers reach `:leader` in the same term. TLC hands back
+  # an 8-state counterexample; the corpus entry is what found it.
   action :handle_vote_response,
     params: [
       s: ^servers,
@@ -375,6 +380,7 @@ defmodule Specs.RaftElection do
         Enum.filter(st.messages, &(&1.type == :vote_response and &1.to == s and &1.granted))
       end
     ] do
+    require msg.term == current_term[s]
     require srv_state[s] == :candidate
 
     let quorum = div(MapSet.size(^servers), 2) + 1
@@ -400,12 +406,22 @@ defmodule Specs.RaftElection do
     voted_for    = update(voted_for, s, fn _ -> :none end)
   end
 
-  # A split vote at `^max_term` with the network drained leaves every server a
-  # candidate with no `timeout` left. That is the model bound, not a Raft
-  # deadlock (02-dsl-semantics.md §5.3).
+  # A split vote at `^max_term` leaves every server at the bound with nothing
+  # deliverable left. That is the model bound, not a Raft deadlock
+  # (02-dsl-semantics.md §5.3).
+  #
+  # "Nothing deliverable" is not the same as "nothing left": the vote responses
+  # still in the network are refusals, grants to a server that has stopped being
+  # a candidate, or grants for a term it has moved past, and nothing ever removes
+  # those. An earlier draft said `size(messages) == 0`, which no reachable end
+  # state satisfies — so every one of them was reported as a deadlock instead.
   terminal :term_bound_exhausted do
-    size(messages) == 0 and
-      Enum.all?(^servers, fn s -> current_term[s] == ^max_term end)
+    Enum.all?(^servers, fn s -> current_term[s] == ^max_term end) and
+      Enum.all?(messages, fn m ->
+        m.type == :vote_response and
+          not (m.granted and srv_state[m.to] == :candidate and
+                 m.term == current_term[m.to])
+      end)
   end
 
   # ── Safety ──
@@ -451,13 +467,17 @@ Two notes on this spec:
 - `^max_term` is a **model bound**, not part of Raft. The coverage report will show
   `timeout` becoming disabled once every server reaches it; that is the bound working,
   not a bug, and it is why `bounded_by` appears in `TLA.Coverage`.
-- `eventually_elect_leader` is **violated** in this bounded model, and the corpus
-  records it as an expected violation: a split vote at `^max_term` ends in the
-  `term_bound_exhausted` terminal state with no leader. The counterexample is the
-  bound, not Raft — the real protocol times out again. TLC's Raft spec has the same
-  property only under a constraint. The test below checks safety exhaustively and
-  asserts that the liveness counterexample ends in that terminal state, which is more
-  useful than deleting a property the model refutes.
+- `eventually_elect_leader` is **violated** in this bounded model: a split vote at
+  `^max_term` ends in the `term_bound_exhausted` terminal state with no leader. The
+  counterexample is the bound, not Raft — the real protocol times out again. TLC's Raft
+  spec has the same property only under a constraint. The test below checks safety
+  exhaustively and asserts that the liveness counterexample ends in that terminal state,
+  which is more useful than deleting a property the model refutes.
+- Both of the notes above are here because the differential corpus put them here. At
+  `servers = {s1, s2, s3}, max_term = 2` this model has 58,359 reachable states and a
+  diameter of 19, TLC and ExTLA agree on both, and the two bugs the entry found — the
+  missing term check and the unreachable terminal predicate — are recorded in
+  `test/differential/raft_election/`.
 
 ### Tests
 
@@ -486,9 +506,12 @@ defmodule Specs.RaftElectionTest do
     assert result.violation.type == :liveness
     assert result.violation.property == :eventually_elect_leader
 
+    # The trace ends where the model bound stops it: every server at `max_term`
+    # and no leader. What is left in `messages` is the undeliverable residue the
+    # `term_bound_exhausted` terminal describes, not an empty network.
     last = List.last(result.violation.states)
     assert Enum.all?(last.current_term, fn {_s, t} -> t == 2 end)
-    assert MapSet.size(last.messages) == 0
+    refute Enum.any?(last.srv_state, fn {_s, st} -> st == :leader end)
   end
 end
 ```

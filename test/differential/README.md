@@ -21,6 +21,14 @@ test/differential/<name>/
 editing it to make a test pass would be editing the definition of "correct", which is
 why CI regenerates it from TLC on every pipeline and fails on any difference.
 
+An entry whose spec ends somewhere takes **two** TLC runs. `-continue` keeps an
+invariant violation from ending the search, but a reached deadlock ends it regardless,
+leaving states on the queue — so `bin/tlc-expected` takes `deadlock` from the first run
+and, when there was one, re-runs with `-deadlock` to get the counts and the invariant
+verdicts from a search that actually finished. `bounded_buffer` differs by one state and
+one level of depth between the two passes, which is exactly how much of the state space
+a first-deadlock stop can hide.
+
 ```json
 {
   "generated_by": "bin/tlc-expected",
@@ -56,8 +64,8 @@ failure of a search that terminated early but happened to reach the same count.
 | `die_hard` | Lamport, *Specifying Systems* | ✅ | ✅ |
 | `two_phase_commit` | Lamport, TLA+ examples | ✅ | ✅ |
 | `distributed_lock` | `spec/07-examples.md` Example 1 | ✅ | ✅ |
-| `raft_election` | `spec/07-examples.md` Example 2 (safety only; liveness is refuted by the term bound by design) | not yet | not yet |
-| `bounded_buffer` | `spec/07-examples.md` Example 3 | not yet | not yet |
+| `raft_election` | `spec/07-examples.md` Example 2 (safety only; liveness is refuted by the term bound by design) | ✅ | ✅ |
+| `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | ✅ |
 | `paxos` | Lamport, *Paxos Made Simple* TLA+ | not yet | not yet |
 
 Each row also carries the `--verify-symmetry` result where a `SYMMETRY` is declared.
@@ -68,7 +76,7 @@ from the day it is written, rather than against its own output a phase later.
 
 ## Writing an entry
 
-Two things bite when translating a spec into TLA+ for TLC.
+Three things bite when translating a spec into TLA+ for TLC.
 
 **Use model values, not strings, for tags.** TLC compares strings strictly and
 *raises* on `"idle" = <<"holding", r>>` rather than returning FALSE, so a spec whose
@@ -76,6 +84,16 @@ control state is sometimes a tag and sometimes a tuple will not run. Declaring
 `CONSTANTS idle, requesting, holding` and assigning `idle = idle` in the `.cfg` makes
 them model values, which are simply unequal to anything they are not — and reads as
 what they translate to on the ExTLA side: atoms.
+
+**A `terminal` has to admit every stuck state, and only stuck states.** TLC calls any
+state with no successors a deadlock and stops there; ExTLA reports one only where no
+`terminal` predicate admits it. So the two sides are compared on where the search
+*stops*, and a spec that declares a terminal is held to both halves of that claim: a
+stuck state no terminal admits is still a deadlock (the run fails), and a terminal that
+admits a state which has successors comes back as `terminal_but_live` in the coverage
+report. Writing `raft_election` failed the first test — the end state of a split vote
+still has undeliverable vote responses in the network, so a terminal saying the network
+is empty admits none of them.
 
 **State the invariant-name mapping.** TLA+ modules prefix by convention (`TPTypeOK`)
 and ExTLA's implicit type invariant is always `:type_ok`, so the differential test
@@ -106,10 +124,13 @@ compares against these files. It is part of the ordinary suite, so the `check` C
 already runs it; the `verify` stage is what keeps `expected.json` honest by regenerating
 it from TLC.
 
-Because TLC halts at the first invariant violation and ExTLA does the same, the
-comparison runs the checker once per invariant — `invariants: [:not_solved]` for the
-violated one, `invariants: []` for the state count — which is the same shape
-`bin/tlc-expected` gets from a single `-continue` run.
+Each entry searches its state space once for the counts, once for the invariants TLC
+says hold, and once more per invariant TLC says is violated. The grouping is not a
+shortcut: a run that checks several invariants and completes has established every one
+of them, because nothing stopped it early — the same argument that lets TLC report on
+several `INVARIANTS` from one search. A violated one still needs a run of its own,
+because TLC halts at the first violation and so does this checker, so the shortest
+counterexample *for that invariant* is only what a run checking only it reports.
 
 ## Why `die_hard` is first
 
