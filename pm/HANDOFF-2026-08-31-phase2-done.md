@@ -33,7 +33,7 @@ there forever — the same shape TLC prints, whose behaviour ends `State 8: Stut
 `main`: `check` (format / compile with warnings-as-errors / test) and `verify`
 (regenerates every `expected.json` from TLC and fails on drift).
 
-**Built in Phase 2, in four MRs:**
+**Built in Phase 2, in five MRs:**
 
 - **The temporal oracle** (#15). Fairness conjuncts in the TLA+ modules, `PROPERTIES` in
   the `.cfg`s, and `bin/tlc-expected` recording a verdict per property from a run of its
@@ -53,9 +53,21 @@ there forever — the same shape TLC prints, whose behaviour ends `State 8: Stut
   comparing verdicts rather than counts, and D-22 refusing symmetry and liveness in the
   same run. `raft_election` at three servers is 58,359 → 9,871 states and 23.3s → 6.6s;
   `bench/symmetry.exs`.
+- **The ledger correction** (#20). The four MRs above met Phase 2's *deliverable* while
+  leaving three of its modules partial against their own specifications:
+  `TLA.Temporal` had one of its eight functions, `TLA.Temporal.Fairness` neither of its
+  two, and `TLA.StateGraph.sccs/1` was private inside `Liveness`. All built, with two
+  amendments recorded as D-23 — temporal operators over a finite trace return
+  `:holds | :violated | :inconclusive` rather than a boolean, and `ENABLED` is an
+  argument to the fairness operators because a behaviour cannot answer it.
 
 **Not built, and raising rather than pretending:** parallel exploration (`workers:`),
-Layer 1 invariants, Layer 3 conformance, `view:`.
+Layer 1 invariants, Layer 3 conformance, `view:`. `TLA.StateGraph.to_dot/2` and
+`to_json/1` are specified in §State Graph and belong to Phase 4's `mix tla.visualize`.
+
+**Phase 2's ledger is true as it stands.** Every module in `06-architecture.md` §Phase 2
+is built to its specification. That was worth checking rather than asserting: it was not
+true after the fourth MR, and the summary said it was.
 
 **Open issues:** **#1 / `pm-1-verification-ledger.md`** — a drift-gated coverage golden
 and spec-version stamps, buildable now. **#16 / `pm-16-solver-guided-pruning.md`** — a
@@ -98,7 +110,9 @@ mix run bench/symmetry.exs        # what symmetry buys
 - **A counterexample the spec's own fairness forbids is not a counterexample.** The
   printed cycle visits, for each constraint, a state where it is disabled or an edge that
   takes it. Getting that wrong produces a plausible-looking lasso that the assumptions
-  rule out, and no verdict test catches it.
+  rule out, and no verdict test catches it — which is why the corpus now re-evaluates
+  every counterexample with `TLA.Temporal` and `TLA.TemporalCheck`, code that shares
+  nothing with the checker that produced it.
 - **TLC's liveness reporting is thin.** It names no property when one fails, and it stops
   the search where it happens to be — which is why `bin/tlc-expected` runs the safety pass
   from a `.cfg` with `PROPERTIES` stripped and each property from a `.cfg` of its own.
