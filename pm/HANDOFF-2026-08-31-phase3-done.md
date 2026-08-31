@@ -59,16 +59,47 @@ design bug in the running code.
 
 ---
 
+## PHASE 4'S ENTRY CONDITION IS MET
+
+§06 admits `TLA.ModelChecker.Parallel` "only once the single-threaded checker is correct
+and has been profiled". Milestone *Parallel-exploration readiness* (#28, closed) did the
+second half in three items:
+
+- **#29** — `workers: n` for n > 1 now **raises**. It was accepted and silently ignored: a
+  single-threaded run reported as `:ok` for a request for four processes.
+- **#30** — `bench/search_profile.exs` and `bench/search_profile.baseline.md`. Not a
+  profiler: `:eprof` lives in OTP's `tools`, absent from this build and from CI's image, so
+  each phase is measured by doing it through the checker's own public functions.
+- **#31** — the graph's tables are `:public`, insertion is race-free (`insert_new` plus an
+  atomic id), and 24 processes registering the same state concurrently get one id.
+
+**Two findings that change what Phase 4 should expect:**
+
+**The contended structure is 0.2% of the search.** §06 §Concurrency Architecture is built
+around ETS as "the only contended structure". It is — and it is nearly free. 93% of the
+work is per-successor computation over no shared state at all. The coordinator's cost —
+batching, collecting the frontier, merging the accumulators — is the design problem, and
+`write_concurrency` was dropped on measurement (1.39x single-writer) precisely because no
+coordinator exists yet to say what lock granularity it wants.
+
+**`State.validate!` is 78% of the raft search**, run on every successor including states
+already seen: 255,270 validations where 58,359 would do. #33 proposes validating once at
+discovery, which preserves §6's guarantee and would beat eight cores on this workload.
+Taking it *before* Phase 4 means a parallel implementation is not built on a shape where
+most of the parallelism goes to work that did not need doing.
+
 ## WHAT IS NEXT
 
-**A. #1, the verification ledger.** Small, open since the beginning, and the last
-"measured, not asserted" gap: the coverage report is not drift-gated the way
-`expected.json` is. Buildable now, and Phase 3 made it more valuable — there is more to
-cover.
+**A. #33, validate once at discovery.** The largest single win available, on one core:
+78% of the raft search, three quarters of it redundant. It is a claim about §6's guarantee
+as much as about speed, which is why it is a proposal rather than a patch.
 
-**B. Phase 4's parallel exploration.** `workers:` still raises. The ETS shape the graph has
-was chosen for it, and it is the cheapest large factor left after symmetry. Nothing in the
-corpus says the state-space wall is being hit yet.
+**B. Phase 4's parallel exploration.** Its entry condition is met and its shape is now
+measured. `workers:` raises until it is built. Best taken after #33, so the parallelism
+lands on work that needs doing.
+
+**C. #1, the verification ledger.** Open since the beginning, and the last "measured, not
+asserted" gap: the coverage report is not drift-gated the way `expected.json` is.
 
 **C. Phase 4's `TLA.PropertyTest` / `mix tla.gen.test`.** The property helpers, not the
 generated files — §06 defers the files deliberately.
@@ -80,8 +111,8 @@ specified in §State Graph and still unbuilt.
 exactly the stuck states, proving a guard unsatisfiable before the run, proving `type_ok`
 inductive.
 
-Recommendation: **A, then B.** A is small and closes a stated gap; B is the only item that
-changes what size of specification the tool can be pointed at.
+Recommendation: **A, then B.** A is measured at up to 3.5x on one core and B multiplies
+whatever A leaves. Doing them in the other order would parallelise work #33 deletes.
 
 ---
 
@@ -139,6 +170,10 @@ bin/tlc-expected --check                           # the oracle gate; CI runs it
   that it could, and CI refuted it — the count is global, so an atom another process
   creates between the two readings looks like this one. A check whose answer depends on
   what an unrelated process did is not a check.
+- **Read a wall time with the load average beside it.** A `raft` run that baselines at
+  23.4s came out at 30.5s on a box at load 7, with the measured phase numbers moving under
+  8%. `bench/search_profile.baseline.md` says so, and an A/B that is not interleaved on the
+  same machine will find regressions that are not there.
 - **A liveness verdict needs a complete graph** (unchanged): `Liveness.check/3` raises
   rather than answer from a partial edge table. A Layer 3 trace has no lasso, so the
   temporal properties needing one are `:inconclusive` by construction.
