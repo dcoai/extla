@@ -106,7 +106,12 @@ declaration of record: it is what `PROPERTIES` is read from.
 | `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | ✅ |
 | `paxos` | Lamport, *Paxos Made Simple* TLA+ | ✅ | ✅ |
 
-Each row also carries the `--verify-symmetry` result where a `SYMMETRY` is declared.
+No entry declares a `SYMMETRY` in its `.cfg`. Three of them could — processes, resources
+and servers are interchangeable — but TLC's symmetry sets and its `PROPERTIES` are not
+sound together, and neither are ExTLA's (`08-decisions.md` D-22), so an entry that
+declared one would have to give up the temporal verdicts this corpus exists to record.
+The reduction is measured instead, on the same models, by `bench/symmetry.exs`, and
+`verify_symmetry: true` confirms both declarations are sound.
 
 The oracle column is filled in ahead of the ExTLA column deliberately: with the expected
 answers already in the repository, every piece of the checker is measured against truth

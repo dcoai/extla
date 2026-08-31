@@ -80,7 +80,7 @@ defmodule TLA.StateGraph do
   parallel checker of Phase 4 needs, and it costs nothing here.
   """
 
-  alias TLA.{Fingerprint, State}
+  alias TLA.{Fingerprint, State, Symmetry}
 
   @type state_id :: non_neg_integer()
 
@@ -98,6 +98,11 @@ defmodule TLA.StateGraph do
           spec: TLA.Spec.Compiled.t(),
           constants: map(),
           fingerprint_bits: 64 | 128,
+
+          # The permutations of `04-layer2-model-checker.md` §Symmetry, or nil. Present,
+          # they are what a state is canonicalized under before it is fingerprinted, so
+          # two symmetric states are one state.
+          symmetry: [Symmetry.mapping()] | nil,
           nodes: :ets.table(),
           fingerprints: :ets.table(),
           initial_states: MapSet.t(state_id()),
@@ -121,6 +126,7 @@ defmodule TLA.StateGraph do
     :nodes,
     :fingerprints,
     fingerprint_bits: 64,
+    symmetry: nil,
     initial_states: MapSet.new(),
     deadlocked: MapSet.new(),
     terminal: MapSet.new(),
@@ -201,6 +207,7 @@ defmodule TLA.StateGraph do
       spec: spec,
       constants: constants,
       fingerprint_bits: Keyword.get(opts, :fingerprint_bits, 64),
+      symmetry: Keyword.get(opts, :symmetry),
       nodes: :ets.new(:tla_nodes, [:set, :protected, read_concurrency: true]),
       fingerprints: :ets.new(:tla_fingerprints, [:set, :protected, read_concurrency: true])
     }
@@ -238,7 +245,7 @@ defmodule TLA.StateGraph do
   end
 
   defp insert(graph, state, record) do
-    fingerprint = Fingerprint.compute(state, bits: graph.fingerprint_bits)
+    fingerprint = fingerprint(graph, state)
 
     case :ets.lookup(graph.fingerprints, fingerprint) do
       [{^fingerprint, id}] ->
@@ -263,6 +270,19 @@ defmodule TLA.StateGraph do
 
         {graph, id, :new}
     end
+  end
+
+  # Under symmetry a state is identified by the smallest encoding of any permutation of
+  # it, so the FIRST of an orbit to be discovered is the one the graph keeps — parent
+  # pointers, edges and traces are all about that representative, and replay produces a
+  # genuine behaviour of the spec rather than a canonicalized stand-in.
+  defp fingerprint(%__MODULE__{symmetry: nil} = graph, state),
+    do: Fingerprint.compute(state, bits: graph.fingerprint_bits)
+
+  defp fingerprint(graph, state) do
+    state
+    |> Symmetry.canonical(graph.symmetry)
+    |> Fingerprint.of_encoding(bits: graph.fingerprint_bits)
   end
 
   @doc """

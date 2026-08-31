@@ -76,6 +76,37 @@ defmodule Mix.Tasks.Tla.CheckTest do
       assert output =~ "declared and not checked"
     end
 
+    test "--verify-symmetry catches a declaration the spec does not deserve" do
+      Application.put_env(:extla, TLA.TestSpecs.Asymmetric,
+        constants: %{processes: MapSet.new([:p1, :p2])},
+        symmetry: [:processes]
+      )
+
+      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Asymmetric) end)
+
+      {output, code} = check(["TLA.TestSpecs.Asymmetric", "--verify-symmetry"])
+
+      assert code == 1
+      assert output =~ "UNSOUND SYMMETRY"
+      assert output =~ "is not sound for this spec"
+      assert output =~ "D-17"
+    end
+
+    test "a symmetry declaration without --verify-symmetry is taken at its word" do
+      Application.put_env(:extla, TLA.TestSpecs.Asymmetric,
+        constants: %{processes: MapSet.new([:p1, :p2])},
+        symmetry: [:processes]
+      )
+
+      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Asymmetric) end)
+
+      {output, code} = check(["TLA.TestSpecs.Asymmetric"])
+
+      assert code == 0
+      assert output =~ "verified"
+      assert output =~ "2 distinct states"
+    end
+
     test "a deadlock is reported as one" do
       Application.put_env(:extla, TLA.TestSpecs.Deadlocking, constants: %{max: 2})
       on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Deadlocking) end)

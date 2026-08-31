@@ -202,8 +202,8 @@ defmodule TLA.ModelCheckerTest do
       assert StateGraph.liveness?(graph)
     end
 
-    test "symmetry raises" do
-      assert_raise ArgumentError, ~r/symmetry reduction is not implemented/, fn ->
+    test "parallel exploration is the phase boundary that is left" do
+      assert_raise ArgumentError, ~r/assigned no value/, fn ->
         ModelChecker.run(Counter, %{constants: %{max: 2}, symmetry: [:accounts]})
       end
     end

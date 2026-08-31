@@ -35,6 +35,10 @@ defmodule Mix.Tasks.Tla.Check do
       --safety-only        Skip liveness. Liveness is checked whenever the spec
                            declares a `temporal`; this turns it off, and with it the
                            liveness graph the check needs.
+      --verify-symmetry    Run the model with and without the `symmetry:` reduction
+                           and fail if any verdict differs. Nothing can establish a
+                           symmetry declaration's soundness statically, so this is
+                           the check that catches a wrong one (08-decisions.md D-17).
       --format             human (default) or json.
 
   ## Exit codes
@@ -61,6 +65,7 @@ defmodule Mix.Tasks.Tla.Check do
     strict_coverage: :boolean,
     allow_incomplete: :boolean,
     safety_only: :boolean,
+    verify_symmetry: :boolean,
     format: :string
   ]
 
@@ -91,21 +96,56 @@ defmodule Mix.Tasks.Tla.Check do
   defp check(module, opts) do
     spec = Spec.Compiled.from_module(module)
     config = config(spec, opts)
-    {module, ModelChecker.run(spec, config)}
+    result = ModelChecker.run(spec, config)
+    {module, %{result | warnings: result.warnings ++ symmetry_note(spec, config)}}
+  rescue
+    error in TLA.Symmetry.UnsoundError -> {module, {:unsound_symmetry, error}}
   end
 
   defp config(spec, opts) do
     constants = constants!(spec)
 
-    # A spec that declares a `temporal` is asking for it to be checked, so the default
-    # is to check it. A spec that declares none pays nothing: the liveness graph is only
-    # built when there is a question for it to answer.
-    check_liveness? = spec.temporals != [] and not Keyword.get(opts, :safety_only, false)
+    symmetry = symmetry(spec)
+
+    # A spec that declares a `temporal` is asking for it to be checked, so the default is
+    # to check it. A spec that declares none pays nothing: the liveness graph is only
+    # built when there is a question for it to answer. Under a symmetry reduction it is
+    # not checked at all — the two are not sound together, and `report/1` says so rather
+    # than leaving the spec's own warning to imply the tool forgot.
+    check_liveness? =
+      spec.temporals != [] and not Keyword.get(opts, :safety_only, false) and symmetry == []
 
     %{constants: constants, check_liveness: check_liveness?}
     |> maybe_put(:max_states, opts[:max_states])
     |> maybe_put(:fingerprint_bits, opts[:fingerprint_bits])
+    |> maybe_symmetry(symmetry, Keyword.get(opts, :verify_symmetry, false))
   end
+
+  # The spec's own warning says the temporal properties went unchecked; this says why,
+  # rather than leaving it to read as though the tool forgot.
+  defp symmetry_note(spec, config) do
+    if Map.get(config, :symmetry, []) != [] and spec.temporals != [] do
+      [
+        "liveness was not checked: symmetry reduction and liveness are not sound together " <>
+          "— the quotient graph can have cycles the real state space does not. Check the " <>
+          "temporal properties in a run without `symmetry:`."
+      ]
+    else
+      []
+    end
+  end
+
+  # Declared beside the constants, because it is a claim about them.
+  defp symmetry(spec) do
+    :extla
+    |> Application.get_env(spec.module, [])
+    |> Keyword.get(:symmetry, [])
+  end
+
+  defp maybe_symmetry(config, [], _verify), do: config
+
+  defp maybe_symmetry(config, names, verify),
+    do: Map.merge(config, %{symmetry: names, verify_symmetry: verify})
 
   defp maybe_put(config, _key, nil), do: config
   defp maybe_put(config, key, value), do: Map.put(config, key, value)
@@ -141,6 +181,12 @@ defmodule Mix.Tasks.Tla.Check do
 
   # ── Reporting ───────────────────────────────────────────────────────────────
 
+  defp report({module, {:unsound_symmetry, error}}) do
+    Mix.shell().info("")
+    Mix.shell().info("#{inspect(module)} — UNSOUND SYMMETRY")
+    Mix.shell().info("\n" <> Exception.message(error))
+  end
+
   defp report({module, result}) do
     Mix.shell().info("")
     Mix.shell().info("#{inspect(module)} — #{verdict(result)}")
@@ -170,33 +216,36 @@ defmodule Mix.Tasks.Tla.Check do
   defp verdict(%{status: :constrained}), do: "INCOMPLETE (state constraint)"
 
   defp encode(results) do
-    payload =
-      Map.new(results, fn {module, result} ->
-        {inspect(module),
-         %{
-           status: result.status,
-           distinct_states: result.distinct_states,
-           states_found: result.states_found,
-           transitions: result.transitions,
-           diameter: result.diameter,
-           deadlock: result.deadlock,
-           duration_ms: result.duration_ms,
-           fingerprint_bits: result.fingerprint_bits,
-           collision_estimate: result.collision_estimate,
-           warnings: result.warnings,
-           coverage: %{
-             actions: result.coverage.actions,
-             never_enabled: result.coverage.never_enabled,
-             invariants: result.coverage.invariants,
-             vacuous: result.coverage.vacuous,
-             terminal_but_live: result.coverage.terminal_but_live,
-             bounded_by: result.coverage.bounded_by
-           },
-           violation: violation_json(result.violation)
-         }}
-      end)
+    payload = Map.new(results, fn {module, result} -> {inspect(module), result_json(result)} end)
 
     Jason.encode!(payload, pretty: true)
+  end
+
+  defp result_json({:unsound_symmetry, error}),
+    do: %{status: :unsound_symmetry, message: Exception.message(error)}
+
+  defp result_json(result) do
+    %{
+      status: result.status,
+      distinct_states: result.distinct_states,
+      states_found: result.states_found,
+      transitions: result.transitions,
+      diameter: result.diameter,
+      deadlock: result.deadlock,
+      duration_ms: result.duration_ms,
+      fingerprint_bits: result.fingerprint_bits,
+      collision_estimate: result.collision_estimate,
+      warnings: result.warnings,
+      coverage: %{
+        actions: result.coverage.actions,
+        never_enabled: result.coverage.never_enabled,
+        invariants: result.coverage.invariants,
+        vacuous: result.coverage.vacuous,
+        terminal_but_live: result.coverage.terminal_but_live,
+        bounded_by: result.coverage.bounded_by
+      },
+      violation: violation_json(result.violation)
+    }
   end
 
   defp violation_json(nil), do: nil
@@ -225,13 +274,24 @@ defmodule Mix.Tasks.Tla.Check do
 
   # ── Exit ────────────────────────────────────────────────────────────────────
 
+  defp status_of({:unsound_symmetry, _error}), do: :unsound_symmetry
+  defp status_of(result), do: result.status
+
   defp exit_with(results, opts) do
-    statuses = Enum.map(results, fn {_module, result} -> result.status end)
-    coverages = Enum.map(results, fn {_module, result} -> result.coverage end)
+    statuses = Enum.map(results, fn {_module, result} -> status_of(result) end)
+
+    coverages =
+      for {_module, %{coverage: coverage}} <- results, do: coverage
+
     allow_incomplete = Keyword.get(opts, :allow_incomplete, false)
     strict = Keyword.get(opts, :strict_coverage, false)
 
     cond do
+      # A wrong `symmetry:` is a failure of the same kind as a violation: the answer the
+      # run gave cannot be trusted.
+      :unsound_symmetry in statuses ->
+        exit({:shutdown, 1})
+
       :violation in statuses ->
         exit({:shutdown, 1})
 

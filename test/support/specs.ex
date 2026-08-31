@@ -343,6 +343,41 @@ defmodule TLA.TestSpecs do
     fairness(:weak, [:give_up])
   end
 
+  defmodule Asymmetric do
+    @moduledoc """
+    Symmetric in shape and not in fact: the invariant names one process by name. A
+    `symmetry: [:processes]` declaration over this spec is unsound, and
+    `verify_symmetry: true` is what says so (`08-decisions.md` D-17).
+    """
+    use TLA.Spec
+
+    constant :processes
+
+    variable :flag, type: ^processes | :none
+
+    init do
+      flag = :none
+    end
+
+    # A literal list rather than `^processes`, so the order the states are discovered
+    # in is the spec's and not a set's — and the collapse this fixture is about is the
+    # same on every run.
+    action :set, params: [p: [:p1, :p2]] do
+      require flag == :none
+      flag = p
+    end
+
+    invariant :never_p2 do
+      flag != :p2
+    end
+
+    # Setting the flag ends the spec; without this the run stops on the deadlock and
+    # both sides report a violation, for different reasons.
+    terminal :settled do
+      flag != :none
+    end
+  end
+
   defmodule Terminating do
     @moduledoc "A spec that ends on purpose (§5.3): the end state is declared."
     use TLA.Spec
