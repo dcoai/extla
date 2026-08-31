@@ -22,6 +22,11 @@ defmodule TLA.GenServer.Runtime do
   alias TLA.ModelChecker.Safety
   alias TLA.{Spec, State, Temporal}
 
+  @typedoc """
+  What a check found: nothing, or the violation it would have raised.
+  """
+  @type finding :: :ok | {:violation, Violation.t()}
+
   @context_key {__MODULE__, :context}
   @trace_key {__MODULE__, :trace}
   @default_trace_buffer 1000
@@ -83,6 +88,12 @@ defmodule TLA.GenServer.Runtime do
   """
   @spec check_step!(module(), atom(), map(), State.t(), State.t()) :: :ok | no_return()
   def check_step!(spec_module, action_name, params, pre, post) do
+    raising(check_step(spec_module, action_name, params, pre, post))
+  end
+
+  @doc "The refinement check, returning the finding instead of raising it."
+  @spec check_step(module(), atom(), map(), State.t(), State.t()) :: finding()
+  def check_step(spec_module, action_name, params, pre, post) do
     %{spec: spec, constants: constants} = context(spec_module)
     action = action!(spec, action_name)
     :ok = params!(action, params, spec)
@@ -96,13 +107,13 @@ defmodule TLA.GenServer.Runtime do
 
     cond do
       enabled == [] ->
-        raise not_enabled(spec, action, params, pre, candidates)
+        {:violation, not_enabled(spec, action, params, pre, candidates)}
 
       Enum.any?(enabled, &(action.transition.(constants, pre, &1) == post)) ->
         :ok
 
       true ->
-        raise diverged(spec, action, constants, enabled, pre, post)
+        {:violation, diverged(spec, action, constants, enabled, pre, post)}
     end
   end
 
@@ -119,9 +130,23 @@ defmodule TLA.GenServer.Runtime do
   """
   @spec check_transition!(module(), module(), term(), State.t(), State.t()) :: :ok | no_return()
   def check_transition!(spec_module, refinement, message, pre, post) do
+    raising(check_transition(spec_module, refinement, message, pre, post))
+  end
+
+  @doc """
+  The same, returning the finding instead of raising it.
+
+  Every check in this module has this pair, and the reason is `TLA.Replay`: a replay
+  reports *which step* failed and carries on being a value, which is not something that
+  can be built out of an exception without catching one. So the checks return findings and
+  the `!` forms raise them — the wrapper needs the raise, the report needs the value, and
+  neither is derived from the other by rescuing.
+  """
+  @spec check_transition(module(), module(), term(), State.t(), State.t()) :: finding()
+  def check_transition(spec_module, refinement, message, pre, post) do
     case refinement.abstract_action(message) do
-      {action, params} -> check_step!(spec_module, action, params, pre, post)
-      :unmapped -> check_stuttering!(spec_module, pre, post)
+      {action, params} -> check_step(spec_module, action, params, pre, post)
+      :unmapped -> check_stuttering(spec_module, pre, post)
     end
   end
 
@@ -134,22 +159,35 @@ defmodule TLA.GenServer.Runtime do
   """
   @spec check_stuttering!(module(), State.t(), State.t()) :: :ok | no_return()
   def check_stuttering!(spec_module, pre, post) do
+    raising(check_stuttering(spec_module, pre, post))
+  end
+
+  @doc "The same, returning the finding instead of raising it."
+  @spec check_stuttering(module(), State.t(), State.t()) :: finding()
+  def check_stuttering(spec_module, pre, post) do
     if pre == post do
       :ok
     else
-      raise %Violation{
-        kind: :unmapped_but_moved,
-        spec: spec_module,
-        pre: pre,
-        post: post,
-        diff: for(var <- State.changed_vars({pre, post}), do: {var, pre[var], post[var]})
-      }
+      {:violation,
+       %Violation{
+         kind: :unmapped_but_moved,
+         spec: spec_module,
+         pre: pre,
+         post: post,
+         diff: for(var <- State.changed_vars({pre, post}), do: {var, pre[var], post[var]})
+       }}
     end
   end
 
   @doc "Check the spec's invariants against an abstract state."
   @spec check_spec_invariants!(module(), State.t()) :: :ok | no_return()
   def check_spec_invariants!(spec_module, abstract) do
+    raising(check_spec_invariants(spec_module, abstract))
+  end
+
+  @doc "The same, returning the finding instead of raising it."
+  @spec check_spec_invariants(module(), State.t()) :: finding()
+  def check_spec_invariants(spec_module, abstract) do
     %{spec: spec, constants: constants} = context(spec_module)
 
     case Safety.check_invariants(spec, constants, abstract) do
@@ -157,13 +195,19 @@ defmodule TLA.GenServer.Runtime do
         :ok
 
       {:violation, name} ->
-        raise %Violation{kind: :invariant, spec: spec_module, name: name, post: abstract}
+        {:violation, %Violation{kind: :invariant, spec: spec_module, name: name, post: abstract}}
     end
   end
 
   @doc "Check the spec's action properties against an abstract transition."
   @spec check_action_properties!(module(), State.t(), State.t()) :: :ok | no_return()
   def check_action_properties!(spec_module, pre, post) do
+    raising(check_action_properties(spec_module, pre, post))
+  end
+
+  @doc "The same, returning the finding instead of raising it."
+  @spec check_action_properties(module(), State.t(), State.t()) :: finding()
+  def check_action_properties(spec_module, pre, post) do
     %{spec: spec, constants: constants} = context(spec_module)
 
     case Safety.check_action_properties(spec, constants, pre, post) do
@@ -171,13 +215,14 @@ defmodule TLA.GenServer.Runtime do
         :ok
 
       {:violation, name} ->
-        raise %Violation{
-          kind: :action_property,
-          spec: spec_module,
-          name: name,
-          pre: pre,
-          post: post
-        }
+        {:violation,
+         %Violation{
+           kind: :action_property,
+           spec: spec_module,
+           name: name,
+           pre: pre,
+           post: post
+         }}
     end
   end
 
@@ -288,6 +333,9 @@ defmodule TLA.GenServer.Runtime do
       true -> :holds
     end
   end
+
+  defp raising(:ok), do: :ok
+  defp raising({:violation, violation}), do: raise(violation)
 
   # ── Candidates, and the two ways a step fails ───────────────────────────────
 

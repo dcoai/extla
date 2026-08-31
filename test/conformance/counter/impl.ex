@@ -36,6 +36,74 @@ defmodule TLA.Conformance.Counter.Impl do
     def handle_call(:get, _from, state), do: {:reply, state.value, state}
   end
 
+  defmodule FaithfulToABuggySpec do
+    @moduledoc """
+    Refines `BuggySpec` exactly — and `BuggySpec` contradicts itself, so the trace the
+    model checker produces from it is a behaviour this server really performs. That is the
+    loop `TLA.Replay.counterexample/3` closes: a design bug found before the code existed,
+    run against the code.
+    """
+    use GenServer
+
+    use TLA.GenServer,
+      spec: TLA.Conformance.Counter.BuggySpec,
+      refinement: TLA.Conformance.Counter.Refinement
+
+    def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+    @impl true
+    def init(_opts), do: {:ok, %{value: 0, status: :ready}}
+
+    @impl true
+    def handle_call(:increment, _from, state) do
+      {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+    end
+
+    def handle_call(:done, _from, state), do: {:reply, :ok, %{state | status: :ready}}
+  end
+
+  defmodule RefusesDone do
+    @moduledoc """
+    Conforms as far as it goes, and has no clause for `:done`. A counterexample that calls
+    for one cannot be followed — which is a finding about the pair rather than a
+    conformance violation, and is reported as `:not_followed`.
+    """
+    use GenServer
+
+    use TLA.GenServer,
+      spec: TLA.Conformance.Counter.Spec,
+      refinement: TLA.Conformance.Counter.Refinement
+
+    def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+    @impl true
+    def init(_opts), do: {:ok, %{value: 0, status: :ready}}
+
+    @impl true
+    def handle_call(:increment, _from, state) do
+      {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+    end
+  end
+
+  defmodule Undrivable do
+    @moduledoc "Correct, and its mapping defines no `concrete_message/2`."
+    use GenServer
+
+    use TLA.GenServer,
+      spec: TLA.Conformance.Counter.Spec,
+      refinement: TLA.Conformance.Counter.Mutants.Undrivable
+
+    def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+    @impl true
+    def init(_opts), do: {:ok, %{value: 0, status: :ready}}
+
+    @impl true
+    def handle_call(:increment, _from, state) do
+      {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+    end
+  end
+
   defmodule CollapsesTwoSteps do
     @moduledoc """
     Example 4's bug. `increment` also does `done`'s work, so two abstract steps happen in

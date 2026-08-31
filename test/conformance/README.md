@@ -78,6 +78,28 @@ that checked only invariants and action properties would report conformance. It 
 ordinary bug, not a corner case: an implementation taking a shortcut the design never
 sanctioned.
 
+## `counter` — replay
+
+`BuggySpec` is the same counter with a design bug written into it: `increment` runs up to
+`max_val` and the invariant says the count never exceeds two. Nothing about the
+implementation is wrong — the specification contradicts itself, `mix tla.check` finds it
+before any code exists, and `Impl.FaithfulToABuggySpec` refines it exactly. A spec whose
+invariant no behaviour violates cannot produce a counterexample, which is why this entry
+exists at all.
+
+| Case | Implementation | Verdict |
+|---|---|---|
+| the model checker's counterexample, replayed | `FaithfulToABuggySpec` | `:violation`, `:invariant`, at the step the trace reaches `count: 3` |
+| a trace calling for a message the server has no clause for | `RefusesDone` | `:not_followed` — "permits a behaviour the implementation does not take" |
+| a trace whose expected post-state the server does not reach | `Conforming` | `:not_followed`, with both abstract states |
+| a mapping with no `concrete_message/2` | `Undrivable` | `:not_followed`, named rather than an undefined function |
+| a captured trace the spec permits | `Conforming` | `:ok`, 3 steps |
+| a captured trace with Example 4's bug in it | `Conforming` | `:violation`, `:diverged`, at step 3 |
+
+`:not_followed` is deliberately not a conformance failure. It says the spec permits a
+behaviour the code does not take, which is a finding about the pair — one of the two is
+wrong, and which one is not something the checker can decide.
+
 ## What `validate!/3` does not decide
 
 Three of §05's five rules are decidable where it runs and two are not, and the return
