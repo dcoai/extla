@@ -6,11 +6,10 @@ defmodule TLA.Differential.TwoPhaseCommit do
   restated, so a disagreement with TLC points at the checker rather than at a
   translation choice.
 
-  One deliberate weakening: TLA+'s `TPTypeOK` includes `msgs \\subseteq Message`,
-  which constrains the shape of every message in the set. The §1.5 grammar has no
-  element-typed set, so `msgs` is `:set` here. Both invariants hold either way, so
-  the comparison is unaffected — but the gap is real and is filed as its own
-  proposal.
+  `type_ok` checks what TLA+'s `TPTypeOK` checks, field for field: §1.5's
+  `set(t)` and record forms say `msgs \\subseteq Message` in the DSL. Until they
+  existed this entry declared `msgs` as `:set` and checked strictly less than TLC
+  did — an entry that can agree with the oracle for the wrong reason.
   """
   use TLA.Spec
 
@@ -18,8 +17,12 @@ defmodule TLA.Differential.TwoPhaseCommit do
 
   variable :rm_state, type: [^rms ~> [:working, :prepared, :committed, :aborted]]
   variable :tm_state, type: [:init, :done]
-  variable :tm_prepared, type: :set
-  variable :msgs, type: :set
+  variable :tm_prepared, type: set(^rms)
+
+  # TLA+'s `Message`, element for element:
+  #   [type : {"Prepared"}, rm : RM] \\cup [type : {"Commit", "Abort"}, rm : {"tm"}]
+  variable :msgs,
+    type: set(%{type: :prepared, rm: ^rms} | %{type: [:commit, :abort], rm: :tm})
 
   init do
     rm_state = for_each(^rms, fn _ -> :working end)

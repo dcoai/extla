@@ -19,7 +19,9 @@ defmodule TLA.Spec.Type do
   | `t1 \\| t2` | Union — a value of either type |
   | `{t1, t2, …}` | A tuple of that arity, element-wise |
   | `[dom ~> rng]` | A map whose keys are exactly `dom` and whose values are in `rng` |
-  | `:set`, `:seq` | Any `MapSet` / any list |
+  | `%{k: t, …}` | A record: a map with exactly these keys, each value of its type |
+  | `:set`, `:seq` | Any `MapSet` / any list, elements unconstrained |
+  | `set(t)`, `seq(t)` | A `MapSet` / list whose every element is of type `t` |
   | `:int`, `:nat` | Any integer / any non-negative integer |
   """
 
@@ -93,6 +95,38 @@ defmodule TLA.Spec.Type do
     check!(rng, constants, opts)
   end
 
+  # `set(t)` / `seq(t)` — a collection whose elements are all of type `t`. A call
+  # form rather than `{:set, t}`, which would collide with the tuple type: that
+  # is already a legal tuple of the literal atom `:set` and a `t`. Bare `:set`
+  # keeps its meaning of "any MapSet".
+  defp check!({collection, _meta, [element]}, constants, opts) when collection in [:set, :seq] do
+    check!(element, constants, opts)
+  end
+
+  defp check!({collection, meta, args}, _constants, opts)
+       when collection in [:set, :seq] and is_list(args) do
+    bad!(opts, meta, "#{collection}/#{length(args)} takes exactly one element type",
+      hint:
+        "Write `#{collection}(t)` for a #{collection} of `t`s, or bare `:#{collection}` " <>
+          "for one whose elements are unconstrained."
+    )
+  end
+
+  # `%{k: t, …}` — a record. TLA+ writes the same thing as a record set,
+  # `[type : {"Prepared"}, rm : RM]`, and a message set is the reason it is here:
+  # without it, `set(t)` has nothing useful to say about a set of records.
+  defp check!({:%{}, meta, pairs}, constants, opts) when is_list(pairs) do
+    Enum.each(pairs, fn
+      {key, type} when is_atom(key) or is_binary(key) or is_integer(key) ->
+        check!(type, constants, opts)
+
+      other ->
+        bad!(opts, meta, "a record type's keys must be literals, got: #{Macro.to_string(other)}",
+          hint: "Write `%{type: :prepared, rm: ^rms}` — each key literal, each value a type."
+        )
+    end)
+  end
+
   # `[:a, :b]` — one of the listed literals.
   defp check!(list, constants, opts) when is_list(list) do
     Enum.each(list, fn element ->
@@ -123,7 +157,9 @@ defmodule TLA.Spec.Type do
           t1 | t2               union
           {t1, t2}              a tuple, element-wise
           [dom ~> rng]          a map with keys exactly dom and values in rng
-          :set | :seq           any MapSet / any list\
+          %{k: t, ...}          a record: exactly these keys, each of its type
+          :set | :seq           any MapSet / any list
+          set(t) | seq(t)       a MapSet / list whose elements are all `t`\
       """
     )
   end
@@ -138,7 +174,18 @@ defmodule TLA.Spec.Type do
   # applied to 1. A range whose low bound is negative is ordinary enough --
   # Paxos's `maxBal` is `-1` until the acceptor promises something -- that
   # rejecting it would be rejecting the type the spec actually has.
-  defp check_bound!({:-, _meta, [bound]}, _constants, _opts) when is_integer(bound), do: :ok
+  defp check_bound!({:-, _meta, [bound]}, constants, opts),
+    do: check_bound!(bound, constants, opts)
+
+  # Arithmetic over bounds, resolved with the constants at check time. A bound
+  # one short of a constant is what a sequence of numbered items has --
+  # `seq: 0..(^max_items - 1)` -- and writing it any other way would mean typing
+  # the variable weaker than the spec means it.
+  defp check_bound!({op, _meta, [left, right]}, constants, opts)
+       when op in [:+, :-, :*, :div] do
+    check_bound!(left, constants, opts)
+    check_bound!(right, constants, opts)
+  end
 
   defp check_bound!(other, _constants, opts) do
     bad!(
@@ -181,6 +228,9 @@ defmodule TLA.Spec.Type do
           | {:union, [resolved()]}
           | {:tuple, [resolved()]}
           | {:function, MapSet.t(), resolved()}
+          | {:record, %{term() => resolved()}}
+          | {:set_of, resolved()}
+          | {:seq_of, resolved()}
           | :set
           | :seq
           | :int
@@ -246,6 +296,16 @@ defmodule TLA.Spec.Type do
      resolve!(range, constants, where)}
   end
 
+  def resolve!({:set, _, [element]}, constants, where),
+    do: {:set_of, resolve!(element, constants, where)}
+
+  def resolve!({:seq, _, [element]}, constants, where),
+    do: {:seq_of, resolve!(element, constants, where)}
+
+  def resolve!({:%{}, _, pairs}, constants, where) when is_list(pairs) do
+    {:record, Map.new(pairs, fn {key, type} -> {key, resolve!(type, constants, where)} end)}
+  end
+
   # Every element was checked to be a literal at compile time, so the list IS the
   # set of permitted values. Note that `[:set]` therefore means the literal atom
   # `:set`, while a bare `:set` means any MapSet — inside a list there is nothing
@@ -287,7 +347,12 @@ defmodule TLA.Spec.Type do
 
   defp bound!(bound, _constants, _where) when is_integer(bound), do: bound
 
-  defp bound!({:-, _meta, [bound]}, _constants, _where) when is_integer(bound), do: -bound
+  defp bound!({:-, _meta, [bound]}, constants, where), do: -bound!(bound, constants, where)
+
+  defp bound!({:+, _, [l, r]}, c, w), do: bound!(l, c, w) + bound!(r, c, w)
+  defp bound!({:-, _, [l, r]}, c, w), do: bound!(l, c, w) - bound!(r, c, w)
+  defp bound!({:*, _, [l, r]}, c, w), do: bound!(l, c, w) * bound!(r, c, w)
+  defp bound!({:div, _, [l, r]}, c, w), do: div(bound!(l, c, w), bound!(r, c, w))
 
   @doc """
   Whether a value inhabits a resolved type.
@@ -311,6 +376,26 @@ defmodule TLA.Spec.Type do
     is_map(value) and not is_struct(value) and
       MapSet.new(Map.keys(value)) == domain and
       Enum.all?(Map.values(value), &member?(range, &1))
+  end
+
+  def member?({:set_of, element}, value),
+    do: is_struct(value, MapSet) and Enum.all?(value, &member?(element, &1))
+
+  def member?({:seq_of, element}, value),
+    do: is_list(value) and Enum.all?(value, &member?(element, &1))
+
+  # A record's keys are exactly those declared, for the same reason a function's
+  # domain is exactly its declared domain: a message with a field the spec never
+  # gave it is the shape error this type exists to catch.
+  def member?({:record, fields}, value) do
+    is_map(value) and not is_struct(value) and
+      map_size(value) == map_size(fields) and
+      Enum.all?(fields, fn {key, type} ->
+        case Map.fetch(value, key) do
+          {:ok, field} -> member?(type, field)
+          :error -> false
+        end
+      end)
   end
 
   def member?(:set, value), do: is_struct(value, MapSet)
@@ -394,6 +479,16 @@ defmodule TLA.Spec.Type do
 
   def describe({:function, domain, range}),
     do: "a map with keys #{inspect(MapSet.to_list(domain))} and values in #{describe(range)}"
+
+  def describe({:set_of, element}), do: "a MapSet of #{describe(element)}"
+  def describe({:seq_of, element}), do: "a list of #{describe(element)}"
+
+  def describe({:record, fields}) do
+    "%{" <>
+      (fields
+       |> Enum.sort_by(fn {key, _} -> key end)
+       |> Enum.map_join(", ", fn {key, type} -> "#{key}: #{describe(type)}" end)) <> "}"
+  end
 
   def describe(:set), do: "a MapSet"
   def describe(:seq), do: "a list"

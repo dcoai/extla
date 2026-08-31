@@ -61,6 +61,15 @@ defmodule TLA.Spec.TypeTest do
       end
     end
 
+    # `0..(^max_items - 1)` is what a sequence of numbered items has, and writing
+    # it any other way would type the variable weaker than the spec means it.
+    test "a bound may be arithmetic over constants" do
+      type = resolve(quote(do: 0..(^max - 1)), %{max: 3})
+
+      assert Type.member?(type, 2)
+      refute Type.member?(type, 3)
+    end
+
     # `-1` is unary minus applied to 1 in the AST, not an integer literal, so
     # this had to be spelled out. Paxos's `maxBal` is -1 until the acceptor
     # promises something, and a grammar that cannot say so cannot type the spec.
@@ -71,6 +80,68 @@ defmodule TLA.Spec.TypeTest do
       assert Type.member?(type, 2)
       refute Type.member?(type, -2)
       refute Type.member?(type, 3)
+    end
+  end
+
+  describe "element-typed collections" do
+    test "set(t) constrains every element" do
+      type = resolve(quote(do: set(^values)), %{values: MapSet.new([:v1, :v2])})
+
+      assert Type.member?(type, MapSet.new([:v1]))
+      assert Type.member?(type, MapSet.new())
+      refute Type.member?(type, MapSet.new([:v1, :nope]))
+      refute Type.member?(type, [:v1])
+    end
+
+    test "seq(t) constrains every element, and a sequence is a list" do
+      type = resolve(quote(do: seq(0..2)))
+
+      assert Type.member?(type, [0, 2, 1])
+      assert Type.member?(type, [])
+      refute Type.member?(type, [0, 3])
+      refute Type.member?(type, MapSet.new([0]))
+    end
+
+    # `{:set, t}` would have been terser, and is already a legal tuple type of
+    # the literal atom `:set` and a `t`. Bare `:set` keeps meaning "any MapSet".
+    test "bare :set and :seq still mean any MapSet and any list" do
+      assert Type.member?(resolve(quote(do: :set)), MapSet.new([:anything, 1]))
+      assert Type.member?(resolve(quote(do: :seq)), [:anything, 1])
+    end
+
+    test "a record's keys are exactly those declared" do
+      type = resolve(quote(do: %{type: :prepared, rm: ^rms}), %{rms: MapSet.new([:r1])})
+
+      assert Type.member?(type, %{type: :prepared, rm: :r1})
+      refute Type.member?(type, %{type: :prepared, rm: :r9})
+      refute Type.member?(type, %{type: :commit, rm: :r1})
+      # A field the spec never gave it is the shape error this type catches.
+      refute Type.member?(type, %{type: :prepared, rm: :r1, extra: 1})
+      refute Type.member?(type, %{type: :prepared})
+    end
+
+    # TLA+'s Message is a union of record sets, and a message set is why the
+    # record form is here at all.
+    test "a set of records, as TLA+'s `msgs \\subseteq Message`" do
+      type =
+        resolve(
+          quote(do: set(%{type: :prepared, rm: ^rms} | %{type: [:commit, :abort], rm: :tm})),
+          %{rms: MapSet.new([:r1, :r2])}
+        )
+
+      assert Type.member?(
+               type,
+               MapSet.new([%{type: :prepared, rm: :r1}, %{type: :commit, rm: :tm}])
+             )
+
+      refute Type.member?(type, MapSet.new([%{type: :prepared, rm: :tm}]))
+    end
+
+    test "a violation message names the element type" do
+      type = resolve(quote(do: set(0..2)))
+
+      assert Type.describe(type) == "a MapSet of 0..2"
+      assert Type.describe(resolve(quote(do: %{a: :nat}))) == "%{a: a non-negative integer}"
     end
   end
 
@@ -216,6 +287,39 @@ defmodule TLA.Spec.TypeTest do
       assert message =~ "type_ok"
       assert message =~ "status = :exploded"
       assert message =~ ":idle | :busy"
+    end
+
+    # pm-11's acceptance: a malformed element is a reported violation naming the
+    # variable, the element and the type it is not. Before `set(t)` existed this
+    # spec checked out fine, because `:set` says nothing about what is in it.
+    test "a malformed element of a set is a type_ok violation, not a silent pass" do
+      defmodule BadMessage do
+        use TLA.Spec
+
+        variable :msgs, type: set(%{to: [:a, :b], n: :nat})
+
+        init do
+          msgs = set()
+        end
+
+        action :send_good do
+          msgs = put(msgs, %{to: :a, n: 1})
+        end
+
+        action :send_bad do
+          msgs = put(msgs, %{to: :c, n: 1})
+        end
+      end
+
+      result = ModelChecker.run(BadMessage, %{})
+
+      assert result.status == :violation
+      assert result.violation.property == :type_ok
+
+      message = result.violation.message
+      assert message =~ "msgs"
+      assert message =~ "to: :c"
+      assert message =~ "a MapSet of %{n: a non-negative integer, to: :a | :b}"
     end
 
     test "can be selected and deselected like any other invariant" do
