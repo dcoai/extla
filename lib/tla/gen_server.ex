@@ -91,6 +91,12 @@ defmodule TLA.GenServer do
       wrapped = env.module |> Module.get_attribute(:tla_wrapped, []) |> Enum.uniq()
 
       quote do
+        @doc false
+        def __tla_spec_module__, do: @tla_spec
+
+        @doc false
+        def __tla_refinement__, do: @tla_refinement
+
         unquote(init_wrapper(wrapped))
 
         unquote_splicing(

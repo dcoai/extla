@@ -47,3 +47,44 @@ defmodule TLA.Conformance.Counter.Spec do
 
   fairness(:weak, [:done])
 end
+
+defmodule TLA.Conformance.Counter.BuggySpec do
+  @moduledoc """
+  The same counter with a design bug in it: `increment` may run up to `max_val`, and the
+  invariant says the count never exceeds two. Nothing about the implementation is wrong —
+  the specification contradicts itself, and `mix tla.check` finds it before any code
+  exists.
+
+  This entry is what `TLA.Replay.counterexample/3` is measured on. A counterexample is
+  only worth having if it can be run against the code, and a spec whose invariant no
+  behaviour violates cannot produce one.
+  """
+  use TLA.Spec
+
+  constant :max_val, default: 5
+
+  variable :count, type: 0..^max_val
+  variable :status, type: [:ready, :incrementing]
+
+  init do
+    count = 0
+    status = :ready
+  end
+
+  action :increment do
+    require status == :ready
+    require count < ^max_val
+
+    count = count + 1
+    status = :incrementing
+  end
+
+  action :done do
+    require status == :incrementing
+    status = :ready
+  end
+
+  invariant :at_most_two do
+    count <= 2
+  end
+end

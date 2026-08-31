@@ -34,6 +34,23 @@ defmodule TLA.Conformance.Counter.Mutants do
   in `test/conformance/README.md` until there is something to check them with.
   """
 
+  defmodule Undrivable do
+    @moduledoc """
+    A mapping that is correct and defines no `concrete_message/2`. Not a fault: the
+    callback is optional, and such an implementation can be *checked* as it runs. It
+    cannot be *driven*, and `TLA.Replay` has to say so by name rather than fail with an
+    undefined function.
+    """
+    use TLA.Refinement
+
+    def abstract(%{value: v, status: s}), do: %{count: v, status: s}
+
+    def abstract_action(:increment), do: {:increment, %{}}
+    def abstract_action(:done), do: {:done, %{}}
+    def abstract_action(:reset), do: {:reset, %{}}
+    def abstract_action(_), do: :unmapped
+  end
+
   defmodule MissingVariable do
     @moduledoc "Maps `count` and forgets `status`. Caught by `abstract!/3`, at runtime."
     use TLA.Refinement

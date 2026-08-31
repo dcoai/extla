@@ -330,7 +330,8 @@ rather than ahead of it.
 - `TLA.GenServer`, `TLA.GenServer.Runtime` — including `check_step!/5`, the
   refinement check that is the point of the layer, and `TLA.GenServer.Violation`,
   whose `:diverged` diff is the layer's primary output
-- `TLA.Replay` — counterexample replay and captured-trace validation
+- `TLA.Replay` — counterexample replay and captured-trace validation, and the
+  reporting forms of each `TLA.GenServer.Runtime` check that a replay is built from
 - `TLA.Simulation`, `TLA.Simulation.Generator`
 - `Mix.Tasks.Tla.Simulate`, `Mix.Tasks.Tla.Replay`
 

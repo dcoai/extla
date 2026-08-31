@@ -422,17 +422,55 @@ defmodule TLA.Replay do
   def trace(genserver_module, captured, opts \\ [])
 
   @type result :: %{
-    status: :ok | :violation,
+    # `:not_followed` is a third outcome, and it is not a conformance failure.
+    # The implementation would not take a step the trace calls for -- it has no
+    # clause for the message, it stopped, it timed out, or it took a DIFFERENT
+    # legal step and landed elsewhere. Each says the spec permits a behaviour
+    # the code does not, which is a finding about the pair rather than about the
+    # implementation, and collapsing it into `:violation` would report the code
+    # as wrong when the specification may be.
+    status: :ok | :violation | :not_followed,
     steps_checked: non_neg_integer(),
     violation: %{
       step: non_neg_integer(),
       kind: :not_enabled | :diverged | :unmapped_but_moved
             | :invariant | :action_property,
+      action: atom() | nil,
+      message: term(),
       detail: String.t()
-    } | nil
+    } | nil,
+
+    # Why a `:not_followed` was not followed. `nil` otherwise.
+    detail: String.t() | nil
   }
 end
 ```
+
+### Every check has a reporting form beside its raising one
+
+`TLA.GenServer.Runtime` gains `check_transition/5`, `check_step/5`, `check_stuttering/3`,
+`check_spec_invariants/2` and `check_action_properties/3`, each returning
+`:ok | {:violation, TLA.GenServer.Violation.t()}`; the `!` forms raise what they return.
+
+A replay reports **which step** failed and goes on being a value. That cannot be built out
+of the exception the wrapper raises without catching it, and the pair is the honest shape
+anyway: the wrapper needs a raise, the report needs a value, and neither is derived from
+the other.
+
+### The trace's own states are checked, not only the steps' legality
+
+An implementation may take a legal step that is not the step the counterexample took —
+where an action is nondeterministic, `concrete_message/2` cannot always name the binding
+the trace chose. A replay that only asked "was each step legal" would call that a
+reproduction. After each message the implementation's abstract state is compared with the
+trace's, and a mismatch is `:not_followed` with both states in the detail.
+
+### Replaying a lasso
+
+`counterexample/3` accepts a `TLA.Trace.lasso()` and replays the prefix followed by **one
+pass** of the cycle. A lasso describes a behaviour that repeats forever; one pass is what
+can be executed, and the liveness claim it stands for is not something a finite run can
+reproduce.
 
 ---
 
