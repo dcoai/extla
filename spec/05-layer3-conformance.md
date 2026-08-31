@@ -220,13 +220,16 @@ defmodule TLA.GenServer do
       @tla_spec unquote(spec_module)
       @tla_refinement unquote(refinement_module)
 
-      Module.register_attribute(__MODULE__, :tla_action_mappings, accumulate: true)
-
       @before_compile TLA.GenServer
     end
   end
 end
 ```
+
+An earlier draft of this macro also registered `:tla_action_mappings`. Nothing
+accumulates into it: the mappings live in the refinement module, which is where
+`abstract_action/1` is defined, and the attribute was a leftover from a design in which
+they were declared in the server. Dropped rather than carried.
 
 ### Compile-Time Transformation
 
@@ -248,16 +251,10 @@ def handle_call(msg, from, state) do
   # is supposed to be; the spec is then applied and its result compared. This is
   # what makes the layer a conformance check rather than an invariant check on a
   # projection.
-  case @tla_refinement.abstract_action(msg) do
-    {action, params} ->
-      TLA.GenServer.Runtime.check_step!(
-        @tla_spec, action, params, pre_abstract, post_abstract
-      )
-
-    :unmapped ->
-      # A message with no spec counterpart must not move the abstract state.
-      TLA.GenServer.Runtime.check_stuttering!(@tla_spec, pre_abstract, post_abstract)
-  end
+  # The dispatch is a call rather than a `case` HERE -- see below.
+  TLA.GenServer.Runtime.check_transition!(
+    @tla_spec, @tla_refinement, msg, pre_abstract, post_abstract
+  )
 
   TLA.GenServer.Runtime.check_spec_invariants!(@tla_spec, post_abstract)
   TLA.GenServer.Runtime.check_action_properties!(@tla_spec, pre_abstract, post_abstract)
@@ -266,6 +263,20 @@ def handle_call(msg, from, state) do
   result
 end
 ```
+
+**The `case` on `abstract_action/1` lives in `Runtime.check_transition!/5`, not in the
+emitted code.** In a module whose messages the compiler can enumerate — a server with one
+callback clause, which is most conformance mutants and some real servers — the call has a
+known return type and one arm of the `case` is provably unreachable. Elixir reports that
+as a warning, in the user's module, about code the user did not write. Behind a `module()`
+argument there is nothing to infer. `init/1`'s `{:ok, state} | :none` tag test is in
+`Runtime.record_initial!/3` for exactly the same reason
+(`03-layer1-invariants.md` §Compile-Time Transformation).
+
+**`init/1` is wrapped too**, for the trace and the spec's invariants. Its result is the
+first abstract state, so there is no step to check — but the state has to be recorded: a
+temporal property over a behaviour that begins at the *second* state is a property of a
+different behaviour.
 
 `check_step!/5` fails in three distinguishable ways, and the error says which:
 
@@ -827,8 +838,50 @@ defmodule TLA.GenServer.Runtime do
   @spec check_temporal_properties(module(), TLA.State.behavior()) ::
     %{atom() => :holds | :violated | :inconclusive}
   def check_temporal_properties(spec_module, behavior)
+
+  @doc """
+  One transition, checked: the step against the action the mapping names, or the
+  stuttering claim `:unmapped` makes. The wrapper calls this rather than
+  `check_step!/5` and `check_stuttering!/3` directly — see §Compile-Time
+  Transformation for why the `case` cannot be emitted.
+  """
+  @spec check_transition!(module(), module(), term(), TLA.State.t(), TLA.State.t()) ::
+    :ok | no_return()
+  def check_transition!(spec_module, refinement, message, pre, post)
+
+  @doc """
+  The first abstract state: mapped, checked against the spec's invariants, and
+  recorded. Takes the raw `init/1` return, because `:ignore` and a bare
+  `{:stop, reason}` produce no state at all.
+  """
+  @spec record_initial!(module(), module(), term()) :: :ok
+  def record_initial!(spec_module, refinement, result)
+
+  @doc """
+  The refinement mapping applied against the memoized compiled spec.
+  `TLA.Refinement.abstract!/3` needs the compiled struct; the wrapper has only the
+  module.
+  """
+  @spec abstract!(module(), module(), map()) :: TLA.State.t()
+  def abstract!(spec_module, refinement, concrete)
+
+  @doc "The behaviour recorded by THIS process, oldest state first."
+  @spec trace() :: TLA.State.behavior()
+  def trace()
 end
 ```
+
+### The compiled spec and the constants are memoized per process
+
+Both are needed on every transition: `__tla_spec__/0` builds its struct on each call, and
+the constants come from application config. They are resolved once per process and kept in
+the process dictionary beside the trace, which is where a GenServer's per-process state
+belongs — and the wrapper always runs inside the server.
+
+**The constants are resolved by `TLA.Spec.Compiled.resolve_constants/1`, the same function
+`mix tla.check` uses.** A specification model checked under one assignment and an
+implementation checked against another are two different specifications, and a verdict
+from each is not a verdict about the same thing.
 
 ---
 

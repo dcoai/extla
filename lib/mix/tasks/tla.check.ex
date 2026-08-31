@@ -150,20 +150,15 @@ defmodule Mix.Tasks.Tla.Check do
   defp maybe_put(config, _key, nil), do: config
   defp maybe_put(config, key, value), do: Map.put(config, key, value)
 
+  # The resolution itself lives on `Spec.Compiled`, so that Layer 3's conformance checking
+  # resolves constants the same way rather than a second way. What is here is the Mix
+  # flavour of the failure.
   defp constants!(spec) do
-    configured =
-      :extla
-      |> Application.get_env(spec.module, [])
-      |> Keyword.get(:constants, %{})
-      |> Map.new()
-
-    constants = Map.merge(Spec.Compiled.default_constants(spec), configured)
-
-    case Spec.Compiled.constant_names(spec) -- Map.keys(constants) do
-      [] ->
+    case Spec.Compiled.resolve_constants(spec) do
+      {:ok, constants} ->
         constants
 
-      missing ->
+      {:error, missing} ->
         Mix.raise("""
         #{inspect(spec.module)} has no assignment for \
         #{Enum.map_join(missing, ", ", &inspect/1)}.
