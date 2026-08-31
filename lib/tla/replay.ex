@@ -29,7 +29,7 @@ defmodule TLA.Replay do
   for; `counterexample/3` says so by name rather than failing with an undefined function.
   """
 
-  alias TLA.GenServer.Runtime
+  alias TLA.GenServer.{Driver, Runtime}
   alias TLA.Trace
 
   @type violation :: %{
@@ -195,28 +195,12 @@ defmodule TLA.Replay do
     end
   end
 
-  # A conformance violation raises inside the server, so it reaches a caller as an exit.
-  # The `:"$gen_call"` is sent directly, tagged with a monitor reference, so the exit
-  # arrives as an ordinary message: a replay reports what happened, and cannot be built by
-  # catching what the wrapper raised.
   defp send_message(server, message, timeout) do
-    ref = Process.monitor(server)
-    send(server, {:"$gen_call", {self(), ref}, message})
-
-    receive do
-      {^ref, reply} ->
-        Process.demonitor(ref, [:flush])
-        {:ok, reply}
-
-      {:DOWN, ^ref, :process, ^server, {%TLA.GenServer.Violation{} = violation, _stack}} ->
-        {:violation, violation}
-
-      {:DOWN, ^ref, :process, ^server, reason} ->
-        {:not_followed, "the server stopped with #{inspect(reason)}"}
-    after
-      timeout ->
-        Process.demonitor(ref, [:flush])
-        {:not_followed, "no reply within #{timeout}ms"}
+    case Driver.call(server, message, timeout) do
+      {:ok, reply} -> {:ok, reply}
+      {:violation, violation} -> {:violation, violation}
+      {:stopped, reason} -> {:not_followed, "the server stopped with #{inspect(reason)}"}
+      {:timeout, ms} -> {:not_followed, "no reply within #{ms}ms"}
     end
   end
 

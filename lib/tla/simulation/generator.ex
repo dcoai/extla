@@ -1,0 +1,65 @@
+defmodule TLA.Simulation.Generator do
+  @moduledoc """
+  Random messages, derived from a spec's own action definitions.
+
+  The spec's `params:` are where nondeterminism lives (`02-dsl-semantics.md` §3), so they
+  are also the domain of possible messages: pick an action, pick a binding of its params
+  from the generators the action declares, and ask the refinement for the concrete message
+  that causes it.
+
+  ## Why the refinement is an argument
+
+  `05-layer3-conformance.md` typed these `from_spec(spec_module, constants)`. A
+  specification has no notion of a message — that is the whole reason
+  `concrete_message/2` exists — so a generator returning one needs the mapping as well.
+  Taking it explicitly is the smallest fix; the alternative, returning `{action, params}`
+  and mapping later, would put half the generator in its caller.
+  """
+
+  alias TLA.{ModelChecker, Spec}
+
+  @doc """
+  A generator over every action, enabled or not.
+
+  Returns `(abstract_state -> {action, params, message}) | nil`, `nil` when nothing can be
+  generated in that state. Messages for disabled actions are the point rather than waste:
+  an implementation that accepts a message the spec forbids in that state is exactly what
+  `check_step!/5` reports as `:not_enabled`, and a generator that never sends one can
+  never find it.
+  """
+  @spec from_spec(module(), module(), map()) :: (TLA.State.t() -> {atom(), map(), term()} | nil)
+  def from_spec(spec_module, refinement, constants) do
+    spec = Spec.Compiled.from_module(spec_module)
+    fn state -> pick(spec, refinement, constants, state, &ModelChecker.bindings/3) end
+  end
+
+  @doc """
+  A generator restricted to actions whose guard holds in the current state.
+
+  Cheaper per step, and the right choice when the question is "does the implementation
+  follow the spec where the spec has something to say" rather than "does it refuse what
+  the spec forbids". A simulation that only ever sends enabled messages cannot produce a
+  `:not_enabled` finding, which is worth knowing before choosing it.
+  """
+  @spec enabled_only(module(), module(), map()) ::
+          (TLA.State.t() -> {atom(), map(), term()} | nil)
+  def enabled_only(spec_module, refinement, constants) do
+    spec = Spec.Compiled.from_module(spec_module)
+    fn state -> pick(spec, refinement, constants, state, &ModelChecker.enabled_bindings/3) end
+  end
+
+  defp pick(spec, refinement, constants, state, bindings_fun) do
+    candidates =
+      for action <- spec.actions,
+          binding <- bindings_fun.(action, constants, state),
+          do: {action.name, binding}
+
+    case candidates do
+      [] -> nil
+      _ -> to_message(refinement, Enum.random(candidates))
+    end
+  end
+
+  defp to_message(refinement, {action, binding}),
+    do: {action, binding, refinement.concrete_message(action, binding)}
+end

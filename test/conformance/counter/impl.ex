@@ -130,6 +130,7 @@ defmodule TLA.Conformance.Counter.Impl do
     end
 
     def handle_call(:done, _from, state), do: {:reply, :ok, %{state | status: :ready}}
+    def handle_call(:reset, _from, state), do: {:reply, :ok, %{state | value: 0}}
   end
 
   defmodule MovesWhileUnmapped do
