@@ -1,5 +1,9 @@
 # HANDOFF — 2026-08-30 — Phase 1 components built, corpus half done
 
+> **SUPERSEDED by `HANDOFF-2026-08-31-phase1-done.md`.** The three remaining
+> corpus entries are in and Phase 1's acceptance gate is met. Kept as the record
+> of what the system looked like with half a corpus.
+
 Supersedes `HANDOFF-2026-08-30-ci-and-phase1.md`, whose blocker (a dead
 ssh-agent socket) turned out to be fixed by reconnecting with agent forwarding.
 This file is self-contained; read it first.
