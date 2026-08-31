@@ -259,6 +259,14 @@ Two more consequences worth stating:
 - `init/1` is wrapped for invariants only. Its result IS the first state, so there is
   no pre-state for an action property or a postcondition to compare against, and no
   earlier message for a precondition to be about.
+- **An `init/1` that produces no state is checked against nothing.** `:ignore` and a bare
+  `{:stop, reason}` are refusals to start, and an invariant evaluated against the absence
+  of a state reports a violation of a predicate that was never given anything to be about.
+  The wrapper calls `Runtime.check_initial_invariants!/4`, which returns `:ok` for both.
+  The tag test lives in `Runtime` rather than in the emitted code because inside a given
+  module `super(arg)` has a known return type, and a `case` on the tag then has a clause
+  the compiler can prove unreachable — reported as a warning, in the user's module, about
+  code the user did not write.
 
 ### `:disabled` emits nothing
 
@@ -382,7 +390,51 @@ Layer 1 supports invariant checking for:
 | `GenServer` | `init/1`, `handle_call/3`, `handle_cast/2`, `handle_info/2`, `handle_continue/2` | Primary target |
 | `GenStateMachine` | `handle_event/4` | State + data checked |
 | `:gen_statem` | `handle_event/4` | Erlang behavior support |
-| `Agent` | `fun` passed to `Agent.update/get` | Via wrapper |
+| `Agent` | `fun` passed to `Agent.update/get` | Via `TLA.Invariant.Agent` |
+
+### What a state machine's `state` is, and what its message is
+
+**`state` is the `{state_name, data}` pair**, in an `invariant` and in an
+`action_property` alike, which is what §GenStateMachine Integration below destructures.
+The pair is built in the wrapper from two of the callback's arguments so that every
+declaration is written against one `state` whatever behaviour carries it.
+
+**A precondition matches the event CONTENT**, not `{event_type, content}`. A
+`precondition {:withdraw, amount}` is then the same declaration on a GenServer and on a
+state machine, and a pattern never has to know whether the message arrived as a call, a
+cast or an info. (D-24.)
+
+Three consequences:
+
+- **A module that defines `handle_event/4` is instrumented as a state machine**, and that
+  decides how its `init/1` is read as well: a GenServer's returns `{:ok, state}`, a state
+  machine's returns `{:ok, state_name, data}`, and the shared extraction would otherwise
+  take the state *name* for the whole state.
+- **`:gen_statem`'s returns get their own extraction**, `extract_statem_state/2`. They are
+  a different language from a GenServer's and one shape collides: `{:stop, reason, data}`
+  carries DATA where a GenServer's `{:stop, reason, state}` carries the whole state. One
+  function cannot answer both.
+- **`:state_functions` mode is not instrumented.** Its transitions live in functions named
+  after the states, which `@on_definition` has no way to recognise. `handle_event/4` — the
+  `:handle_event_function` mode — is what this section specifies.
+
+### An `Agent`'s checks cannot be compiled away
+
+`TLA.Invariant.Agent` wraps `start_link/3`, `update/4`, `cast/3`, `get_and_update/4` and
+`get/4`, each taking as its first argument the module whose declarations apply. An `Agent`
+has no callback module of its own, so the declarations live in an ordinary module that
+`use`s `TLA.Invariant` and nothing there is wrapped.
+
+Two consequences that the rest of Layer 1 does not have (D-25):
+
+- **`:disabled` costs an export lookup rather than nothing.** The mode is read with
+  `Application.compile_env/3`, which does not expand inside a function body — so it cannot
+  be resolved where the call is written. The wrappers are therefore functions, and they
+  ask the declaring module at runtime whether it carries predicates.
+- **`callbacks:` means nothing for an `Agent`.** It restricts a declaration to named OTP
+  callbacks, and the caller's function is not one — it runs inside `Agent`'s own
+  `handle_call/3`. Every declaration in the named module applies to every checked
+  transition.
 
 ### GenStateMachine Integration
 
@@ -448,11 +500,30 @@ defmodule TLA.Invariant.Test do
   @doc """
   Generate a StreamData generator that only produces states satisfying
   the module's named type invariant. Used for property-based testing.
+
+  FILTERS a base generator rather than constructing states: the invariant is the
+  only definition of the type the module actually enforces, and a generator built
+  to mirror it is a copy that can disagree with it.
+
+  `stream_data` is a dev/test-only dependency, so this function has a body only
+  where it is loaded, decided when ExTLA compiles — the same absent-tolerance
+  `jason` and `telemetry` get.
   """
   @spec valid_states(module(), atom(), StreamData.t(map())) :: StreamData.t(map())
   def valid_states(module, type_invariant_name, base_generator)
 end
 ```
+
+Every helper here raises rather than fails when it is given a module carrying no
+predicates — one that does not `use TLA.Invariant`, or one compiled under
+`mode: :disabled`, which emits none. Failing as though the declaration were false would
+report the mode as a broken invariant. `refute_invariant/3` raises the same way for a name
+the module does not declare: a renamed declaration would otherwise turn the test green by
+making it check nothing.
+
+Naming every failing declaration rather than the first is deliberate — a state that breaks
+three invariants is three separate facts about the state, and reporting one hides the
+other two behind another test run.
 
 ### Example Test
 

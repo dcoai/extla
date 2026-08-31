@@ -111,4 +111,113 @@ defmodule TLA.TestServers do
     def init(state), do: {:ok, state}
     def handle_call(:ping, _from, state), do: {:reply, :pong, state}
   end
+
+  defmodule Refusing do
+    @moduledoc """
+    A server whose `init/1` may decline to start. `:ignore` and `{:stop, reason}` are
+    refusals rather than first states, and an invariant checked against the absence of a
+    state reports a violation of a predicate that was given nothing to be about.
+    """
+    use GenServer
+    use TLA.Invariant
+
+    invariant :has_balance, desc: "a started account has a balance" do
+      is_integer(state.balance)
+    end
+
+    @impl true
+    def init(:ignore), do: :ignore
+    def init(:refuse), do: {:stop, :refused}
+    def init(balance), do: {:ok, %{balance: balance}}
+  end
+
+  defmodule TrafficLight do
+    @moduledoc """
+    §03's state machine, as a raw `:gen_statem` in `:handle_event_function` mode.
+
+    `GenStateMachine` is the same callback with a different name on the tin, and taking
+    the dependency to test it would prove less: what is being tested is that a state
+    machine's state is the `{state_name, data}` pair everywhere — in the invariant, in the
+    action property, and in what `init/1` produces.
+    """
+    @behaviour :gen_statem
+    use TLA.Invariant
+
+    invariant :valid_state, desc: "one of three colours, and the count never goes backwards" do
+      {name, data} = state
+      name in [:red, :yellow, :green] and data.cycles >= 0
+    end
+
+    action_property :valid_transitions, desc: "green follows red, yellow green, red yellow" do
+      {old_name, _} = old
+      {new_name, _} = new
+
+      case {old_name, new_name} do
+        {:red, :green} -> true
+        {:green, :yellow} -> true
+        {:yellow, :red} -> true
+        {same, same} -> true
+        _ -> false
+      end
+    end
+
+    precondition {:advance, steps}, desc: "the light advances one step at a time" do
+      steps == 1
+    end
+
+    def start_link(cycles \\ 0), do: :gen_statem.start_link(__MODULE__, cycles, [])
+
+    @impl true
+    def callback_mode, do: :handle_event_function
+
+    @impl true
+    def init(cycles), do: {:ok, :red, %{cycles: cycles}}
+
+    @impl true
+    def handle_event({:call, from}, {:advance, _steps}, name, data) do
+      next = %{red: :green, green: :yellow, yellow: :red}[name]
+      data = if next == :red, do: %{data | cycles: data.cycles + 1}, else: data
+      {:next_state, next, data, [{:reply, from, next}]}
+    end
+
+    # Breaks `valid_transitions`: red to yellow is not a step this light takes.
+    def handle_event({:call, from}, :jump, :red, data) do
+      {:next_state, :yellow, data, [{:reply, from, :yellow}]}
+    end
+
+    # A stuttering step. `:keep_state_and_data` carries no state at all, so the extraction
+    # has to rebuild the pair from the callback's own arguments.
+    def handle_event({:call, from}, :wait, _name, _data) do
+      {:keep_state_and_data, [{:reply, from, :waited}]}
+    end
+
+    # Breaks `valid_state` through the data half, and through a return that keeps the
+    # state name: the pair the invariant sees is {unchanged name, new data}.
+    def handle_event({:call, from}, :corrupt, _name, data) do
+      {:keep_state, %{data | cycles: -1}, [{:reply, from, :corrupted}]}
+    end
+  end
+
+  defmodule CounterRules do
+    @moduledoc """
+    Declarations and nothing else: the module an `Agent`'s checks name.
+
+    An `Agent` has no callback module, so there is nothing here to wrap — which is also
+    the test that `@before_compile` emits predicates for a module with no callbacks at
+    all.
+    """
+    use TLA.Invariant
+
+    invariant :never_negative, desc: "a counter may not go below zero" do
+      state.count >= 0
+    end
+
+    invariant :ceiling_positive, desc: "a counter counts towards something" do
+      state.ceiling > 0
+    end
+
+    action_property :ceiling_never_falls, desc: "the ceiling only ever rises" do
+      new.ceiling >= old.ceiling
+    end
+  end
 end
