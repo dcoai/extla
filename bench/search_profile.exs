@@ -50,8 +50,18 @@ entries = [
   {"raft", TLA.Differential.RaftElection, %{}}
 ]
 
-selected =
+# `workers` switches from the phase profile to the worker sweep: the same entries, run at
+# 1/2/4/8 processes, interleaved. Two modes rather than two files because they measure the
+# same searches and the sweep's numbers are only readable beside the phase table that says
+# which phase the workers are dividing.
+{mode, names} =
   case System.argv() do
+    ["workers" | rest] -> {:workers, rest}
+    rest -> {:phases, rest}
+  end
+
+selected =
+  case names do
     [] -> entries
     names -> Enum.filter(entries, fn {name, _module, _override} -> name in names end)
   end
@@ -199,7 +209,77 @@ pct = fn part, whole -> if whole == 0, do: 0.0, else: Float.round(part / whole *
 IO.puts("""
 
 Search profile — #{:erlang.system_info(:system_version) |> to_string() |> String.trim()}
+Load: #{File.read!("/proc/loadavg") |> String.trim()}
 """)
+
+# ── The worker sweep ────────────────────────────────────────────────────────────────────
+#
+# Interleaved, and that is the whole method rather than a refinement of it. This file's
+# baseline document has the evidence: a `raft` run that measures 23.4s on a quiet machine
+# came out at 30.5s at load 7 with the measured PHASE numbers moving under 8%, and #33's
+# A/B found a 1,800ms gap between two "before" runs taken on different days. Four blocks of
+# runs, one per worker count, would attribute whatever the machine did during block three
+# to four workers.
+#
+# So each round runs every worker count once, rotating which goes first, and the arms are
+# compared on their MINIMA — the run least disturbed by whatever else the box was doing.
+if mode == :workers do
+  counts = [1, 2, 4, 8]
+  rounds = 3
+
+  for {name, module, override} <- selected do
+    spec = Spec.Compiled.from_module(module)
+    {:ok, defaults} = Spec.Compiled.resolve_constants(spec)
+    constants = Map.merge(defaults, override)
+
+    config = fn workers ->
+      %{constants: constants, check_liveness: false, workers: workers}
+    end
+
+    # Every arm warmed before any is measured, so none pays for a cold code path.
+    Enum.each(counts, fn w -> ModelChecker.run(module, config.(w)) end)
+
+    times =
+      Enum.reduce(1..rounds, Map.new(counts, &{&1, []}), fn round, acc ->
+        counts
+        |> Enum.slide(0, rem(round, length(counts)))
+        |> Enum.reduce(acc, fn workers, acc ->
+          {us, result} = :timer.tc(fn -> ModelChecker.run(module, config.(workers)) end)
+
+          # Printed per run rather than only summarised: a sweep whose state counts drift
+          # between arms is measuring two different searches, and that has to be visible
+          # in the output rather than discovered later.
+          IO.puts(
+            "  #{name} round #{round} workers=#{workers}: #{ms.(us * 1000)}ms " <>
+              "(#{result.distinct_states} states, #{result.transitions} transitions, " <>
+              "diameter #{result.diameter}, #{inspect(result.status)})"
+          )
+
+          Map.update!(acc, workers, &[us | &1])
+        end)
+      end)
+
+    base = Enum.min(times[1])
+
+    IO.puts("")
+
+    for w <- counts do
+      min = Enum.min(times[w])
+
+      IO.puts(
+        "  #{String.pad_trailing("#{name} workers=#{w}", 22)} " <>
+          "min #{String.pad_leading("#{ms.(min * 1000)}ms", 10)}  " <>
+          "#{Float.round(base / min, 2)}x  " <>
+          "all #{inspect(Enum.map(Enum.reverse(times[w]), &ms.(&1 * 1000)))}"
+      )
+    end
+
+    IO.puts("")
+  end
+
+  IO.puts("Load at end: #{File.read!("/proc/loadavg") |> String.trim()}")
+  System.halt(0)
+end
 
 for {name, module, override} <- selected do
   spec = Spec.Compiled.from_module(module)
