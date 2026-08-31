@@ -32,6 +32,14 @@ defmodule TLA.Coverage do
   @type action_coverage :: %{
           enabled_in: non_neg_integer(),
           states_generated: non_neg_integer(),
+
+          # How many of this action's successors were NEW when it produced them — an
+          # attribution of first discovery, and therefore a function of the search order
+          # rather than of the model. A state reachable by two actions is credited to
+          # whichever reached it first, so the split across actions moves under
+          # `workers:` while the TOTAL across them does not. Read it as "this action was
+          # a frontier opener" and not as a property of the spec; nothing in the report
+          # is derived from it, for that reason.
           distinct_generated: non_neg_integer()
         }
 
@@ -205,6 +213,88 @@ defmodule TLA.Coverage do
       :too_large -> :too_large
       combinations -> MapSet.new(combinations)
     end
+  end
+
+  @doc """
+  Combine one worker's accumulator into the coordinator's.
+
+  `TLA.ModelChecker.Parallel` gives each worker a **fresh** accumulator from `init/3` and
+  merges what comes back, so `from` describes only that worker's share of the level. The
+  three initial probe values — `ever: false`, `always: true`, `evaluated: false` — are the
+  identities of the operations below, which is what makes a worker that observed nothing
+  contribute nothing.
+
+  Three different rules, and using the wrong one produces a report that looks right:
+
+    * **Counts add.** Each state is observed by exactly one worker — the one that won its
+      fingerprint — and each `{state, action}` pair is expanded by exactly one worker, so
+      nothing is observed twice and summing is exact rather than approximate.
+
+      One of them is exact only in total: `distinct_generated` attributes a state to the
+      action that reached it *first*, and which action that is depends on the order the
+      search took. Its sum over all actions is invariant — every distinct state is
+      credited exactly once — and its split across them is not. That is a property of the
+      quantity, not of this merge; a single-threaded run redistributes it too if the
+      actions are declared in a different order.
+    * **Sets union, and predicates fold.** `ever` is a disjunction over reachable states,
+      `always` a conjunction; splitting the states across workers and combining with `or`
+      and `and` is the same computation in a different order.
+    * **`param_universe` does neither.** It is a property of the CONSTANTS, not of any
+      state: `observe_universe/4` enumerates it once, on the first initial state, before
+      any worker exists. Every worker's copy is therefore either the coordinator's own or
+      `:unknown`, and merging it could only replace a computed universe with an unknown
+      one. The coordinator's is kept, deliberately.
+  """
+  @spec merge(t(), t()) :: t()
+  def merge(%__MODULE__{} = into, %__MODULE__{} = from) do
+    %__MODULE__{
+      into
+      | actions: merge_with(into.actions, from.actions, &merge_action/2),
+        invariants: merge_with(into.invariants, from.invariants, &merge_invariant/2),
+        probes: merge_with(into.probes, from.probes, &merge_probe/2),
+        seen_bindings: merge_with(into.seen_bindings, from.seen_bindings, &merge_bindings/2),
+        live_terminals: MapSet.union(into.live_terminals, from.live_terminals)
+    }
+  end
+
+  # Both accumulators come from the same `init/3`, so their key sets are identical and a
+  # key present in one and not the other would be a bug rather than a case to handle.
+  defp merge_with(into, from, fun), do: Map.merge(into, from, fn _key, a, b -> fun.(a, b) end)
+
+  defp merge_action(a, b) do
+    %{
+      a
+      | enabled_in: a.enabled_in + b.enabled_in,
+        states_generated: a.states_generated + b.states_generated,
+        distinct_generated: a.distinct_generated + b.distinct_generated
+    }
+  end
+
+  # `near_misses` is `nil` for an invariant that declares no `near_miss:`, and stays nil —
+  # `nil + nil` would be an error and `0` would be a claim the invariant never made.
+  defp merge_invariant(a, b) do
+    near =
+      case {a.near_misses, b.near_misses} do
+        {nil, nil} -> nil
+        {x, y} -> x + y
+      end
+
+    %{a | evaluated_in: a.evaluated_in + b.evaluated_in, near_misses: near}
+  end
+
+  defp merge_probe(a, b) do
+    %{
+      a
+      | ever: a.ever or b.ever,
+        always: a.always and b.always,
+        evaluated: a.evaluated or b.evaluated
+    }
+  end
+
+  # The cap is a bound on the REPORT, not on the search, so it is applied here the way
+  # `observe_action/5` applies it: once past it, stop growing the set rather than trim it.
+  defp merge_bindings(a, b) do
+    if MapSet.size(a) > @universe_cap, do: a, else: MapSet.union(a, b)
   end
 
   @doc """

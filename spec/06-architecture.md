@@ -264,6 +264,25 @@ take from one another, so the only contended structure is ETS:
 4. When a worker's batch is empty, coordinator sends more
 5. On violation, coordinator sends `:halt` to all workers
 
+**The rounds are BFS levels, and that is load-bearing** (D-27). The coordinator dispatches
+one whole level and waits for every worker before dispatching the next, rather than
+letting workers pull from a running frontier. D-9's acceptance criterion compares the
+**length** of the shortest counterexample against TLC's, and a free-running frontier does
+not preserve it — a violating state can be reached along a longer path before the shorter
+one has been expanded. The barrier per level is what that criterion costs.
+
+**Workers register states themselves**, calling `StateGraph.add_state/5` rather than
+sending successors back for the coordinator to register. Since #33 that call performs
+fingerprinting and the §6 term check as well as the ETS write, and the three together are
+77% of the `raft` search — so registering centrally would leave about a quarter of the
+work parallel. What makes it safe is `insert_new/2`: of two workers that discover the same
+state, exactly one claims it.
+
+**Liveness is refused alongside `workers:`**, the way D-22 refuses symmetry with it. The
+edge table and ENABLED bits above are drawn as ETS tables and are built as per-struct maps;
+under workers each process would hold a fragment, and a cycle spanning two of them would
+not exist to be found.
+
 ---
 
 ## Implementation Phases

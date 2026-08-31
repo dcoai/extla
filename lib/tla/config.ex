@@ -64,10 +64,17 @@ defmodule TLA.Config do
   Number of workers for parallel state exploration.
 
   Derived rather than asked for: the number of schedulers is a property of the machine, so
-  the system holds the knowledge and the default answers it. **Nothing reads this yet.**
-  Parallel exploration is `TLA.ModelChecker.Parallel`, which is Phase 4
-  (`06-architecture.md`), and until it exists `TLA.ModelChecker`'s `workers:` option
-  refuses rather than quietly running on one process.
+  the system holds the knowledge and this answers it.
+
+  `TLA.ModelChecker.Parallel` honours `workers:`, and `TLA.ModelChecker`'s own default is
+  nonetheless **1**. A parallel search is exhaustive exactly as a single-threaded one is,
+  so the cores buy speed and not a better answer — and how much of the machine to spend on
+  a run is a decision about the machine, held by whoever is running the checker. Pass
+  `workers: TLA.Config.workers()` to take this answer; nothing takes it for a caller who
+  did not ask.
+
+  Set higher than the machine has schedulers, a run is slower rather than wrong — the
+  degradation is visible, which is the property a derived default should keep.
   """
   @spec workers() :: pos_integer()
   def workers do

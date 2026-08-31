@@ -439,13 +439,14 @@ defmodule TLA.ModelChecker do
   @type config :: %{
     constants: map(),                  # constant assignments
     max_states: pos_integer(),         # state limit (default: 1_000_000)
-    # Specified, unimplemented, and REFUSED rather than ignored: `workers: n`
-    # for n > 1 raises until `TLA.ModelChecker.Parallel` exists (Phase 4). A
-    # single-threaded run reported as though it had honoured a request for eight
-    # is a wrong answer about the run -- the failure `max_states_reached` exists
-    # to prevent one level up. The default the eventual implementation will
-    # derive is `System.schedulers_online()`, in `TLA.Config.workers/0`.
-    workers: pos_integer(),            # parallel workers (default: schedulers)
+    # Implemented: `TLA.ModelChecker.Parallel`, level-synchronous BFS over N
+    # workers sharing one ETS graph. Refused together with `check_liveness:`,
+    # for the reason D-22 refuses `symmetry:` with it. The default is 1 rather
+    # than `System.schedulers_online()` until the per-worker coverage
+    # accumulators merge -- a run should not become parallel, and its coverage
+    # report become partial, because the machine has cores. `TLA.Config.workers/0`
+    # derives the machine's answer for a caller who asks for it.
+    workers: pos_integer(),            # parallel workers (default: 1)
     check_deadlock: boolean(),         # report a successor-less state that no `terminal`
                                        # predicate admits (default: true)
     check_liveness: boolean(),         # check temporal properties (default: true)
@@ -487,9 +488,11 @@ defmodule TLA.ModelChecker do
         check_liveness: true
       })
 
-  The example carried `workers: 4` until parallel exploration was specified,
-  unimplemented and refused. It raises today, and an example that raises is a
-  worse thing for a specification to carry than one option fewer.
+  The example carried `workers: 4` while parallel exploration was specified,
+  unimplemented and refused — an example that raises being a worse thing for a
+  specification to carry than one option fewer. It is implemented now, and left
+  out of the example anyway: this one asks for `check_liveness`, which is the
+  one thing `workers:` is refused alongside.
   """
   @spec run(module(), config()) :: result()
   def run(spec_module, config)
