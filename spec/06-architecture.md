@@ -379,8 +379,9 @@ defp deps do
     # Required
     {:stream_data, "~> 1.0", only: [:dev, :test]},
 
-    # Optional — enhanced visualization
-    {:jason, "~> 1.4", optional: true},   # JSON export for state graphs
+    # Optional — enhanced visualization, and observability
+    {:jason, "~> 1.4", optional: true},     # JSON export for state graphs
+    {:telemetry, "~> 1.0", optional: true}, # Layer 1 violation events (03 §Telemetry)
 
     # Development
     {:ex_doc, "~> 0.31", only: :dev, runtime: false},
@@ -390,7 +391,10 @@ defp deps do
 end
 ```
 
-**Zero runtime dependencies.** The core library uses only Elixir/OTP standard modules. `stream_data` is dev/test only (for property test generation).
+**Zero *required* runtime dependencies.** The core library uses only Elixir/OTP standard
+modules. `stream_data` is dev/test only (for property test generation). The two optional
+ones are absent-tolerant by construction: whether they are present is decided when ExTLA
+itself compiles, so a consumer who takes neither carries no code for either.
 
 ---
 

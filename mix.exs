@@ -28,6 +28,10 @@ defmodule ExTLA.MixProject do
     [
       {:stream_data, "~> 1.0", only: [:dev, :test]},
       {:jason, "~> 1.4", optional: true},
+      # Layer 1's violation events. Optional for the same reason jason is: a consumer
+      # who attaches no handler should not be made to carry it, and whether it was
+      # present is decided when ExTLA compiles rather than on every check.
+      {:telemetry, "~> 1.0", optional: true},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
