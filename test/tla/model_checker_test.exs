@@ -202,10 +202,32 @@ defmodule TLA.ModelCheckerTest do
       assert StateGraph.liveness?(graph)
     end
 
-    test "parallel exploration is the phase boundary that is left" do
-      assert_raise ArgumentError, ~r/assigned no value/, fn ->
-        ModelChecker.run(Counter, %{constants: %{max: 2}, symmetry: [:accounts]})
-      end
+    # This test named parallel exploration and asserted something else entirely: that
+    # `symmetry: [:accounts]` raises because the constant is unassigned. True, and about a
+    # different boundary. What `workers:` did was worse than raising — it was accepted,
+    # ignored, and the single-threaded run reported as `:ok`.
+    test "parallel exploration is refused rather than ignored" do
+      error =
+        assert_raise ArgumentError, fn ->
+          ModelChecker.run(Counter, %{constants: %{max: 2}, workers: 4})
+        end
+
+      message = Exception.message(error)
+      assert message =~ "workers: 4"
+      assert message =~ "TLA.ModelChecker.Parallel"
+      assert message =~ "Phase 4"
+
+      # A refusal that only says no is half a message: what does reduce the cost of a
+      # search today is a smaller state space or a smaller budget, and both are named.
+      assert message =~ "symmetry:"
+      assert message =~ "max_states:"
+    end
+
+    test "and one worker is what the checker does, so it is not refused" do
+      config = %{constants: %{max: 2}}
+
+      assert ModelChecker.run(Counter, Map.put(config, :workers, 1)) ==
+               ModelChecker.run(Counter, config)
     end
 
     test "a spec with unchecked temporal properties says so in the warnings" do

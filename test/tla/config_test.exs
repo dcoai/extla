@@ -42,6 +42,11 @@ defmodule TLA.ConfigTest do
 
   describe "workers/0" do
     test "defaults to the scheduler count" do
+      # Derived rather than asked for: the number of schedulers is a property of the
+      # machine, so the system holds the knowledge. Nothing reads it yet — `workers:` is
+      # refused until `TLA.ModelChecker.Parallel` exists — and this is the only place it
+      # is asserted, because a second async test reading it would race this one's
+      # `put_env`.
       assert TLA.Config.workers() == System.schedulers_online()
     end
 
