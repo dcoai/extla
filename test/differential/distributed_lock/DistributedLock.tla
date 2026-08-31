@@ -22,6 +22,8 @@ VARIABLES
   waiting,   \* waiting[r] is the set of processes queued for r
   pc         \* pc[p] is the control state of process p
 
+vars == <<owner, waiting, pc>>
+
 PcStates == {idle, requesting, releasing} \cup ({holding} \X Resources)
 
 TypeOK ==
@@ -68,7 +70,24 @@ Next ==
          \/ AcquireLock(p, r)
          \/ ReleaseLock(p, r)
 
-Spec == Init /\ [][Next]_<<owner, waiting, pc>>
+(***************************************************************************)
+(* The fairness the ExTLA spec declares, conjunct for conjunct. The PER-   *)
+(* BINDING form is the point: `\A p : SF_vars(A(p))` is not `SF_vars(\E p :*)
+(* A(p))` (02-dsl-semantics.md 5.2). The second says only that SOME process*)
+(* acquires infinitely often, which is too weak to say anything about a    *)
+(* particular one -- and NoStarvation is about a particular one.           *)
+(*                                                                         *)
+(* Acquiring is STRONGLY fair for a reason of the same kind: a competitor  *)
+(* can take the lock and hand it back, so AcquireLock(p, r) is enabled     *)
+(* infinitely often without ever being enabled continuously, and weak      *)
+(* fairness would let p starve forever.                                    *)
+(***************************************************************************)
+Fairness ==
+  /\ \A p \in Procs : SF_vars(\E r \in Resources : AcquireLock(p, r))
+  /\ \A p \in Procs : WF_vars(\E r \in Resources : ReleaseLock(p, r))
+  /\ \A p \in Procs : WF_vars(ReturnToIdle(p))
+
+Spec == Init /\ [][Next]_vars /\ Fairness
 
 (***************************************************************************)
 (* Stated over `pc`, which is per PROCESS, so two processes can in         *)
@@ -85,4 +104,16 @@ OwnerIsValid ==
 HoldingMeansOwner ==
   \A p \in Procs :
     \A r \in Resources : pc[p] = <<holding, r>> => owner[r] = p
+
+(***************************************************************************)
+(* Liveness. `Holding(p)` spells out what the ExTLA side writes as         *)
+(* `match?({:holding, _}, pc[p])`: holding SOMETHING, whichever resource.  *)
+(***************************************************************************)
+Holding(p) == \E r \in Resources : pc[p] = <<holding, r>>
+
+NoStarvation ==
+  \A p \in Procs : (pc[p] = requesting) ~> Holding(p)
+
+LockEventuallyReleased ==
+  \A p \in Procs : Holding(p) ~> (pc[p] = idle)
 =============================================================================

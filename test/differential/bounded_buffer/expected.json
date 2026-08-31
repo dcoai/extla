@@ -21,5 +21,11 @@
     "BufferBounded": "holds",
     "CountsConsistent": "holds",
     "NoOverConsumption": "holds"
+  },
+  "properties": {
+    "ProducersMakeProgress": "holds",
+    "ConsumersMakeProgress": "holds",
+    "NoProducerStarvation": "holds",
+    "NoConsumerStarvation": "holds"
   }
 }

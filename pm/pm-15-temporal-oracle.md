@@ -1,7 +1,7 @@
 ---
 id: pm-15
 title: "Phase 2, slice 1: the temporal oracle — TLC's liveness verdicts in the corpus"
-labels: [Planned]
+labels: [In-Progress]
 created: 2026-08-31
 gitlab_issue: 15
 gitlab_synced: true
@@ -82,6 +82,42 @@ thing that distinguishes a working checker from a broken one.
 `bin/tlc-expected --check` green with `properties` in every `expected.json`, the safety
 numbers unchanged, and `raft_election` recorded as refuting its liveness property. No
 ExTLA-side change: `check_liveness: true` still raises.
+
+## As built
+
+Three things came out differently from the plan above, all of them TLC's doing.
+
+**The safety pass runs from a .cfg with `PROPERTIES` stripped.** The plan assumed
+putting `PROPERTIES` in the committed `.cfg` was enough. It is not: `-continue` does not
+cover a temporal violation any more than it covers a deadlock. TLC checks temporal
+properties *during* the search and stops at the first one it refutes, wherever the
+search has got to — two runs of `raft_election` stopped at 20,253 and 20,291 distinct
+states, so the counts were not even reproducible run to run. `bin/tlc-expected` now
+derives a safety `.cfg` without the properties, and the committed `.cfg` is the
+declaration of record that `PROPERTIES` is read from.
+
+**Each property gets a run of its own,** because TLC names none of them when one fails:
+it reports `Temporal properties were violated` and hands back a behaviour. A run
+checking several cannot say which one it refuted. Those runs drop the `INVARIANTS` too —
+TLC halts on a violated invariant before it reaches the liveness check, and `die_hard`
+has one on purpose. Seven extra runs across the corpus; the whole regeneration is 27s.
+
+**The verdict is `"holds"` or `"violated"`, and no lasso.** The plan's open question,
+resolved the way it leaned: TLC's lasso is not canonical the way a breadth-first
+shortest counter-example is, so pinning it would be a fixture the checker cannot be
+expected to match. `raft_election`'s counter-example ends in `State 8: Stuttering`
+rather than a `Back to state N` cycle, which is also a reminder that "prefix and cycle
+length" is not even the right shape for every violation.
+
+One thing was added that the plan excluded, and it is on the corpus side rather than in
+`lib/`: a test that the two sides declare the *same* temporal properties. Nothing
+compares the verdicts yet, so until slice 3 exists that name check is the only thing
+keeping a `temporal` added to `spec.ex` and not to the module from sitting there
+unnoticed — and being checked from day one is the entire argument for landing the oracle
+first.
+
+Safety numbers moved in no entry, as predicted: fairness constrains behaviours, not
+reachable states.
 
 ## Next slices
 

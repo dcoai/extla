@@ -105,7 +105,28 @@ Next ==
   \/ \E c \in Consumers :
        Consume(c) \/ ConsumerDone(c) \/ ConsumerWait(c) \/ ConsumerWake(c)
 
-Spec == Init /\ [][Next]_vars
+(***************************************************************************)
+(* The fairness the ExTLA spec declares, conjunct for conjunct. Four of the*)
+(* eight actions are fair as a WHOLE -- `WF_vars(\E p : Produce(p))` asks  *)
+(* only that production not stop, not that a particular producer produce --*)
+(* and the two wake-ups are fair PER BINDING, because a producer parked in *)
+(* `waiting` starves individually or not at all (02-dsl-semantics.md 5.2). *)
+(*                                                                         *)
+(* ConsumerWake is STRONG where ProducerWake is WEAK, and the asymmetry is *)
+(* the buffer's. A woken consumer can be beaten to the item by another     *)
+(* consumer, so its wake-up flickers on and off; nothing shortens the      *)
+(* buffer on a producer's behalf, so a producer's wake-up stays on until it*)
+(* is taken.                                                               *)
+(***************************************************************************)
+Fairness ==
+  /\ WF_vars(\E p \in Producers : Produce(p))
+  /\ WF_vars(\E c \in Consumers : Consume(c))
+  /\ WF_vars(\E p \in Producers : ProducerDone(p))
+  /\ WF_vars(\E c \in Consumers : ConsumerDone(c))
+  /\ \A p \in Producers : WF_vars(ProducerWake(p))
+  /\ \A c \in Consumers : SF_vars(ConsumerWake(c))
+
+Spec == Init /\ [][Next]_vars /\ Fairness
 
 BufferBounded ==
   Len(buffer) >= 0 /\ Len(buffer) <= BufferSize
@@ -116,4 +137,25 @@ CountsConsistent ==
 
 NoOverConsumption ==
   consumedCount <= MaxItems
+
+(***************************************************************************)
+(* Liveness. NoConsumerStarvation has to except the drained end state: once*)
+(* MaxItems have been produced and consumed the buffer stays empty and     *)
+(* every consumer parks in `waiting` for good -- correctly, and by the     *)
+(* model's own bound. A starvation-freedom property that did not except it *)
+(* would be refuted by the bound rather than by the design.                *)
+(***************************************************************************)
+ProducersMakeProgress ==
+  []<>(producedCount > 0)
+
+ConsumersMakeProgress ==
+  (Len(buffer) > 0) ~> (consumedCount > 0)
+
+NoProducerStarvation ==
+  \A p \in Producers : (producerPc[p] = waiting) ~> (producerPc[p] = ready)
+
+NoConsumerStarvation ==
+  \A c \in Consumers :
+    (consumerPc[c] = waiting)
+      ~> (consumerPc[c] = ready \/ producedCount = MaxItems)
 =============================================================================

@@ -12,5 +12,6 @@
   "invariants": {
     "TPTypeOK": "holds",
     "TPConsistent": "holds"
-  }
+  },
+  "properties": {}
 }

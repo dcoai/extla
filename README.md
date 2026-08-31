@@ -81,6 +81,12 @@ regenerates it from TLC on every pipeline, and a corpus entry that drifts fails 
 build. The oracle landed before the checker precisely so this column could be measured
 rather than assumed.
 
+The corpus now also records TLC's verdict on each entry's **temporal** properties,
+ahead of any liveness checking on the ExTLA side — the same ordering, for the same
+reason. `raft_election`'s `EventuallyElectLeader` comes back *violated*, refuted by the
+model's term bound by design, and that is the entry that will tell a working liveness
+checker from one that answers "holds" to everything.
+
 The corpus paid for itself along the way. `raft_election` is
 [Example 2](spec/07-examples.md) of this repository's own documentation, and TLC refuted
 its headline safety property — a candidate that timed out twice counted a vote granted
@@ -98,6 +104,7 @@ that `f[x]` outside a function's domain was `nil` rather than an error.
 | The implicit `type_ok` invariant | ✅ |
 | `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
 | Differential corpus vs TLC | ✅ all six entries |
+| TLC's temporal verdicts in the corpus | ✅ oracle only; nothing checks them yet |
 | Liveness, fairness, symmetry (Phase 2) | not yet |
 | Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
 | Parallel exploration (Phase 4) | not yet |

@@ -7,6 +7,12 @@ The Phase 1 acceptance gate (`spec/04-layer2-model-checker.md` §Differential te
 2. whether each invariant holds, and
 3. the length of the shortest counterexample where one exists.
 
+The corpus also records TLC's verdict on every **temporal** property — `holds` or
+`violated`. Nothing on the ExTLA side reads them yet; `check_liveness: true` still
+raises, and Phase 2 is what will make them mean something. They are here first for
+the reason the corpus itself came before the checker did: a liveness answer with
+nothing to compare it against is a claim rather than a measurement.
+
 ## Layout
 
 ```
@@ -21,14 +27,6 @@ test/differential/<name>/
 editing it to make a test pass would be editing the definition of "correct", which is
 why CI regenerates it from TLC on every pipeline and fails on any difference.
 
-An entry whose spec ends somewhere takes **two** TLC runs. `-continue` keeps an
-invariant violation from ending the search, but a reached deadlock ends it regardless,
-leaving states on the queue — so `bin/tlc-expected` takes `deadlock` from the first run
-and, when there was one, re-runs with `-deadlock` to get the counts and the invariant
-verdicts from a search that actually finished. `bounded_buffer` differs by one state and
-one level of depth between the two passes, which is exactly how much of the state space
-a first-deadlock stop can hide.
-
 ```json
 {
   "generated_by": "bin/tlc-expected",
@@ -42,7 +40,8 @@ a first-deadlock stop can hide.
   "invariants": {
     "TypeOK": "holds",
     "NotSolved": {"violated_at": 7}
-  }
+  },
+  "properties": {}
 }
 ```
 
@@ -52,10 +51,45 @@ a first-deadlock stop can hide.
 | `diameter` | Depth of the complete state graph search — the BFS level at which the frontier empties |
 | `deadlock` | Whether TLC reached a state with no successors. A `terminal` declaration (`spec/02-dsl-semantics.md` §5.3) is how ExTLA accepts one of these on purpose |
 | `invariants` | `"holds"`, or `{"violated_at": n}` where `n` is the number of states in the shortest counterexample — 7 states is a 6-step trace |
+| `properties` | `"holds"` or `"violated"`, per temporal property, under the fairness the module's `Spec` conjoins |
+
+The verdict on a property is that one word and nothing more. TLC's counterexample is a
+lasso, and a lasso is not canonical the way a breadth-first shortest counterexample is —
+two correct checkers can hand back different cycles for the same violated property. A
+fixture the checker cannot be expected to match would be worse than no fixture, so the
+shape of the lasso is left out until the entries are known to agree on it.
 
 A disagreement on `distinct_states` is the most valuable signal the project has: it
 means successor generation or state identity is wrong. `diameter` catches the narrower
 failure of a search that terminated early but happened to reach the same count.
+
+## The passes
+
+An entry takes one TLC run for safety and one more per temporal property, because
+`-continue` covers neither of the two other ways a run can stop early.
+
+**A deadlock ends the search regardless.** `bin/tlc-expected` takes `deadlock` from the
+first run and, when there was one, re-runs with `-deadlock` to get the counts and the
+invariant verdicts from a search that actually finished. `bounded_buffer` differs by one
+state and one level of depth between the two passes, which is exactly how much of the
+state space a first-deadlock stop can hide.
+
+**A temporal violation ends it too.** TLC checks temporal properties *during* the search
+and stops at the first one it refutes, wherever the search has got to — two runs of
+`raft_election` stopped at 20,253 and 20,291 distinct states. So the safety pass runs
+from a derived `.cfg` with the `PROPERTIES` section removed, which is what keeps
+`distinct_states` and `diameter` reproducible. Fairness constrains behaviours and not
+reachable states, so adding the fairness conjuncts moved neither number in any entry.
+
+**And TLC names no property when one fails.** It reports `Temporal properties were
+violated` and hands back a behaviour, so a run checking several of them cannot say which
+one it refuted — hence one derived `.cfg` and one run per property. Those runs drop the
+`INVARIANTS` too: TLC halts on a violated invariant before it reaches the liveness check,
+and `die_hard` has one on purpose.
+
+The derived `.cfg`s are written to a temporary directory rather than beside the module,
+so nothing a later run could pick up is left behind. The committed `.cfg` stays the
+declaration of record: it is what `PROPERTIES` is read from.
 
 ## Corpus
 
@@ -64,7 +98,7 @@ failure of a search that terminated early but happened to reach the same count.
 | `die_hard` | Lamport, *Specifying Systems* | ✅ | ✅ |
 | `two_phase_commit` | Lamport, TLA+ examples | ✅ | ✅ |
 | `distributed_lock` | `spec/07-examples.md` Example 1 | ✅ | ✅ |
-| `raft_election` | `spec/07-examples.md` Example 2 (safety only; liveness is refuted by the term bound by design) | ✅ | ✅ |
+| `raft_election` | `spec/07-examples.md` Example 2 (its liveness property is refuted by the term bound, by design) | ✅ | ✅ |
 | `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | ✅ |
 | `paxos` | Lamport, *Paxos Made Simple* TLA+ | ✅ | ✅ |
 
@@ -84,7 +118,7 @@ quantifies over a subset of the messages in flight.
 
 ## Writing an entry
 
-Three things bite when translating a spec into TLA+ for TLC.
+Four things bite when translating a spec into TLA+ for TLC.
 
 **Use model values, not strings, for tags.** TLC compares strings strictly and
 *raises* on `"idle" = <<"holding", r>>` rather than returning FALSE, so a spec whose
@@ -102,6 +136,13 @@ admits a state which has successors comes back as `terminal_but_live` in the cov
 report. Writing `raft_election` failed the first test — the end state of a split vote
 still has undeliverable vote responses in the network, so a terminal saying the network
 is empty admits none of them.
+
+**Fairness has to be per binding where the ExTLA spec says so.** `\A p \in Procs :
+SF_vars(A(p))` is not `SF_vars(\E p \in Procs : A(p))` (`spec/02-dsl-semantics.md` §5.2).
+The second says only that *some* process acts infinitely often, which is too weak to
+prove anything about a particular one — and `distributed_lock`'s `NoStarvation` is about
+a particular one. Getting this wrong makes the oracle agree with a checker that is also
+wrong, which is the one failure this corpus cannot catch for itself.
 
 **State the invariant-name mapping.** TLA+ modules prefix by convention (`TPTypeOK`)
 and ExTLA's implicit type invariant is always `:type_ok`, so the differential test

@@ -139,7 +139,31 @@ Next ==
          \/ HandleVoteResponse(s, msg)
          \/ StepDown(s, msg)
 
-Spec == Init /\ [][Next]_vars
+(***************************************************************************)
+(* The fairness the ExTLA spec declares, conjunct for conjunct. All three  *)
+(* are WHOLE-ACTION: the ExTLA side names these actions without a param    *)
+(* list, which is `WF_vars(\E params : A(params))` and not one constraint  *)
+(* per server (02-dsl-semantics.md 5.2). That is the weaker reading, and   *)
+(* the right one here -- EventuallyElectLeader is about the cluster, not   *)
+(* about a particular server.                                              *)
+(*                                                                         *)
+(* Timing out is STRONG where message handling is WEAK. Timeout(s) is      *)
+(* disabled the moment s reaches MaxTerm and re-enabled by a step-down, so *)
+(* it flickers; a message in the network stays deliverable until it is     *)
+(* delivered.                                                              *)
+(*                                                                         *)
+(* StepDown has no fairness on either side. Nothing here needs a server to *)
+(* notice a higher term, and giving it fairness would be assuming something*)
+(* the ExTLA spec does not.                                                *)
+(***************************************************************************)
+Fairness ==
+  /\ SF_vars(\E s \in Servers : Timeout(s))
+  /\ WF_vars(\E s \in Servers :
+               \E msg \in messages : HandleRequestVote(s, msg))
+  /\ WF_vars(\E s \in Servers :
+               \E msg \in messages : HandleVoteResponse(s, msg))
+
+Spec == Init /\ [][Next]_vars /\ Fairness
 
 (***************************************************************************)
 (* Raft's fundamental safety property, and the one this model exists to     *)
@@ -155,4 +179,16 @@ VoteIntegrity ==
 LeaderHasQuorum ==
   \A s \in Servers :
     srvState[s] # leader \/ Cardinality(votesGranted[s]) >= Quorum
+
+(***************************************************************************)
+(* Liveness, and the one property in the corpus that must come back        *)
+(* VIOLATED. A split vote at MaxTerm leaves every server at the bound, no  *)
+(* candidate holding a quorum and nothing deliverable left, and the        *)
+(* behaviour stutters there forever without a leader. That is the model    *)
+(* bound refuting the property, not Raft -- and an oracle in which every   *)
+(* temporal property holds could not tell a working liveness checker from  *)
+(* one that answers "holds" to everything.                                 *)
+(***************************************************************************)
+EventuallyElectLeader ==
+  <>(\E s \in Servers : srvState[s] = leader)
 =============================================================================
