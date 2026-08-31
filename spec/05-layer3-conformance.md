@@ -517,11 +517,22 @@ defmodule TLA.Simulation do
   }
 
   @type result :: %{
-    status: :ok | :violation,
+    # `:error` is a third outcome: the server stopped, or stopped answering,
+    # without a conformance finding. Nothing about conformance was decided after
+    # that point, and reporting it as `:ok` would say the traces passed.
+    status: :ok | :violation | :error,
     traces_run: non_neg_integer(),
     total_steps: non_neg_integer(),
     violation: TLA.Trace.t() | nil,
+    detail: String.t() | nil,
     duration_ms: non_neg_integer(),
+
+    # ALWAYS present, generated when the config gave none. A random run that
+    # finds something and cannot be run again has found nothing anybody can act
+    # on. One seed per trace is derived from it and the trace's index, so trace
+    # 37 of a 1000-trace run can be re-run on its own.
+    seed: integer(),
+    restarts: non_neg_integer(),
     coverage: coverage_report()
   }
 
@@ -529,7 +540,12 @@ defmodule TLA.Simulation do
     actions_hit: %{atom() => non_neg_integer()},
     states_visited: non_neg_integer(),
     invariants_checked: non_neg_integer(),
-    branches_covered: float()
+
+    # Amended from `branches_covered`, which had no definition anywhere in the
+    # project -- nothing else names a branch. This is the fraction of the spec's
+    # actions a run exercised at least once, which is the number the report was
+    # reaching for and one that can be computed from what happened.
+    actions_covered: float()
   }
 
   @doc """
@@ -545,6 +561,18 @@ defmodule TLA.Simulation do
         inject_failures: true,
         seed: 42
       })
+
+  A `message_generator` may return a bare message, as here, or the
+  `{action, params, message}` the built-in generators return. The second form is
+  what lets a counterexample name its actions.
+
+  ## Failure injection
+
+  A crash is not a step of the specification -- nothing in the DSL models one -- so
+  a restart is NOT checked as a transition. What is checked is where recovery
+  lands: the spec's invariants must hold of the recovered abstract state. A server
+  that comes back in a state its own specification forbids is a finding whatever
+  the spec says about crashing.
   """
   @spec run(module(), config()) :: result()
   def run(genserver_module, config)
@@ -579,16 +607,33 @@ defmodule TLA.Simulation.Generator do
   Returns a function that, given the current abstract state,
   produces a random valid message.
   """
-  @spec from_spec(module(), map()) :: (TLA.State.t() -> term())
-  def from_spec(spec_module, constants)
+  Amended to take the REFINEMENT as well. A specification has no notion of a
+  message -- that is what `concrete_message/2` exists for -- so a generator
+  returning one needs the mapping. The alternative, returning `{action, params}`
+  and mapping in the caller, puts half the generator outside it.
+
+  Returns `{action, params, message}`, so that a counterexample built from a
+  simulation names its actions the way a model-checker counterexample does.
+  """
+  @spec from_spec(module(), module(), map()) ::
+    (TLA.State.t() -> {atom(), map(), term()} | nil)
+  def from_spec(spec_module, refinement, constants)
 
   @doc """
   Create a message generator that only produces messages
   corresponding to currently ENABLED actions.
   More efficient — avoids generating messages that will be rejected.
   """
-  @spec enabled_only(module(), map()) :: (TLA.State.t() -> term())
-  def enabled_only(spec_module, constants)
+  **This is the default** `message_generator`. The unrestricted one asks a
+  different question -- does the implementation REFUSE what the spec forbids in
+  this state -- and most servers are not written to: a `handle_call` clause with
+  no guard of its own accepts the message, and `:not_enabled` is the correct
+  finding about that pair. It is also a finding about nearly every server ever
+  written, so hunting it is opt-in (`mix tla.simulate --unrestricted`).
+  """
+  @spec enabled_only(module(), module(), map()) ::
+    (TLA.State.t() -> {atom(), map(), term()} | nil)
+  def enabled_only(spec_module, refinement, constants)
 end
 ```
 

@@ -100,6 +100,26 @@ exists at all.
 behaviour the code does not take, which is a finding about the pair — one of the two is
 wrong, and which one is not something the checker can decide.
 
+## `counter` — simulation
+
+Random walks over the real server, checked at every step. The generator draws from the
+spec's own `params:`, which is where nondeterminism lives.
+
+| Case | Verdict |
+|---|---|
+| 100 random traces against `Conforming` | `:ok`, 100% of the spec's actions covered |
+| the same seed, twice | the same walk, state for state |
+| 5 traces against `CollapsesTwoSteps` | `:violation`, and the finding is a `TLA.Trace` |
+| that trace, handed to `TLA.Replay.counterexample/3` | `:diverged` again, on the same server |
+| `Conforming` under the UNRESTRICTED generator | `:not_enabled` — see below |
+| failure injection over 20 traces | `:ok`, with restarts, each landing in a legal state |
+
+The unrestricted row is the interesting one. `Impl.Conforming`'s `handle_call(:done, …)`
+has no guard of its own, so it accepts `:done` in a state where the spec's `done` is
+disabled — and `:not_enabled` is the correct finding about that pair. It is also a finding
+about nearly every server ever written, which is why the enabled-only generator is the
+default and the unrestricted one is `mix tla.simulate --unrestricted`.
+
 ## What `validate!/3` does not decide
 
 Three of §05's five rules are decidable where it runs and two are not, and the return
