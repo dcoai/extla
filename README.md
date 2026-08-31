@@ -105,6 +105,7 @@ that `f[x]` outside a function's domain was `nil` rather than an error.
 | `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
 | Differential corpus vs TLC | ✅ all six entries |
 | TLC's temporal verdicts in the corpus | ✅ oracle only; nothing checks them yet |
+| The liveness graph — `TLA.Temporal`, the edge table and ENABLED bits | ✅ built on request; nothing runs over it yet |
 | Liveness, fairness, symmetry (Phase 2) | not yet |
 | Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
 | Parallel exploration (Phase 4) | not yet |

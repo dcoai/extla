@@ -48,8 +48,28 @@ defmodule TLA.StateGraph do
   acyclic by construction, and no cycle of the real graph is visible in it.
   Liveness checking is cycle detection, so this record cannot support it — which
   is why `successors/2` reads an edge table and raises when there is none, rather
-  than deriving something wrong from parent pointers. The edge table and the
-  per-state enabled bits arrive with Phase 2.
+  than deriving something wrong from parent pointers.
+
+  So a run that asks for it records, additionally, per expanded state:
+
+      state_id => [{action, params, successor_id}]   # every out-edge
+      state_id => enabled_bits                       # one bit per fairness constraint
+
+  The edge table is what an SCC search runs over. The bits are what fairness needs: WF
+  and SF are conditions on `ENABLED A` at each state of a cycle, which is a function of
+  the state — and the state is discarded as soon as it has been expanded, so the bit has
+  to be taken while it is still in hand. They are indexed by `fairness_index`, the §5.2
+  expansion of the spec's `fairness` declarations (`TLA.Temporal.Fairness`).
+
+  Cost is a function of the branching factor and of how large a binding is — an action
+  whose param is a message record carries that record in every edge — but not of how
+  large a *state* is, which is the property D-5 exists to keep. It is opt-in for that
+  reason and paid for only when asked for, which is TLC's split too.
+
+  Only an **expanded** state has edges. A run that stopped early — `max_states`, a state
+  constraint holding states back, a safety violation halting the search — leaves a
+  partial edge table, and a liveness verdict read off a partial graph would be a claim
+  about behaviours that were never explored. Checking one is a completed run's privilege.
 
   ## ETS
 
@@ -112,6 +132,65 @@ defmodule TLA.StateGraph do
     enabled: nil,
     fairness_index: nil
   ]
+
+  @doc """
+  Turn on the liveness graph, with the fairness constraints its enabled bits are indexed
+  by — `TLA.Temporal.Fairness.expand/3`, which needs the constants and so cannot run
+  until a state exists.
+
+  A spec with no `fairness` declarations still gets a liveness graph, with zero-width
+  bits: the edge table alone answers `always`, `eventually` and `~>`; fairness is what
+  the bits are for.
+  """
+  @spec with_liveness(t(), [TLA.Temporal.Fairness.constraint()]) :: t()
+  def with_liveness(graph, fairness_index) do
+    %{graph | edges: %{}, enabled: %{}, fairness_index: fairness_index}
+  end
+
+  @doc """
+  Whether this graph carries the liveness structure.
+  """
+  @spec liveness?(t()) :: boolean()
+  def liveness?(%__MODULE__{edges: edges}), do: edges != nil
+
+  @doc """
+  Record a state's out-edges and its enabled bits. Called once per expanded state; a
+  no-op on a safety-only graph, so the caller does not branch.
+
+  Every out-edge, including the ones that led to a state already seen — those are exactly
+  the edges that close a cycle, and a cycle is what liveness checking is looking for.
+  """
+  @spec add_edges(t(), state_id(), [edge()], bitstring()) :: t()
+  def add_edges(graph, id, edges, enabled)
+
+  def add_edges(%__MODULE__{edges: nil} = graph, _id, _edges, _enabled), do: graph
+
+  def add_edges(graph, id, edges, enabled) do
+    %{
+      graph
+      | edges: Map.put(graph.edges, id, edges),
+        enabled: Map.put(graph.enabled, id, enabled)
+    }
+  end
+
+  @doc """
+  The ENABLED bits of a state, in `fairness_index` order.
+  """
+  @spec enabled_bits(t(), state_id()) :: bitstring()
+  def enabled_bits(%__MODULE__{enabled: nil}, _id), do: raise(no_liveness_graph())
+
+  def enabled_bits(%__MODULE__{enabled: enabled}, id), do: Map.get(enabled, id, <<>>)
+
+  @doc """
+  Whether the `index`th fairness constraint was enabled in a state.
+  """
+  @spec enabled?(t(), state_id(), non_neg_integer()) :: boolean()
+  def enabled?(graph, id, index) do
+    case enabled_bits(graph, id) do
+      <<_::size(^index), bit::1, _::bitstring>> -> bit == 1
+      _ -> false
+    end
+  end
 
   @doc """
   A new, empty graph for `spec` under `constants`.
@@ -251,11 +330,16 @@ defmodule TLA.StateGraph do
   spanning tree, which has no cycles at all.
   """
   @spec successors(t(), state_id()) :: [edge()]
-  def successors(%__MODULE__{edges: nil}, _id) do
-    raise ArgumentError,
-          "no liveness graph: this graph was built without check_liveness: true, so it has " <>
-            "no edge table. Parent pointers are a spanning tree and cannot answer this."
-  end
+  def successors(%__MODULE__{edges: nil}, _id), do: raise(no_liveness_graph())
 
   def successors(%__MODULE__{edges: edges}, id), do: Map.get(edges, id, [])
+
+  defp no_liveness_graph do
+    %ArgumentError{
+      message:
+        "no liveness graph: this graph was built without it, so it has no edge table and " <>
+          "no enabled bits. Parent pointers are a spanning tree and cannot answer this. " <>
+          "Explore with `liveness_graph: true`."
+    }
+  end
 end
