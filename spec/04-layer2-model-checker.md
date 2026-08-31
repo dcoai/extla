@@ -1149,6 +1149,14 @@ Machine-readable output (`--format json`) carries the full result, coverage
 report and counterexample, so editors and the reporting tooling read structured
 data rather than parsing the human rendering.
 
+**The counterexample in it round-trips.** States and bindings are written by
+`TLA.State.Json`, whose encoding names every term §6 permits — atoms, binaries,
+tuples, maps with non-string keys, `MapSet`s and structs all have JSON of their
+own. An earlier version wrote them with `inspect/1`, which a person can read and
+a machine cannot parse back, and `05-layer3-conformance.md`'s pipeline runs this
+output straight into `mix tla.replay --trace`. The human rendering is
+`TLA.Trace.format/1` and is unchanged.
+
 ### ExUnit Integration
 
 ```elixir

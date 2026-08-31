@@ -1044,6 +1044,29 @@ defmodule Mix.Tasks.Tla.Replay do
 
   Requires `concrete_message/2` on the refinement module for `--trace`;
   `--captured` needs only `abstract/1` and `abstract_action/1`.
+
+  ## The file formats
+
+  `--trace` takes what `mix tla.check --format json` writes -- either the whole
+  document, an object keyed by spec module, or a single trace object lifted out
+  of it.
+
+  `--captured` takes an array of `{"message": …, "state": …}`, oldest first, where
+  `state` is the CONCRETE state the implementation was in AFTER that message.
+
+  Both are `TLA.State.Json` encodings, so a state is written the way the checker
+  writes one and there is no second format to learn. Atom names are resolved
+  against the atoms the system already has: a trace belonging to a different
+  specification fails with the name that did not resolve, rather than decoding
+  into something else, and no file can grow the atom table.
+
+  ## Exit codes
+
+      0  the behaviour was reproduced, or the capture conforms
+      1  a conformance violation
+      2  the implementation could not follow the trace -- NOT a conformance
+         failure, since the spec permits a behaviour the code does not take and
+         which of the two is wrong is not something this can decide
   """
   use Mix.Task
 
