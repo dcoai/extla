@@ -51,6 +51,67 @@ defmodule TLA.Trace do
             length: 0
 
   @doc """
+  The trace as data `Jason.encode!/1` accepts, and `from_json!/1` reads back.
+
+  Accepts a lasso too, which round-trips as `%{prefix:, cycle:}`. States and bindings go
+  through `TLA.State.Json`, because `inspect/1` produces something a person can read and a
+  machine cannot parse — and `05-layer3-conformance.md`'s pipeline runs
+  `mix tla.check --format json` into `mix tla.replay --trace`, which needs the second.
+  """
+  @spec to_json(t() | lasso()) :: map()
+  def to_json(%__MODULE__{} = trace) do
+    %{
+      "type" => Atom.to_string(trace.type),
+      "property" => trace.property && Atom.to_string(trace.property),
+      "message" => trace.message,
+      "length" => trace.length,
+      "actions" => Enum.map(trace.actions, &Atom.to_string/1),
+      "bindings" => Enum.map(trace.bindings, &TLA.State.Json.encode/1),
+      "states" => Enum.map(trace.states, &TLA.State.Json.encode/1)
+    }
+  end
+
+  def to_json(%{prefix: prefix, cycle: cycle}) do
+    %{
+      "type" => "liveness",
+      "property" => prefix.property && Atom.to_string(prefix.property),
+      "message" => prefix.message,
+      "prefix" => to_json(prefix),
+      "cycle" => cycle && to_json(cycle)
+    }
+  end
+
+  @doc """
+  The trace a `to_json/1` result came from.
+
+  Atom names are resolved against the atoms the system already has (`TLA.State.Json`), so
+  a trace belonging to a different specification fails with the name that did not resolve
+  rather than by quietly decoding into something else.
+  """
+  @spec from_json!(map()) :: t() | lasso()
+  def from_json!(%{"prefix" => prefix} = data) do
+    %{prefix: from_json!(prefix), cycle: data["cycle"] && from_json!(data["cycle"])}
+  end
+
+  def from_json!(%{"states" => states} = data) do
+    %__MODULE__{
+      type: String.to_existing_atom(data["type"] || "safety"),
+      property: data["property"] && TLA.State.Json.decode!(%{"a" => data["property"]}),
+      message: data["message"] || "",
+      length: data["length"] || max(length(states) - 1, 0),
+      actions: Enum.map(data["actions"] || [], &TLA.State.Json.decode!(%{"a" => &1})),
+      bindings: Enum.map(data["bindings"] || [], &TLA.State.Json.decode!/1),
+      states: Enum.map(states, &TLA.State.Json.decode!/1)
+    }
+  end
+
+  def from_json!(other) do
+    raise ArgumentError,
+          "#{inspect(other)} is not an encoded trace: expected an object with \"states\" " <>
+            "(a trace) or \"prefix\" (a lasso)."
+  end
+
+  @doc """
   Generate the shortest trace from an initial state to the target.
   """
   @spec generate(StateGraph.t(), StateGraph.state_id(), keyword()) :: t()

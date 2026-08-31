@@ -335,6 +335,9 @@ rather than ahead of it.
 - `TLA.Simulation`, `TLA.Simulation.Generator`, and `TLA.GenServer.Driver` — the
   monitored call `TLA.Replay` and `TLA.Simulation` both drive a server through
 - `Mix.Tasks.Tla.Simulate`, `Mix.Tasks.Tla.Replay`
+- `TLA.State.Json` — the round-trippable form of a §6 state term, which is what
+  makes `mix tla.check --format json` into `mix tla.replay --trace` a pipeline
+  rather than two commands that print at each other
 
 **Deliverable:** a spec, a counterexample from it, and that counterexample replayed
 against the real GenServer.

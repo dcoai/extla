@@ -243,29 +243,12 @@ defmodule Mix.Tasks.Tla.Check do
     }
   end
 
+  # `TLA.Trace.to_json/1` rather than a local encoder: an earlier one wrote states and
+  # bindings with `inspect/1`, which reads well and parses back into nothing — and
+  # `05-layer3-conformance.md`'s pipeline feeds this output straight into
+  # `mix tla.replay --trace`. The human rendering is `Trace.format/1` and is unchanged.
   defp violation_json(nil), do: nil
-
-  defp violation_json(%{prefix: prefix, cycle: cycle}) do
-    %{
-      type: :liveness,
-      property: prefix.property,
-      message: prefix.message,
-      prefix: violation_json(prefix),
-      cycle: violation_json(cycle)
-    }
-  end
-
-  defp violation_json(trace) do
-    %{
-      type: trace.type,
-      property: trace.property,
-      message: trace.message,
-      length: trace.length,
-      actions: trace.actions,
-      bindings: Enum.map(trace.bindings, &inspect/1),
-      states: Enum.map(trace.states, &inspect/1)
-    }
-  end
+  defp violation_json(violation), do: Trace.to_json(violation)
 
   # ── Exit ────────────────────────────────────────────────────────────────────
 
