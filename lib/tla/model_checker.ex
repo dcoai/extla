@@ -24,7 +24,7 @@ defmodule TLA.ModelChecker do
   checking something weaker.
   """
 
-  alias TLA.ModelChecker.{Liveness, Safety}
+  alias TLA.ModelChecker.{Liveness, Parallel, Safety}
   alias TLA.Spec.Type
   alias TLA.Temporal
   alias TLA.Temporal.Fairness
@@ -33,9 +33,10 @@ defmodule TLA.ModelChecker do
   @type config :: %{
           optional(:constants) => map(),
           optional(:max_states) => pos_integer(),
-          # Specified, unimplemented, and REFUSED rather than ignored: `workers: n` for
-          # n > 1 raises until `TLA.ModelChecker.Parallel` exists (Phase 4). See
-          # `reject_unimplemented!/1`.
+          # Parallel state exploration: `TLA.ModelChecker.Parallel`. Defaults to 1 —
+          # `TLA.Config.workers/0` derives the machine's answer for a caller who wants it,
+          # but a run does not silently become parallel because the box has cores. Refused
+          # together with liveness; see `reject_unimplemented!/1`.
           optional(:workers) => pos_integer(),
           optional(:check_deadlock) => boolean(),
           optional(:check_liveness) => boolean(),
@@ -87,6 +88,14 @@ defmodule TLA.ModelChecker do
   @defaults %{
     constants: %{},
     max_states: 1_000_000,
+
+    # §04's config type says the default is `System.schedulers_online()`, and this is 1.
+    # A deliberate deviation, and not a temporary one: a search is exhaustive either way,
+    # so the cores buy speed rather than a better answer — and spending every scheduler on
+    # the box is a decision about the machine, which belongs to whoever is running the
+    # checker rather than to the checker. `TLA.Config.workers/0` derives the machine's
+    # answer for a caller who wants it; nothing derives it for one who did not ask.
+    workers: 1,
     check_deadlock: true,
     check_liveness: false,
     liveness_graph: false,
@@ -198,6 +207,10 @@ defmodule TLA.ModelChecker do
     # Everything the search threads through itself. A struct rather than a
     # widening tuple, because coverage made it a five-tuple and the next phase
     # adds the liveness graph.
+    #
+    # `TLA.ModelChecker.Parallel` builds one of these per worker, with the accumulators
+    # zeroed, and merges what comes back — so a field added here needs a merge rule there.
+    @type t :: %__MODULE__{}
     defstruct [
       :spec,
       :config,
@@ -227,8 +240,21 @@ defmodule TLA.ModelChecker do
     }
 
     run = seed(run)
-    if run.outcome == :ok, do: expand_frontier(run), else: run
+
+    cond do
+      run.outcome != :ok -> run
+      config.workers > 1 -> Parallel.explore(run)
+      true -> expand_frontier(run)
+    end
   end
+
+  @doc false
+  # `TLA.ModelChecker.Parallel` expands a level by folding this over a worker's batch: the
+  # states it discovers land in that worker's own `frontier`, which is the next level's
+  # share. Exposed rather than duplicated — a second implementation of "what a state's
+  # successors are" is the one thing a parallel checker must not have, since the two could
+  # disagree and only one of them is compared against TLC.
+  def expand_one(run, id, state), do: expand(run, id, state)
 
   defp seed(run) do
     run.spec.init
@@ -701,20 +727,20 @@ defmodule TLA.ModelChecker do
               "without it."
     end
 
-    # `workers:` is specified (§04's config type) and unimplemented. Exploring on one
-    # process and answering `:ok` would report a single-threaded run as though it had
-    # honoured a request for eight — the same failure `max_states_reached` exists to
-    # prevent one level up, where "we ran out of budget" must not be returned as "it
-    # holds". So it refuses until `TLA.ModelChecker.Parallel` exists to honour it.
-    if Map.get(config, :workers, 1) > 1 do
+    # Refused for the same reason as the pairing above, and stated the same way. The
+    # liveness graph is the edge table and the ENABLED bits, and both are per-struct maps
+    # on the graph — `add_edges/4` writes them into the struct a single search threads,
+    # not into ETS. Under workers each process would build its own fragment and they would
+    # have to be merged before any cycle spanning two of them existed to be found, which
+    # is a design question of its own rather than a merge. Half-building it would produce
+    # a graph missing exactly the edges a liveness verdict is read off.
+    if Map.get(config, :workers, 1) > 1 and (config.check_liveness or config.liveness_graph) do
       raise ArgumentError,
-            "workers: #{Map.get(config, :workers)} — parallel exploration is not built. " <>
-              "`TLA.ModelChecker.Parallel` is Phase 4 (06-architecture.md), and this " <>
-              "option is refused rather than ignored: a single-threaded run reported as " <>
-              "though it had used #{Map.get(config, :workers)} processes is a wrong " <>
-              "answer about the run. What does reduce the cost of a search today is " <>
-              "`symmetry:` (a smaller state space) and `max_states:` (a smaller budget, " <>
-              "reported as `:max_states_reached` rather than as success)."
+            "workers: #{Map.get(config, :workers)} with liveness is refused: the edge table " <>
+              "and ENABLED bits are built per-process, so a parallel run would answer a " <>
+              "temporal property from a graph missing the edges another worker found — and " <>
+              "a cycle spanning two workers would not exist to be found at all. Check " <>
+              "safety with `workers:`, and liveness on one process."
     end
 
     :ok

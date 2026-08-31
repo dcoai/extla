@@ -204,23 +204,32 @@ defmodule TLA.ModelCheckerTest do
 
     # This test named parallel exploration and asserted something else entirely: that
     # `symmetry: [:accounts]` raises because the constant is unassigned. True, and about a
-    # different boundary. What `workers:` did was worse than raising — it was accepted,
-    # ignored, and the single-threaded run reported as `:ok`.
-    test "parallel exploration is refused rather than ignored" do
+    # different boundary. It then asserted #29's refusal — `workers:` accepted, ignored,
+    # and the single-threaded run reported as `:ok` was worse than raising.
+    #
+    # `TLA.ModelChecker.Parallel` exists now, so what this boundary asserts is the
+    # remaining half: the option is honoured, and the combination that is still unsound
+    # still raises. The rest of parallel exploration is
+    # `test/tla/model_checker/parallel_test.exs` and
+    # `test/differential/parallel_agreement_test.exs`.
+    test "parallel exploration is honoured, and refused only alongside liveness" do
+      result = ModelChecker.run(Counter, %{constants: %{max: 2}, workers: 4})
+      assert result.status == :ok
+      assert result.distinct_states == 4
+
       error =
         assert_raise ArgumentError, fn ->
-          ModelChecker.run(Counter, %{constants: %{max: 2}, workers: 4})
+          ModelChecker.run(Counter, %{constants: %{max: 2}, workers: 4, check_liveness: true})
         end
 
       message = Exception.message(error)
       assert message =~ "workers: 4"
-      assert message =~ "TLA.ModelChecker.Parallel"
-      assert message =~ "Phase 4"
+      assert message =~ "liveness is refused"
 
-      # A refusal that only says no is half a message: what does reduce the cost of a
-      # search today is a smaller state space or a smaller budget, and both are named.
-      assert message =~ "symmetry:"
-      assert message =~ "max_states:"
+      # A refusal that only says no is half a message: the run this caller can have is
+      # named, on both sides of the pairing.
+      assert message =~ "safety with `workers:`"
+      assert message =~ "liveness on one process"
     end
 
     # Everything but `duration_ms`, which is a measurement of the run rather than a fact

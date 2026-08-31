@@ -32,6 +32,9 @@ defmodule Mix.Tasks.Tla.Check do
   ## Other options
 
       --max-states         State limit for the run.
+      --workers            Explore on N processes (default 1). Refused together
+                           with liveness, so a spec that declares a `temporal`
+                           has its safety checked in parallel and says so.
       --safety-only        Skip liveness. Liveness is checked whenever the spec
                            declares a `temporal`; this turns it off, and with it the
                            liveness graph the check needs.
@@ -61,6 +64,7 @@ defmodule Mix.Tasks.Tla.Check do
 
   @switches [
     max_states: :integer,
+    workers: :integer,
     fingerprint_bits: :integer,
     strict_coverage: :boolean,
     allow_incomplete: :boolean,
@@ -97,7 +101,8 @@ defmodule Mix.Tasks.Tla.Check do
     spec = Spec.Compiled.from_module(module)
     config = config(spec, opts)
     result = ModelChecker.run(spec, config)
-    {module, %{result | warnings: result.warnings ++ symmetry_note(spec, config)}}
+    warnings = result.warnings ++ symmetry_note(spec, config) ++ workers_note(spec, config)
+    {module, %{result | warnings: warnings}}
   rescue
     error in TLA.Symmetry.UnsoundError -> {module, {:unsound_symmetry, error}}
   end
@@ -112,14 +117,44 @@ defmodule Mix.Tasks.Tla.Check do
     # built when there is a question for it to answer. Under a symmetry reduction it is
     # not checked at all — the two are not sound together, and `report/1` says so rather
     # than leaving the spec's own warning to imply the tool forgot.
+    # Under `--workers n` liveness is not checked either, for the same reason and handled
+    # the same way: the pairing is refused in `TLA.ModelChecker`, so the task must decide
+    # rather than hand the user a raise for asking two reasonable things at once.
+    # `workers_note/2` says why, beside the symmetry one.
     check_liveness? =
-      spec.temporals != [] and not Keyword.get(opts, :safety_only, false) and symmetry == []
+      spec.temporals != [] and not Keyword.get(opts, :safety_only, false) and symmetry == [] and
+        workers(opts) == 1
 
-    %{constants: constants, check_liveness: check_liveness?}
+    %{constants: constants, check_liveness: check_liveness?, workers: workers(opts)}
     |> maybe_put(:max_states, opts[:max_states])
     |> maybe_put(:fingerprint_bits, opts[:fingerprint_bits])
     |> maybe_symmetry(symmetry, Keyword.get(opts, :verify_symmetry, false))
   end
+
+  # `--workers 0` or a negative one is a typo, not an intent, and the checker's own
+  # refusals are about combinations rather than shapes — so it is caught here.
+  defp workers(opts) do
+    case Keyword.get(opts, :workers, 1) do
+      n when is_integer(n) and n > 0 -> n
+      n -> Mix.raise("--workers must be a positive integer, got: #{inspect(n)}")
+    end
+  end
+
+  # The same shape as `symmetry_note/2`, for the same reason: the spec's own warning says
+  # the temporal properties went unchecked, and this says which flag decided that.
+  defp workers_note(spec, %{workers: n}) when n > 1 do
+    if spec.temporals != [] do
+      [
+        "liveness was not checked: `--workers #{n}` and liveness are refused together — " <>
+          "the edge table and ENABLED bits are built per-process, so a parallel run would " <>
+          "answer a temporal property from a partial graph. Check them without `--workers`."
+      ]
+    else
+      []
+    end
+  end
+
+  defp workers_note(_spec, _config), do: []
 
   # The spec's own warning says the temporal properties went unchecked; this says why,
   # rather than leaving it to read as though the tool forgot.

@@ -595,3 +595,61 @@ while still being forbidden. The soundness argument above depends on the forbidd
 being exactly the non-recurring ones, and would have to be rebuilt.
 
 See `02-dsl-semantics.md` §6, `bench/search_profile.baseline.md`.
+
+---
+
+## D-27 — Parallel exploration is level-synchronous, and workers register their own states
+
+**Decided.** `TLA.ModelChecker.Parallel` expands one whole BFS level across N workers and
+waits for all of them before starting the next. Each worker calls
+`TLA.StateGraph.add_state/5` on its own successors, against the shared ETS tables, and
+returns accumulators that the coordinator merges. `workers:` defaults to **1**.
+
+**Rejected:** a free-running frontier — workers pulling from a shared queue and never
+synchronising. It is the faster design and it trades away the project's acceptance
+criterion. D-9's differential corpus compares the **length** of the shortest
+counterexample against TLC's, and length is not preserved when a violating state can be
+reached along a longer path before the shorter one has been expanded. Length, note, and
+not route: a parallel run may return a *different* trace of the same length and the corpus
+still holds, which is what makes level-synchrony sufficient as well as necessary.
+
+Level-synchrony also buys determinism where it is checked: every state discovered while
+expanding level *k* has depth *k+1*, so whichever worker reports a violation first, the
+trace is the same length.
+
+**Why workers register rather than report.** The simpler design — workers compute
+successors, the coordinator registers them — would parallelise about a quarter of the
+work. Since D-26 `add_state/5` performs fingerprinting and the §6 check as well as the ETS
+write, and `bench/search_profile.baseline.md` puts the three at 77% of the `raft` search;
+Amdahl caps a central registrar near 1.3x however many cores are added. #31 built for
+this: `:public` tables, an atomic id, and `insert_new/2` so that of two workers
+discovering the same state exactly one claims it.
+
+That atomicity is also what makes the accumulators *summable*. A state is observed by
+exactly one worker and a `{state, action}` pair expanded by exactly one worker, so nothing
+is counted twice — the merge is exact rather than approximate.
+
+**What the merge revealed.** `TLA.Coverage`'s `distinct_generated` credits the action that
+reached a state *first*, which is a fact about the search order rather than about the
+model: its split across actions moves under `workers:` and its total does not. It is
+documented as such and nothing in the report is derived from it. Every other coverage
+field is order-independent and must match a single-threaded run exactly — a report naming
+an action as never enabled when it was is a false statement about the model, and
+`--strict-coverage` fails a build on it.
+
+**Why the default is 1**, against §04's stated `System.schedulers_online()`. A parallel
+search is exhaustive exactly as a single-threaded one is, so the cores buy speed and not a
+better answer — and how much of a machine to spend on a run is a decision about the
+machine, held by whoever runs the checker. `TLA.Config.workers/0` derives it for a caller
+who asks; nothing derives it for one who did not.
+
+**Liveness is refused alongside it**, exactly as D-22 refuses symmetry with liveness. The
+edge table and ENABLED bits are per-struct maps, so a parallel run would answer a temporal
+property from a graph missing the edges other workers found, and a cycle spanning two
+workers would not exist to be found at all.
+
+**Revisit if:** the corpus stops comparing counterexample length, or the edge table moves
+into ETS. The first would remove the reason for the barrier; the second would remove the
+reason for the liveness refusal.
+
+See `06-architecture.md` §Concurrency Architecture, `04-layer2-model-checker.md` §Config.
