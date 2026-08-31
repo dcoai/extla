@@ -697,10 +697,18 @@ in TLC (08-decisions.md D-17).
 
 What the tool does instead is make a wrong declaration **detectable**:
 `verify_symmetry: true` (`mix tla.check --verify-symmetry`) runs the same model with
-and without the reduction and fails if any verdict, or the distinct-state count after
-un-reducing, differs. That is a cheap dynamic check on a small constant assignment,
-and it is the one to run once per spec before trusting the reduction on the large
-one.
+and without the reduction and fails if any VERDICT differs — status, what was refuted,
+whether it got stuck, which actions were never enabled. Not the counts: a sound
+reduction changes those on purpose, which is the entire point of it, so comparing them
+would fail on every declaration that worked. That is a cheap dynamic check on a small
+constant assignment, and it is the one to run once per spec before trusting the
+reduction on the large one.
+
+**Not together with liveness.** The quotient graph identifies states, so a path that
+leaves an orbit and one that returns to it look the same, and the quotient can hold
+cycles the real state space does not — which is exactly what a liveness verdict is read
+off. Asking for both raises (`08-decisions.md` D-22). Check safety under the reduction,
+and the temporal properties in a run without it.
 
 ### View abstraction
 

@@ -446,3 +446,22 @@ way to write `t` for a message would have closed the gap for `set(^servers)` and
 every message set where it was.
 
 See `02-dsl-semantics.md` §1.5.
+---
+
+## D-22 — Symmetry reduction and liveness checking are refused together
+
+**Decided.** A run that declares `symmetry:` and asks for `check_liveness: true` raises.
+Safety is checked under the reduction; liveness is checked in a run without it.
+
+**Why:** the quotient graph identifies states, so a path that leaves an orbit and a path
+that returns to it look the same, and the quotient can hold cycles the real state space
+does not. A cycle is precisely what a liveness verdict is read off
+(`04-layer2-model-checker.md` §`TLA.ModelChecker.Liveness`), so a temporal property could
+be reported as refuted by a behavior the spec does not have — or, with the fairness
+constraints reading ENABLED bits of a merged state, as holding when it does not.
+
+TLC warns about the same combination and runs anyway. A warning is not what this project
+does with an unsound answer (design principle 6): the two reductions are each sound on
+their own, and asking for both is asking for an answer neither of them supports.
+
+See `04-layer2-model-checker.md` §Symmetry.

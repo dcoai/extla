@@ -16,15 +16,19 @@ defmodule TLA.ModelChecker do
   (`bench/liveness_graph.exs`), and because a spec that declares no `temporal` has nothing
   to gain from it.
 
-  Parallel exploration and symmetry reduction arrive in later phases; asking for one
-  raises rather than quietly checking something weaker.
+  `symmetry: [:processes]` collapses states that differ only by a permutation of an
+  interchangeable constant, and `verify_symmetry: true` checks the declaration was sound
+  by running the model both ways (`TLA.Symmetry`, `08-decisions.md` D-17).
+
+  Parallel exploration arrives in a later phase; asking for it raises rather than quietly
+  checking something weaker.
   """
 
   alias TLA.ModelChecker.{Liveness, Safety}
   alias TLA.Spec.Type
   alias TLA.Temporal
   alias TLA.Temporal.Fairness
-  alias TLA.{Coverage, Fingerprint, Spec, State, StateGraph, Trace}
+  alias TLA.{Coverage, Fingerprint, Spec, State, StateGraph, Symmetry, Trace}
 
   @type config :: %{
           optional(:constants) => map(),
@@ -123,6 +127,27 @@ defmodule TLA.ModelChecker do
     config = @defaults |> Map.merge(config) |> imply_liveness_graph()
     reject_unimplemented!(config)
 
+    if config.verify_symmetry,
+      do: verify_symmetry(spec, config),
+      else: search_and_finish(spec, config)
+  end
+
+  # The same model, twice: once reduced and once not. What has to survive the reduction is
+  # every ANSWER, not the counts — a sound reduction changes those on purpose, which is
+  # what it is for. Nothing can establish soundness statically (D-17), so this is the check
+  # to run once on a small constant assignment before trusting the reduction on the large
+  # one, and it costs exactly one extra unreduced run.
+  defp verify_symmetry(spec, config) do
+    config = %{config | verify_symmetry: false}
+    {reduced, graph} = search_and_finish(spec, config)
+    {full, _graph} = search_and_finish(spec, %{config | symmetry: nil})
+
+    Symmetry.verify!(reduced, full, config.symmetry)
+
+    {reduced, graph}
+  end
+
+  defp search_and_finish(spec, config) do
     # `type_ok` joins the invariants for the run, so it is checked, selectable
     # with `invariants:`, and counted in the coverage report alongside the
     # declared ones — which is why a report lists an invariant the spec never
@@ -130,7 +155,12 @@ defmodule TLA.ModelChecker do
     spec = %{spec | invariants: checked_invariants(spec, config.constants)}
 
     started = System.monotonic_time(:millisecond)
-    graph = StateGraph.new(spec, config.constants, fingerprint_bits: config.fingerprint_bits)
+
+    graph =
+      StateGraph.new(spec, config.constants,
+        fingerprint_bits: config.fingerprint_bits,
+        symmetry: symmetry_mappings(config)
+      )
 
     run = spec |> search(config, graph) |> check_temporals()
 
@@ -498,6 +528,9 @@ defmodule TLA.ModelChecker do
 
   defp imply_liveness_graph(config), do: config
 
+  defp symmetry_mappings(%{symmetry: names}) when names in [nil, []], do: nil
+  defp symmetry_mappings(config), do: Symmetry.mappings(config.constants, config.symmetry)
+
   defp constrained?(%{state_constraint: nil}, _state), do: false
   defp constrained?(%{state_constraint: constraint}, state), do: not constraint.(state)
 
@@ -598,7 +631,27 @@ defmodule TLA.ModelChecker do
     []
     |> temporal_warning(spec, config)
     |> constrained_warning(status)
+    |> symmetry_warning(config)
   end
+
+  # n! encodings per state, and the product across sets. It is a lever to be benchmarked
+  # rather than assumed (§Symmetry), so a run says what it is paying.
+  defp symmetry_warning(warnings, %{symmetry: names} = config) when names not in [nil, []] do
+    count = config.constants |> Symmetry.mappings(names) |> length()
+
+    if count > 24 do
+      warnings ++
+        [
+          "symmetry #{inspect(names)} canonicalizes each state under #{count} permutations, " <>
+            "which is paid on every state discovered. Measure it against the reduction it " <>
+            "buys before keeping it."
+        ]
+    else
+      warnings
+    end
+  end
+
+  defp symmetry_warning(warnings, _config), do: warnings
 
   defp temporal_warning(warnings, spec, %{check_liveness: false}) when spec.temporals != [] do
     warnings ++
@@ -624,10 +677,23 @@ defmodule TLA.ModelChecker do
   # ── Phase boundaries ────────────────────────────────────────────────────────
 
   defp reject_unimplemented!(config) do
-    if config.symmetry not in [nil, []] or config.verify_symmetry do
+    if config.verify_symmetry and config.symmetry in [nil, []] do
       raise ArgumentError,
-            "symmetry reduction is not implemented yet; it arrives in Phase 2 " <>
-              "(spec/06-architecture.md)."
+            "verify_symmetry: true with no `symmetry:` to verify. It runs the model with " <>
+              "and without a reduction, and there is no reduction here."
+    end
+
+    # A symmetry-reduced graph can hold cycles the real state space does not: the quotient
+    # identifies states, so a path that leaves an orbit and a path that returns to it look
+    # the same. Safety survives that and liveness does not, which is why TLC warns about
+    # exactly this combination — and a warning is not what this project does with an
+    # unsound answer.
+    if config.symmetry not in [nil, []] and config.check_liveness do
+      raise ArgumentError,
+            "symmetry reduction and liveness checking are not sound together: the quotient " <>
+              "graph can have cycles the real state space does not, and a cycle is what a " <>
+              "liveness verdict is read off. Check safety under `symmetry:`, and liveness " <>
+              "without it."
     end
 
     :ok

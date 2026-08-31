@@ -38,7 +38,18 @@ defmodule TLA.Fingerprint do
       16
   """
   @spec compute(TLA.State.t(), keyword()) :: t()
-  def compute(state, opts \\ []) do
+  def compute(state, opts \\ []), do: state |> canonical() |> of_encoding(opts)
+
+  @doc """
+  Fingerprint an encoding that has already been produced.
+
+  Symmetry reduction (`TLA.Symmetry`) picks the smallest encoding of a state over every
+  permutation of its interchangeable constants, and that encoding — not the state it came
+  from — is what identity is then defined by. Re-encoding the winner would be work already
+  done, and re-deriving it a chance for the two to disagree.
+  """
+  @spec of_encoding(binary(), keyword()) :: t()
+  def of_encoding(encoding, opts \\ []) do
     bits = Keyword.get(opts, :bits, @default_bits)
 
     unless bits in @permitted_bits do
@@ -47,7 +58,7 @@ defmodule TLA.Fingerprint do
     end
 
     :sha256
-    |> :crypto.hash(canonical(state))
+    |> :crypto.hash(encoding)
     |> binary_part(0, div(bits, 8))
   end
 

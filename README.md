@@ -98,6 +98,20 @@ answers "holds" to everything.
 not `SF(\E p : Acquire(p))`. The same spec with weak fairness is refuted, with p1 waiting
 while p2 takes the lock and gives it back forever.
 
+**Symmetry reduction** collapses states that differ only by a permutation of an
+interchangeable constant. `mix run bench/symmetry.exs`:
+
+| Model | States | Time |
+|---|---|---|
+| `raft_election`, 3 servers | 58,359 → 9,871 | 23.3s → 6.6s |
+| `distributed_lock`, 3 processes and 2 resources | 184 → 26 | 11ms → 6ms |
+
+Nothing can establish that a `symmetry:` declaration is sound — a constant flows into
+arbitrary Elixir, so the check is undecidable, and it is the author's obligation
+([D-17](spec/08-decisions.md)). `verify_symmetry: true` is what makes a wrong one
+*detectable*: it runs the model both ways and fails if any verdict differs. Both models
+above pass it.
+
 The corpus paid for itself along the way. `raft_election` is
 [Example 2](spec/07-examples.md) of this repository's own documentation, and TLC refuted
 its headline safety property — a candidate that timed out twice counted a vote granted
@@ -118,12 +132,14 @@ that `f[x]` outside a function's domain was `nil` rather than an error.
 | TLC's temporal verdicts in the corpus | ✅ oracle only; nothing checks them yet |
 | The liveness graph — `TLA.Temporal`, the edge table and ENABLED bits | ✅ |
 | `check_liveness: true` — temporal properties, weak and strong fairness | ✅ |
-| Symmetry reduction (Phase 2) | not yet |
+| `symmetry:` / `verify_symmetry:` — symmetry reduction | ✅ |
 | Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
 | Parallel exploration (Phase 4) | not yet |
 
-Asking for something a later phase brings — `symmetry:` — raises rather than quietly
-checking something weaker.
+Asking for parallel exploration, which Phase 4 brings, raises rather than quietly
+checking something weaker. So does asking for symmetry reduction and liveness in the
+same run: the quotient graph can hold cycles the real state space does not, and a cycle
+is what a liveness verdict is read off ([D-22](spec/08-decisions.md)).
 
 See [spec/README.md](spec/README.md) for the full specification, and
 [spec/08-decisions.md](spec/08-decisions.md) for why it is shaped the way it is.
