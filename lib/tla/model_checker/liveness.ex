@@ -67,7 +67,7 @@ defmodule TLA.ModelChecker.Liveness do
   which is linear in the graph.
   """
 
-  alias TLA.{Spec, StateGraph, Trace}
+  alias TLA.{Spec, StateGraph, Temporal, Trace}
 
   @type verdict :: :ok | {:violation, atom(), Trace.lasso()}
 
@@ -386,7 +386,7 @@ defmodule TLA.ModelChecker.Liveness do
   # where the unfair constraint is enabled and searched again, because a subset that
   # avoids them may be fair where the whole was not.
   defp fair_components(graph, region, witness?) do
-    graph |> components(region) |> Enum.flat_map(&refine(graph, &1, witness?))
+    graph |> StateGraph.sccs(region) |> Enum.flat_map(&refine(graph, &1, witness?))
   end
 
   defp refine(graph, component, witness?) do
@@ -445,12 +445,10 @@ defmodule TLA.ModelChecker.Liveness do
   defp taken?(graph, component, action, binding) do
     Enum.any?(component, fn id ->
       Enum.any?(StateGraph.successors(graph, id), fn {name, params, next} ->
-        name == action and MapSet.member?(component, next) and extends?(params, binding)
+        name == action and MapSet.member?(component, next) and Temporal.extends?(params, binding)
       end)
     end)
   end
-
-  defp extends?(params, binding), do: Enum.all?(binding, fn {k, v} -> Map.get(params, k) == v end)
 
   # A stuck state stutters forever (§5.3), which is a self-loop with no action — so it is
   # a component of its own, and a fair one, since nothing is enabled in it to be required.
@@ -459,66 +457,6 @@ defmodule TLA.ModelChecker.Liveness do
       [] -> [{nil, nil, id}]
       edges -> edges
     end
-  end
-
-  # ── Tarjan ──────────────────────────────────────────────────────────────────
-
-  defp components(graph, region) do
-    region
-    |> Enum.sort()
-    |> Enum.reduce(
-      %{index: 0, indices: %{}, low: %{}, stack: [], on: MapSet.new(), out: []},
-      fn id, acc ->
-        if Map.has_key?(acc.indices, id), do: acc, else: connect(graph, region, id, acc)
-      end
-    )
-    |> Map.fetch!(:out)
-    |> Enum.reverse()
-  end
-
-  defp connect(graph, region, v, acc) do
-    acc = %{
-      acc
-      | indices: Map.put(acc.indices, v, acc.index),
-        low: Map.put(acc.low, v, acc.index),
-        index: acc.index + 1,
-        stack: [v | acc.stack],
-        on: MapSet.put(acc.on, v)
-    }
-
-    acc =
-      graph
-      |> successors(v)
-      |> Enum.reduce(acc, fn {_action, _params, w}, acc ->
-        cond do
-          not MapSet.member?(region, w) ->
-            acc
-
-          not Map.has_key?(acc.indices, w) ->
-            acc = connect(graph, region, w, acc)
-            %{acc | low: Map.put(acc.low, v, min(acc.low[v], acc.low[w]))}
-
-          MapSet.member?(acc.on, w) ->
-            %{acc | low: Map.put(acc.low, v, min(acc.low[v], acc.indices[w]))}
-
-          true ->
-            acc
-        end
-      end)
-
-    if acc.low[v] == acc.indices[v], do: pop_component(acc, v), else: acc
-  end
-
-  defp pop_component(acc, v) do
-    {above, [^v | rest]} = Enum.split_while(acc.stack, &(&1 != v))
-    component = MapSet.new([v | above])
-
-    %{
-      acc
-      | stack: rest,
-        on: MapSet.difference(acc.on, component),
-        out: [component | acc.out]
-    }
   end
 
   # ── Paths ───────────────────────────────────────────────────────────────────
@@ -709,8 +647,9 @@ defmodule TLA.ModelChecker.Liveness do
       graph
       |> StateGraph.successors(id)
       |> Enum.find_value(fn {name, params, next} ->
-        if name == action and MapSet.member?(component, next) and extends?(params, binding),
-          do: [{:edge, id, name, params, next}]
+        if name == action and MapSet.member?(component, next) and
+             Temporal.extends?(params, binding),
+           do: [{:edge, id, name, params, next}]
       end)
     end)
   end

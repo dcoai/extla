@@ -105,94 +105,120 @@ the fingerprint would then faithfully preserve as a distinct state.
 
 ## Module: `TLA.Temporal`
 
-Temporal logic operators for reasoning about behaviors (sequences of states).
+Temporal logic operators for reasoning about behaviors (sequences of states), and
+`ENABLED`.
+
+### Two ways to evaluate a temporal formula
+
+`TLA.ModelChecker.Liveness` evaluates the 5.1 fragment over the STATE GRAPH, by looking
+for a strongly connected component a fair behavior could cycle in forever. That answers a
+question about every behavior of the spec at once, which is what model checking is for.
+
+The operators here answer the other question: does THIS ONE BEHAVIOR satisfy the formula?
+That is what Layer 3 needs — an implementation produces a trace, and the trace is checked
+against the properties the spec claims. It is also a cross-check on the first: a lasso the
+model checker hands back as a counterexample must come back `:violated` when evaluated
+here, and its cycle must satisfy every fairness constraint the spec declares. Two
+implementations of the same semantics that share no code and disagree mean one of them is
+wrong; the differential corpus asserts they agree.
+
+### Three verdicts, not a boolean
+
+**Amended.** An earlier draft of this section typed every operator `:: boolean()`. A
+behavior is infinite and a trace is a prefix of one, so a boolean cannot say what a prefix
+actually establishes: it can REFUTE `[]P` — one state where P is false settles it — and it
+can SATISFY `<>P`, but never the other way round, because P might fail after the trace
+ends or hold after it. Returning `true` for "P held throughout the states I saw" is the
+claim-more-than-was-checked failure this project is organized around not making, one level
+below where `max_states_reached` makes it.
+
+Every operator returns `:holds`, `:violated` or `:inconclusive`.
+`05-layer3-conformance.md`'s `check_temporal_properties/2` already required exactly these
+three, so this makes the two documents agree.
+
+A **lasso** removes the doubt. When the trace is a prefix followed by a cycle that repeats
+forever — which is what a model-checker counterexample is, and what a simulation reaching
+a `terminal` state produces — the behavior is fully described by finitely many states, and
+every operator gives a definite answer. `lasso_start` is the index the cycle returns to;
+`TLA.Trace.to_behavior/1` computes it. Without one, `<>[]P`, `[]<>P` and `P ~> Q` are
+`:inconclusive` for every trace, because nothing finite settles them in either direction.
 
 ### Operators
 
 ```elixir
 defmodule TLA.Temporal do
-  @moduledoc """
-  Temporal logic operators over finite behaviors (traces).
-
-  These implement the finite-trace semantics of TLA temporal operators.
-  For model checking, behaviors are finite but may include a "lasso"
-  (back-loop) to represent infinite cyclic behaviors.
-  """
-
+  @type verdict :: :holds | :violated | :inconclusive
   @type predicate :: (TLA.State.t() -> boolean())
   @type action_predicate :: (TLA.State.t(), TLA.State.t() -> boolean())
   @type behavior :: TLA.State.behavior()
+  @type lasso_start :: non_neg_integer() | nil
 
-  @doc """
-  □P (always/box): P holds in every state of the behavior.
-  TLA+ equivalent: []P
-  """
-  @spec always(behavior(), predicate()) :: boolean()
-  def always(behavior, predicate)
+  @doc "[]P — P holds in every state. Refutable by any trace; established only by a lasso."
+  @spec always(behavior(), predicate(), lasso_start()) :: verdict()
+  def always(behavior, predicate, lasso_start \\ nil)
 
-  @doc """
-  ◇P (eventually/diamond): P holds in at least one state.
-  TLA+ equivalent: <>P
-  """
-  @spec eventually(behavior(), predicate()) :: boolean()
-  def eventually(behavior, predicate)
+  @doc "<>P — P holds in at least one state. The mirror of always/3."
+  @spec eventually(behavior(), predicate(), lasso_start()) :: verdict()
+  def eventually(behavior, predicate, lasso_start \\ nil)
 
-  @doc """
-  ◇□P (eventually always): P becomes true and stays true forever.
-  TLA+ equivalent: <>[]P
-  """
-  @spec eventually_always(behavior(), predicate()) :: boolean()
-  def eventually_always(behavior, predicate)
+  @doc "<>[]P — decided by the cycle alone: nothing outside it recurs."
+  @spec eventually_always(behavior(), predicate(), lasso_start()) :: verdict()
+  def eventually_always(behavior, predicate, lasso_start \\ nil)
 
-  @doc """
-  □◇P (always eventually): P is true infinitely often.
-  For finite traces with a lasso, checks that P occurs in the cycle.
-  TLA+ equivalent: []<>P
-  """
-  @spec always_eventually(behavior(), predicate(), lasso_start :: non_neg_integer() | nil) :: boolean()
+  @doc "[]<>P — whether P occurs somewhere in the cycle."
+  @spec always_eventually(behavior(), predicate(), lasso_start()) :: verdict()
   def always_eventually(behavior, predicate, lasso_start \\ nil)
 
-  @doc """
-  P ⇝ Q (leads-to): whenever P is true, Q eventually becomes true.
-  TLA+ equivalent: P ~> Q
-  """
-  @spec leads_to(behavior(), predicate(), predicate()) :: boolean()
-  def leads_to(behavior, p, q)
+  @doc "P ~> Q — whenever P holds, Q holds then or later."
+  @spec leads_to(behavior(), predicate(), predicate(), lasso_start()) :: verdict()
+  def leads_to(behavior, p, q, lasso_start \\ nil)
+
+  @doc "[][A]_v — every step satisfies A or leaves `vars` alone."
+  @spec box_action(behavior(), action_predicate(), [atom()], lasso_start()) :: verdict()
+  def box_action(behavior, action, vars, lasso_start \\ nil)
+
+  @doc "<><A>_v — some step satisfies A and changes something in `vars`."
+  @spec diamond_action(behavior(), action_predicate(), [atom()], lasso_start()) :: verdict()
+  def diamond_action(behavior, action, vars, lasso_start \\ nil)
 
   @doc """
-  □[A]_v (box-action): every step either satisfies action A or is a
-  stuttering step (variables v don't change).
-  TLA+ equivalent: [][A]_vars
+  The steps of a behavior. Under a lasso the last one closes it — from the final
+  state back to `lasso_start`. Leaving it out would lose the step a fairness
+  constraint is most often satisfied by, and would give a cycle of one state no
+  steps at all.
   """
-  @spec box_action(behavior(), action_predicate(), [atom()]) :: boolean()
-  def box_action(behavior, action, vars)
+  @spec steps(behavior(), lasso_start()) :: [TLA.State.step()]
+  def steps(behavior, lasso_start \\ nil)
 
-  @doc """
-  ◇⟨A⟩_v (diamond-action): some step satisfies action A and changes
-  at least one variable in v.
-  TLA+ equivalent: <><A>_vars
-  """
-  @spec diamond_action(behavior(), action_predicate(), [atom()]) :: boolean()
-  def diamond_action(behavior, action, vars)
+  @doc "The states that recur forever: the cycle of a lasso, or nil without one."
+  @spec cycle(behavior(), lasso_start()) :: behavior() | nil
+  def cycle(behavior, lasso_start)
 
   @doc """
   ENABLED: true if the action has at least one legal successor from this state —
   some params combination for which every param generator is non-empty and the
-  guard holds (02-dsl-semantics.md §2.1, §3).
+  guard holds (02-dsl-semantics.md 2.1, 3).
 
   Enabledness is a function of the action's params and guard alone. It does NOT
   consult the state graph — an earlier draft took a `state_graph` argument, but
   the graph records reachable successors, not enabledness, and a parent-pointer
   graph (04-layer2-model-checker.md §State Graph) records no successors at all.
   The liveness checker records the result of this function per state, as a bit
-  per fairness constraint, while the state is materialized during expansion.
+  per fairness constraint, while the state is materialized.
 
   `binding` restricts the check to one binding of the leading params, for
-  per-binding fairness (02-dsl-semantics.md §5.2); `%{}` means any binding.
-  TLA+ equivalent: ENABLED Action, or ENABLED Action(p) with a binding.
+  per-binding fairness (02-dsl-semantics.md 5.2); `%{}` means any binding.
   """
   @spec enabled?(TLA.State.t(), TLA.Spec.Compiled.action_def(), constants :: map(), binding :: map()) :: boolean()
   def enabled?(state, action, constants, binding \\ %{})
+
+  @doc "The same question against bindings already computed."
+  @spec enabled_among?([map()], map()) :: boolean()
+  def enabled_among?(enabled_bindings, binding)
+
+  @doc "Whether a full binding agrees with a partial one everywhere the partial one speaks."
+  @spec extends?(map(), map()) :: boolean()
+  def extends?(full, partial)
 end
 ```
 
@@ -201,37 +227,80 @@ end
 ```elixir
 defmodule TLA.Temporal.Fairness do
   @moduledoc """
-  Weak and strong fairness constraints.
+  Weak and strong fairness: over a spec's declarations, and over one behavior.
 
-  Fairness prevents trivial satisfaction of liveness properties
-  by forbidding infinite stuttering when progress is possible.
+  Fairness prevents trivial satisfaction of liveness properties by forbidding
+  infinite stuttering when progress is possible.
   """
+
+  @typedoc "A declaration, and the binding of the leading params it is about."
+  @type constraint :: {TLA.Spec.Compiled.fairness_def(), binding :: map()}
 
   @doc """
-  Weak fairness: if an action is continuously enabled from some point on,
-  it must eventually be taken.
+  Every fairness constraint of a spec under `constants`, in declaration order and,
+  within a per-binding declaration, in generator order.
 
-  WF_vars(A) ≡ □◇¬(ENABLED ⟨A⟩_vars) ∨ □◇⟨A⟩_vars
-
-  Use when: once enabled, the action stays enabled until taken.
-  Example: a process ready to run without contention.
+  `fairness :strong, acquire_lock: [:p]` is one constraint PER ELEMENT of the set p
+  ranges over (02-dsl-semantics.md 5.2). The order is the bit order of
+  `TLA.StateGraph`'s enabled bitstrings, so it has to be deterministic.
   """
-  @spec weak_fairness(TLA.State.behavior(), TLA.Temporal.action_predicate(), [atom()]) :: boolean()
-  def weak_fairness(behavior, action, vars)
+  @spec expand(TLA.Spec.Compiled.t(), map(), TLA.State.t()) :: [constraint()]
+  def expand(spec, constants, state)
 
   @doc """
-  Strong fairness: if an action is repeatedly enabled (even intermittently),
-  it must eventually be taken.
+  The `{action, enabled}` predicates for one constraint, over a spec and its constants.
 
-  SF_vars(A) ≡ ◇□¬(ENABLED ⟨A⟩_vars) ∨ □◇⟨A⟩_vars
-
-  Use when: the action may be enabled and disabled repeatedly.
-  Example: acquiring a contested lock.
+  `action` is the constraint's action read as TLA+ reads one — a relation on a pair
+  of states, true when some binding the constraint permits carries the first to the
+  second.
   """
-  @spec strong_fairness(TLA.State.behavior(), TLA.Temporal.action_predicate(), [atom()]) :: boolean()
-  def strong_fairness(behavior, action, vars)
+  @spec constraint_predicates(TLA.Spec.Compiled.t(), map(), constraint()) ::
+    {TLA.Temporal.action_predicate(), TLA.Temporal.predicate()}
+  def constraint_predicates(spec, constants, constraint)
+
+  @doc "How a constraint reads, for a message: SF(acquire_lock, p: :p1) or WF(timeout)."
+  @spec describe(constraint()) :: String.t()
+  def describe(constraint)
+
+  @doc """
+  WF_vars(A) over one behavior: if A is CONTINUOUSLY enabled from some point on, it
+  is eventually taken.
+
+      WF_vars(A)  ==  []<>~(ENABLED <A>_vars)  \\/  []<><A>_vars
+
+  Over a lasso both disjuncts reduce to the cycle, since nothing outside it recurs:
+  the first is "A is disabled SOMEWHERE in the cycle", the second is "an A-step
+  occurs INSIDE it". Those are the conditions `TLA.ModelChecker.Liveness` reads off a
+  strongly connected component, arrived at from the other direction.
+  """
+  @spec weak_fairness(TLA.Temporal.behavior(), TLA.Temporal.action_predicate(),
+                      TLA.Temporal.predicate(), [atom()], TLA.Temporal.lasso_start()) ::
+    TLA.Temporal.verdict()
+  def weak_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
+
+  @doc """
+  SF_vars(A): if A is REPEATEDLY enabled — even intermittently — it is eventually taken.
+
+      SF_vars(A)  ==  <>[]~(ENABLED <A>_vars)  \\/  []<><A>_vars
+
+  The only difference from weak_fairness/5 is the first disjunct: over a lasso, A must
+  be disabled in EVERY state of the cycle rather than in one of them. That single
+  quantifier is the whole distance between the two, and it is why `no_starvation`
+  needs the strong form.
+  """
+  @spec strong_fairness(TLA.Temporal.behavior(), TLA.Temporal.action_predicate(),
+                        TLA.Temporal.predicate(), [atom()], TLA.Temporal.lasso_start()) ::
+    TLA.Temporal.verdict()
+  def strong_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
 end
 ```
+
+**Amended: `enabled` is a separate argument.** An earlier draft typed these
+`weak_fairness(behavior, action, vars)`, with the action as a relation on state pairs and
+nothing else. `ENABLED <A>_v` quantifies over every state A could lead to, and a behavior
+contains only the states that happened — so no function of the observed steps can answer
+it. `constraint_predicates/3` builds both predicates from a spec, which is where the
+answer lives.
 
 ---
 

@@ -172,6 +172,23 @@ defmodule TLA.DifferentialCase do
 
           assert TLA.DifferentialCase.refuted(result) == name
           assert result.violation.prefix.length > 0
+
+          # The counterexample, checked a second way. `TLA.ModelChecker.Liveness` reasons
+          # about components of the state graph; `TLA.Temporal` walks the behaviour it
+          # handed back. They share no code, so agreement is evidence — and the cycle has
+          # to be one the spec's own fairness permits, or the lasso is not a behaviour of
+          # the spec at all.
+          behavior = TLA.Trace.to_behavior(result.violation)
+
+          assert :violated in TLA.TemporalCheck.verdicts(spec, @entry.constants, name, behavior),
+                 "the checker refuted #{name}, but its own counterexample does not"
+
+          for {constraint, verdict} <-
+                TLA.TemporalCheck.fairness_verdicts(spec, @entry.constants, behavior) do
+            assert verdict == :holds,
+                   "the counterexample's cycle breaks #{constraint}, so the spec's " <>
+                     "fairness forbids the behaviour it was handed back as"
+          end
         end
       end
 

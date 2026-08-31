@@ -465,3 +465,30 @@ does with an unsound answer (design principle 6): the two reductions are each so
 their own, and asking for both is asking for an answer neither of them supports.
 
 See `04-layer2-model-checker.md` §Symmetry.
+---
+
+## D-23 — A temporal operator over a finite trace returns three verdicts, not a boolean
+
+**Decided.** `TLA.Temporal`'s operators return `:holds | :violated | :inconclusive`, and
+take the index a lasso's cycle returns to.
+
+**Replaced:** `01-foundation.md` typing every operator `:: boolean()`.
+
+**Why:** a behavior is infinite and a trace is a prefix of one. A prefix can refute `[]P`
+and can satisfy `<>P`, and can do neither the other way round — P may fail after the trace
+ends, or hold after it. A boolean forces "P held throughout the states I saw" to be
+reported as "`[]P` holds", which is claiming more than was checked (design principle 6),
+one level below where `max_states_reached` makes the same distinction.
+`05-layer3-conformance.md`'s `check_temporal_properties/2` already specified these three
+verdicts, so the two documents disagreed and this settles it in favor of the honest one.
+
+A lasso removes the doubt: prefix plus repeating cycle describes an infinite behavior with
+finitely many states, and every operator then answers definitely. Without one, `<>[]P`,
+`[]<>P` and `P ~> Q` are `:inconclusive` for every trace.
+
+The same section also amends `TLA.Temporal.Fairness` to take `ENABLED` as its own
+argument. `ENABLED <A>_v` quantifies over every state `A` could lead to, and a behavior
+holds only the states that happened, so no function of the observed steps can answer it —
+the original three-argument signature was not implementable as specified.
+
+See `01-foundation.md` §`TLA.Temporal`.

@@ -199,6 +199,35 @@ defmodule TLA.ModelChecker.LivenessTest do
     end
   end
 
+  describe "the counterexample as a behaviour" do
+    test "a plain trace is a prefix, with no cycle to return to" do
+      trace = ModelChecker.run(TLA.TestSpecs.Broken, %{constants: %{}}).violation
+
+      assert {states, nil} = Trace.to_behavior(trace)
+      assert states == trace.states
+    end
+
+    # §5.3's stuttering end: the behaviour is the prefix, looping on its own last state.
+    test "a stuttering lasso loops on the state the spec ended in" do
+      lasso = check(Stalls, %{}, [:eventually_done]).violation
+
+      assert {states, lasso_start} = Trace.to_behavior(lasso)
+      assert states == lasso.prefix.states
+      assert lasso_start == length(states) - 1
+      assert Enum.at(states, lasso_start) == %{phase: :stuck}
+    end
+
+    # The cycle trace ends where it began, so the repeated state is dropped: the behaviour
+    # lists each state once and `lasso_start` says where to loop back to.
+    test "a real cycle is listed once, not once and a bit" do
+      lasso = check(IdlingUnfair, %{}, [:eventually_two]).violation
+
+      assert {states, lasso_start} = Trace.to_behavior(lasso)
+      assert length(states) == length(lasso.prefix.states) + length(lasso.cycle.states) - 2
+      assert Enum.at(states, lasso_start) == List.last(lasso.cycle.states)
+    end
+  end
+
   defp explore_live(module, constants),
     do: ModelChecker.explore(module, %{constants: constants, liveness_graph: true})
 end
