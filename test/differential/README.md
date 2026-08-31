@@ -8,10 +8,10 @@ The Phase 1 acceptance gate (`spec/04-layer2-model-checker.md` §Differential te
 3. the length of the shortest counterexample where one exists.
 
 The corpus also records TLC's verdict on every **temporal** property — `holds` or
-`violated`. Nothing on the ExTLA side reads them yet; `check_liveness: true` still
-raises, and Phase 2 is what will make them mean something. They are here first for
-the reason the corpus itself came before the checker did: a liveness answer with
-nothing to compare it against is a claim rather than a measurement.
+`violated` — and since Phase 2's `check_liveness: true`, ExTLA is compared against those
+too. The oracle landed a slice before the checker did, for the reason the corpus itself
+came before the checker: a liveness answer with nothing to compare it against is a claim
+rather than a measurement.
 
 ## Layout
 
@@ -52,6 +52,10 @@ why CI regenerates it from TLC on every pipeline and fails on any difference.
 | `deadlock` | Whether TLC reached a state with no successors. A `terminal` declaration (`spec/02-dsl-semantics.md` §5.3) is how ExTLA accepts one of these on purpose |
 | `invariants` | `"holds"`, or `{"violated_at": n}` where `n` is the number of states in the shortest counterexample — 7 states is a 6-step trace |
 | `properties` | `"holds"` or `"violated"`, per temporal property, under the fairness the module's `Spec` conjoins |
+
+`raft_election`'s `EventuallyElectLeader` is the row worth having. A liveness checker
+that reports everything as holding agrees with every other row in this file, and only
+that one tells it apart from a working one.
 
 The verdict on a property is that one word and nothing more. TLC's counterexample is a
 lasso, and a lasso is not canonical the way a breadth-first shortest counterexample is —

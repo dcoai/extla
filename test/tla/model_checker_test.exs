@@ -194,24 +194,12 @@ defmodule TLA.ModelCheckerTest do
   end
 
   describe "phase boundaries" do
-    # Reporting temporal properties as holding without the liveness graph would
-    # be exactly the silent unsoundness the project exists to avoid.
-    test "liveness raises rather than checking something weaker" do
-      assert_raise ArgumentError, ~r/liveness arrives in Phase 2|not implemented yet/, fn ->
-        ModelChecker.run(Counter, %{constants: %{max: 2}, check_liveness: true})
-      end
-    end
+    test "asking for liveness now checks it, and builds the graph to do so" do
+      {result, graph} =
+        ModelChecker.explore(Counter, %{constants: %{max: 2}, check_liveness: true})
 
-    # The graph is built; nothing checks a temporal property with it. A run that
-    # returned :ok here would be claiming an answer it does not have.
-    test "having the liveness graph is not having a liveness answer" do
-      assert_raise ArgumentError, ~r/not implemented yet/, fn ->
-        ModelChecker.run(Counter, %{
-          constants: %{max: 2},
-          check_liveness: true,
-          liveness_graph: true
-        })
-      end
+      assert result.status == :ok
+      assert StateGraph.liveness?(graph)
     end
 
     test "symmetry raises" do
@@ -224,7 +212,7 @@ defmodule TLA.ModelCheckerTest do
       result = ModelChecker.run(Counter, %{constants: %{max: 2}})
 
       assert Enum.any?(result.warnings, &(&1 =~ "temporal"))
-      assert Enum.any?(result.warnings, &(&1 =~ "Phase 2"))
+      assert Enum.any?(result.warnings, &(&1 =~ "check_liveness: true"))
     end
 
     test "a spec with no temporal properties warns about nothing" do

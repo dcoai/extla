@@ -31,7 +31,16 @@ defmodule TLA.Trace do
           length: non_neg_integer()
         }
 
-  @type lasso :: %{prefix: t(), cycle: t()}
+  @typedoc """
+  A liveness counterexample: a finite prefix, then a cycle repeated forever.
+
+  `cycle` is `nil` where a single state refutes the property — `pred` and `always(pred)`
+  are settled by one state, and printing an invented cycle after it would suggest the
+  reason lay somewhere it does not. A `cycle` whose `actions` are empty is a state that
+  stutters forever: a `terminal` (`02-dsl-semantics.md` §5.3), which is a legal end of a
+  behaviour and refutes anything that was still waiting for something to happen.
+  """
+  @type lasso :: %{prefix: t(), cycle: t() | nil}
 
   defstruct type: :safety,
             property: nil,
@@ -47,14 +56,32 @@ defmodule TLA.Trace do
   @spec generate(StateGraph.t(), StateGraph.state_id(), keyword()) :: t()
   def generate(graph, target, opts \\ []) do
     {init_index, steps} = StateGraph.path_to(graph, target)
-    spec = graph.spec
-    constants = graph.constants
+    replay(graph, init_index, steps, opts)
+  end
 
-    initial = spec.init |> Enum.at(init_index) |> apply([constants])
+  @doc """
+  A trace for an arbitrary path: the state `init_index` produces, then `steps` applied in
+  order.
 
+  `generate/3` is the shortest path to one state, which is what a safety violation needs.
+  A liveness counterexample is not that shape — its prefix may be restricted to a subgraph
+  and its cycle starts nowhere near an `init` — so the path is handed over rather than
+  walked back from parent pointers.
+  """
+  @spec replay(StateGraph.t(), non_neg_integer(), [{atom(), map()}], keyword()) :: t()
+  def replay(graph, init_index, steps, opts \\ []) do
+    initial = graph.spec.init |> Enum.at(init_index) |> apply([graph.constants])
+    from(graph, initial, steps, opts)
+  end
+
+  @doc """
+  A trace beginning at a state already in hand, applying `steps` in order.
+  """
+  @spec from(StateGraph.t(), TLA.State.t(), [{atom(), map()}], keyword()) :: t()
+  def from(graph, initial, steps, opts \\ []) do
     states =
       Enum.scan(steps, initial, fn {action, params}, state ->
-        Spec.Compiled.action(spec, action).transition.(constants, state, params)
+        Spec.Compiled.action(graph.spec, action).transition.(graph.constants, state, params)
       end)
 
     %__MODULE__{
@@ -89,9 +116,25 @@ defmodule TLA.Trace do
   def to_diffs(%__MODULE__{states: []}), do: []
 
   @doc """
-  Pretty-print a trace, marking the variables each step changed.
+  Pretty-print a trace or a lasso, marking the variables each step changed.
   """
-  @spec format(t()) :: String.t()
+  @spec format(t() | lasso()) :: String.t()
+  def format(%{prefix: prefix, cycle: nil}), do: format(prefix)
+
+  def format(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do
+    back_to = length(prefix.states)
+
+    joined = %{
+      prefix
+      | states: prefix.states ++ tl(cycle.states),
+        actions: prefix.actions ++ cycle.actions,
+        bindings: prefix.bindings ++ cycle.bindings,
+        length: prefix.length + cycle.length - 1
+    }
+
+    format(joined) <> loop_note(cycle, back_to)
+  end
+
   def format(%__MODULE__{} = trace) do
     header = header(trace)
     diffs = to_diffs(trace)
@@ -105,6 +148,18 @@ defmodule TLA.Trace do
       end)
 
     header <> "\n\n" <> body <> "\n" <> String.duplicate("═", 68) <> "\n"
+  end
+
+  # The whole point of a lasso: what happens after the last state printed. Without this
+  # line the trace reads as though it ended, and "ended" is the one thing it did not do.
+  defp loop_note(%__MODULE__{actions: []}, back_to) do
+    "\nState #{back_to} has no successors: the behaviour stutters there forever " <>
+      "(02-dsl-semantics.md §5.3).\n"
+  end
+
+  defp loop_note(%__MODULE__{states: states}, back_to) do
+    "\n↺ back to state #{back_to} — states #{back_to}-#{back_to + length(states) - 2} " <>
+      "repeat forever.\n"
   end
 
   defp header(%{type: :deadlock}), do: banner("DEADLOCK")

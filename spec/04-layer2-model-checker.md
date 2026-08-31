@@ -757,51 +757,85 @@ end
 ```elixir
 defmodule TLA.ModelChecker.Liveness do
   @moduledoc """
-  Liveness property checking using the state graph.
+  Temporal property checking over the liveness graph.
 
-  Liveness violations manifest as "bad cycles" — strongly connected
-  components in the state graph where a required condition never holds.
-  This implements a variant of the Emerson-Lei algorithm.
+  A liveness property is refuted by an infinite behavior, and an infinite behavior
+  in a finite graph is a LASSO: a finite prefix, then a cycle repeated forever.
+  The states a behavior visits infinitely often are a strongly connected set, so
+  the search is for a strongly connected component that the property forbids
+  cycling in forever and the fairness constraints permit cycling in.
 
-  Liveness checking is significantly more expensive than safety checking, and
-  it requires a graph built with `check_liveness: true` — the edge table and
-  enabled bits of §State Graph. Given a safety-only graph it raises rather than
-  run Tarjan over a spanning tree and report every property as holding.
+  A component S is unfair when a constraint says it cannot be a behavior's tail:
 
-  A terminal state (02-dsl-semantics.md §5.3) is a self-loop for this purpose:
-  stuttering forever there is a legal behavior, so a leads-to whose consequent
-  has not held by then is violated there.
+    WF(A)  A enabled in EVERY state of S, and no edge inside S takes it
+    SF(A)  A enabled in SOME state of S, and no edge inside S takes it
+
+  Both read the ENABLED bits recorded per state (§State Graph) and the edges
+  beside them.
+
+  A broken WF kills every strongly connected SUBSET of S too: a subset has A
+  enabled everywhere as well and no more edges to take it with. A broken SF does
+  not — dropping the states where A is enabled can leave a smaller component that
+  is fair — so the search does exactly that and recurses. That is the shape of the
+  Emerson-Lei algorithm, and the reason this is not "Tarjan, then filter".
+
+  A terminal state (02-dsl-semantics.md 5.3) is a self-loop, and always a fair
+  one: nothing is enabled in it, so no constraint can require anything of it. A
+  leads-to whose consequent has not held by then is violated there.
+
+  It requires a graph built with `check_liveness: true` — the edge table and
+  enabled bits of §State Graph — and a COMPLETE one. Given a safety-only graph it
+  raises rather than run Tarjan over a spanning tree and report every property as
+  holding; given a graph whose search was bounded it raises rather than answer a
+  question about behaviors nobody explored.
   """
+
+  @typedoc "The first violation in declaration order, with the lasso that refutes it."
+  @type verdict :: :ok | {:violation, atom(), TLA.Trace.lasso()}
 
   @doc """
-  Check all temporal properties against the completed state graph.
-  Returns :ok or a lasso-shaped counterexample (prefix + cycle).
-  """
-  @spec check(TLA.Spec.Compiled.t(), TLA.StateGraph.t()) ::
-    :ok | {:violation, atom(), TLA.Trace.lasso()}
-  def check(spec, graph)
+  Check a spec's temporal properties against a completed liveness graph.
 
-  @doc """
-  Check one weak-fairness constraint — an action, or one binding of an action's
-  leading params (02-dsl-semantics.md §5.2). The constraint must not be
-  continuously enabled (its bit set in every state of an SCC, read from
-  `graph.enabled`) without being taken (an edge for it inside the SCC).
+  `selected` is `:all` or a list of names, the way `invariants:` selects
+  invariants — the differential corpus asks one property at a time, because that
+  is how TLC reports them.
   """
-  @spec check_weak_fairness(TLA.Spec.Compiled.t(), TLA.StateGraph.t(),
-                            {TLA.Spec.Compiled.fairness_def(), binding :: map()}) ::
-    :ok | {:violation, TLA.Trace.lasso()}
-  def check_weak_fairness(spec, graph, constraint)
-
-  @doc """
-  Check one strong-fairness constraint. It must not be enabled in ANY state of
-  an SCC without being taken inside it.
-  """
-  @spec check_strong_fairness(TLA.Spec.Compiled.t(), TLA.StateGraph.t(),
-                              {TLA.Spec.Compiled.fairness_def(), binding :: map()}) ::
-    :ok | {:violation, TLA.Trace.lasso()}
-  def check_strong_fairness(spec, graph, constraint)
+  @spec check(TLA.Spec.Compiled.t(), TLA.StateGraph.t(), :all | [atom()]) :: verdict()
+  def check(spec, graph, selected \\ :all)
 end
 ```
+
+### The fragment, shape by shape
+
+§5.1's grammar reduces to six shapes, each a question about components. `\A x \in C`
+is a conjunction of instances, so quantifiers are expanded away before any of this.
+
+| Formula | Refuted by |
+|---|---|
+| `pred` | an initial state where it is false |
+| `always(pred)` | any reachable state where it is false |
+| `eventually(pred)` | a fair component of the ¬pred subgraph, reached without leaving it |
+| `always(eventually(pred))` | a fair component of the ¬pred subgraph, reached any way at all |
+| `eventually(always(pred))` | a fair component holding a ¬pred state |
+| `p ~> q` | a reachable `p /\ ¬q` state that reaches a fair component of the ¬q subgraph |
+
+`always(pred)` needs no component search: every reachable state has a fair
+continuation, because a walk to a BOTTOM component is always available and a bottom
+component is always fair — every action enabled inside it has its edge inside it,
+since nothing leaves.
+
+A nesting outside the table raises. The grammar is recursive and admits
+`always(eventually(always(p)))`; evaluating one of those as though it were
+something simpler is a weaker check reported as the real thing.
+
+### The counterexample
+
+The cycle a violation prints is a closed walk through everything the cycle must
+contain: for each fairness constraint, a state of the component where it is
+disabled, or an edge inside the component that takes it. A constraint is satisfied
+by a BEHAVIOR and not by a component, so a cycle that skipped the state where a
+constraint is disabled would be a cycle that constraint forbids — printed as a
+counterexample to a property the spec's own assumptions never allowed to fail.
 
 ---
 

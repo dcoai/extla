@@ -138,11 +138,17 @@ defmodule TLA.Spec.Compiled do
   # no negation, conjunction or disjunction OF FORMULAS. This fragment is
   # checkable by SCC analysis without building a Buchi automaton, and covers the
   # properties people write. Widening it is a change to §5.1 first.
+  # A temporal formula's predicates take only the state: the constants were captured when
+  # `temporal_def.formula` was applied to them, which is what makes a formula a function
+  # of the constants in the first place. An invariant's `predicate()` takes both, because
+  # an invariant is not rebuilt per run.
+  @type state_predicate :: (TLA.State.t() -> boolean())
+
   @type temporal_formula ::
           {:always, temporal_formula()}
           | {:eventually, temporal_formula()}
-          | {:leads_to, predicate(), predicate()}
-          | {:predicate, predicate()}
+          | {:leads_to, state_predicate(), state_predicate()}
+          | {:predicate, state_predicate()}
           # ∀ over a constant: the set is resolved at check time, the body
           # instantiated once per element, and each instance checked independently.
           | {:for_all, (constants() -> Enumerable.t()), (term() -> temporal_formula())}
