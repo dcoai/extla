@@ -562,9 +562,18 @@ defmodule TLA.StateGraph do
   memory. This is TLC's split too: safety on fingerprints alone, liveness on a
   second graph paid for only when asked for.
 
-  Cost: roughly 16 bytes per edge plus the bits, on top of the 64-byte node.
-  For a branching factor b that is ~16b bytes per state — still independent of
-  state SIZE, which is the property D-5 exists to keep.
+  Cost, measured rather than estimated (`bench/liveness_graph.exs`): about 210
+  bytes per edge on `raft_election` and 270 on `bounded_buffer`, and 10-15% on
+  the search. An earlier draft here guessed ~16 bytes per edge, which was the
+  cost of `{action, successor_id}` and forgot the binding — and a binding is a
+  map, holding a whole message record where the param is a message. The figure
+  that survives is the one D-5 exists for: it is a function of the branching
+  factor and of how large a BINDING is, and not of how large a STATE is.
+
+  Only an EXPANDED state has edges. A run that stopped early — max_states, a
+  state constraint, a safety violation halting the search — leaves a partial edge
+  table, and a liveness verdict read off one would be a claim about behaviors
+  that were never explored.
   """
 
   @type state_id :: non_neg_integer()

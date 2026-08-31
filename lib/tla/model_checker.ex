@@ -17,6 +17,8 @@ defmodule TLA.ModelChecker do
 
   alias TLA.ModelChecker.Safety
   alias TLA.Spec.Type
+  alias TLA.Temporal
+  alias TLA.Temporal.Fairness
   alias TLA.{Coverage, Fingerprint, Spec, State, StateGraph, Trace}
 
   @type config :: %{
@@ -25,6 +27,13 @@ defmodule TLA.ModelChecker do
           optional(:workers) => pos_integer(),
           optional(:check_deadlock) => boolean(),
           optional(:check_liveness) => boolean(),
+
+          # Build the liveness graph — the edge table and the ENABLED bits of
+          # `TLA.StateGraph` — without checking anything with it. It exists so the
+          # structure could land, be measured and be tested on its own;
+          # `check_liveness: true` is the option to reach for, and it will imply this
+          # once `TLA.ModelChecker.Liveness` exists.
+          optional(:liveness_graph) => boolean(),
           optional(:symmetry) => [atom()] | nil,
           optional(:verify_symmetry) => boolean(),
           optional(:state_constraint) => (State.t() -> boolean()) | nil,
@@ -65,6 +74,7 @@ defmodule TLA.ModelChecker do
     max_states: 1_000_000,
     check_deadlock: true,
     check_liveness: false,
+    liveness_graph: false,
     symmetry: nil,
     verify_symmetry: false,
     state_constraint: nil,
@@ -173,7 +183,11 @@ defmodule TLA.ModelChecker do
     |> Enum.reduce_while(run, fn {init_fn, index}, run ->
       state = run.config.constants |> init_fn.() |> State.validate!()
       {graph, id, status} = StateGraph.add_state(run.graph, state, nil, index, nil)
-      run = %{run | graph: graph, found: run.found + 1} |> note_universes(state)
+
+      run =
+        %{run | graph: graph, found: run.found + 1}
+        |> note_universes(state)
+        |> note_fairness_index(state)
 
       case admit(run, state, id, status) do
         {:ok, run, :explore} -> {:cont, %{run | frontier: :queue.in({id, state}, run.frontier)}}
@@ -202,6 +216,21 @@ defmodule TLA.ModelChecker do
   # A newly discovered state is checked, then either queued for expansion or held
   # back by the state constraint. A state already seen is neither: its invariants
   # were evaluated when it was first found.
+  # The fairness index is a function of the constants and not of any one state —
+  # §5.2 restricts a quantified param to a constant or a literal, and §7 rejects a
+  # state-drawn one — so it is built once, on the first initial state. A real state
+  # rather than a stand-in, for the same reason `note_universes/2` uses one.
+  defp note_fairness_index(%{config: %{liveness_graph: false}} = run, _state), do: run
+
+  defp note_fairness_index(run, state) do
+    if StateGraph.liveness?(run.graph) do
+      run
+    else
+      index = Fairness.expand(run.spec, run.config.constants, state)
+      %{run | graph: StateGraph.with_liveness(run.graph, index)}
+    end
+  end
+
   defp admit(run, _state, _id, :existing), do: {:ok, run, :hold}
 
   defp admit(run, state, id, :new) do
@@ -236,36 +265,82 @@ defmodule TLA.ModelChecker do
     end
   end
 
+  # A state is expanded exactly once, and this is the only place it is
+  # materialized with its successors in hand — so it is where the liveness graph's
+  # edges and ENABLED bits have to be taken. `enabled` carries the bindings the
+  # search has already computed; the bits are read off those rather than
+  # re-evaluated, which is why the structure costs no extra guard evaluations.
   defp expand(run, id, state) do
+    liveness? = StateGraph.liveness?(run.graph)
+
     run.spec.actions
-    |> Enum.reduce_while({:ok, run, false}, fn action, {:ok, run, live?} ->
+    |> Enum.reduce_while({:ok, run, false, [], []}, fn action,
+                                                       {:ok, run, live?, enabled, edges} ->
       bindings = enabled_bindings(action, run.config.constants, state)
 
-      case take_action(run, action, bindings, id, state) do
-        {:ok, run} -> {:cont, {:ok, run, live? or bindings != []}}
-        {:violation, run, trace} -> {:halt, {:violation, run, trace}}
+      case take_action(run, action, bindings, id, state, liveness?) do
+        {:ok, run, action_edges} ->
+          enabled = if liveness?, do: [{action.name, bindings} | enabled], else: enabled
+          {:cont, {:ok, run, live? or bindings != [], enabled, action_edges ++ edges}}
+
+        {:violation, run, trace} ->
+          {:halt, {:violation, run, trace}}
       end
     end)
     |> case do
-      {:ok, run, false} ->
-        {:ok, mark_stuck(run, id, state)}
+      {:ok, run, live?, enabled, edges} ->
+        run = record_liveness(run, id, Enum.reverse(edges), enabled)
 
-      {:ok, run, true} ->
-        coverage =
-          Coverage.observe_live_terminal(run.coverage, run.spec, run.config.constants, state)
+        if live? do
+          coverage =
+            Coverage.observe_live_terminal(run.coverage, run.spec, run.config.constants, state)
 
-        {:ok, %{run | coverage: coverage}}
+          {:ok, %{run | coverage: coverage}}
+        else
+          {:ok, mark_stuck(run, id, state)}
+        end
 
       {:violation, run, trace} ->
         {:violation, run, trace}
     end
   end
 
-  defp take_action(run, _action, [], _id, _state), do: {:ok, run}
+  defp record_liveness(run, id, edges, enabled) do
+    if StateGraph.liveness?(run.graph) do
+      bits = enabled_bits(run.graph.fairness_index, enabled)
+      %{run | graph: StateGraph.add_edges(run.graph, id, edges, bits)}
+    else
+      run
+    end
+  end
 
-  defp take_action(run, action, bindings, id, state) do
+  # One bit per fairness constraint, in `fairness_index` order: is any enabled
+  # binding of its action one this constraint is about? `%{}` — whole-action
+  # fairness — asks only whether the action is enabled at all, which is the
+  # strictly weaker question §5.2 exists to distinguish.
+  # `enabled` is a list keyed by action name rather than a map: a spec has a
+  # handful of actions, and this runs once per state, so a linear scan over ten
+  # entries beats building a map to throw away.
+  defp enabled_bits(index, enabled) do
+    Enum.reduce(index, <<>>, fn {%{action: action}, binding}, bits ->
+      on = Temporal.enabled_among?(bindings_of(enabled, action), binding)
+      <<bits::bitstring, if(on, do: 1, else: 0)::1>>
+    end)
+  end
+
+  defp bindings_of(enabled, action) do
+    case List.keyfind(enabled, action, 0) do
+      {^action, bindings} -> bindings
+      nil -> []
+    end
+  end
+
+  defp take_action(run, _action, [], _id, _state, _liveness?), do: {:ok, run, []}
+
+  defp take_action(run, action, bindings, id, state, liveness?) do
     bindings
-    |> Enum.reduce_while({:ok, run, 0, 0}, fn params, {:ok, run, generated, distinct} ->
+    |> Enum.reduce_while({:ok, run, 0, 0, []}, fn params,
+                                                  {:ok, run, generated, distinct, edges} ->
       next =
         run.config.constants
         |> action.transition.(state, params)
@@ -292,13 +367,18 @@ defmodule TLA.ModelChecker do
           run = %{run | graph: graph}
           distinct = if status == :new, do: distinct + 1, else: distinct
 
+          # Recorded whether or not the successor is new: an edge back into a state
+          # already seen is exactly the edge that closes a cycle, and a cycle is
+          # what liveness checking is looking for.
+          edges = if liveness?, do: [{action.name, params, next_id} | edges], else: edges
+
           case admit(run, next, next_id, status) do
             {:ok, run, :explore} ->
               run = %{run | frontier: :queue.in({next_id, next}, run.frontier)}
-              {:cont, {:ok, run, generated + 1, distinct}}
+              {:cont, {:ok, run, generated + 1, distinct, edges}}
 
             {:ok, run, :hold} ->
-              {:cont, {:ok, run, generated + 1, distinct}}
+              {:cont, {:ok, run, generated + 1, distinct, edges}}
 
             {:violation, run, trace} ->
               {:halt, {:violation, run, trace}}
@@ -306,11 +386,11 @@ defmodule TLA.ModelChecker do
       end
     end)
     |> case do
-      {:ok, run, generated, distinct} ->
+      {:ok, run, generated, distinct, edges} ->
         coverage =
           Coverage.observe_action(run.coverage, action.name, bindings, generated, distinct)
 
-        {:ok, %{run | coverage: coverage}}
+        {:ok, %{run | coverage: coverage}, edges}
 
       {:violation, run, trace} ->
         {:violation, run, trace}
@@ -494,10 +574,11 @@ defmodule TLA.ModelChecker do
   defp reject_unimplemented!(config) do
     if config.check_liveness do
       raise ArgumentError,
-            "check_liveness: true is not implemented yet. Liveness needs the edge table and " <>
-              "the per-state ENABLED bits of the liveness graph, which arrive in Phase 2 " <>
-              "(spec/06-architecture.md). Reporting temporal properties as holding without " <>
-              "them would be the silent-unsoundness this project exists to avoid."
+            "check_liveness: true is not implemented yet. The liveness graph it needs — the " <>
+              "edge table and the per-state ENABLED bits — is built by `liveness_graph: true`, " <>
+              "but nothing checks a temporal property with it yet (spec/06-architecture.md). " <>
+              "Returning :ok from a run that was asked to check liveness and checked none " <>
+              "would be the silent-unsoundness this project exists to avoid."
     end
 
     if config.symmetry not in [nil, []] or config.verify_symmetry do
