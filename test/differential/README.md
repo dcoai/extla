@@ -61,7 +61,27 @@ The verdict on a property is that one word and nothing more. TLC's counterexampl
 lasso, and a lasso is not canonical the way a breadth-first shortest counterexample is —
 two correct checkers can hand back different cycles for the same violated property. A
 fixture the checker cannot be expected to match would be worse than no fixture, so the
-shape of the lasso is left out until the entries are known to agree on it.
+shape of the lasso is left out of `expected.json`.
+
+**It is not left unchecked.** A fixture is not the only way to check a counterexample, and
+for a lasso it is the wrong way. What the corpus does instead needs no oracle at all,
+because a counterexample is a claim about the *spec* and the spec is right here:
+
+- **`TLA.Trace.validate/3`** — every counterexample the corpus produces, safety and
+  liveness alike, is checked to be a behaviour the spec admits: it starts at a state an
+  `init` block produces, every step names an action enabled there *with that binding*, and
+  every step's post-state is what that action's transition actually returns. Before this
+  existed, a counterexample with real states, real actions and a fabricated pairing between
+  them passed every gate the project had.
+- **`TLA.TemporalCheck`** — the property is evaluated over the behaviour directly, with
+  `TLA.Temporal`'s operators, which share no code with `TLA.ModelChecker.Liveness`. A
+  lasso the checker calls a counterexample must come back `:violated`, and its cycle must
+  satisfy every fairness constraint the spec declares — otherwise the checker has handed
+  back a behaviour the spec's own assumptions forbid.
+
+So the lasso is checked against the spec rather than against TLC, which is stronger for
+this particular thing: TLC's agreement would only say the two tools found *a* cycle, and
+this says the cycle handed back is real.
 
 A disagreement on `distinct_states` is the most valuable signal the project has: it
 means successor generation or state identity is wrong. `diameter` catches the narrower

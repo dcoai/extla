@@ -13,7 +13,7 @@ defmodule TLA.Trace do
   pointers and replayed forward from the `init` block that produced the root.
   """
 
-  alias TLA.{Spec, StateGraph}
+  alias TLA.{ModelChecker, Spec, StateGraph}
 
   @type t :: %__MODULE__{
           type: :safety | :liveness | :deadlock,
@@ -175,6 +175,166 @@ defmodule TLA.Trace do
 
   def to_behavior(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do
     {prefix.states ++ (cycle.states |> tl() |> Enum.drop(-1)), length(prefix.states) - 1}
+  end
+
+  @doc """
+  Check that a counterexample is a behaviour the spec actually admits.
+
+  A pure function of the trace and the spec: no oracle, no second search, no
+  implementation on the other end. A checker that hands back a trace is making a claim
+  about the spec, and this is the claim checked against the spec rather than against a
+  fixture recording what some other tool once said.
+
+  ## What it checks
+
+    1. The first state is one the spec's `init` blocks produce.
+    2. Every step names an action that is **enabled with that binding** in the state
+       before it — `TLA.ModelChecker.enabled_steps/3`, the checker's own notion of what
+       may happen next, so this cannot agree with a second enumeration instead of with
+       the checker.
+    3. Every step's post-state is what that action's transition actually produces. This is
+       the one a trace can fail while looking entirely plausible: real states, real
+       actions, and a pairing between them that is a lie.
+    4. For a lasso, additionally: the cycle starts where the prefix ends, its steps are
+       legal, and it **closes** — applying them returns to its own first state.
+
+  ## What it deliberately does not check
+
+  Whether the property is genuinely refuted along the behaviour, and whether the cycle
+  satisfies the spec's fairness. Both are already checked, by `TLA.TemporalCheck`, which
+  shares no code with `TLA.ModelChecker.Liveness` and is what makes that agreement
+  evidence. A third implementation of the same semantics here would add a place for them
+  to disagree and no new information.
+
+  Returns `:ok`, or `{:error, message}` naming the step and what was wrong with it.
+  """
+  @spec validate(t() | lasso(), module() | Spec.Compiled.t(), map()) :: :ok | {:error, String.t()}
+  def validate(trace_or_lasso, spec, constants)
+
+  def validate(%__MODULE__{} = trace, spec, constants) do
+    spec = compiled(spec)
+
+    with :ok <- from_init(spec, constants, trace),
+         do: legal_steps(spec, constants, trace, "the trace")
+  end
+
+  def validate(%{prefix: prefix, cycle: nil}, spec, constants) do
+    validate(prefix, spec, constants)
+  end
+
+  def validate(%{prefix: prefix, cycle: %__MODULE__{states: []}}, spec, constants) do
+    with :ok <- validate(prefix, spec, constants),
+         do: {:error, "the lasso's cycle has no states, so there is nothing to repeat."}
+  end
+
+  def validate(%{prefix: prefix, cycle: %__MODULE__{} = cycle}, spec, constants) do
+    spec = compiled(spec)
+
+    with :ok <- validate(prefix, spec, constants),
+         :ok <- cycle_continues(prefix, cycle),
+         :ok <- legal_steps(spec, constants, cycle, "the cycle"),
+         do: cycle_closes(cycle)
+  end
+
+  @doc """
+  `validate/3`, raising instead of returning an error. For a test that wants the message
+  rather than a boolean.
+  """
+  @spec validate!(t() | lasso(), module() | Spec.Compiled.t(), map()) :: :ok
+  def validate!(trace_or_lasso, spec, constants) do
+    case validate(trace_or_lasso, spec, constants) do
+      :ok -> :ok
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
+  defp compiled(%Spec.Compiled{} = spec), do: spec
+  defp compiled(module) when is_atom(module), do: Spec.Compiled.from_module(module)
+
+  # A trace with no states is not a short behaviour, it is not a behaviour — and it
+  # reaches the validator as a corrupted one rather than as a legitimate edge case, so it
+  # gets a message rather than an `:erlang.hd` crash from three functions further in.
+  defp from_init(_spec, _constants, %__MODULE__{states: []}) do
+    {:error, "the trace has no states, so there is no behaviour to check."}
+  end
+
+  defp from_init(spec, constants, %__MODULE__{states: [first | _]}) do
+    if Enum.any?(spec.init, &(&1.(constants) == first)) do
+      :ok
+    else
+      {:error,
+       "the trace starts at a state no `init` block produces:\n\n  #{inspect(first)}\n\n" <>
+         "A counterexample that does not start where the spec starts is not a behaviour " <>
+         "of the spec, whatever else is true of it."}
+    end
+  end
+
+  defp from_init(_spec, _constants, _trace), do: :ok
+
+  # Zipped rather than indexed, so a trace whose `actions` and `states` disagree in length
+  # is caught here as a shape error rather than silently checking the shorter of the two.
+  defp legal_steps(spec, constants, %__MODULE__{} = trace, what) do
+    if length(trace.actions) != length(trace.states) - 1 or
+         length(trace.bindings) != length(trace.actions) do
+      {:error,
+       "#{what} has #{length(trace.states)} states, #{length(trace.actions)} actions and " <>
+         "#{length(trace.bindings)} bindings, which cannot describe one behaviour."}
+    else
+      trace.states
+      |> Enum.zip(tl(trace.states))
+      |> Enum.zip(Enum.zip(trace.actions, trace.bindings))
+      |> Enum.with_index(1)
+      |> Enum.reduce_while(:ok, fn {{{pre, post}, {action, binding}}, step}, :ok ->
+        case legal_step(spec, constants, pre, post, action, binding, step, what) do
+          :ok -> {:cont, :ok}
+          error -> {:halt, error}
+        end
+      end)
+    end
+  end
+
+  defp legal_step(spec, constants, pre, post, action, binding, step, what) do
+    cond do
+      {action, binding} not in ModelChecker.enabled_steps(spec, constants, pre) ->
+        {:error,
+         "#{what}, step #{step}: #{inspect(action)} with #{inspect(binding)} is not " <>
+           "enabled in\n\n  #{inspect(pre)}\n\n" <>
+           "What is enabled there: " <>
+           inspect(ModelChecker.enabled_steps(spec, constants, pre), limit: 8)}
+
+      Spec.Compiled.action(spec, action).transition.(constants, pre, binding) != post ->
+        {:error,
+         "#{what}, step #{step}: #{inspect(action)} with #{inspect(binding)} is enabled " <>
+           "in\n\n  #{inspect(pre)}\n\nbut produces\n\n  " <>
+           inspect(Spec.Compiled.action(spec, action).transition.(constants, pre, binding)) <>
+           "\n\nand the trace says the next state is\n\n  #{inspect(post)}\n\n" <>
+           "Real states and a real action, paired by something that did not compute them."}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp cycle_continues(prefix, cycle) do
+    if List.last(prefix.states) == hd(cycle.states) do
+      :ok
+    else
+      {:error,
+       "the cycle starts at\n\n  #{inspect(hd(cycle.states))}\n\nbut the prefix ends " <>
+         "at\n\n  #{inspect(List.last(prefix.states))}\n\nso the lasso is two " <>
+         "behaviours rather than one."}
+    end
+  end
+
+  defp cycle_closes(%__MODULE__{states: states}) do
+    if hd(states) == List.last(states) do
+      :ok
+    else
+      {:error,
+       "the cycle does not close: it starts at\n\n  #{inspect(hd(states))}\n\nand ends " <>
+         "at\n\n  #{inspect(List.last(states))}\n\nso it cannot be repeated forever, " <>
+         "which is the only thing a lasso's cycle is for."}
+    end
   end
 
   @doc """
