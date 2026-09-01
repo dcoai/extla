@@ -29,7 +29,14 @@ defmodule TLA.PropertyTest do
   helpers.
   """
 
-  alias TLA.ModelChecker
+  # `TLA.ModelChecker` is deliberately NOT aliased. Its only use is inside the
+  # `Code.ensure_loaded?(StreamData)` branch below, and that branch is not compiled where
+  # `stream_data` is absent — which is how this library compiles as a DEPENDENCY, since a
+  # consumer does not get its dev/test deps. An alias used only there is unused there, and
+  # the consumer gets a warning about code they did not write.
+  #
+  # `Spec` and `Type` stay: both are used outside the branch, in `compiled/1` and
+  # `validated!/4` and in typespecs that exist in either case.
   alias TLA.Spec
   alias TLA.Spec.Type
 
@@ -112,7 +119,7 @@ defmodule TLA.PropertyTest do
     defp walk(_spec, _constants, _state, 0), do: StreamData.constant([])
 
     defp walk(spec, constants, state, remaining) do
-      case ModelChecker.enabled_steps(spec, constants, state) do
+      case TLA.ModelChecker.enabled_steps(spec, constants, state) do
         [] ->
           StreamData.constant([])
 

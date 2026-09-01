@@ -60,6 +60,29 @@ test:
   script:
     - mix test
 
+# The library as a CONSUMER gets it, which is not how anything else here builds it.
+#
+# `stream_data` is `only: [:dev, :test]`, so under MIX_ENV=test the
+# `Code.ensure_loaded?(StreamData)` gates are always true and their `else` branches are
+# never compiled. A consumer does not get this project's dev/test dependencies, so for
+# them the gates are false and those branches are the ones that build -- unexercised and,
+# until this job, unlinted by the project that owns them.
+#
+# dco-tek/extla#51 is what that costs: an unused alias reached `extc`'s compile output,
+# and ExTLA's own CI could not see it in any environment it built.
+#
+# MIX_ENV=prod because `mix.exs` gives it neither the dev nor the test dependencies, which
+# is the closest this repo can get to standing where a consumer stands.
+consumer-compile:
+  extends: .elixir
+  stage: check
+  variables:
+    MIX_ENV: prod
+  script:
+    # `before_script` already ran `mix deps.get`, and it ran it with MIX_ENV=prod, so what
+    # is on disk is the dependency set a consumer would have.
+    - mix compile --force --warnings-as-errors
+
 # What the gates catch (#46). The mutation harness copies the checker, breaks it on
 # purpose, and reports which gate noticed — so it compiles the project several times over
 # and cannot live in `test`, which #46 requires to stay near its current runtime.
