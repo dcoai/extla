@@ -248,7 +248,14 @@ defmodule TLA.DifferentialCase do
         # would report a violation the spec never expressed.
         invariants = TLA.ModelChecker.checked_invariants(spec, @entry.constants)
 
-        assert TLA.GraphAudit.invariant_partition(spec, @entry.constants, invariants) == :ok
+        # Found once, used twice: an independent walk over the whole reachable set is the
+        # expensive part, and both remaining checks are questions about that same set.
+        states = TLA.GraphAudit.reachable(spec, @entry.constants)
+
+        assert TLA.GraphAudit.invariant_partition(@entry.constants, invariants, states) == :ok
+
+        # The collision margin a run reports is a probability. This is the observation.
+        assert TLA.GraphAudit.fingerprint_injectivity(ctx.graph, states) == :ok
       end
 
       # Shortest-ness, checked without the fixture. `expected.json` records TLC's length

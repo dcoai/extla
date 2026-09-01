@@ -35,6 +35,16 @@ defmodule TLA.GraphAudit do
   It is still test-only, and deliberately not on `add_state/5`'s path: D-26 moved the §6
   term check there because it was 77.9% of the `raft` search and D-27 bought 5.40x on top,
   and spending that back on always-on redundancy would undo Phase 4.
+
+  ## What the three audits cost
+
+  `mix test` went from **64 s to 81 s** as they were added — about 17 s for three redundant
+  computations over six corpus entries, one of which is 58,359 states. The bulk of it is
+  `reachable/2`, an independent walk of the whole state space, which is why the partition
+  and the injectivity check share one call rather than making two.
+
+  Recorded rather than estimated, and worth stating plainly: it is a 27% suite for a check
+  that closed a survivor no other gate could see.
   """
 
   alias TLA.{ModelChecker, Spec, StateGraph}
@@ -91,9 +101,8 @@ defmodule TLA.GraphAudit do
   It also catches a predicate that **raises** on a reachable state, which today surfaces
   from inside the search rather than as a finding about the invariant.
   """
-  @spec invariant_partition(Spec.Compiled.t(), map(), [map()]) :: :ok | {:error, String.t()}
-  def invariant_partition(spec, constants, invariants) do
-    states = TLA.BoundedSearch.reachable_within(spec, constants, :infinity)
+  @spec invariant_partition(map(), [map()], MapSet.t(TLA.State.t())) :: :ok | {:error, String.t()}
+  def invariant_partition(constants, invariants, states) do
     total = MapSet.size(states)
 
     Enum.reduce_while(invariants, :ok, fn invariant, :ok ->
@@ -126,6 +135,69 @@ defmodule TLA.GraphAudit do
         other -> {holds, fails, [{state, other} | odd]}
       end
     end)
+  end
+
+  @doc """
+  No two distinct reachable states share a fingerprint.
+
+  A run reports `collision_estimate` — a *probability*, from the birthday bound. Two
+  distinct states sharing a fingerprint silently removes a subtree from the search and
+  lowers `distinct_states`, and nothing says so: the run reports a smaller number with
+  exactly the same confidence. This turns that probability into an observation.
+
+  ## Why it changes nothing in the search
+
+  #48 asks for a test-only mode that retains states beside their fingerprints, and warns
+  that the default path must not pay for it — D-26 moved the §6 term check onto
+  `add_state/5`'s miss branch because it was 77.9% of the `raft` search, and D-27 bought
+  5.40x on top.
+
+  There is no mode, and no flag, because none is needed. The states come from
+  `TLA.BoundedSearch`, which finds them without the checker's help, and the fingerprint is
+  observed through `StateGraph.id_of/2`: **two distinct states that collide are handed the
+  same id.** So the check is made entirely from outside, `lib/` is untouched, and "the
+  default path is unchanged" is a fact about the diff rather than a benchmark result.
+
+  ## Not applicable under symmetry
+
+  Under a symmetry reduction two distinct states sharing an id is the *point* — an orbit
+  is meant to collapse (§Symmetry). The claim only means something without one, so this
+  refuses rather than reporting the reduction as a defect.
+  """
+  @spec fingerprint_injectivity(StateGraph.t(), MapSet.t(TLA.State.t())) ::
+          :ok | {:error, String.t()}
+  def fingerprint_injectivity(graph, states) do
+    if graph.symmetry not in [nil, []] do
+      raise ArgumentError,
+            "fingerprint injectivity is not a property of a symmetry-reduced graph: an " <>
+              "orbit collapsing to one id is what `symmetry:` is for. Audit a run without it."
+    end
+
+    states
+    |> Enum.group_by(&StateGraph.id_of(graph, &1))
+    |> Enum.find(fn {_id, sharing} -> length(sharing) > 1 end)
+    |> case do
+      nil ->
+        :ok
+
+      {id, sharing} ->
+        {:error,
+         "#{length(sharing)} distinct reachable states share id #{id}, so their " <>
+           "fingerprints collided:\n\n" <>
+           Enum.map_join(Enum.take(sharing, 3), "\n", &"  #{inspect(&1)}") <>
+           "\n\nA collision removes a subtree from the search and lowers " <>
+           "`distinct_states`. Nothing reports it: the run hands back a smaller number " <>
+           "with the same confidence, and `collision_estimate` says only how likely that " <>
+           "was, never whether it happened."}
+    end
+  end
+
+  @doc """
+  Every reachable state, found without the checker's help. See `TLA.BoundedSearch`.
+  """
+  @spec reachable(Spec.Compiled.t(), map()) :: MapSet.t(TLA.State.t())
+  def reachable(spec, constants) do
+    TLA.BoundedSearch.reachable_within(spec, constants, :infinity)
   end
 
   defp walk(_spec, _constants, _graph, [], _seen), do: :ok

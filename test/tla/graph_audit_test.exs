@@ -140,7 +140,12 @@ defmodule TLA.GraphAuditTest do
 
       invariants = ModelChecker.checked_invariants(spec, constants)
 
-      assert GraphAudit.invariant_partition(spec, constants, invariants) == :ok
+      assert GraphAudit.invariant_partition(
+               constants,
+               invariants,
+               GraphAudit.reachable(spec, constants)
+             ) == :ok
+
       assert invariants != [], "the fixture must have an invariant, or this proves nothing"
     end
 
@@ -150,7 +155,13 @@ defmodule TLA.GraphAuditTest do
       {spec, constants, _graph} = graph_for(TestSpecs.Broken)
       bad = %{name: :truthy_nonsense, predicate: fn _c, _s -> :maybe end}
 
-      assert {:error, message} = GraphAudit.invariant_partition(spec, constants, [bad])
+      assert {:error, message} =
+               GraphAudit.invariant_partition(
+                 constants,
+                 [bad],
+                 GraphAudit.reachable(spec, constants)
+               )
+
       assert message =~ ":truthy_nonsense"
       assert message =~ "returned neither `true` nor `false`"
       assert message =~ ":maybe"
@@ -163,7 +174,13 @@ defmodule TLA.GraphAuditTest do
       {spec, constants, _graph} = graph_for(TestSpecs.Broken)
       bad = %{name: :missing_key, predicate: fn _c, state -> Map.get(state, :no_such_var) end}
 
-      assert {:error, message} = GraphAudit.invariant_partition(spec, constants, [bad])
+      assert {:error, message} =
+               GraphAudit.invariant_partition(
+                 constants,
+                 [bad],
+                 GraphAudit.reachable(spec, constants)
+               )
+
       assert message =~ ":missing_key"
       assert message =~ "a violation the spec never expressed"
     end
@@ -176,7 +193,13 @@ defmodule TLA.GraphAuditTest do
         predicate: fn _c, state -> if state.n == 3, do: :shrug, else: true end
       }
 
-      assert {:error, message} = GraphAudit.invariant_partition(spec, constants, [bad])
+      assert {:error, message} =
+               GraphAudit.invariant_partition(
+                 constants,
+                 [bad],
+                 GraphAudit.reachable(spec, constants)
+               )
+
       assert message =~ "1 returned neither"
     end
 
@@ -189,7 +212,50 @@ defmodule TLA.GraphAuditTest do
       # matters is that it happens here, over a named invariant, rather than from inside
       # the search over an anonymous state.
       assert_raise ArithmeticError, fn ->
-        GraphAudit.invariant_partition(spec, constants, [bad])
+        GraphAudit.invariant_partition(constants, [bad], GraphAudit.reachable(spec, constants))
+      end
+    end
+  end
+
+  describe "fingerprint_injectivity/2" do
+    test "a real graph maps distinct states to distinct ids" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+
+      assert GraphAudit.fingerprint_injectivity(graph, GraphAudit.reachable(spec, constants)) ==
+               :ok
+    end
+
+    # The observation the reported `collision_estimate` cannot make. Two states sharing an
+    # id means their fingerprints collided, which removes a subtree from the search and
+    # lowers `distinct_states` — and the run reports that smaller number with exactly the
+    # same confidence as a correct one.
+    test "two distinct states handed the same id are caught" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+      states = GraphAudit.reachable(spec, constants)
+
+      # Point a second state's fingerprint at an id already taken, which is what a
+      # collision looks like from outside: `id_of/2` answers the same id for both.
+      [{fingerprint_a, id_a}, {fingerprint_b, _} | _] = :ets.tab2list(graph.fingerprints)
+      refute fingerprint_a == fingerprint_b
+      :ets.insert(graph.fingerprints, {fingerprint_b, id_a})
+
+      assert {:error, message} = GraphAudit.fingerprint_injectivity(graph, states)
+      assert message =~ "distinct reachable states share id #{id_a}"
+      assert message =~ "removes a subtree from the search"
+    end
+
+    test "it refuses a symmetry-reduced graph rather than calling the reduction a defect" do
+      {_result, graph} =
+        ModelChecker.explore(TestSpecs.Asymmetric, %{
+          constants: %{processes: MapSet.new([:p1, :p2])},
+          liveness_graph: true,
+          check_deadlock: false,
+          invariants: [],
+          symmetry: [:processes]
+        })
+
+      assert_raise ArgumentError, ~r/not a property of a symmetry-reduced graph/, fn ->
+        GraphAudit.fingerprint_injectivity(graph, MapSet.new())
       end
     end
   end
