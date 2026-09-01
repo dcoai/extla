@@ -1042,6 +1042,7 @@ defmodule Mix.Tasks.Tla.Simulate do
       mix tla.simulate MyApp.TransferServer
       mix tla.simulate MyApp.TransferServer --traces 5000 --steps 100
       mix tla.simulate MyApp.TransferServer --inject-failures --seed 42
+      mix tla.simulate MyApp.TransferServer --against-graph
   """
   use Mix.Task
 
@@ -1049,6 +1050,44 @@ defmodule Mix.Tasks.Tla.Simulate do
   def run(args)
 end
 ```
+
+#### `--against-graph`: Layer 2 and Layer 3 checked against each other
+
+Layers 2 and 3 compute over the same specification and never look at one another. Layer 2
+says which states are reachable; Layer 3 runs a real GenServer and observes behaviour
+through a refinement mapping. A trace the implementation produces that is **not a path in
+the checker's graph** means one of three things, and only two are ever considered:
+
+1. the implementation is wrong — the finding Layer 3 exists for;
+2. the refinement mapping is wrong — §Simulation's own stated catch;
+3. **the search missed a state** — a checker defect, and the only one no other gate can
+   find. TLC agreement covers the differential corpus's models; a running server explores
+   paths driven by real OTP scheduling rather than by the traversal code under test.
+
+`TLA.Conformance.against_graph/3` requires every observed state to be a node and every
+observed step to be an edge, and classifies each divergence:
+
+| finding | when |
+|---|---|
+| `:checker` | the spec **permits** the step and the graph lacks it — the search missed something |
+| `:absent_state` | a state the graph never registered at all |
+| `:not_a_step_of_the_spec` | no action of the spec permits the step |
+
+**The third row is a pair, not a verdict, and deliberately.** An observed step the spec
+forbids means the implementation did something wrong *or* the mapping described the step
+wrongly, and one step of evidence cannot separate them. `test/conformance/README.md` states
+the same position for the mirror case, `:not_followed`: "one of the two is wrong, and which
+one is not something the checker can decide." Layer 3's own `check_step/5` runs during the
+simulation and reports its reading; this adds the containment view beside it rather than
+overruling it.
+
+**A run that could not build the full graph declines to classify.** Past `max_states`, or
+under a `state_constraint`, absence from the graph is a fact about the bound rather than
+about the search — so the run's status is a required argument and a bounded one is refused.
+Reporting a bound as a checker finding is the false positive that would get this turned off.
+
+Off by default, and it runs traces one at a time: containment is a question about each
+*behaviour*, and `TLA.Simulation.run/2` returns a verdict.
 
 ### `mix tla.replay`
 
