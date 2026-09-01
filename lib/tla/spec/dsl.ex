@@ -242,8 +242,21 @@ defmodule TLA.Spec.DSL do
     {description, _} = pop_option(opts, :desc, caller, "action_property #{inspect(name)}")
 
     constants = Macro.var(:tla_constants, __MODULE__)
-    old = Macro.var(:old, nil)
-    new = Macro.var(:new, nil)
+
+    # `generated: true` on the variables themselves, not just on the `quote` below.
+    #
+    # A one-sided property — one that constrains only the post-state, which is how you say
+    # "every transition into this state establishes this" — leaves the other binding
+    # unused, and the compiler then warns about a variable that does not appear in the
+    # source. There is nothing the author can prefix with an underscore, because they did
+    # not write it.
+    #
+    # The `quote generated: true` at the bottom of this macro is the mechanism for
+    # suppressing exactly that, and it does not reach these: it marks the nodes the quote
+    # CREATES, and a node injected with `unquote/1` carries its own metadata. So the flag
+    # goes here, where the variables are built.
+    old = {:old, [generated: true], nil}
+    new = {:new, [generated: true], nil}
 
     ctx =
       context(caller, "action_property #{inspect(name)}", %{
