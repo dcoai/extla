@@ -32,6 +32,12 @@ defmodule Mix.Tasks.Tla.Simulate do
                            `:not_enabled` is a true finding about nearly all of
                            them.
       --format             human (default) or json.
+      --against-graph      Also require every observed state to be a node of the
+                           model checker's graph and every step an edge. Off by
+                           default: it needs a completed graph, which not every
+                           simulation target has, and it runs traces one at a
+                           time because containment is a question about each
+                           behaviour rather than about the verdict.
 
   ## Exit codes
 
@@ -57,6 +63,7 @@ defmodule Mix.Tasks.Tla.Simulate do
     concurrency: :integer,
     inject_failures: :boolean,
     unrestricted: :boolean,
+    against_graph: :boolean,
     format: :string
   ]
 
@@ -74,6 +81,10 @@ defmodule Mix.Tasks.Tla.Simulate do
       end
 
     result = Simulation.run(module, config(module, opts))
+
+    if Keyword.get(opts, :against_graph, false) do
+      check_against_graph(module, opts)
+    end
 
     case Keyword.get(opts, :format, "human") do
       "json" -> IO.puts(encode(module, result))
@@ -100,6 +111,78 @@ defmodule Mix.Tasks.Tla.Simulate do
 
       true ->
         module
+    end
+  end
+
+  # Cross-layer agreement (#49): every state the server visits must be a node of the
+  # checker's graph, and every step an edge. A step the SPEC permits that the graph lacks
+  # is a defect in the search — the one finding no other gate here can produce.
+  #
+  # Traces run one at a time under this flag, because `Simulation.run/2` returns a verdict
+  # and not the behaviours, and containment is a question about each behaviour. That is
+  # the cost of the flag, and it is why it is off by default.
+  defp check_against_graph(module, opts) do
+    spec_module = module.__tla_spec_module__()
+    spec = TLA.Spec.Compiled.from_module(spec_module)
+
+    constants =
+      case TLA.Spec.Compiled.resolve_constants(spec) do
+        {:ok, constants} ->
+          constants
+
+        {:error, missing} ->
+          Mix.raise(
+            "--against-graph builds the model checker's graph for " <>
+              "#{inspect(spec_module)}, and it has no assignment for " <>
+              "#{Enum.map_join(missing, ", ", &inspect/1)}. Give them a `default:` beside " <>
+              "the declaration, or in config."
+          )
+      end
+
+    {result, graph} =
+      TLA.ModelChecker.explore(spec_module, %{
+        constants: constants,
+        liveness_graph: true,
+        invariants: [],
+        action_properties: []
+      })
+
+    unless result.status in [:ok, :violation, :deadlock] do
+      Mix.raise(
+        "--against-graph needs a complete graph, and checking #{inspect(spec_module)} " <>
+          "returned #{inspect(result.status)}. Absence from a truncated graph is a fact " <>
+          "about the bound rather than about the search, so this declines to answer " <>
+          "rather than report a finding it cannot stand behind."
+      )
+    end
+
+    traces = Keyword.get(opts, :traces, 100)
+    seed = Keyword.get(opts, :seed, :erlang.unique_integer([:positive]))
+
+    finding =
+      Enum.find_value(1..traces, fn i ->
+        {_result, behaviour} =
+          Simulation.run_trace(module, %{
+            max_steps: Keyword.get(opts, :steps, 20),
+            seed: seed + i
+          })
+
+        case TLA.Conformance.against_graph(graph, behaviour, status: result.status) do
+          :ok -> nil
+          found -> {i, found}
+        end
+      end)
+
+    case finding do
+      nil ->
+        Mix.shell().info(
+          "\nagainst-graph: #{traces} traces, every state a node and every step an edge."
+        )
+
+      {i, found} ->
+        Mix.shell().info("\nagainst-graph: trace #{i} (seed #{seed + i}) left the graph.\n")
+        Mix.shell().info(TLA.Conformance.explain(found))
+        exit({:shutdown, 1})
     end
   end
 
