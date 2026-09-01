@@ -65,7 +65,33 @@ be found.
 
 ---
 
-## SINCE THEN: *What the gates catch* is done
+## SINCE THEN: two milestones closed
+
+### *Warnings a consumer inherits* (#32, #51)
+
+Two compile warnings that reached consumers and that ExTLA's own CI could not see, for the
+same reason each time: **the condition producing them does not hold when ExTLA compiles
+itself.**
+
+- **#32** — a one-sided `action_property` warned about a binding the author never wrote.
+  `quote generated: true` is the mechanism for suppressing that and it does not reach a
+  node injected with `unquote/1`, so the flag went on the variables where they are built.
+  The neighbouring macros are safe because their vars are `__MODULE__`-context and
+  hygienic; `old`/`new` are `nil`-context of necessity, because the author writes them.
+  **`extc` can now drop its `EXTC_SKIP_SPECS` workaround.**
+- **#51** — an unused alias, visible only where `stream_data` is absent, which is how the
+  library compiles as a dependency and never how it compiles here. The fix is one line;
+  the guard is the point: a blocking **`consumer-compile`** job runs
+  `MIX_ENV=prod mix compile --force --warnings-as-errors`.
+
+**The lesson generalises, and is why these were one milestone:** ask what configuration
+this project never builds itself in. Both defects lived exactly there.
+
+Still open and *not* solved by that job: the `else` branches of all three
+`Code.ensure_loaded?(StreamData)` gates compile clean but remain **unexercised**. Linting
+them is not running them.
+
+### *What the gates catch* is done
 
 Five proposals (#46-#50), closed. The project's correctness gates were assertions about
 themselves; they are now measurements.
@@ -116,19 +142,10 @@ into a shared leaf library — says "awaiting approval" and is agentronic's call
 Cross-Project Boundary Rule. It has **not** been filed. The milestone builds ExTLA's own
 renderer for its own golden, which does not presuppose the extraction.
 
-**B. #51 — `TLA.PropertyTest`'s alias is unused without `stream_data`.** A regression from
-#45, filed from `extc`, which is where it shows: ExTLA's own CI cannot see it because
-`stream_data` is always loaded under `MIX_ENV=test`. One line. The interesting half is the
-gap it exposes — no job compiles the library without its dev/test deps, so the whole `else`
-branch of every `Code.ensure_loaded?(StreamData)` gate is unexercised.
+**B. #16 — solver-guided pruning.** Still `Research`, so not ready for `/prop-eval` or
+`/prop-break-down`. The work there is shaping it into a concrete proposal.
 
-**C. #32 — `action_property` warns about an unused `old`/`new` binding.** `extc` carries an
-`EXTC_SKIP_SPECS` workaround for it in CI, which is fresh evidence a consumer is paying for
-it.
-
-**D. #16 — solver-guided pruning.** Still `Research`, so not ready for `/prop-eval`.
-
-Recommended order: **B and C** (both small, both with downstream evidence), then **A**.
+That is the whole queue. *Warnings a consumer inherits* (#32, #51) closed on 2026-09-01.
 
 ---
 
@@ -145,6 +162,7 @@ mix format && mix compile --warnings-as-errors && mix test && bin/tlc-expected -
 ```
 
 ```bash
+MIX_ENV=prod mix compile --warnings-as-errors      # the library as a consumer gets it
 mix tla.mutants                                    # what the gates catch; writes survivors.json
 mix tla.mutants --check                            # the drift gate (CI, ~8.5 min)
 mix test --include mutation                        # the harness's own tests
@@ -207,6 +225,11 @@ The previous handoff's list still holds in full. What Phase 4 added:
   `TLA.Invariant.Test` established. The `else` branch is never compiled under
   `MIX_ENV=test`, so it cannot be tested — say so rather than writing a test that only
   asserts the branch you can see.
+- **Ask what configuration this project never builds itself in.** Both warnings in
+  *Warnings a consumer inherits* lived exactly there — one needs a one-sided
+  `action_property`, which no fixture here has, and one needs a build without
+  `stream_data`, which nothing here was. `consumer-compile` closes the second; the first
+  now has a test that reads stderr rather than a fixture.
 - **A gate that cannot fail is worse than no gate**, and two proposals asked for one. Check
   whether a proposed check has an input that makes it red *before* building it: the
   invariant partition (#58) and the implementation-vs-mapping split (#60) both needed
