@@ -20,6 +20,12 @@ defmodule ExTLA.MixProject do
 
   def application, do: [extra_applications: [:logger, :crypto]]
 
+  # `mix tla.mutants` lives in `test/support/` — it mutates ExTLA's own source, so it is a
+  # tool of this checkout rather than of the library, and it must not ship in the package.
+  # Declaring its environment here is what lets it be invoked as `mix tla.mutants` instead
+  # of `MIX_ENV=test mix tla.mutants`, which is a prefix everyone forgets once.
+  def cli, do: [preferred_envs: ["tla.mutants": :test]]
+
   defp elixirc_paths(:test), do: ["lib", "test/support", "test/differential", "test/conformance"]
   defp elixirc_paths(_), do: ["lib"]
 

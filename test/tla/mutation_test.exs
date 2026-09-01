@@ -14,6 +14,7 @@ defmodule TLA.MutationTest do
   use ExUnit.Case, async: true
 
   alias TLA.Mutation
+  alias TLA.Mutation.Catalogue
   alias TLA.Mutation.Mutant
 
   # Real, and aimed at the search itself: `expand/3` folds over every action, so dropping
@@ -79,18 +80,119 @@ defmodule TLA.MutationTest do
     end
   end
 
-  describe "the catalogue's anchors still apply" do
-    # Cheap, and it runs in the normal suite for that reason: it is the check that fails
-    # the day someone edits `expand/3`, rather than three weeks later when a sweep is next
-    # run and quietly measures less.
-    test "every anchor used in this file is present exactly once in the real source" do
-      for mutant <- [@drops_an_action, @does_not_compile] do
+  describe "the catalogue" do
+    # Cheap, and in the normal suite for that reason: it is the check that fails the day
+    # someone edits `expand/3`, rather than three weeks later when a sweep is next run and
+    # quietly measures less. Every mutant, not just the ones this file uses.
+    test "every anchor resolves exactly once in the file its mutant names" do
+      for mutant <- Catalogue.all() do
+        assert File.exists?(mutant.file),
+               "#{mutant.name} names #{mutant.file}, which does not exist"
+
         source = File.read!(mutant.file)
         count = length(String.split(source, mutant.anchor)) - 1
 
         assert count == 1,
                "#{mutant.name}: anchor appears #{count} times in #{mutant.file}, expected 1"
       end
+    end
+
+    test "every mutant says what it models, so the catalogue can be read" do
+      for mutant <- Catalogue.all() do
+        assert is_binary(mutant.models) and String.length(mutant.models) > 20,
+               "#{mutant.name} has no usable `models:` line"
+      end
+    end
+
+    test "names are unique — they are the keys in survivors.json" do
+      names = Enum.map(Catalogue.all(), & &1.name)
+      assert names == Enum.uniq(names)
+    end
+
+    test "fetch!/1 names what is available when asked for something that is not" do
+      error = assert_raise ArgumentError, fn -> Catalogue.fetch!(:no_such_mutant) end
+
+      assert Exception.message(error) =~ ":no_such_mutant"
+      assert Exception.message(error) =~ ":drops_an_action"
+    end
+  end
+
+  describe "the artifact" do
+    # Real catalogue names, because `encode/1` looks each row's `models:` up there — the
+    # artifact carries what the mutant models, so a name with no mutant behind it is not a
+    # row the artifact could ever hold.
+    @results [
+      %{name: :weakens_a_type_domain, outcome: :survived, gate: :corpus, expected: :nothing},
+      %{name: :drops_an_action, outcome: :killed, gate: :corpus, expected: :corpus}
+    ]
+
+    test "is sorted by name, so two runs of the same code produce the same bytes" do
+      first = Mix.Tasks.Tla.Mutants.encode(@results)
+      again = Mix.Tasks.Tla.Mutants.encode(Enum.reverse(@results))
+
+      assert first == again
+
+      names = Jason.decode!(first)["mutants"] |> Enum.map(& &1["name"])
+      assert names == Enum.sort(names)
+      assert names == ["drops_an_action", "weakens_a_type_domain"]
+    end
+
+    # Anything that varies between two runs of the same code makes the drift gate cry
+    # wolf, and a gate that cries wolf gets disabled.
+    test "carries nothing that varies between identical runs" do
+      encoded = Mix.Tasks.Tla.Mutants.encode(@results)
+
+      refute encoded =~ ~r/\d{4}-\d{2}-\d{2}/, "a date leaked into the artifact"
+      refute encoded =~ "ms"
+      refute encoded =~ "duration"
+      refute encoded =~ "output"
+    end
+
+    test "counts every outcome, including the two that are not kills" do
+      summary =
+        Mix.Tasks.Tla.Mutants.encode(@results)
+        |> Jason.decode!()
+        |> Map.fetch!("summary")
+
+      assert summary == %{"killed" => 1, "survived" => 1, "build_error" => 0, "timeout" => 0}
+    end
+  end
+
+  describe "drift" do
+    # The two directions mean opposite things, and a diff alone does not say which
+    # happened — so the message names them rather than leaving a reader to work it out.
+    test "a gate that got weaker is reported as a regression" do
+      was = %{"mutants" => [%{"name" => "a", "outcome" => "killed"}]}
+      now = %{"mutants" => [%{"name" => "a", "outcome" => "survived"}]}
+
+      message = Mix.Tasks.Tla.Mutants.drift_message(was, now)
+
+      assert message =~ "REGRESSION"
+      assert message =~ "a — now survived"
+      refute message =~ "PROGRESS"
+    end
+
+    test "a gate that got stronger is reported as progress, and still fails" do
+      was = %{"mutants" => [%{"name" => "a", "outcome" => "survived"}]}
+      now = %{"mutants" => [%{"name" => "a", "outcome" => "killed"}]}
+
+      message = Mix.Tasks.Tla.Mutants.drift_message(was, now)
+
+      assert message =~ "PROGRESS"
+      refute message =~ "REGRESSION"
+      assert message =~ "has to be recorded or it can be"
+    end
+
+    test "a mutant added to or removed from the catalogue is named" do
+      was = %{"mutants" => [%{"name" => "gone", "outcome" => "killed"}]}
+      now = %{"mutants" => [%{"name" => "fresh", "outcome" => "killed"}]}
+
+      message = Mix.Tasks.Tla.Mutants.drift_message(was, now)
+
+      assert message =~ "new to the catalogue"
+      assert message =~ "fresh"
+      assert message =~ "gone from the catalogue"
+      assert message =~ "gone"
     end
   end
 
@@ -121,6 +223,7 @@ defmodule TLA.MutationGateTest do
   use ExUnit.Case, async: false
 
   alias TLA.Mutation
+  alias TLA.Mutation.Catalogue
   alias TLA.Mutation.Mutant
 
   @moduletag :mutation

@@ -1,0 +1,24 @@
+{
+  "mutants": [
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "successor generation that silently omits an action",
+      "name": "drops_an_action",
+      "outcome": "killed"
+    },
+    {
+      "expected": "nothing",
+      "gate": "corpus",
+      "models": "a corpus entry typing a variable more loosely than the TLA+ it is checked against — the defect found by reading the corpus rather than by running it",
+      "name": "weakens_a_type_domain",
+      "outcome": "survived"
+    }
+  ],
+  "summary": {
+    "build_error": 0,
+    "killed": 1,
+    "survived": 1,
+    "timeout": 0
+  }
+}

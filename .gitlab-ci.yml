@@ -71,7 +71,13 @@ mutation:
   extends: .elixir
   stage: verify
   script:
+    # The runner's own behaviour first -- a broken runner would make every mutant look
+    # like a survivor, so the sweep below is only meaningful if these pass.
     - mix test --only mutation
+    # Then the measurement itself. Drift fails in both directions: a mutant that newly
+    # survives is a regression in the gates, and one that newly dies is progress that has
+    # to be recorded or it can be lost again with nothing noticing.
+    - mix tla.mutants --check
 
 # The oracle side of the corpus. This job is the reason expected.json can be
 # trusted as a fixture: it is regenerated from TLC on every pipeline and diffed
