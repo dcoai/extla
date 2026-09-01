@@ -12,7 +12,7 @@
       "gate": "corpus",
       "models": "an out-edge missing from the liveness table, so a cycle cannot be found",
       "name": "drops_a_liveness_edge",
-      "outcome": "survived"
+      "outcome": "killed"
     },
     {
       "expected": "corpus",
@@ -94,8 +94,8 @@
   ],
   "summary": {
     "build_error": 0,
-    "killed": 10,
-    "survived": 2,
+    "killed": 11,
+    "survived": 1,
     "timeout": 1
   }
 }

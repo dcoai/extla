@@ -14,20 +14,25 @@ defmodule TLA.Mutation.Catalogue do
 
   ## What it measured, the first time it ran
 
-  **10 killed, 2 survived, 1 timeout, in 8m33s** on the machine
-  `bench/search_profile.baseline.md` names. That wall time is why the sweep is its own CI
-  job rather than part of `mix test`, and it is a measurement rather than an estimate.
+  **11 killed, 1 survived, 1 timeout.** It began at 10 and 2; `drops_a_liveness_edge` was
+  the first survivor closed, by #59's `TLA.GraphAudit`. The sweep runs in 8m33s on the
+  machine `bench/search_profile.baseline.md` names, which is why it is its own CI job
+  rather than part of `mix test`, and which is a measurement rather than an estimate.
 
-  The two survivors are the specification for the rest of this milestone:
+  The remaining survivor is the specification for the rest of this milestone:
 
     * **`weakens_a_type_domain`** — expected, and the reason #46 exists. Widening a
       `type:` admits states nothing reaches, so `distinct_states` does not move and
       `expected.json` still matches while ExTLA checks strictly less than TLC.
-    * **`drops_a_liveness_edge`** — **not** expected, and the more interesting of the two.
-      An out-edge missing from the liveness table is caught by nothing at all: every
-      temporal verdict in the corpus still matches. `test/differential/README.md` already
-      says the lasso's shape is unchecked; this is what that costs, measured. It is #47's
-      to close.
+
+  And the one closed, kept here because how it was closed is the point:
+
+    * **`drops_a_liveness_edge`** — not predicted by #46 or by me. An out-edge missing
+      from the liveness table was caught by nothing at all: every temporal verdict in the
+      corpus still matched, because a missing edge makes a cycle unfindable and an
+      unfindable cycle is indistinguishable from a property that holds. Killed by
+      auditing the edge table against the successors the spec admits (#59) — a check
+      nobody would have written without the sweep saying it was needed.
 
   Three mutants are killed only by `:suite` and not by the corpus — `skips_symmetry_-
   canonicalization`, `wrong_init_index`, `param_universe_from_the_right`. That is not a

@@ -1,0 +1,131 @@
+defmodule TLA.GraphAuditTest do
+  @moduledoc """
+  `TLA.GraphAudit` (#48/#59).
+
+  Every test here damages a real graph, because the defects this exists for are the ones
+  that leave a graph **self-consistent**: a missing edge and a wrongly-stuck state both
+  produce a smaller graph that no assertion contradicts. An audit that only ever sees a
+  correct graph would be a function that returns `:ok`.
+  """
+
+  use ExUnit.Case, async: true
+
+  alias TLA.{GraphAudit, ModelChecker, Spec, TestSpecs}
+
+  defp graph_for(module, constants \\ %{}) do
+    {_result, graph} =
+      ModelChecker.explore(module, %{
+        constants: constants,
+        liveness_graph: true,
+        check_deadlock: false,
+        invariants: []
+      })
+
+    {Spec.Compiled.from_module(module), constants, graph}
+  end
+
+  describe "a graph the checker really built" do
+    test "audits clean" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+
+      assert GraphAudit.audit(spec, constants, graph) == :ok
+    end
+
+    test "including one with a stuck state in it" do
+      {spec, constants, graph} = graph_for(TestSpecs.Broken)
+
+      assert GraphAudit.audit(spec, constants, graph) == :ok
+    end
+
+    test "and one with more than one initial state" do
+      {spec, constants, graph} = graph_for(TestSpecs.TwoStarts)
+
+      assert GraphAudit.audit(spec, constants, graph) == :ok
+    end
+  end
+
+  describe "an edge table that is not what the spec admits" do
+    # The defect #54 found surviving every gate. A missing out-edge makes some cycle
+    # unfindable, and an unfindable cycle is indistinguishable from a property that holds.
+    test "a dropped edge is found, and the message says which state" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+
+      {id, [_dropped | rest]} = Enum.find(graph.edges, fn {_id, edges} -> edges != [] end)
+      damaged = %{graph | edges: Map.put(graph.edges, id, rest)}
+
+      assert {:error, message} = GraphAudit.audit(spec, constants, damaged)
+      assert message =~ "state #{id}'s recorded out-edges"
+      assert message =~ "admitted but not recorded"
+      assert message =~ "indistinguishable from a property that holds"
+    end
+
+    # The reason the comparison is by identity and not by count. A table with the right
+    # NUMBER of wrong edges is exactly what a merge or an ordering defect produces.
+    test "a right-sized wrong table is found too" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+
+      [{one, [first | _]}, {two, [second | _]}] =
+        graph.edges |> Enum.filter(fn {_, e} -> e != [] end) |> Enum.take(2)
+
+      swapped =
+        graph.edges
+        |> Map.put(one, [second | tl(graph.edges[one])])
+        |> Map.put(two, [first | tl(graph.edges[two])])
+
+      assert {:error, message} = GraphAudit.audit(spec, constants, %{graph | edges: swapped})
+      assert message =~ "recorded but not admitted"
+    end
+  end
+
+  describe "a stuck claim that is not true" do
+    test "a state recorded as deadlocked that has successors" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+
+      live = graph.edges |> Enum.find(fn {_id, edges} -> edges != [] end) |> elem(0)
+      damaged = %{graph | deadlocked: MapSet.put(graph.deadlocked, live)}
+
+      assert {:error, message} = GraphAudit.audit(spec, constants, damaged)
+      assert message =~ "recorded as deadlocked, but the spec enables actions in it"
+    end
+
+    # `Broken` runs to n = 5 and then has nothing enabled; `Counter` cycles through
+    # `reset` forever and has no stuck state at all, so it cannot exercise this.
+    test "a state with nothing enabled that the search did not record as stuck" do
+      {spec, constants, graph} = graph_for(TestSpecs.Broken)
+
+      damaged = %{graph | terminal: MapSet.new(), deadlocked: MapSet.new()}
+
+      assert {:error, message} = GraphAudit.audit(spec, constants, damaged)
+      assert message =~ "has no enabled action, but the search did not record it"
+    end
+  end
+
+  describe "what it refuses to audit" do
+    test "a graph with no edge table, rather than reporting every edge as missing" do
+      {_result, graph} =
+        ModelChecker.explore(TestSpecs.Cube, %{check_deadlock: false, invariants: []})
+
+      spec = Spec.Compiled.from_module(TestSpecs.Cube)
+
+      assert_raise ArgumentError, ~r/needs the edge table/, fn ->
+        GraphAudit.audit(spec, %{}, graph)
+      end
+    end
+  end
+
+  describe "a state the search never registered" do
+    test "is named as a state the search missed, not as a missing edge" do
+      {spec, constants, graph} = graph_for(TestSpecs.Cube)
+
+      # Forget one state entirely: drop its fingerprint, so `id_of/2` cannot find it. That
+      # is what a search which missed a state would leave behind.
+      last = graph.fingerprints |> :ets.tab2list() |> List.last()
+      :ets.delete_object(graph.fingerprints, last)
+
+      assert {:error, message} = GraphAudit.audit(spec, constants, graph)
+
+      assert message =~ "never registered" or message =~ "recorded out-edges",
+             "expected a missed-state or edge finding, got: #{message}"
+    end
+  end
+end
