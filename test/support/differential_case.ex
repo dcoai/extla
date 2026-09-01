@@ -192,6 +192,33 @@ defmodule TLA.DifferentialCase do
         end
       end
 
+      # Every violation the entry produces, safety and liveness alike, checked against the
+      # spec rather than against a fixture. Until this existed, nothing checked that a
+      # counterexample's consecutive states were connected by the actions it names: the
+      # states could be reachable, the actions real, and the pairing between them
+      # fabricated, and every gate in the project would pass it.
+      test "every counterexample it produces is a behaviour the spec admits", ctx do
+        spec = TLA.DifferentialCase.run_spec(@entry)
+
+        for {tlc_name, %{"violated_at" => _}} <- ctx.expected["invariants"] do
+          name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+
+          result =
+            TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+
+          assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
+                 "the safety counterexample for #{name} is not a behaviour of the spec"
+        end
+
+        for {tlc_name, "violated"} <- ctx.expected["properties"] do
+          name = TLA.DifferentialCase.temporal_name!(spec, tlc_name, @entry)
+          result = TLA.DifferentialCase.check_liveness(@entry, [name])
+
+          assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
+                 "the lasso for #{name} is not a behaviour of the spec"
+        end
+      end
+
       test "the counterexample replays to the state that violates the invariant", ctx do
         violated = Enum.find(ctx.expected["invariants"], fn {_, verdict} -> is_map(verdict) end)
 
