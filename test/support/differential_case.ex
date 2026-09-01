@@ -219,6 +219,38 @@ defmodule TLA.DifferentialCase do
         end
       end
 
+      # Shortest-ness, checked without the fixture. `expected.json` records TLC's length
+      # and the comparison above uses it, so a search that stopped being breadth-first is
+      # caught only where the length happens to change. This asserts it from the spec
+      # alone, with a search that shares no traversal code with the checker's — which is
+      # what makes it trustworthy on a spec TLC has never seen.
+      #
+      # Only entries with a violated INVARIANT are covered, and today that is `die_hard`
+      # alone: the others have none. That is a fact about the corpus rather than a budget
+      # this test declined to spend, and it is stated rather than left to be inferred from
+      # a test that silently does nothing.
+      test "a violated invariant's counterexample is the shortest one there is", ctx do
+        violated = Enum.filter(ctx.expected["invariants"], fn {_, v} -> is_map(v) end)
+        spec = TLA.DifferentialCase.run_spec(@entry)
+
+        for {tlc_name, _} <- violated do
+          name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+          invariant = Enum.find(spec.invariants, &(&1.name == name))
+
+          result =
+            TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+
+          assert TLA.BoundedSearch.nothing_violates_before?(
+                   spec,
+                   @entry.constants,
+                   &invariant.predicate.(@entry.constants, &1),
+                   result.violation.length
+                 ),
+                 "an independent search found a violation of #{name} shorter than the " <>
+                   "#{result.violation.length}-state counterexample the checker returned"
+        end
+      end
+
       test "the counterexample replays to the state that violates the invariant", ctx do
         violated = Enum.find(ctx.expected["invariants"], fn {_, verdict} -> is_map(verdict) end)
 
