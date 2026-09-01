@@ -30,7 +30,7 @@ defmodule TLA.Simulation.Generator do
   @spec from_spec(module(), module(), map()) :: (TLA.State.t() -> {atom(), map(), term()} | nil)
   def from_spec(spec_module, refinement, constants) do
     spec = Spec.Compiled.from_module(spec_module)
-    fn state -> pick(spec, refinement, constants, state, &ModelChecker.bindings/3) end
+    fn state -> pick(spec, refinement, ModelChecker.steps(spec, constants, state)) end
   end
 
   @doc """
@@ -45,20 +45,14 @@ defmodule TLA.Simulation.Generator do
           (TLA.State.t() -> {atom(), map(), term()} | nil)
   def enabled_only(spec_module, refinement, constants) do
     spec = Spec.Compiled.from_module(spec_module)
-    fn state -> pick(spec, refinement, constants, state, &ModelChecker.enabled_bindings/3) end
+    fn state -> pick(spec, refinement, ModelChecker.enabled_steps(spec, constants, state)) end
   end
 
-  defp pick(spec, refinement, constants, state, bindings_fun) do
-    candidates =
-      for action <- spec.actions,
-          binding <- bindings_fun.(action, constants, state),
-          do: {action.name, binding}
-
-    case candidates do
-      [] -> nil
-      _ -> to_message(refinement, Enum.random(candidates))
-    end
-  end
+  # The candidates come from `TLA.ModelChecker` rather than from a comprehension here:
+  # "what may happen next" has one implementation, and it is the checker's — the one the
+  # differential corpus compares against TLC.
+  defp pick(_spec, _refinement, []), do: nil
+  defp pick(_spec, refinement, candidates), do: to_message(refinement, Enum.random(candidates))
 
   defp to_message(refinement, {action, binding}),
     do: {action, binding, refinement.concrete_message(action, binding)}

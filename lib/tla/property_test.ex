@@ -29,6 +29,7 @@ defmodule TLA.PropertyTest do
   helpers.
   """
 
+  alias TLA.ModelChecker
   alias TLA.Spec
   alias TLA.Spec.Type
 
@@ -60,6 +61,71 @@ defmodule TLA.PropertyTest do
     def init_states(spec, constants) do
       spec |> compiled() |> initial_states(constants) |> StreamData.member_of()
     end
+
+    @doc """
+    A generator over the spec's behaviours, as `{action, params}` steps.
+
+    Every generated sequence is a **real behaviour**: it starts at one of the spec's
+    initial states, and at every step the action it names is enabled with the binding it
+    names. Nothing generated is a sequence the spec forbids.
+
+    ## Where the choices come from
+
+    `TLA.ModelChecker.enabled_steps/3` — the checker's own enumeration, the one the
+    differential corpus compares against TLC. A second implementation of "what may happen
+    next" could disagree with it, and only one of the two is measured.
+
+    ## Why there is no refinement argument
+
+    `TLA.Simulation.Generator` takes one and returns a concrete message; this returns
+    `{action_name, params}` and stops there. A sequence of actions is *spec-level*, and
+    mapping it to messages is the consumer's own `check all` body — §05's usage example
+    calls `concrete_message/2` there itself. The two signatures differ on purpose.
+
+    ## Shrinking
+
+    Sound, and for a structural reason: every prefix of a behaviour is a behaviour, so a
+    shorter sequence from the same initial state is still one the spec admits. The length
+    is generated first and shrinks toward zero, so a shrunk counterexample is a sequence
+    the implementation really could have taken — a generator that shrank into an *invalid*
+    sequence would report failures that cannot happen, which is the failure mode worth
+    guarding.
+
+    A walk that runs out of enabled actions stops there, so a sequence may be shorter than
+    the length drawn. It is never longer than `max_length`.
+    """
+    @spec action_sequences(module() | Spec.Compiled.t(), map(), pos_integer()) ::
+            StreamData.t([{atom(), map()}])
+    def action_sequences(spec, constants, max_length \\ 20) do
+      spec = compiled(spec)
+
+      StreamData.bind(init_states(spec, constants), fn state ->
+        StreamData.bind(StreamData.integer(0..max_length), fn length ->
+          walk(spec, constants, state, length)
+        end)
+      end)
+    end
+
+    # Each step's choices depend on the state the previous step produced, so the generator
+    # is built by binding rather than by composing independent ones. `bind/2` is lazy, so
+    # nothing past the drawn length is ever enumerated.
+    defp walk(_spec, _constants, _state, 0), do: StreamData.constant([])
+
+    defp walk(spec, constants, state, remaining) do
+      case ModelChecker.enabled_steps(spec, constants, state) do
+        [] ->
+          StreamData.constant([])
+
+        candidates ->
+          StreamData.bind(StreamData.member_of(candidates), fn {action, params} = step ->
+            next = Spec.Compiled.action(spec, action).transition.(constants, state, params)
+
+            spec
+            |> walk(constants, next, remaining - 1)
+            |> StreamData.map(&[step | &1])
+          end)
+      end
+    end
   else
     @doc """
     Unavailable: `stream_data` is not loaded.
@@ -71,6 +137,16 @@ defmodule TLA.PropertyTest do
     def init_states(_spec, _constants) do
       raise ArgumentError,
             "TLA.PropertyTest.init_states/2 needs `stream_data`, which is not loaded. " <>
+              "Add `{:stream_data, \"~> 1.0\", only: [:dev, :test]}` to your deps."
+    end
+
+    @doc """
+    Unavailable: `stream_data` is not loaded. See `init_states/2`.
+    """
+    @spec action_sequences(module() | Spec.Compiled.t(), map(), pos_integer()) :: no_return()
+    def action_sequences(_spec, _constants, _max_length \\ 20) do
+      raise ArgumentError,
+            "TLA.PropertyTest.action_sequences/3 needs `stream_data`, which is not loaded. " <>
               "Add `{:stream_data, \"~> 1.0\", only: [:dev, :test]}` to your deps."
     end
   end

@@ -81,6 +81,133 @@ defmodule TLA.PropertyTestTest do
     end
   end
 
+  describe "action_sequences/3" do
+    @constants %{max: 2}
+
+    property "every generated sequence is a behaviour the spec admits" do
+      spec = TLA.Spec.Compiled.from_module(TestSpecs.Counter)
+      initial = PropertyTest.initial_states(spec, @constants)
+
+      check all(sequence <- PropertyTest.action_sequences(TestSpecs.Counter, @constants, 8)) do
+        # Replayed against the checker's own notion of what is enabled, not against a
+        # second reading of the spec: the generator's whole claim is that it agrees with
+        # the checker, so checking it against itself would establish nothing.
+        Enum.reduce(sequence, hd(initial), fn {action, params}, state ->
+          enabled = ModelChecker.enabled_steps(spec, @constants, state)
+
+          assert {action, params} in enabled,
+                 "#{action} with #{inspect(params)} is not enabled in #{inspect(state)}"
+
+          TLA.Spec.Compiled.action(spec, action).transition.(@constants, state, params)
+        end)
+      end
+    end
+
+    property "and one the model checker walks, step for step" do
+      spec = TLA.Spec.Compiled.from_module(TestSpecs.TwoStarts)
+
+      {_result, graph} =
+        ModelChecker.explore(TestSpecs.TwoStarts, %{check_deadlock: false, liveness_graph: true})
+
+      check all(sequence <- PropertyTest.action_sequences(TestSpecs.TwoStarts, %{}, 4)) do
+        # Every state the sequence passes through is a state the search registered, and
+        # every step is an edge the search recorded. A sequence that left the graph would
+        # be a behaviour the checker says does not exist.
+        [initial] = Enum.take(PropertyTest.initial_states(spec, %{}), 1)
+
+        Enum.reduce(sequence, initial, fn {action, params}, state ->
+          id = TLA.StateGraph.id_of(graph, state)
+          next = TLA.Spec.Compiled.action(spec, action).transition.(%{}, state, params)
+          next_id = TLA.StateGraph.id_of(graph, next)
+
+          assert id != nil and next_id != nil
+          assert {action, params, next_id} in TLA.StateGraph.successors(graph, id)
+
+          next
+        end)
+      end
+    end
+
+    property "no sequence is longer than max_length" do
+      check all(
+              max <- StreamData.integer(1..6),
+              sequence <- PropertyTest.action_sequences(TestSpecs.Counter, @constants, max)
+            ) do
+        assert length(sequence) <= max
+      end
+    end
+
+    # The soundness property. A generator that shrank into an invalid sequence would
+    # report failures the implementation cannot produce — every prefix of a behaviour is a
+    # behaviour, and this asserts the generator honours that rather than assuming it.
+    test "shrinking yields sequences that are still replayable" do
+      spec = TLA.Spec.Compiled.from_module(TestSpecs.Counter)
+      generator = PropertyTest.action_sequences(TestSpecs.Counter, @constants, 6)
+
+      for seed <- 1..25 do
+        tree = generator.generator.(:rand.seed_s(:exsss, {seed, seed, seed}), 10)
+
+        for candidate <- [tree.root | Enum.take(shrunk_values(tree), 8)] do
+          assert replayable?(spec, @constants, candidate),
+                 "shrinking produced a sequence the spec does not admit: #{inspect(candidate)}"
+        end
+      end
+    end
+
+    test "a spec that runs out of enabled actions stops there rather than hanging" do
+      # `TwoStarts` allows exactly two `step`s and then has no enabled action at all.
+      # Nothing can extend a sequence past that, and asking for 50 must neither produce
+      # one nor loop looking for one.
+      sequences =
+        TestSpecs.TwoStarts
+        |> PropertyTest.action_sequences(%{}, 50)
+        |> Enum.take(30)
+
+      assert Enum.all?(sequences, &(length(&1) <= 2)),
+             "expected short sequences, got #{inspect(Enum.map(sequences, &length/1))}"
+    end
+
+    test "a length of zero is a behaviour too" do
+      assert [] in Enum.take(PropertyTest.action_sequences(TestSpecs.Counter, @constants, 3), 40)
+    end
+  end
+
+  # §05's own usage example, run rather than quoted. It is the shape the module exists to
+  # support: the generator hands back spec-level steps, and the consumer's own body maps
+  # them to messages with `concrete_message/2` and checks the abstraction after each.
+  describe "the usage example from 05-layer3-conformance.md" do
+    alias TLA.Conformance.Counter.Impl
+    alias TLA.Conformance.Counter.Refinement
+    alias TLA.Conformance.Counter.Spec, as: CounterSpec
+
+    property "the server conforms under random action sequences" do
+      constants = %{max_val: 5}
+      compiled = TLA.Spec.Compiled.from_module(CounterSpec)
+
+      check all(
+              actions <- PropertyTest.action_sequences(CounterSpec, constants, 10),
+              max_runs: 25
+            ) do
+        {:ok, pid} = Impl.Conforming.start_link()
+
+        for {action, params} <- actions do
+          GenServer.call(pid, Refinement.concrete_message(action, params))
+
+          abstract = Refinement.abstract(:sys.get_state(pid))
+
+          assert TLA.ModelChecker.Safety.check_invariants(
+                   compiled,
+                   constants,
+                   abstract,
+                   :all
+                 ) == :ok
+        end
+
+        GenServer.stop(pid)
+      end
+    end
+  end
+
   describe "what init_states/2 refuses" do
     defmodule OutsideItsType do
       @moduledoc false
@@ -118,6 +245,22 @@ defmodule TLA.PropertyTestTest do
       assert result.violation.property == :type_ok
       assert result.violation.length == 1
     end
+  end
+
+  defp shrunk_values(tree), do: Stream.map(tree.children, & &1.root)
+
+  defp replayable?(spec, constants, sequence) do
+    [initial] = Enum.take(PropertyTest.initial_states(spec, constants), 1)
+
+    Enum.reduce_while(sequence, {true, initial}, fn {action, params}, {_, state} ->
+      if {action, params} in ModelChecker.enabled_steps(spec, constants, state) do
+        next = TLA.Spec.Compiled.action(spec, action).transition.(constants, state, params)
+        {:cont, {true, next}}
+      else
+        {:halt, {false, state}}
+      end
+    end)
+    |> elem(0)
   end
 
   # `StreamData.LazyTree`'s children are the shrunk alternatives; taking the first
