@@ -144,11 +144,8 @@ defmodule TLA.StateGraph.Export do
   end
 
   defp label(graph, id) do
-    {init_index, steps} = StateGraph.path_to(graph, id)
-    trace = Trace.replay(graph, init_index, steps)
-
-    trace.states
-    |> List.last()
+    graph
+    |> StateGraph.state_at(id)
     |> Enum.sort_by(fn {var, _} -> var end)
     |> Enum.map_join("\\n", fn {var, value} -> "#{var} = #{inspect(value, limit: 5)}" end)
   end
@@ -201,8 +198,7 @@ defmodule TLA.StateGraph.Export do
 
   defp json_state(graph, id) do
     record = StateGraph.node_record(graph, id)
-    {init_index, steps} = StateGraph.path_to(graph, id)
-    state = graph |> Trace.replay(init_index, steps) |> Map.fetch!(:states) |> List.last()
+    state = StateGraph.state_at(graph, id)
 
     %{
       "id" => id,

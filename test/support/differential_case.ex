@@ -35,8 +35,16 @@ defmodule TLA.DifferentialCase do
         # side. An ExTLA action property that TLC's module does not have would
         # otherwise halt the search early and make the counts differ for a
         # reason that is not a bug.
+        # `liveness_graph: true` so the edge table exists for `TLA.GraphAudit` to audit.
+        # Built here rather than in that test, because building it there meant exploring
+        # `raft_election` a second time — 20 seconds of this suite for a graph this one
+        # already has.
         {result, graph} =
-          TLA.DifferentialCase.explore(@entry, invariants: [], action_properties: [])
+          TLA.DifferentialCase.explore(@entry,
+            invariants: [],
+            action_properties: [],
+            liveness_graph: true
+          )
 
         %{expected: expected, result: result, graph: graph}
       end
@@ -217,6 +225,22 @@ defmodule TLA.DifferentialCase do
           assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
                  "the lasso for #{name} is not a behaviour of the spec"
         end
+      end
+
+      # The two records that are self-consistent when wrong. #54's sweep found
+      # `drops_a_liveness_edge` surviving every gate: a missing out-edge makes some cycle
+      # unfindable, and an unfindable cycle is indistinguishable from a property that
+      # holds, so every temporal verdict still matched `expected.json`.
+      test "what the search recorded is what the spec admits", ctx do
+        spec = TLA.DifferentialCase.run_spec(@entry)
+
+        # Only a complete run can be audited. A bounded one has states it discovered and
+        # never expanded, and reading those as missing edges would manufacture a finding
+        # out of a limit the run already reports.
+        assert ctx.result.status in [:ok, :violation],
+               "the audit needs a complete run, got #{inspect(ctx.result.status)}"
+
+        assert TLA.GraphAudit.audit(spec, @entry.constants, ctx.graph) == :ok
       end
 
       # Shortest-ness, checked without the fixture. `expected.json` records TLC's length
