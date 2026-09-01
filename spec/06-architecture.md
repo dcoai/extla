@@ -363,11 +363,26 @@ against the real GenServer.
 
 ### Phase 4 — Scale and ecosystem
 
-- `TLA.ModelChecker.Parallel` — added only once the single-threaded checker is correct
-  and has been profiled. A wrong answer computed on eight cores is still wrong, and
-  parallelism makes every correctness bug harder to reproduce.
-- `TLA.PropertyTest` / `Mix.Tasks.Tla.Gen.Test`
-- `Mix.Tasks.Tla.Visualize` (DOT only)
+**Complete.** All three entries are built, on the terms this section set for them.
+
+- `TLA.ModelChecker.Parallel` — added only once the single-threaded checker was correct
+  and had been profiled. A wrong answer computed on eight cores is still wrong, and
+  parallelism makes every correctness bug harder to reproduce. Level-synchronous BFS
+  (D-27), because D-9's corpus compares the *length* of the shortest counterexample and a
+  free-running frontier does not preserve it. 5.40x at 8 workers; the corpus agrees with
+  TLC at 1, 2, 4 and 8. Liveness is refused alongside it, as D-22 refuses symmetry.
+- `TLA.PropertyTest` — `init_states/2` and `action_sequences/3`, drawing their choices
+  from the checker's own `enabled_steps/3` rather than a second implementation.
+  `Mix.Tasks.Tla.Gen.Test` is **not** built: §Deferred removes generated test files from
+  v1, and `05-layer3-conformance.md` now says so where it used to specify them.
+- `Mix.Tasks.Tla.Visualize` (DOT only) — over `TLA.StateGraph.to_dot/2` and `to_json/1`.
+  Both require the edge table and refuse to draw the spanning tree of parent pointers as
+  though it were the transition relation; both refuse a graph past the cap while naming
+  its true count.
+
+Entering the phase, `raft_election` took 23.4 s. It now takes 1.65 s — 2.65x from
+validating each state once at discovery (D-26) and 5.40x from the workers, and the
+differential corpus holds throughout.
 
 ### Deferred past v1, deliberately
 
