@@ -66,10 +66,13 @@ defmodule TLA.Mutation do
       * `:replacement` — what to put there.
       * `:kills` — the gate expected to catch it, or `:nothing` where the mutant is
         expected to survive and the survival is the finding.
+      * `:timeout` — seconds for this mutant's gate, overriding the sweep's. For a
+        defect that makes the search non-terminating, where the sweep's budget would be
+        spent waiting for something that is never going to finish.
     """
 
     @enforce_keys [:name, :models, :file, :anchor, :replacement, :kills]
-    defstruct [:name, :models, :file, :anchor, :replacement, :kills]
+    defstruct [:name, :models, :file, :anchor, :replacement, :kills, timeout: nil]
 
     @type gate :: :corpus | :suite | :nothing
     @type t :: %__MODULE__{
@@ -78,7 +81,8 @@ defmodule TLA.Mutation do
             file: String.t(),
             anchor: String.t(),
             replacement: String.t(),
-            kills: gate()
+            kills: gate(),
+            timeout: pos_integer() | nil
           }
   end
 
@@ -146,7 +150,7 @@ defmodule TLA.Mutation do
   """
   @spec run_one(Path.t(), Mutant.t(), keyword()) :: result()
   def run_one(workspace, %Mutant{} = mutant, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, @default_timeout)
+    timeout = mutant.timeout || Keyword.get(opts, :timeout, @default_timeout)
     # Separate, and generous: a mutant that compiles slowly is not a mutant that hung, and
     # one budget for both would report the first as the second.
     compile_timeout = Keyword.get(opts, :compile_timeout, @default_timeout)

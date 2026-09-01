@@ -3,8 +3,78 @@
     {
       "expected": "corpus",
       "gate": "corpus",
+      "models": "parameter enumeration that misses one binding of an enabled action",
+      "name": "drops_a_binding",
+      "outcome": "killed"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "an out-edge missing from the liveness table, so a cycle cannot be found",
+      "name": "drops_a_liveness_edge",
+      "outcome": "survived"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "a parallel merge that loses one worker's states, under-counting the search",
+      "name": "drops_a_worker_contribution",
+      "outcome": "killed"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
       "models": "successor generation that silently omits an action",
       "name": "drops_an_action",
+      "outcome": "killed"
+    },
+    {
+      "expected": "nothing",
+      "gate": "corpus",
+      "models": "an action taken in a state its guard forbids. Measured as a TIMEOUT and not as a gap: without guards the search is bounded only by the variables' declared types, which on raft_election is astronomically large, so no gate that has to finish can ever kill it. The axis is real; a terminating gate is the wrong instrument for it, and #50's generated models — small by construction — are the right one",
+      "name": "ignores_a_guard",
+      "outcome": "timeout"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "an ENABLED bit recorded the wrong way round, so fairness is read inverted",
+      "name": "inverts_a_weak_fairness_bit",
+      "outcome": "killed"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "a trace one step short, because the walk back drops a step",
+      "name": "off_by_one_in_the_path_walk",
+      "outcome": "killed"
+    },
+    {
+      "expected": "suite",
+      "gate": "suite",
+      "models": "a coverage merge taking `param_universe` from the worker rather than the coordinator. D-27 names this asymmetry. The CORPUS does not catch it — `finalize/2` drops `param_universe` from the report, so a wrong one shows only where a run has unreached params to name — and #39's unit tests do",
+      "name": "param_universe_from_the_right",
+      "outcome": "killed"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "a frontier that stops being breadth-first, so a counterexample is no longer the shortest — the length D-9 compares and D-27's barrier exists to preserve",
+      "name": "searches_depth_first",
+      "outcome": "killed"
+    },
+    {
+      "expected": "suite",
+      "gate": "suite",
+      "models": "a symmetric state that is not put in canonical form, so an orbit is explored twice",
+      "name": "skips_symmetry_canonicalization",
+      "outcome": "killed"
+    },
+    {
+      "expected": "corpus",
+      "gate": "corpus",
+      "models": "state identity narrow enough to collide, silently merging distinct states",
+      "name": "truncates_the_fingerprint",
       "outcome": "killed"
     },
     {
@@ -13,12 +83,19 @@
       "models": "a corpus entry typing a variable more loosely than the TLA+ it is checked against — the defect found by reading the corpus rather than by running it",
       "name": "weakens_a_type_domain",
       "outcome": "survived"
+    },
+    {
+      "expected": "suite",
+      "gate": "suite",
+      "models": "replay starting from the wrong `init` block, which only a spec with more than one can expose",
+      "name": "wrong_init_index",
+      "outcome": "killed"
     }
   ],
   "summary": {
     "build_error": 0,
-    "killed": 1,
-    "survived": 1,
-    "timeout": 0
+    "killed": 10,
+    "survived": 2,
+    "timeout": 1
   }
 }
