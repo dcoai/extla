@@ -17,26 +17,6 @@ defmodule TLA.MutationTest do
   alias TLA.Mutation.Catalogue
   alias TLA.Mutation.Mutant
 
-  # Real, and aimed at the search itself: `expand/3` folds over every action, so dropping
-  # one removes states the corpus counted with TLC.
-  @drops_an_action %Mutant{
-    name: :drops_an_action,
-    models: "successor generation that silently omits an action",
-    file: "lib/tla/model_checker.ex",
-    anchor: "    run.spec.actions\n    |> Enum.reduce_while(",
-    replacement: "    Enum.drop(run.spec.actions, 1)\n    |> Enum.reduce_while(",
-    kills: :corpus
-  }
-
-  @does_not_compile %Mutant{
-    name: :does_not_compile,
-    models: "a mutant whose patch does not parse — not a defect, and not a kill",
-    file: "lib/tla/model_checker.ex",
-    anchor: "  defp expand(run, id, state) do",
-    replacement: "  defp expand(run, id, state) do <<< not elixir",
-    kills: :corpus
-  }
-
   describe "patch/2" do
     test "replaces the anchor and nothing else" do
       mutant = anchored("ANCHOR", "PATCHED")
