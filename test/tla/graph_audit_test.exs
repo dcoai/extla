@@ -128,4 +128,69 @@ defmodule TLA.GraphAuditTest do
              "expected a missed-state or edge finding, got: #{message}"
     end
   end
+
+  describe "invariant_partition/3" do
+    # `Safety.check_invariants/4` reads a predicate's result with `if`, so truthiness
+    # rather than a boolean decides the verdict. That is what makes this partition a real
+    # check rather than the tautology it looks like: `|I| + |not I| == total` cannot fail
+    # if `not` is Elixir's, and ExTLA keeps no invariant AST to negate independently. The
+    # third bucket is what can fail.
+    test "a real invariant partitions the reachable states" do
+      {spec, constants, _graph} = graph_for(TestSpecs.Broken)
+
+      invariants = ModelChecker.checked_invariants(spec, constants)
+
+      assert GraphAudit.invariant_partition(spec, constants, invariants) == :ok
+      assert invariants != [], "the fixture must have an invariant, or this proves nothing"
+    end
+
+    # `:maybe` is truthy, so every state would report `holds` and the run would be green
+    # over an invariant that never expressed anything.
+    test "a predicate returning a truthy non-boolean is caught" do
+      {spec, constants, _graph} = graph_for(TestSpecs.Broken)
+      bad = %{name: :truthy_nonsense, predicate: fn _c, _s -> :maybe end}
+
+      assert {:error, message} = GraphAudit.invariant_partition(spec, constants, [bad])
+      assert message =~ ":truthy_nonsense"
+      assert message =~ "returned neither `true` nor `false`"
+      assert message =~ ":maybe"
+      assert message =~ "reports `holds`"
+    end
+
+    # `nil` is falsy, so the run reports a violation the spec never expressed — a
+    # counterexample for a property nobody wrote.
+    test "a predicate returning nil is caught, and it is the more dangerous case" do
+      {spec, constants, _graph} = graph_for(TestSpecs.Broken)
+      bad = %{name: :missing_key, predicate: fn _c, state -> Map.get(state, :no_such_var) end}
+
+      assert {:error, message} = GraphAudit.invariant_partition(spec, constants, [bad])
+      assert message =~ ":missing_key"
+      assert message =~ "a violation the spec never expressed"
+    end
+
+    test "one that decides most states and fumbles one is still caught" do
+      {spec, constants, _graph} = graph_for(TestSpecs.Broken)
+
+      bad = %{
+        name: :mostly_fine,
+        predicate: fn _c, state -> if state.n == 3, do: :shrug, else: true end
+      }
+
+      assert {:error, message} = GraphAudit.invariant_partition(spec, constants, [bad])
+      assert message =~ "1 returned neither"
+    end
+
+    test "and a predicate that raises surfaces as the invariant's problem" do
+      {spec, constants, _graph} = graph_for(TestSpecs.Broken)
+      bad = %{name: :explodes, predicate: fn _c, state -> state.n / 0 > 1 end}
+
+      # It raises rather than returning an error, and that is the honest outcome: a
+      # predicate that cannot be evaluated is not a partition that came out wrong. What
+      # matters is that it happens here, over a named invariant, rather than from inside
+      # the search over an anonymous state.
+      assert_raise ArithmeticError, fn ->
+        GraphAudit.invariant_partition(spec, constants, [bad])
+      end
+    end
+  end
 end
