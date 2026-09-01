@@ -760,4 +760,35 @@ defmodule TLA.TestSpecs do
       n < 3 or rem(n, 2) == 0
     end
   end
+
+  defmodule TwoStarts do
+    @moduledoc """
+    Two `init` blocks, which `04-layer2-model-checker.md` disjuncts into a nondeterministic
+    choice of start state.
+
+    Nothing else in the corpus or the fixtures has more than one, so this is what exercises
+    `node_record.init_index` — the field that exists so replay knows which block produced
+    the root of a path — and what makes `TLA.PropertyTest.init_states/2` a generator over
+    more than a single value.
+    """
+    use TLA.Spec
+
+    variable :side, type: [:left, :right]
+    variable :steps, type: 0..2
+
+    init do
+      side = :left
+      steps = 0
+    end
+
+    init do
+      side = :right
+      steps = 0
+    end
+
+    action :step do
+      require steps < 2
+      steps = steps + 1
+    end
+  end
 end
