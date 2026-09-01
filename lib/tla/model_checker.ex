@@ -505,6 +505,41 @@ defmodule TLA.ModelChecker do
   end
 
   @doc """
+  Every `{action, binding}` a state admits — the choices available from it, without
+  applying any of them.
+
+  `successors/3` answers the same question and applies the transitions, which is what the
+  search needs and what a caller choosing ONE of them does not: `TLA.Simulation.Generator`
+  picks a candidate and asks the refinement for a message, and
+  `TLA.PropertyTest.action_sequences/3` picks one and walks. Both had their own `for`
+  comprehension over `spec.actions` and `enabled_bindings/3` before this existed, which is
+  two implementations of "what may happen next" that could disagree — and only one of them
+  is what the differential corpus compares against TLC.
+
+  Actions are taken in declaration order and bindings in generator order, so the list is
+  the same on every run.
+  """
+  @spec enabled_steps(Spec.Compiled.t(), map(), State.t()) :: [{atom(), map()}]
+  def enabled_steps(spec, constants, state),
+    do: steps(spec, constants, state, &enabled_bindings/3)
+
+  @doc """
+  Every `{action, binding}` in a state, guard or no guard.
+
+  The counterpart of `bindings/3` to `enabled_steps/3`'s `enabled_bindings/3`. A simulation
+  that sends only enabled messages can never find an implementation that accepts one the
+  spec forbids, which is why the unfiltered form is offered rather than assumed away.
+  """
+  @spec steps(Spec.Compiled.t(), map(), State.t()) :: [{atom(), map()}]
+  def steps(spec, constants, state), do: steps(spec, constants, state, &bindings/3)
+
+  defp steps(spec, constants, state, bindings_fun) do
+    for action <- spec.actions,
+        binding <- bindings_fun.(action, constants, state),
+        do: {action.name, binding}
+  end
+
+  @doc """
   Every parameter binding of an action whose guard holds in a state.
 
   Params bind left to right and each generator receives the bindings made before

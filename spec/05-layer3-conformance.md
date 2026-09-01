@@ -666,7 +666,30 @@ defmodule TLA.PropertyTest do
     StreamData.t([{atom(), map()}])
   def action_sequences(spec_module, constants, max_length \\ 20)
 
+  # Both are compiled behind `Code.ensure_loaded?(StreamData)`. `stream_data` is a
+  # dev/test-only dependency of ExTLA (§06 §Dependencies keeps runtime dependencies at
+  # zero), so a consumer who wants generators declares it themselves, and the functions
+  # have a body only where it is loaded. This is the shape `TLA.Invariant.Test` already
+  # uses for `valid_states/3`.
+  #
+  # The choices in a sequence come from `TLA.ModelChecker.enabled_steps/3` — the checker's
+  # own enumeration, the one the differential corpus compares against TLC — rather than
+  # from a second implementation of what may happen next. Note the deliberate difference
+  # from `TLA.Simulation.Generator`, which takes a refinement and returns a concrete
+  # message: a sequence of actions is spec-level, and the mapping belongs in the
+  # consumer's own test body, as the example below shows.
+
   @doc """
+  > **Status: deferred past v1** (`06-architecture.md` §Implementation Phases).
+  >
+  > Generated test *files* are deferred with `mix tla.gen.test`, and for the reason
+  > §Deferred gives: "`mix tla.gen.test` writes code someone then has to maintain; the
+  > property helpers give most of the value without that." The two generators above are
+  > those helpers, and the usage example below is what they are for — a `check all` the
+  > consumer owns, rather than a file ExTLA writes and they inherit.
+  >
+  > Specified here so the design is not painted into a corner, and not built.
+
   Generate a complete property test module for a spec.
   Writes an ExUnit test file that:
   1. Generates random valid action sequences
