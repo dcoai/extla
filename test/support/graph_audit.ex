@@ -64,6 +64,70 @@ defmodule TLA.GraphAudit do
     walk(spec, constants, graph, initial, MapSet.new(initial))
   end
 
+  @doc """
+  Every invariant partitions the reachable states into the ones it holds in and the ones
+  it does not — and into nothing else.
+
+  ## Why this is not the tautology it looks like
+
+  `|states ⊨ I| + |states ⊨ ¬I| == distinct_states` is trivially true if `¬` is Elixir's
+  `not`, and ExTLA does not retain an invariant's AST, so there is no way to compile a
+  *negated* invariant and evaluate it independently. Written that way the check could not
+  fail, and a check that cannot fail is worse than none.
+
+  What makes the partition real is the **third bucket**. `TLA.ModelChecker.Safety` reads a
+  predicate's result with `if` (`safety.ex:28`), so it is truthiness rather than a boolean
+  that decides a verdict:
+
+    * a predicate returning `nil` — a `Map.get/2` that missed, say — reports a
+      **violation** that the spec never expressed;
+    * a predicate returning `:maybe`, `0` or `""` reports **holds**, because every one of
+      those is truthy.
+
+  Both are silent, and both are the shape #48 is about: the wrong answer and the right one
+  are the same word. So this counts `true` and `false` separately and requires them to sum
+  to the whole — anything that is neither lands in neither count and the sum falls short.
+
+  It also catches a predicate that **raises** on a reachable state, which today surfaces
+  from inside the search rather than as a finding about the invariant.
+  """
+  @spec invariant_partition(Spec.Compiled.t(), map(), [map()]) :: :ok | {:error, String.t()}
+  def invariant_partition(spec, constants, invariants) do
+    states = TLA.BoundedSearch.reachable_within(spec, constants, :infinity)
+    total = MapSet.size(states)
+
+    Enum.reduce_while(invariants, :ok, fn invariant, :ok ->
+      case partition(invariant, constants, states) do
+        {holds, fails, []} when holds + fails == total ->
+          {:cont, :ok}
+
+        {holds, fails, odd} ->
+          {:halt,
+           {:error,
+            "invariant #{inspect(invariant.name)} does not partition the #{total} " <>
+              "reachable states: #{holds} hold, #{fails} do not, and #{length(odd)} " <>
+              "returned neither `true` nor `false`.\n\n" <>
+              Enum.map_join(Enum.take(odd, 3), "\n\n", fn {state, value} ->
+                "  #{inspect(state)}\n  -> #{inspect(value)}"
+              end) <>
+              "\n\n`Safety.check_invariants/4` reads this with `if`, so a truthy " <>
+              "non-boolean reports `holds` and `nil` reports a violation the spec never " <>
+              "expressed. Either way the verdict is decided by something other than the " <>
+              "invariant."}}
+      end
+    end)
+  end
+
+  defp partition(invariant, constants, states) do
+    Enum.reduce(states, {0, 0, []}, fn state, {holds, fails, odd} ->
+      case invariant.predicate.(constants, state) do
+        true -> {holds + 1, fails, odd}
+        false -> {holds, fails + 1, odd}
+        other -> {holds, fails, [{state, other} | odd]}
+      end
+    end)
+  end
+
   defp walk(_spec, _constants, _graph, [], _seen), do: :ok
 
   defp walk(spec, constants, graph, [state | rest], seen) do

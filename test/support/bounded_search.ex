@@ -56,7 +56,8 @@ defmodule TLA.BoundedSearch do
   search cannot afford — it is why `TLA.Fingerprint` exists (D-5) — and exactly what makes
   this independent of it.
   """
-  @spec reachable_within(Spec.Compiled.t(), map(), non_neg_integer()) :: MapSet.t(TLA.State.t())
+  @spec reachable_within(Spec.Compiled.t(), map(), non_neg_integer() | :infinity) ::
+          MapSet.t(TLA.State.t())
   def reachable_within(spec, constants, steps) do
     initial = Enum.map(spec.init, & &1.(constants))
     grow(spec, constants, MapSet.new(initial), initial, steps)
@@ -65,7 +66,18 @@ defmodule TLA.BoundedSearch do
   defp grow(_spec, _constants, seen, _frontier, 0), do: seen
   defp grow(_spec, _constants, seen, [], _steps), do: seen
 
+  # `:infinity` for a caller that wants the whole reachable set rather than a bounded
+  # prefix of it. It terminates on the empty frontier above, which is the only thing that
+  # ever terminates a complete search anyway.
+  defp grow(spec, constants, seen, frontier, :infinity) do
+    grow_level(spec, constants, seen, frontier, :infinity)
+  end
+
   defp grow(spec, constants, seen, frontier, steps) do
+    grow_level(spec, constants, seen, frontier, steps)
+  end
+
+  defp grow_level(spec, constants, seen, frontier, steps) do
     next =
       for state <- frontier,
           {action, binding} <- ModelChecker.enabled_steps(spec, constants, state),
@@ -74,7 +86,9 @@ defmodule TLA.BoundedSearch do
           uniq: true,
           do: post
 
-    grow(spec, constants, MapSet.union(seen, MapSet.new(next)), next, steps - 1)
+    remaining = if steps == :infinity, do: :infinity, else: steps - 1
+
+    grow(spec, constants, MapSet.union(seen, MapSet.new(next)), next, remaining)
   end
 
   @doc """

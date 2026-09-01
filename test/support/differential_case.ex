@@ -241,6 +241,14 @@ defmodule TLA.DifferentialCase do
                "the audit needs a complete run, got #{inspect(ctx.result.status)}"
 
         assert TLA.GraphAudit.audit(spec, @entry.constants, ctx.graph) == :ok
+
+        # Every invariant the run would check, including the implicit `type_ok`, decides
+        # every reachable state with a real boolean — `Safety.check_invariants/4` reads
+        # the result with `if`, so a truthy non-boolean would report `holds` and `nil`
+        # would report a violation the spec never expressed.
+        invariants = TLA.ModelChecker.checked_invariants(spec, @entry.constants)
+
+        assert TLA.GraphAudit.invariant_partition(spec, @entry.constants, invariants) == :ok
       end
 
       # Shortest-ness, checked without the fixture. `expected.json` records TLC's length
