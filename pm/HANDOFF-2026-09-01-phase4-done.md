@@ -1,6 +1,6 @@
-# HANDOFF — 2026-09-01 — Phase 4 is done; start here
+# HANDOFF — 2026-09-01 — Phase 4 and *What the gates catch* are done; start here
 
-Supersedes `HANDOFF-2026-08-31-phase4-start.md`, which should move to `pm/closed/`.
+Supersedes `HANDOFF-2026-08-31-phase4-start.md`, now in `pm/closed/`.
 Self-contained; read it first.
 
 ---
@@ -65,24 +65,70 @@ be found.
 
 ---
 
+## SINCE THEN: *What the gates catch* is done
+
+Five proposals (#46-#50), closed. The project's correctness gates were assertions about
+themselves; they are now measurements.
+
+- **#46** — `mix tla.mutants`, a 13-mutant catalogue, and `test/mutation/survivors.json`
+  drift-gated in both directions. **11 killed, 1 survived, 1 timeout**, 8m33s, its own CI
+  job.
+- **#47** — `TLA.Trace.validate/3`, and an independent bounded re-search. Nothing had
+  checked that a trace's consecutive states were connected by the actions it names.
+- **#48** — `TLA.GraphAudit`: the edge table and stuck states against what the spec admits,
+  the invariant partition, and fingerprint injectivity.
+- **#49** — `TLA.Conformance.against_graph/3` and `mix tla.simulate --against-graph`.
+- **#50** — `TLA.SpecGenerator` and seven metamorphic properties at unbounded extent.
+
+**733 tests, ~78 s** (64 s before; the audits cost ~17 s and it is recorded in
+`GraphAudit`'s moduledoc).
+
+### The four findings worth carrying
+
+1. **The sweep corrected its author twice.** `param_universe_from_the_right` survives the
+   *corpus* and dies only in the suite — #39 had claimed the tests catch it, and they do,
+   just not there. And `ignores_a_guard` can never be killed by a gate that has to finish.
+2. **`drops_a_liveness_edge` survived every gate** and nobody predicted it. A missing
+   out-edge makes a cycle unfindable, and an unfindable cycle is indistinguishable from a
+   property that holds. #59 killed it.
+3. **Two proposals asked for checks that could not fail.** #48's invariant partition is a
+   tautology if `¬` is Elixir's `not`; what makes it real is the third bucket, since
+   `Safety.check_invariants/4` reads the predicate with `if` and a truthy non-boolean
+   silently reports `holds`. #49 asked for an implementation-vs-mapping split that
+   `test/conformance/README.md` already says is undecidable. Both shipped in the shape that
+   can fail, with the reasoning on the issues.
+4. **Generated models do not make the corpus redundant, and #50 slightly overstated the
+   case.** Of four mutants, three die to these properties and `drops_a_binding` does not —
+   because every arm drops the same binding and agrees perfectly on a wrong answer, and
+   because `BoundedSearch` and `GraphAudit` share `enabled_steps/3`, which is what the
+   mutant patches. A defect in what the guards and transitions *mean* is invisible to
+   everything that reads them. Only TLC sees it.
+
+---
+
 ## WHAT IS NEXT
 
-The queue is three items, and none of them is Phase 4.
+**A. #1 — the verification ledger.** Accepted, with its own milestone (*The verification
+ledger*) and its three open questions answered at evaluation: per-item hashing, a HARD gate
+from day one, and the file at the project root. **Not yet broken down.** One thing needs a
+human decision before it can move: section (c) — extracting the generic golden machinery
+into a shared leaf library — says "awaiting approval" and is agentronic's call under the
+Cross-Project Boundary Rule. It has **not** been filed. The milestone builds ExTLA's own
+renderer for its own golden, which does not presuppose the extraction.
 
-**A. #1 — the verification ledger.** Open since the beginning and now the oldest debt: the
-coverage report is not drift-gated the way `expected.json` is. This is the last
-"measured, not asserted" gap in the project, and with Phase 4 done there is nothing
-competing with it. **Recommended first.**
+**B. #51 — `TLA.PropertyTest`'s alias is unused without `stream_data`.** A regression from
+#45, filed from `extc`, which is where it shows: ExTLA's own CI cannot see it because
+`stream_data` is always loaded under `MIX_ENV=test`. One line. The interesting half is the
+gap it exposes — no job compiles the library without its dev/test deps, so the whole `else`
+branch of every `Code.ensure_loaded?(StreamData)` gate is unexercised.
 
-**B. #32 — `action_property` warns about an unused `old`/`new` binding.** Filed during the
-Phase 4 readiness work and never evaluated. Small, and a warning in code a user did not
-write is the class of defect the project has already fixed four of.
+**C. #32 — `action_property` warns about an unused `old`/`new` binding.** `extc` carries an
+`EXTC_SKIP_SPECS` workaround for it in CI, which is fresh evidence a consumer is paying for
+it.
 
-**C. #16 — solver-guided pruning.** Carries `Research`, not `Proposal`, so it is **not**
-ready for `/prop-eval` or `/prop-break-down`. The work there is shaping it into a concrete
-proposal.
+**D. #16 — solver-guided pruning.** Still `Research`, so not ready for `/prop-eval`.
 
-Recommended order: **A, then B.**
+Recommended order: **B and C** (both small, both with downstream evidence), then **A**.
 
 ---
 
@@ -99,6 +145,10 @@ mix format && mix compile --warnings-as-errors && mix test && bin/tlc-expected -
 ```
 
 ```bash
+mix tla.mutants                                    # what the gates catch; writes survivors.json
+mix tla.mutants --check                            # the drift gate (CI, ~8.5 min)
+mix test --include mutation                        # the harness's own tests
+mix tla.simulate MyApp.Server --against-graph      # Layer 2 vs Layer 3 containment
 mix tla.check Specs.X --format json                # Layer 2, machine-readable
 mix tla.check Specs.X --workers 8                  # parallel safety; implies safety-only
 mix tla.visualize Specs.X --output g.dot           # DOT; `dot -Tsvg g.dot -o g.svg`
@@ -157,6 +207,14 @@ The previous handoff's list still holds in full. What Phase 4 added:
   `TLA.Invariant.Test` established. The `else` branch is never compiled under
   `MIX_ENV=test`, so it cannot be tested — say so rather than writing a test that only
   asserts the branch you can see.
+- **A gate that cannot fail is worse than no gate**, and two proposals asked for one. Check
+  whether a proposed check has an input that makes it red *before* building it: the
+  invariant partition (#58) and the implementation-vs-mapping split (#60) both needed
+  reshaping, and both reshapings are on their issues.
+- **A metamorphic property sees only what differs between its arms.** A defect affecting
+  every arm equally is invisible to it, and re-derivations that share `enabled_steps/3`
+  inherit anything wrong with the spec's guards and transitions. That is the boundary of
+  what the non-oracle gates can reach.
 - **A deferred report is not a missing report.** Parallel coverage was going to be a
   separate work item behind a warning; running `mix tla.check --workers 8` showed it
   emitting `action :consume was never enabled` — *false*, because `never_enabled` derives
