@@ -11,7 +11,8 @@ does not restate it.
 
 ## [Unreleased]
 
-Nothing yet.
+Nothing yet. `mix.exs` reads `0.2.0-dev`: the `-dev` suffix is what keeps a commit from
+claiming to be the release it merely follows.
 
 ## [0.1.0] — 2026-09-02
 
