@@ -181,10 +181,19 @@ bin/tlc-expected --check                           # the oracle gate; CI runs it
 have `pm/` files in `pm/closed/`. If GitLab goes unreachable, reconstruct from
 `glab issue view` before it does, or work from this handoff.
 
-**Per-milestone worktrees are not usable here.** CLAUDE.md describes
-`~/Projects/claude-tools/worktree.exs`; that directory does not exist on this machine, and
-neither do `mem_append.exs`, `mem_lint.exs` or `ensure_labels.exs`. Work in the main
-checkout and say so.
+**Per-milestone worktrees ARE usable here.** An earlier revision of this handoff claimed
+`~/Projects/claude-tools/` did not exist on this machine. That was wrong, and corrected on
+2026-09-02 (#73/#80): all eleven scripts are present, including `worktree.exs`,
+`mem_append.exs`, `mem_lint.exs` and `ensure_labels.exs`. `mem_append.exs` and `mem_lint.exs`
+were both run successfully that day.
+
+Use the main checkout anyway when only one milestone is active and one instance is running —
+worktrees exist to parallelise *across* milestones, and a seeded one costs ~1.4 GB. The point
+of this correction is that the option is available, not that it is always right.
+
+**The lesson is about handoffs, not about worktrees.** "That directory does not exist" is a
+claim with a one-second check behind it and a day of misdirection in front of it. A handoff
+is read first and trusted; do not assert environment facts in one — say how to check.
 
 ---
 

@@ -287,6 +287,11 @@ not exist to be found.
 
 ## Implementation Phases
 
+**This section is the single source of truth for what is built.** Each phase below carries
+its own status, and nothing else in the repository restates it — `README.md` links here
+rather than keeping a second copy, because the second copy is what drifted (#73: it claimed
+Phases 1 and 2 were done and Phase 3 and 4 were "not yet", two phases after they shipped).
+
 ### The ordering rationale
 
 An earlier plan made Layer 1 the MVP, on the reasoning that it is the easiest piece to
@@ -304,6 +309,8 @@ commits. The model checker is the moat; it is built first, and Layer 1 falls out
 runtime checking engine it requires.
 
 ### Phase 1 — Prove the DSL (v0.1)
+
+**Complete.**
 
 **Goal:** a spec written in the DSL compiles, and its safety properties are checked
 correctly.
@@ -326,6 +333,8 @@ exercised, and agrees with TLC on every spec in the corpus.
 
 ### Phase 2 — Liveness
 
+**Complete.**
+
 - `TLA.Temporal`, `TLA.Temporal.Fairness`
 - The liveness graph: edge table and per-state ENABLED bits in `TLA.StateGraph`,
   built only under `check_liveness: true` (`04-layer2-model-checker.md` §State Graph)
@@ -336,6 +345,8 @@ exercised, and agrees with TLC on every spec in the corpus.
 **Deliverable:** temporal properties and fairness, on models large enough to matter.
 
 ### Phase 3 — Layer 1, and the conformance bridge
+
+**Complete.**
 
 Layer 1 is small once the runtime checking engine exists; it ships alongside Layer 3
 rather than ahead of it.
