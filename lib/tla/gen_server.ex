@@ -59,12 +59,14 @@ defmodule TLA.GenServer do
   defmacro __using__(opts) do
     spec_module = Keyword.fetch!(opts, :spec)
     refinement_module = Keyword.fetch!(opts, :refinement)
+    spec_version = Keyword.get(opts, :spec_version)
 
     quote do
       use TLA.Invariant
 
       @tla_spec unquote(spec_module)
       @tla_refinement unquote(refinement_module)
+      @tla_spec_version unquote(spec_version)
 
       @before_compile TLA.GenServer
     end
@@ -82,12 +84,14 @@ defmodule TLA.GenServer do
     spec = Module.get_attribute(env.module, :tla_spec)
     refinement = Module.get_attribute(env.module, :tla_refinement)
     mode = Module.get_attribute(env.module, :tla_mode)
+    stamp = Module.get_attribute(env.module, :tla_spec_version)
 
     if mode == :disabled do
       quote do
       end
     else
       validate!(spec, refinement)
+      check_stamp!(env, spec, stamp)
       wrapped = env.module |> Module.get_attribute(:tla_wrapped, []) |> Enum.uniq()
 
       quote do
@@ -96,6 +100,9 @@ defmodule TLA.GenServer do
 
         @doc false
         def __tla_refinement__, do: @tla_refinement
+
+        @doc false
+        def __tla_spec_version__, do: @tla_spec_version
 
         unquote(init_wrapper(wrapped))
 
@@ -112,6 +119,51 @@ defmodule TLA.GenServer do
   # that does not cover the spec is a build failure rather than a runtime surprise —
   # `validate!/3` is given the spec's declared constants, because a compile has no run to
   # take an assignment from.
+  # The `spec_version:` stamp (#67).
+  #
+  # OPT-IN. A mapping without a stamp compiles exactly as before, and `unstamped` is a
+  # legitimate state the ledger reports — this cannot break existing users, and a mechanism
+  # that forced every mapping to carry a hash on day one would be adopted by pasting hashes.
+  defp check_stamp!(_env, _spec, nil), do: :ok
+
+  defp check_stamp!(env, spec, stamp) do
+    case TLA.Spec.Hash.module_version(spec) do
+      # No source on disk — a spec from a released package. The stamp cannot be checked, and
+      # saying so is the honest outcome: passing silently would let an unverifiable stamp read
+      # as a verified one, which is worse than having no stamp at all.
+      nil ->
+        IO.warn(
+          "cannot verify spec_version for #{inspect(spec)}: its source is not on disk, " <>
+            "so the stamp is unchecked here.",
+          Macro.Env.stacktrace(env)
+        )
+
+      ^stamp ->
+        :ok
+
+      current ->
+        raise TLA.Spec.CompileError, """
+        #{inspect(env.module)} is stamped against #{inspect(spec)} version #{stamp}, \
+        but that spec is now version #{current}.
+
+        The refinement mapping was written against a spec that has since changed. Nothing
+        about the mapping itself is checked by this — `abstract/1` still compiles and still
+        returns an action name — so the risk is a mapping that is now wrong and whose only
+        symptom is a `:diverged` at runtime, on a path that may not be exercised for months.
+
+        RE-READ the mapping against the spec as it stands and confirm that each variable and
+        action it names still means what it did. Then record that you have:
+
+            use TLA.GenServer,
+              spec: #{inspect(spec)},
+              spec_version: "#{current}"
+
+        `mix tla.stamp --restamp` will make that edit once you have made the judgement. It is
+        a convenience for a decision already taken, not a way to skip it.
+        """
+    end
+  end
+
   defp validate!(spec, refinement) do
     Code.ensure_compiled!(spec)
     Code.ensure_compiled!(refinement)
