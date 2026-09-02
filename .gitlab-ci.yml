@@ -154,6 +154,17 @@ mutation:
 #
 # What this does NOT fail on: items with NOTHING. The backlog is the document's content, not
 # its error condition — a gate failing on gaps could only be satisfied by deleting rows.
+#
+# TWO THINGS CHECK THIS GOLDEN, and that is deliberate (#75, #84). `ledger_test.exs` asserts the
+# same equality inside `mix test`, in the `check` stage, so a developer sees drift before pushing
+# and CI fails one stage earlier than this job. That means **this job never runs on a drifted
+# golden** — `check` has already failed — so a reader seeing `skipped` here beside a red `test`
+# is looking at the system working, not at a gate that was missed.
+#
+# It is not redundant. The test exercises `TLA.Ledger.render/1`; this job is the only thing that
+# runs the mix TASK — its argv parsing, `--check`, and `check!/2`. Deleting it would leave that
+# task with no coverage at all. Its `Mix.raise` branches are covered by
+# `test/mix/tla_coverage_test.exs` since #84; before that they had never executed anywhere.
 tla-coverage-drift:
   extends: .elixir
   stage: verify
