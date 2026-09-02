@@ -27,7 +27,6 @@ defmodule TLA.Spec.Temporal do
   Parse a temporal block into quoted code that builds a
   `TLA.Spec.Compiled.temporal_formula()`.
   """
-  @spec parse!(Macro.t(), Rewriter.t()) :: Macro.t()
   def parse!({:__block__, meta, statements}, ctx) when length(statements) > 1 do
     bad!(
       ctx,

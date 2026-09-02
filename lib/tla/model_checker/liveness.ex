@@ -80,7 +80,6 @@ defmodule TLA.ModelChecker.Liveness do
 
   Returns the first violation in declaration order, with the lasso that refutes it.
   """
-  @spec check(Spec.Compiled.t(), StateGraph.t(), :all | [atom()]) :: verdict()
   def check(spec, graph, selected \\ :all) do
     complete!(graph)
 

@@ -16,7 +16,6 @@ defmodule TLA.Function do
       iex> TLA.Function.construct(MapSet.new([1, 2]), &(&1 * 10))
       %{1 => 10, 2 => 20}
   """
-  @spec construct(MapSet.t(), (term() -> term())) :: map()
   def construct(domain, mapping), do: Map.new(domain, &{&1, mapping.(&1)})
 
   @doc """
@@ -31,7 +30,6 @@ defmodule TLA.Function do
       iex> TLA.Function.function_set(MapSet.new([]), MapSet.new([0, 1]))
       MapSet.new([%{}])
   """
-  @spec function_set(MapSet.t(), MapSet.t()) :: MapSet.t(map())
   def function_set(domain, range) do
     domain
     |> Enum.reduce([%{}], fn key, functions ->
@@ -46,7 +44,6 @@ defmodule TLA.Function do
       iex> TLA.Function.domain(%{a: 1, b: 2})
       MapSet.new([:a, :b])
   """
-  @spec domain(map()) :: MapSet.t()
   def domain(f), do: f |> Map.keys() |> MapSet.new()
 
   @doc """
@@ -58,7 +55,6 @@ defmodule TLA.Function do
       iex> TLA.Function.except(%{a: 1, b: 2}, a: 9)
       %{a: 9, b: 2}
   """
-  @spec except(map(), [{term(), term()}]) :: map()
   def except(f, updates) do
     Enum.reduce(updates, f, fn {key, value}, acc -> Map.replace!(acc, key, value) end)
   end
@@ -70,7 +66,6 @@ defmodule TLA.Function do
       iex> TLA.Function.except_with(%{a: 1}, :a, &(&1 + 1))
       %{a: 2}
   """
-  @spec except_with(map(), term(), (term() -> term())) :: map()
   def except_with(f, key, update_fn), do: Map.update!(f, key, update_fn)
 
   @doc """
@@ -80,7 +75,6 @@ defmodule TLA.Function do
       iex> TLA.Function.record_set(pc: MapSet.new([:idle, :busy]), n: MapSet.new([0]))
       MapSet.new([%{pc: :idle, n: 0}, %{pc: :busy, n: 0}])
   """
-  @spec record_set(keyword(MapSet.t())) :: MapSet.t(map())
   def record_set(field_specs) do
     field_specs
     |> Enum.reduce([%{}], fn {field, set}, records ->

@@ -27,7 +27,6 @@ defmodule TLA.Simulation.Generator do
   `check_step!/5` reports as `:not_enabled`, and a generator that never sends one can
   never find it.
   """
-  @spec from_spec(module(), module(), map()) :: (TLA.State.t() -> {atom(), map(), term()} | nil)
   def from_spec(spec_module, refinement, constants) do
     spec = Spec.Compiled.from_module(spec_module)
     fn state -> pick(spec, refinement, ModelChecker.steps(spec, constants, state)) end
@@ -41,8 +40,6 @@ defmodule TLA.Simulation.Generator do
   the spec forbids". A simulation that only ever sends enabled messages cannot produce a
   `:not_enabled` finding, which is worth knowing before choosing it.
   """
-  @spec enabled_only(module(), module(), map()) ::
-          (TLA.State.t() -> {atom(), map(), term()} | nil)
   def enabled_only(spec_module, refinement, constants) do
     spec = Spec.Compiled.from_module(spec_module)
     fn state -> pick(spec, refinement, ModelChecker.enabled_steps(spec, constants, state)) end

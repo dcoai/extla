@@ -27,8 +27,6 @@ defmodule TLA.Coverage do
   the sentence — and is the only way to have them at all.
   """
 
-  alias TLA.Spec.Compiled
-
   @type action_coverage :: %{
           enabled_in: non_neg_integer(),
           states_generated: non_neg_integer(),
@@ -92,7 +90,6 @@ defmodule TLA.Coverage do
   @doc """
   A fresh accumulator for a run.
   """
-  @spec init(Compiled.t(), map(), [Compiled.invariant_def()]) :: t()
   def init(spec, constants, invariants) do
     %__MODULE__{
       actions:
@@ -114,7 +111,6 @@ defmodule TLA.Coverage do
   Record a newly discovered state: which invariants were evaluated on it, which
   were pressed against, and which temporal probes it satisfied.
   """
-  @spec observe_state(t(), [Compiled.invariant_def()], map(), TLA.State.t()) :: t()
   def observe_state(coverage, invariants, constants, state) do
     invariants =
       Enum.reduce(invariants, coverage.invariants, fn invariant, acc ->
@@ -143,7 +139,6 @@ defmodule TLA.Coverage do
   @doc """
   Record what expanding one state produced for one action.
   """
-  @spec observe_action(t(), atom(), [map()], non_neg_integer(), non_neg_integer()) :: t()
   def observe_action(coverage, _name, [], _generated, _distinct), do: coverage
 
   def observe_action(coverage, name, bindings, generated, distinct) do
@@ -170,7 +165,6 @@ defmodule TLA.Coverage do
   enabled action. Not an error — nothing is cut — but almost always a predicate
   broader than the end state it was written for.
   """
-  @spec observe_live_terminal(t(), Compiled.t(), map(), TLA.State.t()) :: t()
   def observe_live_terminal(coverage, spec, constants, state) do
     admitting =
       spec.terminals
@@ -186,7 +180,6 @@ defmodule TLA.Coverage do
   literal have one: the set a state function returns changes from state to state,
   so there is no fixed universe to subtract from.
   """
-  @spec observe_universe(t(), Compiled.action_def(), map(), TLA.State.t()) :: t()
   def observe_universe(coverage, action, constants, state) do
     universe =
       if Enum.all?(action.param_sources, fn {_, source} -> source in [:constant, :literal] end) do
@@ -254,7 +247,6 @@ defmodule TLA.Coverage do
       `:unknown`, and merging it could only replace a computed universe with an unknown
       one. The coordinator's is kept, deliberately.
   """
-  @spec merge(t(), t()) :: t()
   def merge(%__MODULE__{} = into, %__MODULE__{} = from) do
     %__MODULE__{
       into
@@ -309,7 +301,6 @@ defmodule TLA.Coverage do
   @doc """
   Finish the accumulator into the report.
   """
-  @spec finalize(t(), :none | :state_constraint | :max_states | :violation) :: t()
   def finalize(coverage, bounded_by) do
     %__MODULE__{
       actions: coverage.actions,
@@ -427,7 +418,6 @@ defmodule TLA.Coverage do
   @doc """
   Whether this run found anything worth a warning.
   """
-  @spec clean?(t()) :: boolean()
   def clean?(coverage) do
     coverage.never_enabled == [] and coverage.vacuous == [] and
       coverage.terminal_but_live == [] and
@@ -437,7 +427,6 @@ defmodule TLA.Coverage do
   @doc """
   The warnings, one line each.
   """
-  @spec warnings(t()) :: [String.t()]
   def warnings(coverage) do
     Enum.map(coverage.never_enabled, &"action #{inspect(&1)} was never enabled") ++
       Enum.map(coverage.vacuous, &vacuity_line/1) ++
@@ -462,7 +451,6 @@ defmodule TLA.Coverage do
   enough to be worth a build failure, but not always, and a tool that refuses to
   proceed on a judgement call gets its check turned off entirely.
   """
-  @spec warn_unless_clean(t(), keyword() | map()) :: :ok | {:error, [String.t()]}
   def warn_unless_clean(coverage, opts \\ []) do
     strict =
       if is_map(opts), do: Map.get(opts, :strict_coverage, false), else: opts[:strict_coverage]
@@ -477,7 +465,6 @@ defmodule TLA.Coverage do
   @doc """
   Render for terminal output.
   """
-  @spec format(t(), keyword()) :: String.t()
   def format(coverage, opts \\ []) do
     title = Keyword.get(opts, :title, "COVERAGE")
     rule = String.duplicate("-", max(0, 68 - String.length(title) - 5))

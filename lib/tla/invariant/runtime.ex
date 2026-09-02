@@ -33,7 +33,6 @@ defmodule TLA.Invariant.Runtime do
 
   The names come from the wrapper, already filtered by `callbacks:`.
   """
-  @spec check_invariants!(module(), [atom()], term()) :: :ok | no_return()
   def check_invariants!(module, names, state) do
     Enum.each(names, fn name ->
       unless module.__tla_invariant__(name, state) do
@@ -52,7 +51,6 @@ defmodule TLA.Invariant.Runtime do
   The same, timing each check and emitting a `:checked` event. Called only from a module
   compiled under `config :extla, telemetry: :verbose`.
   """
-  @spec check_invariants!(module(), [atom()], term(), :verbose) :: :ok | no_return()
   def check_invariants!(module, names, state, :verbose) do
     Enum.each(names, fn name ->
       measured(:invariant, module, name, fn -> module.__tla_invariant__(name, state) end)
@@ -71,7 +69,6 @@ defmodule TLA.Invariant.Runtime do
   @doc """
   Check the named action properties over a transition.
   """
-  @spec check_action_properties!(module(), [atom()], term(), term()) :: :ok | no_return()
   def check_action_properties!(module, names, old_state, new_state) do
     Enum.each(names, fn name ->
       unless module.__tla_action_property__(name, old_state, new_state) do
@@ -90,8 +87,6 @@ defmodule TLA.Invariant.Runtime do
   @doc """
   The same, under `:verbose`.
   """
-  @spec check_action_properties!(module(), [atom()], term(), term(), :verbose) ::
-          :ok | no_return()
   def check_action_properties!(module, names, old_state, new_state, :verbose) do
     Enum.each(names, fn name ->
       measured(:action_property, module, name, fn ->
@@ -117,7 +112,6 @@ defmodule TLA.Invariant.Runtime do
   generated clause's way of saying "this declaration is not about this message", which is
   a different thing from a predicate that returned false.
   """
-  @spec check_preconditions!(module(), atom(), term(), term()) :: :ok | no_return()
   def check_preconditions!(module, callback, message, state) do
     Enum.each(module.__tla_conditions__(:precondition), fn {index, description} ->
       case module.__tla_precondition__(index, message, state) do
@@ -143,7 +137,6 @@ defmodule TLA.Invariant.Runtime do
   @doc """
   Check every postcondition whose pattern matches `message`.
   """
-  @spec check_postconditions!(module(), atom(), term(), term(), term()) :: :ok | no_return()
   def check_postconditions!(module, callback, message, old_state, new_state) do
     Enum.each(module.__tla_conditions__(:postcondition), fn {index, description} ->
       case module.__tla_postcondition__(index, message, old_state, new_state) do
@@ -175,7 +168,6 @@ defmodule TLA.Invariant.Runtime do
   from `init/1` does not. Treating those as stuttering is right — nothing moved — and it
   keeps the wrapper from having to know which callback it is wrapping.
   """
-  @spec extract_state(term(), term()) :: term()
   def extract_state(result, pre_state)
 
   def extract_state({:reply, _reply, state}, _pre), do: state
@@ -201,7 +193,6 @@ defmodule TLA.Invariant.Runtime do
   live in functions named after the states, which `@on_definition` cannot recognise. §03
   specifies `handle_event/4`, which is the `:handle_event_function` mode.
   """
-  @spec extract_statem_state(term(), {term(), term()}) :: {term(), term()}
   def extract_statem_state(result, pre)
 
   def extract_statem_state({:next_state, name, data}, _pre), do: {name, data}
@@ -226,8 +217,6 @@ defmodule TLA.Invariant.Runtime do
   type system says so, as a warning, in the user's module, about code the user did not
   write. Behind a function taking `term()` there is nothing to prove.
   """
-  @spec check_initial_invariants!(module(), [atom()], term(), :genserver | :statem) ::
-          :ok | no_return()
   def check_initial_invariants!(module, names, result, shape) do
     case initial(result, shape) do
       {:ok, state} -> check_invariants!(module, names, state)
@@ -236,8 +225,6 @@ defmodule TLA.Invariant.Runtime do
   end
 
   @doc "The same, under `:verbose`."
-  @spec check_initial_invariants!(module(), [atom()], term(), :genserver | :statem, :verbose) ::
-          :ok | no_return()
   def check_initial_invariants!(module, names, result, shape, :verbose) do
     case initial(result, shape) do
       {:ok, state} -> check_invariants!(module, names, state, :verbose)
@@ -256,7 +243,6 @@ defmodule TLA.Invariant.Runtime do
   that was never given anything to be about. The `init/1` wrapper checks nothing in that
   case — which is why this returns a tag rather than a state and a fallback.
   """
-  @spec initial_state(term()) :: {:ok, term()} | :none
   def initial_state(result)
 
   def initial_state({:ok, state}), do: {:ok, state}
@@ -272,7 +258,6 @@ defmodule TLA.Invariant.Runtime do
   declaration written as `{name, data} = state` would refuse with a `MatchError` naming
   neither the invariant nor the reason.
   """
-  @spec initial_statem_state(term()) :: {:ok, {term(), term()}} | :none
   def initial_statem_state(result)
 
   def initial_statem_state({:ok, name, data}), do: {:ok, {name, data}}
@@ -288,7 +273,6 @@ defmodule TLA.Invariant.Runtime do
   (§03 §Supported OTP Behaviors). Returns the new state, so it can stand in the middle of
   the `Agent.update/3` function it is called from.
   """
-  @spec check_agent_step!(module(), term(), term()) :: term()
   def check_agent_step!(module, old_state, new_state) do
     if instrumented?(module), do: agent_step!(module, old_state, new_state), else: new_state
   end
@@ -316,7 +300,6 @@ defmodule TLA.Invariant.Runtime do
   the invariants must still hold — the same reason a GenServer callback that returns its
   state unchanged is still checked.
   """
-  @spec check_agent_state!(module(), term()) :: term()
   def check_agent_state!(module, state) do
     if instrumented?(module), do: agent_state!(module, state), else: state
   end

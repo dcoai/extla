@@ -13,7 +13,6 @@ defmodule TLA.Mix.SpecTarget do
   @doc """
   The spec modules named on the command line, or every one in the project when none were.
   """
-  @spec resolve!([String.t()]) :: [module()]
   def resolve!([]) do
     Mix.Project.config()
     |> Keyword.fetch!(:app)
@@ -40,7 +39,6 @@ defmodule TLA.Mix.SpecTarget do
   @doc """
   The constant assignment for a spec, or an error naming both places it could come from.
   """
-  @spec constants!(Spec.Compiled.t()) :: map()
   def constants!(spec) do
     case Spec.Compiled.resolve_constants(spec) do
       {:ok, constants} ->
@@ -65,7 +63,6 @@ defmodule TLA.Mix.SpecTarget do
   @doc """
   Whether a module carries a compiled specification.
   """
-  @spec spec?(module()) :: boolean()
   def spec?(module) do
     Code.ensure_loaded?(module) and function_exported?(module, :__tla_spec__, 0)
   end

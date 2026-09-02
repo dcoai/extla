@@ -36,7 +36,7 @@ defmodule TLA.Symmetry do
   trusting the reduction on the large one.
   """
 
-  alias TLA.{Fingerprint, State}
+  alias TLA.Fingerprint
 
   @typedoc "One permutation, as the substitution it performs on the elements it moves."
   @type mapping :: %{term() => term()}
@@ -58,7 +58,6 @@ defmodule TLA.Symmetry do
   sorted first, so the permutation list — and therefore every fingerprint — is the same on
   every run.
   """
-  @spec mappings(map(), [atom()]) :: [mapping()]
   def mappings(constants, names) do
     names
     |> Enum.map(&elements!(constants, &1))
@@ -108,7 +107,6 @@ defmodule TLA.Symmetry do
   form in exactly the sense the fingerprint cares about — and Erlang's term order, which
   compares an integer below an atom, is not.
   """
-  @spec canonical(State.t(), [mapping()]) :: binary()
   def canonical(state, mappings) do
     mappings
     |> Enum.map(&Fingerprint.canonical(permute(state, &1)))
@@ -119,7 +117,6 @@ defmodule TLA.Symmetry do
   A state with every occurrence of a symmetric element replaced, wherever it appears —
   as a value, inside a set or a sequence, as a map key, or nested in any of those.
   """
-  @spec permute(term(), mapping()) :: term()
   def permute(term, mapping) when map_size(mapping) == 0, do: term
 
   def permute(%MapSet{} = set, mapping), do: MapSet.new(set, &permute(&1, mapping))
@@ -151,7 +148,6 @@ defmodule TLA.Symmetry do
   the run gives — whether it verified, what it refuted, whether it got stuck, and which
   actions it never enabled.
   """
-  @spec verdict(map()) :: map()
   def verdict(result) do
     %{
       status: result.status,
@@ -168,7 +164,6 @@ defmodule TLA.Symmetry do
   @doc """
   Compare the two runs, raising with what differed.
   """
-  @spec verify!(map(), map(), [atom()]) :: :ok
   def verify!(reduced, full, names) do
     with_reduction = verdict(reduced)
     without = verdict(full)

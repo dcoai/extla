@@ -10,17 +10,12 @@ defmodule TLA.ModelChecker.Safety do
   to check.
   """
 
-  alias TLA.Spec.Compiled
-  alias TLA.State
-
   @doc """
   Check the selected invariants against a single state.
 
   `only` restricts the check to named invariants, the way a TLC `.cfg` selects
   which of a module's invariants a run checks; `:all` is every declared one.
   """
-  @spec check_invariants(Compiled.t(), map(), State.t(), :all | [atom()]) ::
-          :ok | {:violation, atom()}
   def check_invariants(spec, constants, state, only \\ :all) do
     spec.invariants
     |> selected(only)
@@ -32,8 +27,6 @@ defmodule TLA.ModelChecker.Safety do
   @doc """
   Check all action properties against a transition.
   """
-  @spec check_action_properties(Compiled.t(), map(), State.t(), State.t(), :all | [atom()]) ::
-          :ok | {:violation, atom()}
   def check_action_properties(spec, constants, old_state, new_state, only \\ :all) do
     spec.action_properties
     |> selected(only)
@@ -52,7 +45,6 @@ defmodule TLA.ModelChecker.Safety do
   preferred over `check_deadlock: false` — that turns the check off for every
   other state in the spec at the same time.
   """
-  @spec classify_stuck(Compiled.t(), map(), State.t()) :: :terminal | :deadlocked
   def classify_stuck(spec, constants, state) do
     if Enum.any?(spec.terminals, & &1.predicate.(constants, state)),
       do: :terminal,
@@ -66,7 +58,6 @@ defmodule TLA.ModelChecker.Safety do
   and so does ExTLA, so reproducing TLC's per-invariant report means one run per
   invariant — and a run measuring the state count has to check nothing at all.
   """
-  @spec selected([map()], :all | [atom()]) :: [map()]
   def selected(declarations, :all), do: declarations
 
   def selected(declarations, names) when is_list(names),

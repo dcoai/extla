@@ -55,7 +55,6 @@ defmodule TLA.Config do
   Maximum states to explore during model checking before aborting.
   Prevents runaway exploration.
   """
-  @spec max_states() :: pos_integer()
   def max_states do
     Application.get_env(:extla, :max_states, 1_000_000)
   end
@@ -76,7 +75,6 @@ defmodule TLA.Config do
   Set higher than the machine has schedulers, a run is slower rather than wrong — the
   degradation is visible, which is the property a derived default should keep.
   """
-  @spec workers() :: pos_integer()
   def workers do
     Application.get_env(:extla, :workers, System.schedulers_online())
   end

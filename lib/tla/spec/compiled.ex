@@ -58,7 +58,6 @@ defmodule TLA.Spec.Compiled do
   The constant assignments declared with `default:`, for a run that was given
   none of its own.
   """
-  @spec default_constants(t()) :: map()
   def default_constants(%__MODULE__{constants: constants}) do
     for %{name: name, opts: opts} <- constants,
         Keyword.has_key?(opts, :default),
@@ -159,7 +158,6 @@ defmodule TLA.Spec.Compiled do
   Raises `ArgumentError` for a module that is not a spec, rather than letting an
   `UndefinedFunctionError` surface from three frames down.
   """
-  @spec from_module(module()) :: t()
   def from_module(module) do
     Code.ensure_loaded(module)
 
@@ -180,7 +178,6 @@ defmodule TLA.Spec.Compiled do
   checked with one assignment and an implementation checked against another are two
   different specifications, and a verdict from each is not a verdict about the same thing.
   """
-  @spec resolve_constants(t()) :: {:ok, map()} | {:error, [atom()]}
   def resolve_constants(%__MODULE__{} = spec) do
     configured =
       :extla
@@ -199,18 +196,15 @@ defmodule TLA.Spec.Compiled do
   @doc """
   The declared variable names, in declaration order.
   """
-  @spec variable_names(t()) :: [atom()]
   def variable_names(%__MODULE__{variables: variables}), do: Enum.map(variables, & &1.name)
 
   @doc """
   The declared constant names, in declaration order.
   """
-  @spec constant_names(t()) :: [atom()]
   def constant_names(%__MODULE__{constants: constants}), do: Enum.map(constants, & &1.name)
 
   @doc """
   The action with the given name, or `nil`.
   """
-  @spec action(t(), atom()) :: action_def() | nil
   def action(%__MODULE__{actions: actions}, name), do: Enum.find(actions, &(&1.name == name))
 end

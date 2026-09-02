@@ -37,8 +37,6 @@ defmodule TLA.Spec.Params do
   Returns `{[{name, arg_asts, body_ast}], [{name, source}]}`, where each body is
   the generator's body given `(constants, pre_state, bound_so_far)`.
   """
-  @spec compile!(Macro.t(), Rewriter.t(), Macro.t(), Macro.t(), Macro.t()) ::
-          {[{atom(), Macro.t()}], [{atom(), TLA.Spec.Compiled.param_source()}]}
   def compile!(nil, _ctx, _constants, _state, _bound), do: {[], []}
 
   def compile!(entries, ctx, constants, state, bound) when is_list(entries) do

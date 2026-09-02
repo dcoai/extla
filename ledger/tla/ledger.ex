@@ -63,7 +63,6 @@ defmodule TLA.Ledger do
 
   A spec that cannot be run is not an error here — it is a finding, per honesty condition 1.
   """
-  @spec run([module()]) :: [section]
   def run(modules \\ SpecTarget.resolve!([])) do
     freshness = freshness_by_spec()
     Enum.map(modules, &section(&1, freshness))
@@ -280,7 +279,6 @@ defmodule TLA.Ledger do
   One group per spec module, so a reader sees a spec's gaps together rather than having to
   reassemble them from a flat table.
   """
-  @spec golden_spec([section]) :: map
   def golden_spec(sections) do
     all = rows(sections)
 
@@ -389,14 +387,11 @@ defmodule TLA.Ledger do
   end
 
   @doc "Render the ledger."
-  @spec render([section]) :: iodata
   def render(sections), do: sections |> golden_spec() |> Surfex.Golden.render()
 
   @doc "Every row across every section — the ledger's flat census."
-  @spec rows([section]) :: [row]
   def rows(sections), do: Enum.flat_map(sections, & &1.rows)
 
   @doc "Items with no verification at all: the backlog this document exists to keep visible."
-  @spec gaps([section]) :: [row]
   def gaps(sections), do: sections |> rows() |> Enum.filter(&(&1.evidence == :nothing))
 end

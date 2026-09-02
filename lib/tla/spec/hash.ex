@@ -44,7 +44,6 @@ defmodule TLA.Spec.Hash do
   @doc """
   The content version of a quoted node or a source binary: 8 lowercase hex characters.
   """
-  @spec definition_hash(Macro.t() | String.t()) :: String.t()
   def definition_hash(source) when is_binary(source),
     do: source |> Code.string_to_quoted!() |> definition_hash()
 
@@ -65,7 +64,6 @@ defmodule TLA.Spec.Hash do
   defp strip_meta(leaf), do: leaf
 
   @doc "Every versionable item declared anywhere in `source`."
-  @spec scan(String.t()) :: %{item() => String.t()}
   def scan(source), do: source |> Code.string_to_quoted!() |> scan_ast()
 
   @doc """
@@ -77,7 +75,6 @@ defmodule TLA.Spec.Hash do
   other stale. A stamp going stale for something that did not change is the same "cries wolf"
   failure position-insensitivity exists to prevent, arriving by a different route.
   """
-  @spec scan(String.t(), module()) :: %{item() => String.t()}
   def scan(source, module) do
     case source |> Code.string_to_quoted!() |> module_body(Module.split(module), []) do
       nil -> %{}
@@ -92,7 +89,6 @@ defmodule TLA.Spec.Hash do
   spec that arrived inside a released package has a version nobody here can compute, and
   callers render that differently from an item with none.
   """
-  @spec item_versions(module()) :: %{item() => String.t()}
   def item_versions(module) do
     case source(module) do
       nil -> %{}
@@ -112,7 +108,6 @@ defmodule TLA.Spec.Hash do
   position-insensitivity: reformatting a spec does not invalidate every mapping written against
   it. Returns `nil` when the spec's source is not on disk.
   """
-  @spec module_version(module()) :: String.t() | nil
   def module_version(module) do
     case item_versions(module) do
       empty when empty == %{} ->
@@ -129,7 +124,6 @@ defmodule TLA.Spec.Hash do
   end
 
   @doc "The kinds of item that carry a version."
-  @spec kinds() :: [atom()]
   def kinds, do: @kinds
 
   defp scan_ast(ast) do

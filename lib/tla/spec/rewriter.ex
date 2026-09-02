@@ -53,7 +53,6 @@ defmodule TLA.Spec.Rewriter do
   @doc """
   Rewrite an expression, resolving `^constants` and bare variables.
   """
-  @spec rewrite(Macro.t(), t()) :: Macro.t()
   def rewrite(ast, %__MODULE__{} = ctx), do: walk(ast, ctx)
 
   # ── The walk ────────────────────────────────────────────────────────────────
@@ -159,7 +158,6 @@ defmodule TLA.Spec.Rewriter do
   @doc """
   The rejection builder for `init`: there is no earlier state to read.
   """
-  @spec reject_init() :: (atom() -> {String.t(), String.t()})
   def reject_init do
     fn name ->
       {"`init` cannot read variable #{inspect(name)}",
@@ -171,7 +169,6 @@ defmodule TLA.Spec.Rewriter do
   @doc """
   The rejection builder for `action_property`: §4 requires `old.`/`new.`.
   """
-  @spec reject_action_property() :: (atom() -> {String.t(), String.t()})
   def reject_action_property do
     fn name ->
       {"bare variable #{inspect(name)} in an action_property",
@@ -185,7 +182,6 @@ defmodule TLA.Spec.Rewriter do
   The rejection builder for a `params:` generator, which receives the pre-state
   as its own argument.
   """
-  @spec reject_param(atom()) :: (atom() -> {String.t(), String.t()})
   def reject_param(state_arg) do
     fn name ->
       {"bare variable #{inspect(name)} in a `params:` generator",
@@ -200,7 +196,6 @@ defmodule TLA.Spec.Rewriter do
   Every name bound anywhere in the AST, ignoring scope. See the module note on
   why this over-approximates.
   """
-  @spec bound_names(Macro.t()) :: MapSet.t(atom())
   def bound_names(ast) do
     {_ast, bound} =
       Macro.prewalk(ast, MapSet.new(), fn
@@ -224,7 +219,6 @@ defmodule TLA.Spec.Rewriter do
   The variable names bound by a pattern. A pinned name is a value, not a
   binding, so `^x` contributes nothing.
   """
-  @spec pattern_names(Macro.t()) :: MapSet.t(atom())
   def pattern_names(pattern) do
     {_ast, names} =
       Macro.prewalk(pattern, MapSet.new(), fn

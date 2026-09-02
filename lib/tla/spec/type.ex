@@ -34,7 +34,6 @@ defmodule TLA.Spec.Type do
   `constants` is the set of declared constant names; a `^name` naming something
   else is reported here rather than at check time.
   """
-  @spec validate!(Macro.t(), MapSet.t(atom()), keyword()) :: Macro.t()
   def validate!(type, constants, opts) do
     check!(type, constants, opts)
     type
@@ -243,7 +242,6 @@ defmodule TLA.Spec.Type do
   useful type mentions a constant that has no value until a run assigns one
   (D-19). `where` names the variable, for the error message.
   """
-  @spec resolve!(Macro.t(), map(), atom()) :: resolved()
   def resolve!(type, constants, where)
 
   def resolve!(:set, _constants, _where), do: :set
@@ -357,7 +355,6 @@ defmodule TLA.Spec.Type do
   @doc """
   Whether a value inhabits a resolved type.
   """
-  @spec member?(resolved(), term()) :: boolean()
   def member?({:literal, literal}, value), do: value === literal
   def member?({:one_of, literals}, value), do: Enum.any?(literals, &(&1 === value))
 
@@ -409,7 +406,6 @@ defmodule TLA.Spec.Type do
   Resolution happens once per run rather than once per state: the constants do
   not change, and the state space is where the work is.
   """
-  @spec resolved_variables(TLA.Spec.Compiled.t(), map()) :: [{atom(), resolved()}]
   def resolved_variables(spec, constants) do
     for %{name: name, type: type} <- spec.variables, type != nil do
       {name, resolve!(type, constants, name)}
@@ -422,8 +418,6 @@ defmodule TLA.Spec.Type do
   Types are checked as an invariant rather than used to prune, so a state outside
   its type is a reported violation and not a silently narrower search (D-19).
   """
-  @spec check_state([{atom(), resolved()}], TLA.State.t()) ::
-          :ok | {:violation, atom(), resolved(), term()}
   def check_state(resolved, state) do
     Enum.find_value(resolved, :ok, fn {name, type} ->
       value = Map.fetch!(state, name)
@@ -437,7 +431,6 @@ defmodule TLA.Spec.Type do
   It is checked in every reachable state, which is why a coverage report lists a
   `type_ok` the spec never declared.
   """
-  @spec invariant(TLA.Spec.Compiled.t(), map()) :: TLA.Spec.Compiled.invariant_def() | nil
   def invariant(spec, constants) do
     case resolved_variables(spec, constants) do
       [] ->
@@ -455,7 +448,6 @@ defmodule TLA.Spec.Type do
   @doc """
   Explain a `:type_ok` violation: which variable, what it holds, what it declared.
   """
-  @spec explain(TLA.Spec.Compiled.t(), map(), TLA.State.t()) :: String.t()
   def explain(spec, constants, state) do
     case spec |> resolved_variables(constants) |> check_state(state) do
       {:violation, name, type, value} ->
@@ -469,7 +461,6 @@ defmodule TLA.Spec.Type do
   @doc """
   Render a resolved type for a violation message.
   """
-  @spec describe(resolved()) :: String.t()
   def describe({:literal, literal}), do: inspect(literal)
   def describe({:one_of, literals}), do: Enum.map_join(literals, " | ", &inspect/1)
   def describe({:range, lo, hi}), do: "#{lo}..#{hi}"
