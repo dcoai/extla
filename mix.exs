@@ -1,7 +1,7 @@
 defmodule ExTLA.MixProject do
   use Mix.Project
 
-  @version "0.1.0-dev"
+  @version "0.1.0"
 
   def project do
     [
@@ -13,8 +13,11 @@ defmodule ExTLA.MixProject do
       deps: deps(),
       name: "ExTLA",
       description: "TLA+-inspired formal verification for Elixir/OTP systems",
-      package: [licenses: ["MIT"], files: ~w(lib mix.exs README.md LICENSE spec)],
-      docs: [main: "readme", extras: ["README.md" | Path.wildcard("spec/*.md")]]
+      package: [licenses: ["MIT"], files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec)],
+      docs: [
+        main: "readme",
+        extras: ["README.md", "CHANGELOG.md" | Path.wildcard("spec/*.md")]
+      ]
     ]
   end
 
