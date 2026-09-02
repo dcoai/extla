@@ -11,6 +11,12 @@ erl_crash.dump
 .elixir_ls/
 .lexical/
 
+# ExUnit's `tmp_dir` writes here, one directory per test, named after the test.
+# Two of those .dot files were committed by accident in #43 and carried in every
+# commit until #81 -- harmless in themselves, but their paths embed test NAMES, so
+# renaming a test orphans a file nobody later recognises as garbage.
+/tmp/
+
 # Downloaded oracle -- bin/tlc-expected fetches and checksums it on demand
 /.tla/
 
