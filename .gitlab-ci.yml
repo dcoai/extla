@@ -34,6 +34,13 @@ default:
   before_script:
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends git
+    # The memory ceiling this job runs under (#85, #86). `main` #950 was OOM-killed --
+    # `Killed  mix test`, which GitLab reports as `script_failure` and reads exactly like a
+    # failing test -- and every measurement up to that point had been of the numerator only:
+    # the suite peaks near 728 MB, against a limit nobody had recorded. Both paths because
+    # cgroup v2 exposes the first and v1 the second; the `|| echo` matters as much as the
+    # `cat`, since a silent absence would read as "unlimited" when it means "still unknown".
+    - cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo "no cgroup limit visible"
     # `surfex` is declared with a `git@host:` URL, which is what a developer needs: this
     # instance authenticates people by ssh key, and `mix deps.get` over https on a
     # workstation fails with `could not read Username`. But git has no built-in ssh -- an
