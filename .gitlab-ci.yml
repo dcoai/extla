@@ -41,6 +41,17 @@ default:
     # cgroup v2 exposes the first and v1 the second; the `|| echo` matters as much as the
     # `cat`, since a silent absence would read as "unlimited" when it means "still unknown".
     - cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo "no cgroup limit visible"
+    # That answer came back `max` -- no per-job ceiling at all -- which redirected the question
+    # rather than settling it (#88). With no cgroup limit, `Killed mix test` is the HOST OOM
+    # killer picking the largest process on a machine out of physical memory, so what matters is
+    # what this host HAS and what else is on it. `free -m` reports the host's memory for the same
+    # reason; `uptime` says whether other jobs were co-resident; `nproc` because ExUnit's
+    # max_cases defaults to it and every peak-RSS figure in #77 and #85 was measured on 16 cores.
+    # /proc rather than `free` and `uptime`: those come from `procps`, which this slim image
+    # does not carry -- the first attempt at this line failed the job with `free: command not
+    # found`. procfs is always there, and `|| true` so a diagnostic can never be what breaks a
+    # build.
+    - (head -3 /proc/meminfo; cat /proc/loadavg; nproc) 2>/dev/null || true
     # `surfex` is declared with a `git@host:` URL, which is what a developer needs: this
     # instance authenticates people by ssh key, and `mix deps.get` over https on a
     # workstation fails with `could not read Username`. But git has no built-in ssh -- an
