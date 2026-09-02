@@ -111,6 +111,24 @@ mutation:
 # trusted as a fixture: it is regenerated from TLC on every pipeline and diffed
 # against what is committed, so a hand-edit that makes a future ExTLA test pass
 # fails here instead.
+# #1: the verification ledger. `TLA_COVERAGE.md` is generated, so a difference means it was
+# hand-edited or a spec changed without a regenerate — both build failures. HARD from day one
+# (#1, open question 2): "an advisory gate on a verification artifact is the same mistake as
+# `IO.warn` on `max_states_reached`" (D-10).
+#
+# MIX_ENV=test because ExTLA's own specs ARE its test corpus; a consuming project's live in
+# `lib/` and would use dev.
+#
+# What this does NOT fail on: items with NOTHING. The backlog is the document's content, not
+# its error condition — a gate failing on gaps could only be satisfied by deleting rows.
+tla-coverage-drift:
+  extends: .elixir
+  stage: verify
+  variables:
+    MIX_ENV: test
+  script:
+    - mix tla.coverage --check
+
 tlc-corpus:
   stage: verify
   image: eclipse-temurin:21-jre
