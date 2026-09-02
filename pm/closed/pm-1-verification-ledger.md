@@ -1,11 +1,19 @@
 ---
 id: pm-1
 title: "Verification ledger: drift-gated coverage golden + spec-version stamps"
-labels: [Proposal]
+labels: [Proposal, Accepted]
 created: 2026-08-29
 gitlab_issue: 1
 gitlab_synced: true
+closed: true
 ---
+
+> **Closed 2026-09-02.** Delivered by #64, #65, #66 and #67 under the milestone *The
+> verification ledger*: `TLA_COVERAGE.md` with a HARD drift gate, per-item content versions,
+> the `spec_version:` stamp, and a pinned JSON schema for `mix tla.check`. Section (c) — the
+> extraction of the generic golden machinery into a shared leaf library — was resolved by
+> `surfex` (`dco-tek/surfex`), which ExTLA now consumes as a `only: [:dev, :test]` dependency,
+> so consumers inherit nothing.
 
 ## Problem
 
