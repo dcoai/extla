@@ -73,14 +73,36 @@ defmodule TLA.GeneratedModelsTest do
         for workers <- [2, 4, 8] do
           many = ModelChecker.run(spec, Map.put(config, :workers, workers))
 
-          assert {many.status, many.distinct_states, many.transitions, many.diameter} ==
-                   {one.status, one.distinct_states, one.transitions, one.diameter},
-                 "#{workers} workers disagreed:\n\n#{SpecGenerator.format(description)}"
+          assert many.status == one.status,
+                 "#{workers} workers reached a different verdict:\n\n#{SpecGenerator.format(description)}"
 
           if one.violation do
             assert many.violation.length == one.violation.length,
                    "the counterexample changed length at #{workers} workers, which is what " <>
                      "D-27's barrier exists to prevent:\n\n#{SpecGenerator.format(description)}"
+          end
+
+          # The COUNTS are only comparable when the search ran to completion, and this is a
+          # property of the design rather than a concession. `Parallel.dispatch/2` feeds an
+          # `ordered: false` `Task.async_stream` into `Enum.reduce_while`, so on a violation it
+          # HALTS -- and any worker whose result had not yet been consumed is discarded without
+          # `merge/2` ever adding its `state_count` and `transition_count`. Which workers got in
+          # is a fact about scheduling. One worker is a single batch, so the baseline is
+          # deterministic; that is why the two can disagree at all.
+          #
+          # `:max_states_reached` is excluded for the neighbouring reason: workers halt their
+          # own batch against a shared count, so how many states each added before the budget
+          # was hit is timing-dependent too.
+          #
+          # What D-27 promises, and what D-9's corpus compares, is the VERDICT and the
+          # counterexample's LENGTH -- both asserted above, unconditionally. `parallel.ex`'s
+          # own halt comment says the same: "no worker still running could report a shorter
+          # counterexample than this one." Do not re-tighten this into the counts.
+          if one.status == :ok do
+            assert {many.distinct_states, many.transitions, many.diameter} ==
+                     {one.distinct_states, one.transitions, one.diameter},
+                   "#{workers} workers disagreed on a COMPLETED search, where the totals are " <>
+                     "deterministic:\n\n#{SpecGenerator.format(description)}"
           end
         end
       end
