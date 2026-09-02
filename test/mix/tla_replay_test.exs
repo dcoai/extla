@@ -72,7 +72,9 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         |> counterexample_file()
         |> File.read!()
         |> Jason.decode!()
-        |> get_in(["TLA.Conformance.Counter.BuggySpec", "violation"])
+        |> Map.fetch!("specs")
+        |> Enum.find(&(&1["spec"] == "TLA.Conformance.Counter.BuggySpec"))
+        |> Map.fetch!("violation")
         |> TLA.Trace.from_json!()
 
       assert %TLA.Trace{} = trace
@@ -125,7 +127,14 @@ defmodule Mix.Tasks.Tla.ReplayTest do
 
     test "a results file with no entry for this server's spec", %{tmp: tmp} do
       path = Path.join(tmp, "other.json")
-      File.write!(path, Jason.encode!(%{"Some.Other.Spec" => %{"violation" => nil}}))
+
+      File.write!(
+        path,
+        Jason.encode!(%{
+          "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+          "specs" => [%{"spec" => "Some.Other.Spec", "violation" => nil}]
+        })
+      )
 
       assert_raise Mix.Error, ~r/has no result for/, fn ->
         Replay.run([@server, "--trace", path])
@@ -137,10 +146,29 @@ defmodule Mix.Tasks.Tla.ReplayTest do
 
       File.write!(
         path,
-        Jason.encode!(%{"TLA.Conformance.Counter.BuggySpec" => %{"violation" => nil}})
+        Jason.encode!(%{
+          "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+          "specs" => [%{"spec" => "TLA.Conformance.Counter.BuggySpec", "violation" => nil}]
+        })
       )
 
       assert_raise Mix.Error, ~r/records no counterexample/, fn ->
+        Replay.run([@server, "--trace", path])
+      end
+    end
+
+    test "a results file written by a schema version this ExTLA does not read", %{tmp: tmp} do
+      path = Path.join(tmp, "future.json")
+
+      File.write!(
+        path,
+        Jason.encode!(%{
+          "schema_version" => Mix.Tasks.Tla.Check.schema_version() + 1,
+          "specs" => [%{"spec" => "TLA.Conformance.Counter.BuggySpec", "violation" => nil}]
+        })
+      )
+
+      assert_raise Mix.Error, ~r/schema version/, fn ->
         Replay.run([@server, "--trace", path])
       end
     end

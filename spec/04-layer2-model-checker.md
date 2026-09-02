@@ -1182,6 +1182,72 @@ a machine cannot parse back, and `05-layer3-conformance.md`'s pipeline runs this
 output straight into `mix tla.replay --trace`. The human rendering is
 `TLA.Trace.format/1` and is unchanged.
 
+#### The JSON result schema
+
+`--format json` emits a **versioned envelope**, so a reader can refuse a shape it
+does not know rather than misread it:
+
+```json
+{
+  "schema_version": 1,
+  "specs": [
+    {
+      "spec": "Specs.TransferProtocol",
+      "status": "ok",
+      "message": null,
+      "distinct_states": 3612,
+      "states_found": 9004,
+      "transitions": 12871,
+      "diameter": 14,
+      "deadlock": false,
+      "duration_ms": 812,
+      "fingerprint_bits": 64,
+      "collision_estimate": 1.0e-9,
+      "warnings": [],
+      "coverage": {
+        "actions": {"begin_transfer": {"enabled_in": 44, "states_generated": 88,
+                                       "distinct_generated": 61}},
+        "never_enabled": ["cancel_transfer"],
+        "invariants": {"type_ok": {"evaluated_in": 3612, "near_misses": null}},
+        "vacuous": [],
+        "terminal_but_live": [],
+        "bounded_by": "none"
+      },
+      "violation": null
+    }
+  ]
+}
+```
+
+Four rules the schema keeps, each of which a consumer depends on:
+
+1. **`schema_version` leads the envelope.** Without it the only way to notice
+   that this output changed is to get a wrong answer from it. A reader should
+   refuse an unrecognised version rather than parse optimistically.
+2. **`specs` is a sorted list of self-describing entries**, not a map keyed by
+   module name. A consumer iterating results should not have to know the key was
+   a module, and the order is stable so two runs diff cleanly.
+3. **Every entry carries every key, and absent is `null` — never `0`.** A zero
+   near-miss count is a finding; not having measured near-misses is not, and
+   `TLA.Coverage` already distinguishes them. Defaulting `null` to `0` on the way
+   out would erase the distinction at exactly the boundary that cannot recover
+   it. `status: "unsound_symmetry"` fills `message` and leaves the measurements
+   `null` for the same reason.
+4. **A bounded run is marked.** `coverage.bounded_by` is one of `none`,
+   `state_constraint`, `max_states` or `violation`; anything but `none` means the
+   counts are lower bounds, for the same reason `:max_states_reached` exists
+   (`08-decisions.md` D-10).
+
+`duration_ms` is wall time and therefore varies between runs. It belongs to a
+report, not to a comparison: two runs of an unchanged spec differ in it, so
+nothing should gate on it.
+
+This exists so ExTLA can be an evidence **producer** for another project's
+coverage ladder without the two being merged. ExTLA produces evidence stronger
+than a static gate — exhaustive verification over a bounded model, and
+machine-checked refinement — and a stable schema is all a consumer needs to place
+`model_checked` and `refinement_checked` above its own classes.
+
 ### ExUnit Integration
 
 ```elixir

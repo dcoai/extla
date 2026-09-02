@@ -225,36 +225,85 @@ defmodule Mix.Tasks.Tla.Check do
   defp verdict(%{status: :max_states_reached}), do: "INCOMPLETE (state limit)"
   defp verdict(%{status: :constrained}), do: "INCOMPLETE (state constraint)"
 
-  defp encode(results) do
-    payload = Map.new(results, fn {module, result} -> {inspect(module), result_json(result)} end)
+  # The JSON result schema (#66). Versioned and ordered, deliberately.
+  #
+  # A reader must be able to REFUSE a shape it does not know rather than misread it, so the
+  # envelope leads with `schema_version`. Without it, the only way to notice that ExTLA's
+  # output changed is to get the wrong answer from it — and #1 section (d) wants agentronic
+  # consuming this to place `model_checked` and `refinement_checked` above `static_gate` on its
+  # evidence ladder. A cross-project reader that cannot detect a shape change is a maintenance
+  # tax on both projects.
+  #
+  # `specs` is a sorted LIST of self-describing entries rather than a map keyed by module name:
+  # a consumer iterating results should not have to know that the key was a module, and the
+  # order is stable so two runs diff cleanly.
+  @schema_version 1
 
-    Jason.encode!(payload, pretty: true)
+  defp encode(results) do
+    specs =
+      results
+      |> Enum.map(fn {module, result} -> Map.put(result_json(result), :spec, inspect(module)) end)
+      |> Enum.sort_by(& &1.spec)
+
+    Jason.encode!(%{schema_version: @schema_version, specs: specs}, pretty: true)
   end
 
-  defp result_json({:unsound_symmetry, error}),
-    do: %{status: :unsound_symmetry, message: Exception.message(error)}
+  @doc false
+  @spec schema_version() :: pos_integer()
+  def schema_version, do: @schema_version
+
+  defp result_json({:unsound_symmetry, error}) do
+    %{
+      empty_result()
+      | status: :unsound_symmetry,
+        message: Exception.message(error)
+    }
+  end
 
   defp result_json(result) do
     %{
-      status: result.status,
-      distinct_states: result.distinct_states,
-      states_found: result.states_found,
-      transitions: result.transitions,
-      diameter: result.diameter,
-      deadlock: result.deadlock,
-      duration_ms: result.duration_ms,
-      fingerprint_bits: result.fingerprint_bits,
-      collision_estimate: result.collision_estimate,
-      warnings: result.warnings,
-      coverage: %{
-        actions: result.coverage.actions,
-        never_enabled: result.coverage.never_enabled,
-        invariants: result.coverage.invariants,
-        vacuous: result.coverage.vacuous,
-        terminal_but_live: result.coverage.terminal_but_live,
-        bounded_by: result.coverage.bounded_by
-      },
-      violation: violation_json(result.violation)
+      empty_result()
+      | status: result.status,
+        distinct_states: result.distinct_states,
+        states_found: result.states_found,
+        transitions: result.transitions,
+        diameter: result.diameter,
+        deadlock: result.deadlock,
+        duration_ms: result.duration_ms,
+        fingerprint_bits: result.fingerprint_bits,
+        collision_estimate: result.collision_estimate,
+        warnings: result.warnings,
+        coverage: %{
+          actions: result.coverage.actions,
+          never_enabled: result.coverage.never_enabled,
+          invariants: result.coverage.invariants,
+          vacuous: result.coverage.vacuous,
+          terminal_but_live: result.coverage.terminal_but_live,
+          bounded_by: result.coverage.bounded_by
+        },
+        violation: violation_json(result.violation)
+    }
+  end
+
+  # Every entry carries every key. A field that is absent because nothing measured it is
+  # `null`, which is NOT the same fact as zero: a zero near-miss count is a finding, and not
+  # having looked is not (`TLA.Coverage`'s own distinction). A consumer must be able to tell
+  # them apart, so nothing here is defaulted to 0 on the way out.
+  defp empty_result do
+    %{
+      status: nil,
+      message: nil,
+      distinct_states: nil,
+      states_found: nil,
+      transitions: nil,
+      diameter: nil,
+      deadlock: nil,
+      duration_ms: nil,
+      fingerprint_bits: nil,
+      collision_estimate: nil,
+      warnings: [],
+      coverage: nil,
+      violation: nil
     }
   end
 

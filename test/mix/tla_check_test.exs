@@ -198,7 +198,12 @@ defmodule Mix.Tasks.Tla.CheckTest do
     test "--format json carries the result, the coverage and the counterexample" do
       {output, 1} = check(["TLA.TestSpecs.Broken", "--format", "json"])
 
-      entry = output |> Jason.decode!() |> Map.fetch!("TLA.TestSpecs.Broken")
+      # #66: results now arrive in a versioned envelope, as a sorted list of self-describing
+      # entries rather than a map keyed by module name.
+      decoded = Jason.decode!(output)
+
+      assert decoded["schema_version"] == Check.schema_version()
+      entry = Enum.find(decoded["specs"], &(&1["spec"] == "TLA.TestSpecs.Broken"))
 
       assert entry["status"] == "violation"
       assert entry["violation"]["property"] == "below_three"
