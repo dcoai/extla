@@ -26,13 +26,31 @@ defmodule ExTLA.MixProject do
   # of `MIX_ENV=test mix tla.mutants`, which is a prefix everyone forgets once.
   def cli, do: [preferred_envs: ["tla.mutants": :test]]
 
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/differential", "test/conformance"]
+  # `ledger/` is the verification ledger's tooling (#1): the content-version scan, the
+  # coverage golden and its mix task. Dev and test only, and never shipped — it depends on
+  # `surfex`, which is itself dev/test only, so a `lib/` placement would break a consumer's
+  # prod compile. `consumer-compile` (#63) is the job that proves this stays true.
+  defp elixirc_paths(:test),
+    do: ["lib", "ledger", "test/support", "test/differential", "test/conformance"]
+
+  defp elixirc_paths(:dev), do: ["lib", "ledger"]
   defp elixirc_paths(_), do: ["lib"]
 
   # spec/06-architecture.md §Dependencies. Zero runtime dependencies.
   defp deps do
     [
       {:stream_data, "~> 1.0", only: [:dev, :test]},
+      # The verification ledger's renderer and source-scan primitives (#1), shared with
+      # agentronic and extc so one convention serves all three.
+      #
+      # `only: [:dev, :test]` is load-bearing, not hygiene: dev/test deps are NOT transitive,
+      # so nothing here reaches anyone who depends on ExTLA. That is what answers #1 section
+      # (c)'s objection that consumers would inherit a documentation framework.
+      {:surfex,
+       git: "git@gitlab.conet.yarina.org:dco-tek/surfex.git",
+       tag: "v0.1.0",
+       only: [:dev, :test],
+       runtime: false},
       {:jason, "~> 1.4", optional: true},
       # Layer 1's violation events. Optional for the same reason jason is: a consumer
       # who attaches no handler should not be made to carry it, and whether it was
