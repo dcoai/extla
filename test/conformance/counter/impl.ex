@@ -15,9 +15,16 @@ defmodule TLA.Conformance.Counter.Impl do
     @moduledoc "One callback per spec action, and each one exactly the spec's transition."
     use GenServer
 
+    # #67: the conforming mapping carries a `spec_version:` stamp, so the corpus exercises the
+    # mechanism rather than merely offering it. Edit `Spec`'s actions or invariants and this
+    # module stops compiling until someone re-reads the mapping — which is the whole point.
+    #
+    # Its siblings below are deliberately left unstamped: the stamp is opt-in, and a corpus in
+    # which every mapping is stamped could not show that an unstamped one still compiles.
     use TLA.GenServer,
       spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement
+      refinement: TLA.Conformance.Counter.Refinement,
+      spec_version: "a5b5d168"
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 

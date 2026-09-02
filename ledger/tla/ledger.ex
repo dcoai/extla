@@ -65,22 +65,47 @@ defmodule TLA.Ledger do
   """
   @spec run([module()]) :: [section]
   def run(modules \\ SpecTarget.resolve!([])) do
-    Enum.map(modules, &section/1)
+    freshness = freshness_by_spec()
+    Enum.map(modules, &section(&1, freshness))
   end
 
-  defp section(module) do
+  # Freshness per spec, derived from the `spec_version:` stamps refinement mappings carry (#67).
+  #
+  # A stamp is a claim that someone re-read a mapping against a particular version of a spec.
+  # So an item is `fresh` when a mapping has confirmed against the spec AS IT STANDS, `stale`
+  # when one confirmed against a version that has since moved, and `unstamped` when nothing has
+  # claimed anything.
+  #
+  # `stale` wins over `fresh` when a spec has several mappings and they disagree: one mapping
+  # being current does not make another one's outdated claim true, and reporting the optimistic
+  # answer would hide exactly the mapping that needs re-reading.
+  defp freshness_by_spec do
+    Mix.Tasks.Tla.Stamp.states()
+    |> Enum.reject(&(&1.status == :unstamped))
+    |> Enum.group_by(& &1.spec, & &1.status)
+    |> Map.new(fn {spec, statuses} ->
+      cond do
+        :stale in statuses -> {spec, :stale}
+        :unverifiable in statuses -> {spec, :unverifiable}
+        true -> {spec, :fresh}
+      end
+    end)
+  end
+
+  defp section(module, freshness) do
+    fresh = Map.get(freshness, module, :unstamped)
     spec = Spec.Compiled.from_module(module)
     versions = TLA.Spec.Version.versions(module)
 
     case Spec.Compiled.resolve_constants(spec) do
       {:ok, constants} ->
         case check(spec, constants) do
-          {:ok, coverage} -> checked(module, spec, versions, coverage)
-          {:exit, reason} -> errored(module, spec, versions, reason)
+          {:ok, coverage} -> checked(module, spec, versions, coverage, fresh)
+          {:exit, reason} -> errored(module, spec, versions, reason, fresh)
         end
 
       {:error, missing} ->
-        unrunnable(module, spec, versions, missing)
+        unrunnable(module, spec, versions, missing, fresh)
     end
   end
 
@@ -122,7 +147,7 @@ defmodule TLA.Ledger do
 
   # A spec whose check raised. Every item is listed with NOTHING: nothing was verified, and
   # the section heading carries why.
-  defp errored(module, spec, versions, reason) do
+  defp errored(module, spec, versions, reason, fresh) do
     %{
       module: module,
       source: source(module),
@@ -137,7 +162,7 @@ defmodule TLA.Ledger do
             name: name,
             version: Map.get(versions, {kind, name}),
             evidence: :nothing,
-            fresh: :unstamped,
+            fresh: fresh,
             exercised: "raised",
             bounded?: false
           }
@@ -151,7 +176,7 @@ defmodule TLA.Ledger do
   defp describe({reason, _stacktrace}) when is_atom(reason), do: inspect(reason)
   defp describe(_), do: "unknown"
 
-  defp checked(module, spec, versions, coverage) do
+  defp checked(module, spec, versions, coverage, fresh) do
     bounded? = coverage.bounded_by != :none
     vacuous = MapSet.new(coverage.vacuous, & &1.property)
 
@@ -171,7 +196,7 @@ defmodule TLA.Ledger do
             name: name,
             version: Map.get(versions, {kind, name}),
             evidence: evidence,
-            fresh: :unstamped,
+            fresh: fresh,
             exercised: exercised,
             bounded?: bounded?
           }
@@ -181,7 +206,7 @@ defmodule TLA.Ledger do
 
   # Honesty condition 1. Every item still gets a row; the evidence is NOTHING because none was
   # produced, and the section says which constants would let it be.
-  defp unrunnable(module, spec, versions, missing) do
+  defp unrunnable(module, spec, versions, missing, fresh) do
     %{
       module: module,
       source: source(module),
@@ -196,7 +221,7 @@ defmodule TLA.Ledger do
             name: name,
             version: Map.get(versions, {kind, name}),
             evidence: :nothing,
-            fresh: :unstamped,
+            fresh: fresh,
             exercised: "cannot run",
             bounded?: false
           }

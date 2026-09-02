@@ -129,10 +129,26 @@ defmodule TLA.LedgerTest do
       end
     end
 
-    # #67 introduces stamps. Until then `unstamped` is the honest value, and claiming `fresh`
-    # would assert a re-confirmation nobody has made.
-    test "freshness is unstamped until spec_version: exists", %{sections: sections} do
-      assert Enum.all?(Ledger.rows(sections), &(&1.fresh == :unstamped))
+    # Superseded by #67, which introduced the stamps this column reports. It previously
+    # asserted every row was `unstamped`, which was the honest value while nothing could
+    # stamp anything.
+    test "freshness reflects the spec_version stamps mappings carry", %{sections: sections} do
+      by_status = sections |> Ledger.rows() |> Enum.frequencies_by(& &1.fresh)
+
+      assert by_status[:fresh] > 0, "the corpus stamps at least one mapping (#67)"
+      assert by_status[:unstamped] > 0, "and deliberately leaves others unstamped"
+      assert Enum.all?(Map.keys(by_status), &(&1 in [:fresh, :stale, :unstamped, :unverifiable]))
+    end
+
+    # A stamp names a spec, so only the items of THAT spec become fresh. If freshness leaked
+    # across specs the column would claim re-confirmation nobody made — the precise dishonesty
+    # the ledger exists to prevent.
+    test "a stamp freshens only its own spec's items", %{sections: sections} do
+      stamped = Enum.find(sections, &(&1.module == TLA.Conformance.Counter.Spec))
+      unstamped = Enum.find(sections, &(&1.module == TLA.Conformance.Counter.BuggySpec))
+
+      assert Enum.all?(stamped.rows, &(&1.fresh == :fresh))
+      assert Enum.all?(unstamped.rows, &(&1.fresh == :unstamped))
     end
   end
 
