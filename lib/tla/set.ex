@@ -13,7 +13,6 @@ defmodule TLA.Set do
       iex> TLA.Set.powerset(MapSet.new([1, 2])) |> Enum.sort_by(&MapSet.size/1)
       [MapSet.new([]), MapSet.new([1]), MapSet.new([2]), MapSet.new([1, 2])]
   """
-  @spec powerset(MapSet.t()) :: MapSet.t(MapSet.t())
   def powerset(set) do
     set
     |> Enum.reduce([MapSet.new()], fn element, subsets ->
@@ -29,7 +28,6 @@ defmodule TLA.Set do
       iex> TLA.Set.cross(MapSet.new([1, 2]), MapSet.new([:a]))
       MapSet.new([{1, :a}, {2, :a}])
   """
-  @spec cross(MapSet.t(), MapSet.t()) :: MapSet.t(tuple())
   def cross(s1, s2) do
     for a <- s1, b <- s2, into: MapSet.new(), do: {a, b}
   end
@@ -47,7 +45,6 @@ defmodule TLA.Set do
       iex> TLA.Set.cross_many([])
       MapSet.new([{}])
   """
-  @spec cross_many([MapSet.t()]) :: MapSet.t(tuple())
   def cross_many(sets) do
     sets
     |> Enum.reduce([[]], fn set, acc -> for tail <- acc, x <- set, do: [x | tail] end)
@@ -61,7 +58,6 @@ defmodule TLA.Set do
       iex> TLA.Set.distributed_union(MapSet.new([MapSet.new([1, 2]), MapSet.new([2, 3])]))
       MapSet.new([1, 2, 3])
   """
-  @spec distributed_union(MapSet.t(MapSet.t())) :: MapSet.t()
   def distributed_union(set_of_sets) do
     Enum.reduce(set_of_sets, MapSet.new(), &MapSet.union(&2, &1))
   end
@@ -75,7 +71,6 @@ defmodule TLA.Set do
       iex> TLA.Set.map(MapSet.new([1, 2, 3]), &rem(&1, 2))
       MapSet.new([0, 1])
   """
-  @spec map(MapSet.t(), (term() -> term())) :: MapSet.t()
   def map(set, fun), do: MapSet.new(set, fun)
 
   @doc """
@@ -84,7 +79,6 @@ defmodule TLA.Set do
       iex> TLA.Set.filter(MapSet.new([1, 2, 3, 4]), &(rem(&1, 2) == 0))
       MapSet.new([2, 4])
   """
-  @spec filter(MapSet.t(), (term() -> boolean())) :: MapSet.t()
   def filter(set, predicate), do: set |> Enum.filter(predicate) |> MapSet.new()
 
   @doc """
@@ -108,7 +102,6 @@ defmodule TLA.Set do
       iex> TLA.Set.choose(MapSet.new([3, 1, 2]), &(&1 > 1))
       2
   """
-  @spec choose(MapSet.t(), (term() -> boolean())) :: term()
   def choose(set, predicate \\ fn _ -> true end) do
     set
     |> Enum.filter(predicate)
@@ -131,7 +124,6 @@ defmodule TLA.Set do
       iex> TLA.Set.for_all?(MapSet.new([2, 4]), &(rem(&1, 2) == 0))
       true
   """
-  @spec for_all?(MapSet.t(), (term() -> boolean())) :: boolean()
   def for_all?(set, predicate), do: Enum.all?(set, predicate)
 
   @doc """
@@ -142,7 +134,6 @@ defmodule TLA.Set do
       iex> TLA.Set.exists?(MapSet.new([1, 2]), &(&1 > 1))
       true
   """
-  @spec exists?(MapSet.t(), (term() -> boolean())) :: boolean()
   def exists?(set, predicate), do: Enum.any?(set, predicate)
 
   @doc """
@@ -156,6 +147,5 @@ defmodule TLA.Set do
       iex> TLA.Set.range(3, 1)
       MapSet.new([])
   """
-  @spec range(integer(), integer()) :: MapSet.t(integer())
   def range(a, b) when is_integer(a) and is_integer(b), do: MapSet.new(a..b//1)
 end

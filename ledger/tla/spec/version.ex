@@ -49,7 +49,6 @@ defmodule TLA.Spec.Version do
   consumer, say — rather than raising: an absent source means "cannot version this", which the
   ledger renders as `—`, and that is a different fact from "this item has no version".
   """
-  @spec versions(module()) :: %{item() => String.t()}
   def versions(module) do
     case source(module) do
       nil -> %{}
@@ -62,11 +61,9 @@ defmodule TLA.Spec.Version do
 
       TLA.Spec.Version.version(Specs.Counter, :action, :increment)
   """
-  @spec version(module(), atom(), atom()) :: String.t() | nil
   def version(module, kind, name), do: module |> versions() |> Map.get({kind, name})
 
   @doc "Every versionable item in `source`, as `%{{kind, name} => version}`."
-  @spec scan(String.t()) :: %{item() => String.t()}
   def scan(source) do
     {_, items} =
       source
@@ -85,7 +82,6 @@ defmodule TLA.Spec.Version do
   end
 
   @doc "The kinds of item that carry a version."
-  @spec kinds() :: [atom()]
   def kinds, do: @kinds
 
   # `action` and friends take the item name first, but the same atom-headed shape appears in

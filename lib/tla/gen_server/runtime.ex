@@ -39,7 +39,6 @@ defmodule TLA.GenServer.Runtime do
   only the module — so it comes through here, where the compiled spec is already resolved
   for the process rather than rebuilt per callback.
   """
-  @spec abstract!(module(), module(), map()) :: State.t()
   def abstract!(spec_module, refinement, concrete) do
     %{spec: spec} = context(spec_module)
     TLA.Refinement.abstract!(refinement, spec, concrete)
@@ -58,7 +57,6 @@ defmodule TLA.GenServer.Runtime do
   at it: a temporal property over a behaviour that begins at the second state is a property
   of a different behaviour.
   """
-  @spec record_initial!(module(), module(), term()) :: :ok
   def record_initial!(spec_module, refinement, result) do
     case TLA.Invariant.Runtime.initial_state(result) do
       {:ok, concrete} ->
@@ -86,13 +84,11 @@ defmodule TLA.GenServer.Runtime do
   one does and none reproduces the post-state — with a variable-by-variable diff against
   the closest candidate.
   """
-  @spec check_step!(module(), atom(), map(), State.t(), State.t()) :: :ok | no_return()
   def check_step!(spec_module, action_name, params, pre, post) do
     raising(check_step(spec_module, action_name, params, pre, post))
   end
 
   @doc "The refinement check, returning the finding instead of raising it."
-  @spec check_step(module(), atom(), map(), State.t(), State.t()) :: finding()
   def check_step(spec_module, action_name, params, pre, post) do
     %{spec: spec, constants: constants} = context(spec_module)
     action = action!(spec, action_name)
@@ -128,7 +124,6 @@ defmodule TLA.GenServer.Runtime do
   provably unreachable. That is a warning in the user's module about code the user did not
   write. Behind a `module()` argument there is nothing to infer.
   """
-  @spec check_transition!(module(), module(), term(), State.t(), State.t()) :: :ok | no_return()
   def check_transition!(spec_module, refinement, message, pre, post) do
     raising(check_transition(spec_module, refinement, message, pre, post))
   end
@@ -142,7 +137,6 @@ defmodule TLA.GenServer.Runtime do
   the `!` forms raise them — the wrapper needs the raise, the report needs the value, and
   neither is derived from the other by rescuing.
   """
-  @spec check_transition(module(), module(), term(), State.t(), State.t()) :: finding()
   def check_transition(spec_module, refinement, message, pre, post) do
     case refinement.abstract_action(message) do
       {action, params} -> check_step(spec_module, action, params, pre, post)
@@ -157,13 +151,11 @@ defmodule TLA.GenServer.Runtime do
   counterpart must not move the abstract state, and a mapping that is merely incomplete is
   caught here rather than passing silently.
   """
-  @spec check_stuttering!(module(), State.t(), State.t()) :: :ok | no_return()
   def check_stuttering!(spec_module, pre, post) do
     raising(check_stuttering(spec_module, pre, post))
   end
 
   @doc "The same, returning the finding instead of raising it."
-  @spec check_stuttering(module(), State.t(), State.t()) :: finding()
   def check_stuttering(spec_module, pre, post) do
     if pre == post do
       :ok
@@ -180,13 +172,11 @@ defmodule TLA.GenServer.Runtime do
   end
 
   @doc "Check the spec's invariants against an abstract state."
-  @spec check_spec_invariants!(module(), State.t()) :: :ok | no_return()
   def check_spec_invariants!(spec_module, abstract) do
     raising(check_spec_invariants(spec_module, abstract))
   end
 
   @doc "The same, returning the finding instead of raising it."
-  @spec check_spec_invariants(module(), State.t()) :: finding()
   def check_spec_invariants(spec_module, abstract) do
     %{spec: spec, constants: constants} = context(spec_module)
 
@@ -200,13 +190,11 @@ defmodule TLA.GenServer.Runtime do
   end
 
   @doc "Check the spec's action properties against an abstract transition."
-  @spec check_action_properties!(module(), State.t(), State.t()) :: :ok | no_return()
   def check_action_properties!(spec_module, pre, post) do
     raising(check_action_properties(spec_module, pre, post))
   end
 
   @doc "The same, returning the finding instead of raising it."
-  @spec check_action_properties(module(), State.t(), State.t()) :: finding()
   def check_action_properties(spec_module, pre, post) do
     %{spec: spec, constants: constants} = context(spec_module)
 
@@ -238,7 +226,6 @@ defmodule TLA.GenServer.Runtime do
   and drops oldest-first: an unbounded per-process trace is a memory leak in any long-lived
   GenServer, which is most of them.
   """
-  @spec record_transition!(module(), term(), State.t(), State.t()) :: :ok
   def record_transition!(_spec_module, _message, pre, post) do
     trace = Process.get(@trace_key, [])
     trace = if trace == [], do: [pre], else: trace
@@ -248,7 +235,6 @@ defmodule TLA.GenServer.Runtime do
   end
 
   @doc "The behaviour recorded by THIS process, oldest state first."
-  @spec trace() :: State.behavior()
   def trace, do: @trace_key |> Process.get([]) |> Enum.reverse()
 
   @doc """
@@ -258,7 +244,6 @@ defmodule TLA.GenServer.Runtime do
   the same reason `record_transition!/4` takes no pid. The function runs inside the target
   and returns its state unchanged; only the trace travels back.
   """
-  @spec get_trace(pid()) :: State.behavior()
   def get_trace(pid) do
     caller = self()
     ref = make_ref()
@@ -285,8 +270,6 @@ defmodule TLA.GenServer.Runtime do
   have repeated that cycle forever — so the properties that need one are `:inconclusive`
   by construction rather than by accident.
   """
-  @spec check_temporal_properties(module(), State.behavior()) ::
-          %{atom() => :holds | :violated | :inconclusive}
   def check_temporal_properties(spec_module, behavior) do
     %{spec: spec, constants: constants} = context(spec_module)
 

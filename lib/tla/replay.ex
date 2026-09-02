@@ -64,7 +64,6 @@ defmodule TLA.Replay do
   the server stopping, or timing out. That is the informative case above: the spec permits
   a step the code does not take.
   """
-  @spec counterexample(module(), Trace.t() | Trace.lasso(), keyword()) :: result()
   def counterexample(module, trace, opts \\ [])
 
   def counterexample(module, %{prefix: prefix, cycle: cycle}, opts) do
@@ -105,7 +104,6 @@ defmodule TLA.Replay do
   A capture of one entry is checked for the spec's invariants and nothing else: one state
   is not a step.
   """
-  @spec trace(module(), [{term(), map()}], keyword()) :: result()
   def trace(module, captured, opts \\ [])
 
   def trace(_module, [], _opts), do: %{status: :ok, steps_checked: 0, violation: nil, detail: nil}

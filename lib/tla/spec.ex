@@ -103,7 +103,6 @@ defmodule TLA.Spec do
       @doc """
       The compiled specification (`TLA.Spec.Compiled`).
       """
-      @spec __tla_spec__() :: TLA.Spec.Compiled.t()
       def __tla_spec__ do
         %TLA.Spec.Compiled{
           module: __MODULE__,

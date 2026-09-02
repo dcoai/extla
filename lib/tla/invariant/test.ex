@@ -125,7 +125,6 @@ defmodule TLA.Invariant.Test do
     of the type the module actually enforces, and a generator built to mirror it would be
     a copy that can disagree with it.
     """
-    @spec valid_states(module(), atom(), StreamData.t()) :: StreamData.t()
     def valid_states(module, type_invariant_name, base_generator) do
       __ensure_declared__(module, type_invariant_name)
       StreamData.filter(base_generator, &__holds__(module, type_invariant_name, &1))
@@ -137,7 +136,6 @@ defmodule TLA.Invariant.Test do
     It is a `dev`/`test`-only dependency of ExTLA, so a consumer who wants generators
     declares it themselves — and this function has a body only where it does.
     """
-    @spec valid_states(module(), atom(), term()) :: no_return()
     def valid_states(_module, _type_invariant_name, _base_generator) do
       raise ArgumentError,
             "TLA.Invariant.Test.valid_states/3 needs `stream_data`, which is not loaded. " <>

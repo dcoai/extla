@@ -41,7 +41,6 @@ defmodule TLA.State.Json do
   @doc """
   A state term as data `Jason.encode!/1` accepts.
   """
-  @spec encode(term()) :: term()
   def encode(term)
 
   def encode(integer) when is_integer(integer), do: integer
@@ -71,7 +70,6 @@ defmodule TLA.State.Json do
   Raises `TLA.State.Json.Error` on JSON this module did not write, and on an atom no
   loaded module has ever mentioned.
   """
-  @spec decode!(term()) :: term()
   def decode!(data)
 
   def decode!(integer) when is_integer(integer), do: integer

@@ -162,7 +162,6 @@ defmodule TLA.StateGraph do
   bits: the edge table alone answers `always`, `eventually` and `~>`; fairness is what
   the bits are for.
   """
-  @spec with_liveness(t(), [TLA.Temporal.Fairness.constraint()]) :: t()
   def with_liveness(graph, fairness_index) do
     %{graph | edges: %{}, enabled: %{}, fairness_index: fairness_index}
   end
@@ -170,7 +169,6 @@ defmodule TLA.StateGraph do
   @doc """
   Whether this graph carries the liveness structure.
   """
-  @spec liveness?(t()) :: boolean()
   def liveness?(%__MODULE__{edges: edges}), do: edges != nil
 
   @doc """
@@ -180,7 +178,6 @@ defmodule TLA.StateGraph do
   Every out-edge, including the ones that led to a state already seen — those are exactly
   the edges that close a cycle, and a cycle is what liveness checking is looking for.
   """
-  @spec add_edges(t(), state_id(), [edge()], bitstring()) :: t()
   def add_edges(graph, id, edges, enabled)
 
   def add_edges(%__MODULE__{edges: nil} = graph, _id, _edges, _enabled), do: graph
@@ -196,7 +193,6 @@ defmodule TLA.StateGraph do
   @doc """
   The ENABLED bits of a state, in `fairness_index` order.
   """
-  @spec enabled_bits(t(), state_id()) :: bitstring()
   def enabled_bits(%__MODULE__{enabled: nil}, _id), do: raise(no_liveness_graph())
 
   def enabled_bits(%__MODULE__{enabled: enabled}, id), do: Map.get(enabled, id, <<>>)
@@ -204,7 +200,6 @@ defmodule TLA.StateGraph do
   @doc """
   Whether the `index`th fairness constraint was enabled in a state.
   """
-  @spec enabled?(t(), state_id(), non_neg_integer()) :: boolean()
   def enabled?(graph, id, index) do
     case enabled_bits(graph, id) do
       <<_::size(^index), bit::1, _::bitstring>> -> bit == 1
@@ -215,7 +210,6 @@ defmodule TLA.StateGraph do
   @doc """
   A new, empty graph for `spec` under `constants`.
   """
-  @spec new(TLA.Spec.Compiled.t(), map(), keyword()) :: t()
   def new(spec, constants, opts \\ []) do
     %__MODULE__{
       spec: spec,
@@ -265,8 +259,6 @@ defmodule TLA.StateGraph do
   whose encoding does not identify a state. Callers may assume that a state which has
   entered the graph is one the checker has vetted.
   """
-  @spec add_state(t(), State.t(), state_id() | nil, atom() | non_neg_integer(), map() | nil) ::
-          {t(), state_id(), :new | :existing}
   def add_state(graph, state, parent, action, params)
 
   def add_state(graph, state, nil, init_index, _params) when is_integer(init_index) do
@@ -375,14 +367,12 @@ defmodule TLA.StateGraph do
   `:ets.info/2` with `:size` is O(1) — it reads a counter the table maintains, not the
   table — so this is affordable per expanded state, which is where the limit is checked.
   """
-  @spec live_state_count(t()) :: non_neg_integer()
   def live_state_count(%__MODULE__{fingerprints: fingerprints}),
     do: :ets.info(fingerprints, :size)
 
   @doc """
   The node record for a state id.
   """
-  @spec node_record(t(), state_id()) :: node_record()
   def node_record(graph, id) do
     case :ets.lookup(graph.nodes, id) do
       [{^id, record}] -> record
@@ -395,26 +385,22 @@ defmodule TLA.StateGraph do
   otherwise. Equal to the number of states on the shortest path to it, which is
   the number TLC reports as a counterexample's length.
   """
-  @spec depth(t(), state_id()) :: pos_integer()
   def depth(graph, id), do: node_record(graph, id).depth
 
   @doc """
   Count one transition, whether or not it discovered a new state.
   """
-  @spec count_transition(t()) :: t()
   def count_transition(graph), do: %{graph | transition_count: graph.transition_count + 1}
 
   @doc """
   Mark an expanded state that has no successors.
   """
-  @spec mark_terminal(t(), state_id()) :: t()
   def mark_terminal(graph, id), do: %{graph | terminal: MapSet.put(graph.terminal, id)}
 
   @doc """
   Mark an expanded state that has no successors and that no `terminal` predicate
   admits.
   """
-  @spec mark_deadlocked(t(), state_id()) :: t()
   def mark_deadlocked(graph, id), do: %{graph | deadlocked: MapSet.put(graph.deadlocked, id)}
 
   @doc """
@@ -428,7 +414,6 @@ defmodule TLA.StateGraph do
   the graph that found it. This is how a caller holding one asks the graph which node it
   is looking at.
   """
-  @spec id_of(t(), State.t()) :: state_id() | nil
   def id_of(graph, state) do
     case :ets.lookup(graph.fingerprints, fingerprint(graph, state)) do
       [{_fingerprint, id}] -> id
@@ -444,7 +429,6 @@ defmodule TLA.StateGraph do
   rather than carried through the whole search — and it is why every caller of this is
   either bounded (`to_dot/2`) or a test.
   """
-  @spec state_at(t(), state_id()) :: State.t()
   def state_at(graph, id) do
     {init_index, steps} = path_to(graph, id)
 
@@ -478,7 +462,6 @@ defmodule TLA.StateGraph do
   Initial states carry a double border, declared terminals a doubled octagon, and
   deadlocked states a fill.
   """
-  @spec to_dot(t(), keyword()) :: String.t()
   defdelegate to_dot(graph, opts \\ []), to: TLA.StateGraph.Export
 
   @doc """
@@ -491,7 +474,6 @@ defmodule TLA.StateGraph do
 
   Requires the edge table, for the reason `to_dot/2` does.
   """
-  @spec to_json(t()) :: String.t()
   defdelegate to_json(graph), to: TLA.StateGraph.Export
 
   @doc """
@@ -500,7 +482,6 @@ defmodule TLA.StateGraph do
 
   The first element is the `init` block that produced the root.
   """
-  @spec path_to(t(), state_id()) :: {init_index :: non_neg_integer(), [{atom(), map()}]}
   def path_to(graph, target), do: walk_back(graph, target, [])
 
   defp walk_back(graph, id, steps) do
@@ -520,7 +501,6 @@ defmodule TLA.StateGraph do
   cheaper source, and guessing from parent pointers would be wrong — they form a
   spanning tree, which has no cycles at all.
   """
-  @spec successors(t(), state_id()) :: [edge()]
   def successors(%__MODULE__{edges: nil}, _id), do: raise(no_liveness_graph())
 
   def successors(%__MODULE__{edges: edges}, id), do: Map.get(edges, id, [])
@@ -537,7 +517,6 @@ defmodule TLA.StateGraph do
   out-edges comes back as a component of one, and whether stuttering there forever counts
   as a cycle is the same kind of question (`02-dsl-semantics.md` §5.3).
   """
-  @spec sccs(t()) :: [MapSet.t(state_id())]
   def sccs(%__MODULE__{} = graph), do: sccs(graph, MapSet.new(0..(graph.state_count - 1)//1))
 
   @doc """
@@ -547,7 +526,6 @@ defmodule TLA.StateGraph do
   smaller subgraphs as strong fairness rules components out
   (`04-layer2-model-checker.md` §`TLA.ModelChecker.Liveness`).
   """
-  @spec sccs(t(), MapSet.t(state_id())) :: [MapSet.t(state_id())]
   def sccs(%__MODULE__{edges: nil}, _region), do: raise(no_liveness_graph())
 
   def sccs(graph, region) do

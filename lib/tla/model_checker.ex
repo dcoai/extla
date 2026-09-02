@@ -118,7 +118,6 @@ defmodule TLA.ModelChecker do
 
       TLA.ModelChecker.run(Specs.Counter, %{constants: %{max: 3}})
   """
-  @spec run(module() | Spec.Compiled.t(), config()) :: result()
   def run(spec, config \\ %{}) do
     {result, _graph} = explore(spec, config)
     result
@@ -128,13 +127,11 @@ defmodule TLA.ModelChecker do
   Run only safety checking. In Phase 1 this is what `run/2` does; the separate
   name is the one that stays correct once liveness exists.
   """
-  @spec check_safety(module() | Spec.Compiled.t(), config()) :: result()
   def check_safety(spec, config \\ %{}), do: run(spec, Map.put(config, :check_liveness, false))
 
   @doc """
   Run the model checker and return the full state graph, for inspection.
   """
-  @spec explore(module() | Spec.Compiled.t(), config()) :: {result(), StateGraph.t()}
   def explore(spec, config \\ %{})
 
   def explore(module, config) when is_atom(module),
@@ -194,7 +191,6 @@ defmodule TLA.ModelChecker do
   every other invariant's verdict on that state uninteresting — the useful thing
   to report is that a variable holds something the spec says it cannot.
   """
-  @spec checked_invariants(module() | Spec.Compiled.t(), map()) :: [Spec.Compiled.invariant_def()]
   def checked_invariants(module, constants) when is_atom(module),
     do: module |> Spec.Compiled.from_module() |> checked_invariants(constants)
 
@@ -493,7 +489,6 @@ defmodule TLA.ModelChecker do
   deterministic — a checker whose state graph varied between runs could not be
   compared to TLC.
   """
-  @spec successors(Spec.Compiled.t(), map(), State.t()) :: [{atom(), map(), State.t()}]
   def successors(spec, %{constants: constants}, state), do: successors(spec, constants, state)
 
   def successors(spec, constants, state) when is_map(constants) do
@@ -519,7 +514,6 @@ defmodule TLA.ModelChecker do
   Actions are taken in declaration order and bindings in generator order, so the list is
   the same on every run.
   """
-  @spec enabled_steps(Spec.Compiled.t(), map(), State.t()) :: [{atom(), map()}]
   def enabled_steps(spec, constants, state),
     do: steps(spec, constants, state, &enabled_bindings/3)
 
@@ -530,7 +524,6 @@ defmodule TLA.ModelChecker do
   that sends only enabled messages can never find an implementation that accepts one the
   spec forbids, which is why the unfiltered form is offered rather than assumed away.
   """
-  @spec steps(Spec.Compiled.t(), map(), State.t()) :: [{atom(), map()}]
   def steps(spec, constants, state), do: steps(spec, constants, state, &bindings/3)
 
   defp steps(spec, constants, state, bindings_fun) do
@@ -546,7 +539,6 @@ defmodule TLA.ModelChecker do
   it, so a later param can be constrained by an earlier one. A generator that
   returns nothing disables the action here, exactly as a false guard would.
   """
-  @spec enabled_bindings(Spec.Compiled.action_def(), map(), State.t()) :: [map()]
   def enabled_bindings(action, constants, state) do
     action
     |> bindings(constants, state)
@@ -556,7 +548,6 @@ defmodule TLA.ModelChecker do
   @doc """
   Every parameter binding of an action in a state, guard or no guard.
   """
-  @spec bindings(Spec.Compiled.action_def(), map(), State.t()) :: [map()]
   def bindings(action, constants, state) do
     Enum.reduce(action.params, [%{}], fn {name, generator}, bound ->
       for binding <- bound,

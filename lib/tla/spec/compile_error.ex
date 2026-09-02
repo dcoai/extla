@@ -15,7 +15,6 @@ defmodule TLA.Spec.CompileError do
   Raise a diagnostic. `hint` is a second paragraph naming the fix; omit it only
   when there is nothing more useful to say than the problem itself.
   """
-  @spec raise!(keyword()) :: no_return()
   def raise!(opts) do
     module = Keyword.fetch!(opts, :module)
     declaration = Keyword.fetch!(opts, :declaration)

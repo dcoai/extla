@@ -52,7 +52,6 @@ defmodule TLA.Invariant.Agent do
   returns, so a violation raises where a GenServer's would: in the process that made the
   illegal move.
   """
-  @spec update(module(), Agent.agent(), (term() -> term()), timeout()) :: :ok
   def update(module, agent, fun, timeout \\ 5_000) do
     Agent.update(
       agent,
@@ -65,7 +64,6 @@ defmodule TLA.Invariant.Agent do
   `Agent.cast/2`, checked. Asynchronous, so a violation reaches the caller only as the
   agent's exit — which is what a violated invariant in a `handle_cast/2` does too.
   """
-  @spec cast(module(), Agent.agent(), (term() -> term())) :: :ok
   def cast(module, agent, fun) do
     Agent.cast(agent, fn state -> Runtime.check_agent_step!(module, state, fun.(state)) end)
   end
@@ -74,7 +72,6 @@ defmodule TLA.Invariant.Agent do
   `Agent.get_and_update/3`, checked. The caller's function returns `{reply, new_state}`;
   the transition checked is to that new state.
   """
-  @spec get_and_update(module(), Agent.agent(), (term() -> {term(), term()}), timeout()) :: term()
   def get_and_update(module, agent, fun, timeout \\ 5_000) do
     Agent.get_and_update(
       agent,
@@ -93,7 +90,6 @@ defmodule TLA.Invariant.Agent do
   invariants must hold of it, exactly as they must of a callback that returns its state
   unchanged.
   """
-  @spec get(module(), Agent.agent(), (term() -> term()), timeout()) :: term()
   def get(module, agent, fun, timeout \\ 5_000) do
     Agent.get(agent, fn state -> fun.(Runtime.check_agent_state!(module, state)) end, timeout)
   end
@@ -104,7 +100,6 @@ defmodule TLA.Invariant.Agent do
   The `Agent` counterpart of the `init/1` wrapper, and partial for the same reason: the
   function's result IS the first state, so there is no transition to check.
   """
-  @spec start_link(module(), (-> term()), keyword()) :: Elixir.Agent.on_start()
   def start_link(module, fun, options \\ []) do
     Agent.start_link(fn -> Runtime.check_agent_state!(module, fun.()) end, options)
   end

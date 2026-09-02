@@ -47,7 +47,6 @@ defmodule Mix.Tasks.Tla.Stamp do
   `status` is `:fresh`, `:stale`, `:unstamped` or `:unverifiable`. Read from source, so this
   answers even when a stale stamp is stopping the project from compiling.
   """
-  @spec states() :: [map()]
   def states do
     index = module_index()
 
@@ -58,7 +57,6 @@ defmodule Mix.Tasks.Tla.Stamp do
   end
 
   @doc "Every `.ex` file on the project's compile paths, plus its test support trees."
-  @spec sources() :: [String.t()]
   def sources do
     Mix.Project.config()
     |> Keyword.get(:elixirc_paths, ["lib"])
@@ -69,7 +67,6 @@ defmodule Mix.Tasks.Tla.Stamp do
   end
 
   @doc "A `module => source path` index built by parsing `defmodule` declarations."
-  @spec module_index() :: %{module() => String.t()}
   def module_index do
     for path <- sources(),
         module <- modules_in(File.read!(path)),
@@ -97,7 +94,6 @@ defmodule Mix.Tasks.Tla.Stamp do
   defp collect_modules(_other, _prefix), do: []
 
   @doc "Every `use TLA.GenServer` site, as `%{module, spec, stamp, path}`."
-  @spec mappings(%{module() => String.t()}) :: [map()]
   def mappings(index) do
     index
     |> Map.values()

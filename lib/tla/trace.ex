@@ -58,7 +58,6 @@ defmodule TLA.Trace do
   machine cannot parse — and `05-layer3-conformance.md`'s pipeline runs
   `mix tla.check --format json` into `mix tla.replay --trace`, which needs the second.
   """
-  @spec to_json(t() | lasso()) :: map()
   def to_json(%__MODULE__{} = trace) do
     %{
       "type" => Atom.to_string(trace.type),
@@ -88,7 +87,6 @@ defmodule TLA.Trace do
   a trace belonging to a different specification fails with the name that did not resolve
   rather than by quietly decoding into something else.
   """
-  @spec from_json!(map()) :: t() | lasso()
   def from_json!(%{"prefix" => prefix} = data) do
     %{prefix: from_json!(prefix), cycle: data["cycle"] && from_json!(data["cycle"])}
   end
@@ -114,7 +112,6 @@ defmodule TLA.Trace do
   @doc """
   Generate the shortest trace from an initial state to the target.
   """
-  @spec generate(StateGraph.t(), StateGraph.state_id(), keyword()) :: t()
   def generate(graph, target, opts \\ []) do
     {init_index, steps} = StateGraph.path_to(graph, target)
     replay(graph, init_index, steps, opts)
@@ -129,7 +126,6 @@ defmodule TLA.Trace do
   and its cycle starts nowhere near an `init` — so the path is handed over rather than
   walked back from parent pointers.
   """
-  @spec replay(StateGraph.t(), non_neg_integer(), [{atom(), map()}], keyword()) :: t()
   def replay(graph, init_index, steps, opts \\ []) do
     initial = graph.spec.init |> Enum.at(init_index) |> apply([graph.constants])
     from(graph, initial, steps, opts)
@@ -138,7 +134,6 @@ defmodule TLA.Trace do
   @doc """
   A trace beginning at a state already in hand, applying `steps` in order.
   """
-  @spec from(StateGraph.t(), TLA.State.t(), [{atom(), map()}], keyword()) :: t()
   def from(graph, initial, steps, opts \\ []) do
     states =
       Enum.scan(steps, initial, fn {action, params}, state ->
@@ -168,7 +163,6 @@ defmodule TLA.Trace do
   to. A cycle of one state is a `terminal` stuttering forever (`02-dsl-semantics.md`
   §5.3), and comes back as the prefix with `lasso_start` on its last state.
   """
-  @spec to_behavior(t() | lasso()) :: {TLA.State.behavior(), non_neg_integer() | nil}
   def to_behavior(%__MODULE__{states: states}), do: {states, nil}
 
   def to_behavior(%{prefix: prefix, cycle: nil}), do: {prefix.states, nil}
@@ -208,7 +202,6 @@ defmodule TLA.Trace do
 
   Returns `:ok`, or `{:error, message}` naming the step and what was wrong with it.
   """
-  @spec validate(t() | lasso(), module() | Spec.Compiled.t(), map()) :: :ok | {:error, String.t()}
   def validate(trace_or_lasso, spec, constants)
 
   def validate(%__MODULE__{} = trace, spec, constants) do
@@ -240,7 +233,6 @@ defmodule TLA.Trace do
   `validate/3`, raising instead of returning an error. For a test that wants the message
   rather than a boolean.
   """
-  @spec validate!(t() | lasso(), module() | Spec.Compiled.t(), map()) :: :ok
   def validate!(trace_or_lasso, spec, constants) do
     case validate(trace_or_lasso, spec, constants) do
       :ok -> :ok
@@ -340,7 +332,6 @@ defmodule TLA.Trace do
   @doc """
   Export a trace as a sequence of state diffs, for programmatic consumption.
   """
-  @spec to_diffs(t()) :: [%{action: atom(), params: map(), changed: map(), state: TLA.State.t()}]
   def to_diffs(%__MODULE__{states: [first | rest]} = trace) do
     steps = Enum.zip([trace.actions, trace.bindings, rest])
 
@@ -360,7 +351,6 @@ defmodule TLA.Trace do
   @doc """
   Pretty-print a trace or a lasso, marking the variables each step changed.
   """
-  @spec format(t() | lasso()) :: String.t()
   def format(%{prefix: prefix, cycle: nil}), do: format(prefix)
 
   def format(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do

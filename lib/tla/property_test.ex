@@ -64,7 +64,6 @@ defmodule TLA.PropertyTest do
     that quietly filtered it away would hide the same defect behind a property that
     silently tested less than it appeared to.
     """
-    @spec init_states(module() | Spec.Compiled.t(), map()) :: StreamData.t(TLA.State.t())
     def init_states(spec, constants) do
       spec |> compiled() |> initial_states(constants) |> StreamData.member_of()
     end
@@ -101,8 +100,6 @@ defmodule TLA.PropertyTest do
     A walk that runs out of enabled actions stops there, so a sequence may be shorter than
     the length drawn. It is never longer than `max_length`.
     """
-    @spec action_sequences(module() | Spec.Compiled.t(), map(), pos_integer()) ::
-            StreamData.t([{atom(), map()}])
     def action_sequences(spec, constants, max_length \\ 20) do
       spec = compiled(spec)
 
@@ -140,7 +137,6 @@ defmodule TLA.PropertyTest do
     It is a `dev`/`test`-only dependency of ExTLA, so a consumer who wants generators
     declares it themselves — and this function has a body only where it does.
     """
-    @spec init_states(module() | Spec.Compiled.t(), map()) :: no_return()
     def init_states(_spec, _constants) do
       raise ArgumentError,
             "TLA.PropertyTest.init_states/2 needs `stream_data`, which is not loaded. " <>
@@ -150,7 +146,6 @@ defmodule TLA.PropertyTest do
     @doc """
     Unavailable: `stream_data` is not loaded. See `init_states/2`.
     """
-    @spec action_sequences(module() | Spec.Compiled.t(), map(), pos_integer()) :: no_return()
     def action_sequences(_spec, _constants, _max_length \\ 20) do
       raise ArgumentError,
             "TLA.PropertyTest.action_sequences/3 needs `stream_data`, which is not loaded. " <>
@@ -161,7 +156,6 @@ defmodule TLA.PropertyTest do
   @doc false
   # Public for the `stream_data`-less build to have something to test, and because the
   # list is the useful thing when a caller wants every initial state rather than one.
-  @spec initial_states(module() | Spec.Compiled.t(), map()) :: [TLA.State.t()]
   def initial_states(spec, constants) do
     spec = compiled(spec)
 

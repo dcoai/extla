@@ -38,7 +38,6 @@ defmodule TLA.StateGraph.Export do
   @doc """
   DOT for Graphviz. See `TLA.StateGraph.to_dot/2`.
   """
-  @spec to_dot(StateGraph.t(), keyword()) :: String.t()
   def to_dot(graph, opts \\ []) do
     require_edges!(graph, "to_dot/2")
     max_states = Keyword.get(opts, :max_states, @default_max_states)
@@ -64,7 +63,6 @@ defmodule TLA.StateGraph.Export do
   @doc """
   JSON for tooling. See `TLA.StateGraph.to_json/1`.
   """
-  @spec to_json(StateGraph.t()) :: String.t()
   def to_json(graph) do
     require_edges!(graph, "to_json/1")
     ids = ids(graph)
@@ -107,7 +105,6 @@ defmodule TLA.StateGraph.Export do
   # the alternative is the task re-implementing the comparison and the two drifting.
   #
   # Returns `nil` when the graph is small enough.
-  @spec refusal(StateGraph.t(), pos_integer(), String.t()) :: String.t() | nil
   def refusal(graph, max_states, flag \\ ":max_states") do
     if graph.state_count > max_states do
       "this graph has #{graph.state_count} states and the limit is #{max_states}. " <>

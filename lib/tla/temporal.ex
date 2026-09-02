@@ -48,7 +48,7 @@ defmodule TLA.Temporal do
   the direction that reports a violated property as holding.
   """
 
-  alias TLA.{ModelChecker, Spec, State}
+  alias TLA.{ModelChecker, State}
 
   @typedoc """
   What a finite trace establishes about a formula. `:inconclusive` is not a failure — it
@@ -82,7 +82,6 @@ defmodule TLA.Temporal do
   nothing and asks `ENABLED \\E p : AcquireLock(p)`, which is the whole-action form and a
   strictly weaker question — the distinction §5.2 exists for.
   """
-  @spec enabled?(State.t(), Spec.Compiled.action_def(), map(), map()) :: boolean()
   def enabled?(state, action, constants, binding \\ %{}) do
     action
     |> ModelChecker.enabled_bindings(constants, state)
@@ -95,7 +94,6 @@ defmodule TLA.Temporal do
   The checker has the enabled bindings of every action in hand while it expands a state —
   they are what it turns into edges — so the bits cost no guard evaluations of their own.
   """
-  @spec enabled_among?([map()], map()) :: boolean()
   def enabled_among?(enabled_bindings, binding) when binding == %{},
     do: enabled_bindings != []
 
@@ -109,7 +107,6 @@ defmodule TLA.Temporal do
   action taken inside the component" all ask it, so it has one definition rather than
   three.
   """
-  @spec extends?(map(), map()) :: boolean()
   def extends?(full, partial), do: Enum.all?(partial, fn {k, v} -> Map.get(full, k) == v end)
 
   # ── Operators over one behaviour ────────────────────────────────────────────
@@ -120,7 +117,6 @@ defmodule TLA.Temporal do
   Refutable by any trace: one state where P is false settles it. Establishable only when
   the trace is a lasso, because otherwise P may fail after it ends.
   """
-  @spec always(behavior(), predicate(), lasso_start()) :: verdict()
   def always(behavior, predicate, lasso_start \\ nil) do
     check!(behavior, lasso_start)
 
@@ -132,7 +128,6 @@ defmodule TLA.Temporal do
 
   The mirror of `always/3`: satisfiable by any trace, refutable only by a lasso.
   """
-  @spec eventually(behavior(), predicate(), lasso_start()) :: verdict()
   def eventually(behavior, predicate, lasso_start \\ nil) do
     check!(behavior, lasso_start)
 
@@ -147,7 +142,6 @@ defmodule TLA.Temporal do
   decided by the cycle alone — the states outside it occur finitely often and cannot
   settle what happens "forever after".
   """
-  @spec eventually_always(behavior(), predicate(), lasso_start()) :: verdict()
   def eventually_always(behavior, predicate, lasso_start \\ nil) do
     check!(behavior, lasso_start)
 
@@ -163,7 +157,6 @@ defmodule TLA.Temporal do
   With a lasso, exactly "P occurs somewhere in the cycle": the cycle's states are the
   ones that recur, and nothing else does.
   """
-  @spec always_eventually(behavior(), predicate(), lasso_start()) :: verdict()
   def always_eventually(behavior, predicate, lasso_start \\ nil) do
     check!(behavior, lasso_start)
 
@@ -181,7 +174,6 @@ defmodule TLA.Temporal do
   trace where every P was answered may fail at the first state past the end. Neither
   direction is settled by a prefix.
   """
-  @spec leads_to(behavior(), predicate(), predicate(), lasso_start()) :: verdict()
   def leads_to(behavior, p, q, lasso_start \\ nil)
 
   def leads_to(behavior, _p, _q, nil) do
@@ -214,7 +206,6 @@ defmodule TLA.Temporal do
   The stuttering allowance is what makes a TLA formula about a system rather than about a
   transcript: a step that changes nothing the spec models is always permitted.
   """
-  @spec box_action(behavior(), action_predicate(), [atom()], lasso_start()) :: verdict()
   def box_action(behavior, action, vars, lasso_start \\ nil) do
     check!(behavior, lasso_start)
 
@@ -232,7 +223,6 @@ defmodule TLA.Temporal do
   The `<A>_v` form excludes stuttering deliberately: "A happened" has to mean something
   moved, or every behaviour satisfies it by standing still.
   """
-  @spec diamond_action(behavior(), action_predicate(), [atom()], lasso_start()) :: verdict()
   def diamond_action(behavior, action, vars, lasso_start \\ nil) do
     check!(behavior, lasso_start)
 
@@ -251,7 +241,6 @@ defmodule TLA.Temporal do
   `lasso_start`. Leaving it out would lose the step a fairness constraint is most often
   satisfied by, and would let a cycle of one state have no steps at all.
   """
-  @spec steps(behavior(), lasso_start()) :: [State.step()]
   def steps(behavior, lasso_start \\ nil)
 
   def steps(behavior, nil), do: Enum.zip(behavior, tl(behavior))
@@ -262,7 +251,6 @@ defmodule TLA.Temporal do
   @doc """
   The states that recur forever: the cycle of a lasso, or `nil` without one.
   """
-  @spec cycle(behavior(), lasso_start()) :: behavior() | nil
   def cycle(_behavior, nil), do: nil
   def cycle(behavior, lasso_start), do: Enum.drop(behavior, lasso_start)
 

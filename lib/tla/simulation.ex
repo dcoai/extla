@@ -92,7 +92,6 @@ defmodule TLA.Simulation do
   The seed is always in the result, generated when none was given: a random run that finds
   something and cannot be run again has found nothing anybody can act on.
   """
-  @spec run(module(), config()) :: result()
   def run(module, config \\ %{}) do
     config = configure(module, config)
     started = System.monotonic_time(:millisecond)
@@ -116,7 +115,6 @@ defmodule TLA.Simulation do
   the debugging entry point: a run that passed and a run that failed are read the same
   way.
   """
-  @spec run_trace(module(), config()) :: {result(), TLA.State.behavior()}
   def run_trace(module, config \\ %{}) do
     config = configure(module, Map.put(config, :traces, 1))
     started = System.monotonic_time(:millisecond)
@@ -133,7 +131,6 @@ defmodule TLA.Simulation do
   write a scenario by hand. `TLA.Replay.counterexample/3` is the other direction: from
   *abstract* actions through `concrete_message/2`.
   """
-  @spec replay(module(), [term()], config()) :: result()
   def replay(module, messages, config \\ %{}) do
     config = configure(module, Map.put(config, :traces, 1))
     started = System.monotonic_time(:millisecond)

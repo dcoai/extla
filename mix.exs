@@ -57,7 +57,6 @@ defmodule ExTLA.MixProject do
       # present is decided when ExTLA compiles rather than on every check.
       {:telemetry, "~> 1.0", optional: true},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

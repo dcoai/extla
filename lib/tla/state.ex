@@ -37,7 +37,6 @@ defmodule TLA.State do
       iex> TLA.State.new(x: 0, y: 1)
       %{x: 0, y: 1}
   """
-  @spec new(Enumerable.t()) :: t()
   def new(assignments), do: Map.new(assignments)
 
   @doc """
@@ -49,7 +48,6 @@ defmodule TLA.State do
       iex> TLA.State.get(%{x: 0}, :x)
       0
   """
-  @spec get(t(), variable_name()) :: value()
   def get(state, var), do: Map.fetch!(state, var)
 
   @doc """
@@ -64,7 +62,6 @@ defmodule TLA.State do
       iex> TLA.State.prime(%{x: 0, y: 1}, :x, 2)
       %{x: 2, y: 1}
   """
-  @spec prime(t(), variable_name(), value()) :: t()
   def prime(state, var, value), do: Map.replace!(state, var, value)
 
   @doc """
@@ -73,7 +70,6 @@ defmodule TLA.State do
       iex> TLA.State.prime_many(%{x: 0, y: 1}, %{x: 2, y: 3})
       %{x: 2, y: 3}
   """
-  @spec prime_many(t(), %{variable_name() => value()}) :: t()
   def prime_many(state, assignments) do
     Enum.reduce(assignments, state, fn {var, value}, acc -> prime(acc, var, value) end)
   end
@@ -84,7 +80,6 @@ defmodule TLA.State do
       iex> TLA.State.stuttering?({%{x: 0}, %{x: 0}})
       true
   """
-  @spec stuttering?(step()) :: boolean()
   def stuttering?({pre, post}), do: pre == post
 
   @doc """
@@ -93,7 +88,6 @@ defmodule TLA.State do
       iex> TLA.State.changed_vars({%{x: 0, y: 1}, %{x: 2, y: 1}})
       MapSet.new([:x])
   """
-  @spec changed_vars(step()) :: MapSet.t(variable_name())
   def changed_vars({pre, post}) do
     pre
     |> Map.keys()
@@ -109,7 +103,6 @@ defmodule TLA.State do
       iex> TLA.State.unchanged?({%{x: 0, y: 1}, %{x: 2, y: 1}}, [:y])
       true
   """
-  @spec unchanged?(step(), [variable_name()]) :: boolean()
   def unchanged?({pre, post}, vars) do
     Enum.all?(vars, fn var -> Map.fetch!(pre, var) == Map.fetch!(post, var) end)
   end
@@ -131,7 +124,6 @@ defmodule TLA.State do
       iex> TLA.State.validate!(%{x: 0, q: [:a, {1, "b"}]})
       %{x: 0, q: [:a, {1, "b"}]}
   """
-  @spec validate!(t()) :: t() | no_return()
   def validate!(state) when is_map(state) do
     Enum.each(state, fn {var, value} -> validate_term!(value, var, []) end)
     state

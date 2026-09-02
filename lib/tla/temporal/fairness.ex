@@ -43,7 +43,6 @@ defmodule TLA.Temporal.Fairness do
   The order is the bit order of `TLA.StateGraph`'s enabled bitstrings, so it has to be
   deterministic — the same reason the search itself is.
   """
-  @spec expand(Spec.Compiled.t(), map(), State.t()) :: [constraint()]
   def expand(spec, constants, state) do
     Enum.flat_map(spec.fairness, fn fairness ->
       case fairness.per do
@@ -62,7 +61,6 @@ defmodule TLA.Temporal.Fairness do
   @doc """
   How a constraint reads, for a message: `SF(acquire_lock, p: :p1)` or `WF(timeout)`.
   """
-  @spec describe(constraint()) :: String.t()
   def describe({%{kind: kind, action: action}, binding}) do
     prefix = if kind == :strong, do: "SF", else: "WF"
 
@@ -99,13 +97,6 @@ defmodule TLA.Temporal.Fairness do
   function of the observed steps can answer it. `constraint_predicates/3` builds both from
   a spec, which is where the answer actually lives.
   """
-  @spec weak_fairness(
-          Temporal.behavior(),
-          Temporal.action_predicate(),
-          Temporal.predicate(),
-          [atom()],
-          Temporal.lasso_start()
-        ) :: Temporal.verdict()
   def weak_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
 
   def weak_fairness(_behavior, _action, _enabled, _vars, nil), do: :inconclusive
@@ -131,13 +122,6 @@ defmodule TLA.Temporal.Fairness do
   competitor takes the lock and gives it back, so acquiring is disabled in some states of
   the cycle and enabled in others, which satisfies WF and not SF.
   """
-  @spec strong_fairness(
-          Temporal.behavior(),
-          Temporal.action_predicate(),
-          Temporal.predicate(),
-          [atom()],
-          Temporal.lasso_start()
-        ) :: Temporal.verdict()
   def strong_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
 
   def strong_fairness(_behavior, _action, _enabled, _vars, nil), do: :inconclusive
@@ -172,8 +156,6 @@ defmodule TLA.Temporal.Fairness do
   themselves, and building them here keeps the arithmetic of §5.2's per-binding form in
   one place.
   """
-  @spec constraint_predicates(Spec.Compiled.t(), map(), constraint()) ::
-          {Temporal.action_predicate(), Temporal.predicate()}
   def constraint_predicates(spec, constants, {fairness, binding}) do
     action = Spec.Compiled.action(spec, fairness.action)
 

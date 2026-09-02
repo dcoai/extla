@@ -32,7 +32,6 @@ defmodule TLA.Spec.Block do
   @doc """
   Split a block into its top-level statements.
   """
-  @spec statements(Macro.t()) :: [Macro.t()]
   def statements({:__block__, _, stmts}), do: stmts
   def statements(nil), do: []
   def statements(single), do: [single]
@@ -40,10 +39,6 @@ defmodule TLA.Spec.Block do
   @doc """
   Classify one statement of an `init` or `action` body.
   """
-  @spec classify!(Macro.t(), Rewriter.t()) ::
-          {:guard, Macro.t(), keyword()}
-          | {:let, Macro.t(), Macro.t(), keyword()}
-          | {:assign, atom(), Macro.t(), keyword()}
   def classify!({:require, meta, [expr]}, _ctx), do: {:guard, expr, meta}
 
   def classify!({:let, meta, [{:=, _, [pattern, rhs]}]}, ctx) do
@@ -82,7 +77,6 @@ defmodule TLA.Spec.Block do
   Check the classified statements of an action body and return the assignments,
   in source order, having rejected a variable assigned twice or not declared.
   """
-  @spec assignments!([tuple()], Rewriter.t()) :: [{atom(), Macro.t(), keyword()}]
   def assignments!(classified, ctx) do
     classified
     |> Enum.filter(&match?({:assign, _, _, _}, &1))
@@ -132,7 +126,6 @@ defmodule TLA.Spec.Block do
   `let v = f[k]` has to actually protect it, which it only does if `and`
   short-circuits over the binding.
   """
-  @spec guard_body([tuple()], Rewriter.t()) :: Macro.t()
   def guard_body(classified, ctx) do
     case last_guard_index(classified) do
       nil ->
@@ -224,7 +217,6 @@ defmodule TLA.Spec.Block do
   The transition: the post-state, as one merge of the assigned variables onto
   the pre-state. A variable not assigned is untouched, which is `UNCHANGED`.
   """
-  @spec transition_body([tuple()], Rewriter.t(), Macro.t()) :: Macro.t()
   def transition_body(classified, ctx, state_ast) do
     {steps, updates} =
       classified
@@ -265,7 +257,6 @@ defmodule TLA.Spec.Block do
   omission would surface much later as a `KeyError` from whichever action first
   reads it — a long way from the declaration that caused it.
   """
-  @spec init_body([tuple()], Rewriter.t(), [atom()]) :: Macro.t()
   def init_body(classified, ctx, declared) do
     Enum.each(classified, fn
       {:guard, _expr, meta} ->
@@ -329,7 +320,6 @@ defmodule TLA.Spec.Block do
   only on the match — because a guard that does not mention every param is
   perfectly normal and should not warn.
   """
-  @spec bind_params([atom()], Macro.t()) :: [Macro.t()]
   def bind_params(names, params_ast) do
     Enum.map(names, fn name ->
       quote generated: true do
@@ -345,7 +335,6 @@ defmodule TLA.Spec.Block do
   rejected: §1.2 permits assignment only in `init` and `action`, where it means
   "the post-state". In a predicate there is no post-state for it to mean.
   """
-  @spec desugar_predicate!(Macro.t(), Rewriter.t()) :: Macro.t()
   def desugar_predicate!(block, ctx) do
     block
     |> statements()
@@ -395,7 +384,6 @@ defmodule TLA.Spec.Block do
   `nil` means *not measured* — which the coverage report must render differently
   from zero, since zero is the finding and "not measured" is not.
   """
-  @spec near_miss(Macro.t()) :: Macro.t() | nil
   def near_miss(desugared) do
     {leading, final} = split_final(desugared)
 

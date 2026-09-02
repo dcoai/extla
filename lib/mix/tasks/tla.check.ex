@@ -249,7 +249,6 @@ defmodule Mix.Tasks.Tla.Check do
   end
 
   @doc false
-  @spec schema_version() :: pos_integer()
   def schema_version, do: @schema_version
 
   defp result_json({:unsound_symmetry, error}) do

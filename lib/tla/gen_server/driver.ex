@@ -18,7 +18,6 @@ defmodule TLA.GenServer.Driver do
           {:ok, term()} | {:violation, Violation.t()} | {:stopped, term()} | {:timeout, timeout()}
 
   @doc "Call `server` with `message`, reporting the outcome instead of raising it."
-  @spec call(pid(), term(), timeout()) :: outcome()
   def call(server, message, timeout \\ 5_000) do
     ref = Process.monitor(server)
     send(server, {:"$gen_call", {self(), ref}, message})

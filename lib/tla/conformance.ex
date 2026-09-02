@@ -65,7 +65,6 @@ defmodule TLA.Conformance do
 
       TLA.Conformance.against_graph(graph, behaviour, status: result.status)
   """
-  @spec against_graph(StateGraph.t(), TLA.State.behavior(), keyword()) :: finding()
   def against_graph(graph, behaviour, opts) do
     status = Keyword.fetch!(opts, :status)
 
@@ -127,7 +126,6 @@ defmodule TLA.Conformance do
   @doc """
   A finding rendered for a person, saying which of the three it is and why that matters.
   """
-  @spec explain(finding()) :: String.t()
   def explain(:ok), do: "every observed state is in the graph, and every step is an edge."
 
   def explain({:checker, %{step: step, from: from, to: to}}) do

@@ -36,7 +36,6 @@ defmodule TLA.Invariant.Violation do
   @doc """
   Report a violation, according to the mode the module was compiled under.
   """
-  @spec report!(t(), TLA.Config.mode()) :: :ok | no_return()
   def report!(violation, mode \\ :enabled)
 
   def report!(%__MODULE__{} = violation, :enabled), do: raise(violation)

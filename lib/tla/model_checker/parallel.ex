@@ -83,7 +83,6 @@ defmodule TLA.ModelChecker.Parallel do
   the completed run, in the same shape `TLA.ModelChecker`'s single-threaded search
   returns. `check_temporals/1` and `finish/2` do not know which one produced it.
   """
-  @spec explore(ModelChecker.Run.t()) :: ModelChecker.Run.t()
   def explore(run) do
     level = :queue.to_list(run.frontier)
     levels(%{run | frontier: :queue.new()}, level)

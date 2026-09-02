@@ -92,8 +92,6 @@ defmodule TLA.Refinement do
   everything was checked. Raises `TLA.Refinement.Error` on anything it can decide and
   finds wrong.
   """
-  @spec validate!(module(), module() | Spec.Compiled.t(), map() | nil) ::
-          {:ok, deferred :: [String.t()]} | no_return()
   def validate!(refinement, spec, constants \\ nil)
 
   def validate!(refinement, spec_module, constants) when is_atom(spec_module) do
@@ -139,7 +137,6 @@ defmodule TLA.Refinement do
   every step into a `:diverged`. Both are named here rather than diagnosed three frames
   later.
   """
-  @spec abstract!(module(), Spec.Compiled.t(), map()) :: State.t() | no_return()
   def abstract!(refinement, spec, concrete) do
     abstract = refinement.abstract(concrete)
 

@@ -25,7 +25,6 @@ defmodule TLA.Fingerprint do
   versions, so two equal states could encode differently and be explored twice — or,
   worse, a stored fingerprint could stop matching after an OTP upgrade.
   """
-  @spec canonical(TLA.State.t()) :: binary()
   def canonical(state), do: :erlang.term_to_binary(state, [:deterministic])
 
   @doc """
@@ -37,7 +36,6 @@ defmodule TLA.Fingerprint do
       iex> byte_size(TLA.Fingerprint.compute(%{x: 1}, bits: 128))
       16
   """
-  @spec compute(TLA.State.t(), keyword()) :: t()
   def compute(state, opts \\ []), do: state |> canonical() |> of_encoding(opts)
 
   @doc """
@@ -48,7 +46,6 @@ defmodule TLA.Fingerprint do
   from — is what identity is then defined by. Re-encoding the winner would be work already
   done, and re-deriving it a chance for the two to disagree.
   """
-  @spec of_encoding(binary(), keyword()) :: t()
   def of_encoding(encoding, opts \\ []) do
     bits = Keyword.get(opts, :bits, @default_bits)
 
@@ -75,7 +72,6 @@ defmodule TLA.Fingerprint do
       iex> TLA.Fingerprint.collision_estimate(10_000_000, 64)
       2.710505431213761e-6
   """
-  @spec collision_estimate(non_neg_integer(), pos_integer()) :: float()
   def collision_estimate(distinct_states, bits)
       when is_integer(distinct_states) and distinct_states >= 0 and is_integer(bits) and bits > 0 do
     distinct_states * distinct_states / :math.pow(2, bits + 1)
