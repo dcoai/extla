@@ -51,7 +51,13 @@ defmodule Mix.Tasks.Tla.Coverage do
     end
   end
 
-  defp check!(path, rendered) do
+  # Public only so its failure paths can be tested. Both `Mix.raise` branches below were
+  # executed by NOTHING before #84: no test invoked this task, and in CI the job that runs it
+  # is in `verify`, which never starts when `ledger_test.exs`'s own drift assertion fails first
+  # in `check`. So the gate's red path had never once run (#75). The success path is exercised
+  # by the `tla-coverage-drift` job on every pipeline.
+  @doc false
+  def check!(path, rendered) do
     case File.read(path) do
       {:ok, ^rendered} ->
         Mix.shell().info("#{@golden} is current")
