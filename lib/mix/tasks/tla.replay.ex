@@ -102,11 +102,33 @@ defmodule Mix.Tasks.Tla.Replay do
       %{"prefix" => _} ->
         Trace.from_json!(data)
 
-      %{^spec => %{"violation" => nil}} ->
-        Mix.raise("#{path} records no counterexample for #{spec}: the spec was verified.")
+      # The versioned envelope `mix tla.check --format json` writes (#66). This is the
+      # `05-layer3-conformance.md` pipeline: check writes, replay reads.
+      #
+      # The version is CHECKED rather than ignored, which is the entire reason it exists. A
+      # reader that parses optimistically discovers a shape change by getting a wrong answer
+      # from it; refusing an unknown version turns that into a message naming both versions.
+      %{"schema_version" => version, "specs" => specs} when is_list(specs) ->
+        unless version == Mix.Tasks.Tla.Check.schema_version() do
+          Mix.raise(
+            "#{path} was written by schema version #{version}; this ExTLA reads version " <>
+              "#{Mix.Tasks.Tla.Check.schema_version()}. Re-run `mix tla.check --format json`."
+          )
+        end
 
-      %{^spec => %{"violation" => violation}} ->
-        Trace.from_json!(violation)
+        case Enum.find(specs, &(&1["spec"] == spec)) do
+          nil ->
+            Mix.raise(
+              "#{path} has no result for #{spec}. It carries: " <>
+                "#{specs |> Enum.map_join(", ", & &1["spec"])}."
+            )
+
+          %{"violation" => nil} ->
+            Mix.raise("#{path} records no counterexample for #{spec}: the spec was verified.")
+
+          %{"violation" => violation} ->
+            Trace.from_json!(violation)
+        end
 
       %{} = results ->
         Mix.raise(
