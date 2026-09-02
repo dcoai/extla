@@ -17,12 +17,14 @@ defmodule TLA.ModelChecker.LivenessTest do
 
   @processes %{processes: MapSet.new([:p1, :p2])}
 
-  defp check(module, constants, names) do
-    ModelChecker.run(module, %{
-      constants: constants,
-      check_liveness: true,
-      temporals: names
-    })
+  defp check(module, constants, names, opts \\ %{}) do
+    ModelChecker.run(
+      module,
+      Map.merge(
+        %{constants: constants, check_liveness: true, temporals: names},
+        opts
+      )
+    )
   end
 
   describe "verdicts" do
@@ -51,8 +53,16 @@ defmodule TLA.ModelChecker.LivenessTest do
       assert check(Idling, %{}, [:eventually_two]).status == :ok
     end
 
+    # `max_states` is load-bearing, not tidiness. `Unbounded` is infinite (`tick: n = n + 1`),
+    # so without a bound this inherits TLA.Config's default of 1,000,000 and builds a liveness
+    # graph -- the edge table and ENABLED bits, which are per-struct maps -- over a million
+    # states, in order to assert that a status is one of two atoms. Measured at 909 MB peak RSS
+    # for this file, against 125-178 MB for every other test file in the suite, and it was
+    # enough to get `mix test` OOM-killed in CI (#77, #78). The claim under test is that asking
+    # for liveness changes nothing for a spec with no temporal properties; 100 states settle
+    # that as well as a million. The test at line ~137 bounds itself the same way.
     test "a spec with no temporal properties is unaffected by asking" do
-      assert check(Unbounded, %{}, :all).status in [:ok, :max_states_reached]
+      assert check(Unbounded, %{}, :all, %{max_states: 100}).status in [:ok, :max_states_reached]
     end
   end
 
