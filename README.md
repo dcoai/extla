@@ -57,7 +57,10 @@ mix tla.replay   MyApp.Counter     # replay a counterexample against real code
 
 ## Status
 
-**Phases 1 and 2 are done, on the terms the project set for itself.**
+**All four phases are done, on the terms the project set for itself** — see
+[spec/06-architecture.md §Implementation Phases](spec/06-architecture.md#implementation-phases),
+which is where what-is-built is recorded.
+
 `mix tla.check MySpec` explores the state space breadth-first, checks the invariants and
 the temporal properties, reports the shortest counterexample — or the lasso — when it
 finds one, and prints what the run actually exercised.
@@ -122,25 +125,21 @@ six gaps in the DSL and the harness, each fixed where it was found — most rece
 four entries were typing a variable *weaker* than the TLA+ they are checked against, and
 that `f[x]` outside a function's domain was `nil` rather than an error.
 
-| Piece | State |
-|---|---|
-| `TLA.State`, `TLA.Config`, `TLA.Fingerprint`, `TLA.Set`, `TLA.Function` | ✅ |
-| `TLA.Spec` DSL + the §7 compile-time validator | ✅ |
-| `TLA.StateGraph`, breadth-first `TLA.ModelChecker`, `TLA.Trace` | ✅ |
-| The implicit `type_ok` invariant | ✅ |
-| `TLA.Coverage`, `mix tla.check`, `TLA.Spec.Test` | ✅ |
-| Differential corpus vs TLC | ✅ all six entries |
-| TLC's temporal verdicts in the corpus | ✅ compared, not just recorded |
-| The liveness graph — `TLA.Temporal`, the edge table and ENABLED bits | ✅ |
-| `check_liveness: true` — temporal properties, weak and strong fairness | ✅ |
-| `symmetry:` / `verify_symmetry:` — symmetry reduction | ✅ |
-| Layer 1 invariants, Layer 3 conformance (Phase 3) | not yet |
-| Parallel exploration (Phase 4) | not yet |
+**Phase 3** added Layer 1 invariants on running processes and the Layer 3 conformance
+bridge — `TLA.GenServer`, `TLA.Refinement`, `mix tla.simulate` and `mix tla.replay`.
+**Phase 4** added parallel exploration (**5.40x at 8 workers**; `raft_election` went from
+23.4 s to 1.65 s, with the corpus agreeing with TLC at 1, 2, 4 and 8), `TLA.PropertyTest`,
+and `mix tla.visualize`.
 
-Asking for parallel exploration, which Phase 4 brings, raises rather than quietly
-checking something weaker. So does asking for symmetry reduction and liveness in the
-same run: the quotient graph can hold cycles the real state space does not, and a cycle
-is what a liveness verdict is read off ([D-22](spec/08-decisions.md)).
+What is built, phase by phase, is recorded in
+[spec/06-architecture.md §Implementation Phases](spec/06-architecture.md#implementation-phases)
+and not restated here — a second copy is what let this section claim two phases were
+unbuilt for a day and a half after they shipped.
+
+Asking for symmetry reduction and liveness in the same run raises rather than quietly
+checking something weaker: the quotient graph can hold cycles the real state space does
+not, and a cycle is what a liveness verdict is read off ([D-22](spec/08-decisions.md)).
+Liveness is refused alongside `workers:` for the neighbouring reason ([D-27](spec/08-decisions.md)).
 
 See [spec/README.md](spec/README.md) for the full specification, and
 [spec/08-decisions.md](spec/08-decisions.md) for why it is shaped the way it is.

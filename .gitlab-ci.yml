@@ -3,10 +3,15 @@
 #
 # `check` builds and tests the Elixir side. `verify` runs the TLC differential
 # corpus (test/differential/README.md), the Phase 1 acceptance gate
-# (spec/08-decisions.md D-9). Until the checker exists, `verify` pins the oracle:
-# it re-runs TLC and fails if TLC no longer reports what the committed
-# expected.json records. Once ExTLA can check a spec, comparing its answers to
-# those same files is one more job in this stage.
+# (spec/08-decisions.md D-9): it re-runs TLC and fails if TLC no longer reports
+# what the committed expected.json records, so those files are an oracle rather
+# than a fixture somebody can edit to make a test pass.
+#
+# Comparing ExTLA's OWN answers to expected.json happens in the differential
+# suite under `mix test` -- the `check` stage, not this one. An earlier version
+# of this comment anticipated it as "one more job in this stage"; it arrived
+# somewhere else, and a reader looking for it in `verify` would not find it
+# (#73/#80).
 
 stages:
   - check
