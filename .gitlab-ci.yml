@@ -29,6 +29,27 @@ default:
   before_script:
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends git
+    # `surfex` is declared with a `git@host:` URL, which is what a developer needs: this
+    # instance authenticates people by ssh key, and `mix deps.get` over https on a
+    # workstation fails with `could not read Username`. But git has no built-in ssh -- an
+    # scp-style URL makes git exec an `ssh` binary, which this slim image does not carry.
+    # So CI maps that spelling onto the job-token URL, rather than `mix.exs` changing to
+    # suit CI (#70, #71).
+    #
+    # The credential is `CI_JOB_TOKEN`: per-job and ephemeral, so nothing long-lived is
+    # stored. It resolves only because `dco-tek/extla` is on `dco-tek/surfex`'s inbound
+    # job-token allowlist, which is per-project and is NOT inherited from the group. If
+    # this starts failing with "HTTP Basic: Access denied", check that allowlist before
+    # touching anything here -- the message reads like a credential problem and is not one.
+    #
+    # `--add` on the second line is load-bearing. `insteadOf` is a multi-valued key and
+    # plain `git config` REPLACES a value rather than appending, so without it the second
+    # line silently deletes the first. Only the `git@` rewrite is needed today, since
+    # `surfex` is the one git dependency -- the pair is taken as `extc` wrote it because
+    # the hazard is invisible until a second git dependency is added, and then costs an
+    # afternoon.
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/".insteadOf "https://${CI_SERVER_HOST}/"
+    - git config --global --add url."https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/".insteadOf "git@${CI_SERVER_HOST}:"
     - mix local.hex --force
     - mix local.rebar --force
     - mix deps.get
