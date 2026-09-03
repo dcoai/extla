@@ -39,6 +39,13 @@ release it merely follows.
 
 ### Added
 
+- `guides/tutorial/08-modelling.md` — deriving a specification from a system, on a job runner the
+  tutorial has not already solved: which fields are state and which are derivable (with the
+  measurement that a derivable field costs no states but buys an obligation, and a counterexample
+  about your own bookkeeping when you get it wrong), constants against bounds, what is abstracted
+  away and what that costs, how big to make it — 64 states at two jobs, 512 at three — and what
+  was left out entirely (#104, #110).
+
 - A gate over the **built** documentation: every internal link in `doc/*.html` must resolve, and a
   `docs` CI job builds the docs so it actually runs. It found ExDoc's sidebar home link 404ing on
   all 84 generated pages, and the README's `LICENSE` link 404ing on the front page — neither

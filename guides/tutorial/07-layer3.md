@@ -246,8 +246,9 @@ assert_spec Tutorial.StrongLock, %{
 }
 ```
 
-That is the whole of the tutorial's mechanics. Where specs live in a project, what belongs in
-CI and what it costs are the next thing to settle.
+That is the whole of the tutorial's mechanics. What remains is the judgement: deciding what to
+put in a model in the first place, which the [next page](08-modelling.md) derives on a system this
+tutorial has not already solved.
 
 ## Where to next
 
