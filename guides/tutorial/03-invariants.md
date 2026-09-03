@@ -4,9 +4,45 @@ ExTLA tutorial. Previous: [The DSL in practice](02-dsl.md).
 
 An `invariant` is a boolean over the variables that must hold in every reachable state. The
 checker evaluates each one in each state it discovers, and stops at the first state where one is
-false — that is the counterexample [Getting started](../getting-started.md) ends with. This section
-is about the other outcome: what the report says when every invariant *holds*, and why that is
-worth reading.
+false — that is the counterexample [Getting started](../getting-started.md) ends with.
+
+This page is about the rest of it: how to decide what to assert, how to read the report when every
+invariant *holds* (which is where a spec that verifies for the wrong reason gives itself away),
+how to state a property of a **step** rather than a state, and the failure you are most likely to
+meet first — a specification that finishes its work and is refuted for it.
+
+## Choosing what to assert
+
+A specification with no invariants verifies instantly and proves nothing. The question is what to
+write, and there is a usable order.
+
+**Start with the types, which you have already written.** Every `variable`'s `type:` is checked in
+every state as an invariant named `type_ok`, so the shape of your state is asserted before you
+write a line. That is not a formality: a spec whose action drives a variable out of range is
+refuted by it, and it is the invariant that most often catches a spec that is simply wrong about
+its own state.
+
+**Then ask what the system promises its callers**, and write each promise as a predicate that must
+never be false. Not "the code does X" — a specification is not a paraphrase of an implementation
+— but the things you would be embarrassed to be wrong about. For a lock: at most one holder. For a
+queue: nothing is delivered twice, nothing is lost. For an allocator: no two clients hold the same
+resource. These are usually few, short, and about *relationships between variables* rather than
+about any one of them.
+
+**Say what an invariant is for when the name will not carry it.** `desc:` is not decoration — it
+is printed with the violation:
+
+<!-- tla:skip reason=an invariant declaration on its own, not a compilable module -->
+```elixir
+invariant :mutual_exclusion,
+  desc: "at most one client holds the lock — THE property this design exists to keep" do
+  Enum.count(^clients, fn c -> pc[c] == :holding end) <= 1
+end
+```
+
+**Then use the coverage report to check your own work**, which the next two sections are about.
+The report is the only place that will tell you an invariant you were proud of was never once at
+risk.
 
 ## `type_ok` is an invariant you did not write
 
@@ -116,11 +152,306 @@ has no cancellation in it. Nothing about the verdict is wrong; what is wrong is 
 verdict about. The coverage table is the only place that shows, and `--strict-coverage` is how you
 make it exit 3 rather than print a warning.
 
-Two other kinds of property belong to this family and are not built here: an `action_property`
-constrains a *step* — `old` and `new` are bound, and it holds or fails per transition rather than
-per state ([§4](../../spec/02-dsl-semantics.md#4-action_property-uses-old-and-new)) — and a `terminal`
-declares which successor-less states are final on purpose, so they are not reported as deadlocks
-([§5.3](../../spec/02-dsl-semantics.md#5-3-terminal-states-are-declared-not-inferred)).
+## `action_property` — a property of a *step*
+
+An invariant is a claim about each state on its own. Some properties are not of that kind: *money
+is never created*, *the audit log only ever grows*, *the lock is never stolen from its holder*. Each
+compares a state with the one before it, and no predicate over a single state can express any of
+them — every state involved is perfectly legal, and it is the *transition* between two of them that
+is wrong.
+
+`action_property` is that claim. `old` and `new` are bound to the pre- and post-state, and the
+property is evaluated on every step the checker takes:
+
+<!-- tla:spec -->
+```elixir
+defmodule Tutorial.AuditedLock do
+  use TLA.Spec
+
+  constant :clients, default: set([:alice, :bob])
+
+  variable :holder, type: ^clients | :none
+  variable :log,    type: seq(^clients)
+
+  init do
+    holder = :none
+    log    = seq()
+  end
+
+  action :acquire, params: [c: ^clients] do
+    require holder == :none
+    holder = c
+    log    = append(log, c)
+  end
+
+  action :release do
+    require holder != :none
+    holder = :none
+  end
+
+  # Housekeeping, and the bug: it throws away everything but the first entry.
+  action :compact do
+    require len(log) > 1
+    log = seq([head(log)])
+  end
+
+  invariant :holder_is_logged do
+    holder == :none or len(log) > 0
+  end
+
+  action_property :log_only_grows do
+    len(new.log) >= len(old.log)
+  end
+end
+```
+
+Note what an invariant could *not* have caught. Every state this spec reaches is fine: a holder or
+none, a log of some length, and `holder_is_logged` holds throughout. There is no bad state to find
+— only a bad step, from a log of two entries to a log of one.
+
+<!-- tla:check module=Tutorial.AuditedLock expect=violation property=log_only_grows -->
+```
+Tutorial.AuditedLock — VIOLATION: log_only_grows
+```
+
+The refuted property is named, and the step that refutes it is the `compact` that runs when the
+log holds two entries: `[:alice, :bob]` becomes `[:alice]`, and `len(new.log) >= len(old.log)` is
+`1 >= 2`. Delete the `compact` action and the spec verifies.
+
+> #### The trace for this one is not to be trusted yet {: .warning}
+>
+> The verdict above is correct, and this page deliberately does not print the counterexample. An
+> `action_property` violation's trace is currently generated from the **post-state**, so when that
+> state was already reachable by a shorter route the trace shows *that* route and the offending
+> step is absent — the step it marks can even satisfy the property. Found while writing this page
+> and filed as **#112**, with the fix and a guard: for a safety trace, assert that the named
+> property actually fails where the trace says it does.
+>
+> Invariant and deadlock traces are unaffected, and correctly so: those are claims about a
+> *state*, and any path that reaches it is a fair counterexample.
+
+`02-dsl-semantics.md` [§4](../../spec/02-dsl-semantics.md#4-action_property-uses-old-and-new) is
+normative on `old` and `new` — in particular that a bare variable name inside an
+`action_property` is a compile error, because there it would be ambiguous which of the two you
+meant.
+
+## Deadlock, and the `terminal` you will need
+
+This is the first thing that will go wrong for you, so it is worth meeting deliberately.
+
+**A reachable state with no enabled action is a deadlock, and the checker reports it as a
+violation.** That is the right default — for a lock, a queue, a protocol, a state nothing can leave
+is a bug. But it means that **any specification which finishes its work is refuted**, because
+finishing looks exactly like being stuck.
+
+Here is the same lock, made one-shot: each client may take it once and is then `:done`.
+
+<!-- tla:spec -->
+```elixir
+defmodule Tutorial.OneShotLock do
+  use TLA.Spec
+
+  constant :clients, default: set([:alice, :bob])
+
+  variable :free, type: [true, false]
+  variable :pc,   type: [^clients ~> [:idle, :waiting, :holding, :done]]
+
+  init do
+    free = true
+    pc   = for_each(^clients, fn _ -> :idle end)
+  end
+
+  action :request, params: [c: ^clients] do
+    require pc[c] == :idle
+    pc = update(pc, c, fn _ -> :waiting end)
+  end
+
+  action :acquire, params: [c: ^clients] do
+    require pc[c] == :waiting
+    require free
+    free = false
+    pc   = update(pc, c, fn _ -> :holding end)
+  end
+
+  action :finish, params: [c: ^clients] do
+    require pc[c] == :holding
+    free = true
+    pc   = update(pc, c, fn _ -> :done end)
+  end
+
+  invariant :mutual_exclusion do
+    Enum.count(^clients, fn c -> pc[c] == :holding end) <= 1
+  end
+end
+```
+
+Nothing about it is wrong. Every client gets the lock, uses it, and is done. And:
+
+```sh
+mix tla.check Tutorial.OneShotLock
+```
+
+<!-- tla:check module=Tutorial.OneShotLock expect=deadlock states=15 depth=7 -->
+```
+Tutorial.OneShotLock — DEADLOCK
+  15 distinct states, 20 transitions, depth 7, 10ms
+
+═══ DEADLOCK ═══════════════════════════════════════════════════════
+
+State 1 (Init):
+  free = true
+  pc   = %{alice: :idle, bob: :idle}
+
+── request(c: :alice) ────────────────────
+…
+── finish(c: :bob) ────────────────────
+
+State 7 [VIOLATION]:
+  free = true
+  pc   = %{alice: :done, bob: :done}   ← changed
+
+════════════════════════════════════════════════════════════════════
+```
+
+Read the last state: both clients are `done`, the lock is free, and **no action is enabled**
+— `request` needs `:idle`, `acquire` needs `:waiting`, `finish` needs `:holding`. The system has
+finished, and the checker cannot tell that from being wedged. Exit code 1.
+
+The counterexample is still worth reading even here, because the state it ends in is the answer:
+if that state is what success looks like, you have found a missing declaration rather than a bug.
+
+### Declaring the end state
+
+`terminal` names the states that are final on purpose:
+
+<!-- tla:spec -->
+```elixir
+defmodule Tutorial.OneShotLockDone do
+  use TLA.Spec
+
+  constant :clients, default: set([:alice, :bob])
+
+  variable :free, type: [true, false]
+  variable :pc,   type: [^clients ~> [:idle, :waiting, :holding, :done]]
+
+  init do
+    free = true
+    pc   = for_each(^clients, fn _ -> :idle end)
+  end
+
+  action :request, params: [c: ^clients] do
+    require pc[c] == :idle
+    pc = update(pc, c, fn _ -> :waiting end)
+  end
+
+  action :acquire, params: [c: ^clients] do
+    require pc[c] == :waiting
+    require free
+    free = false
+    pc   = update(pc, c, fn _ -> :holding end)
+  end
+
+  action :finish, params: [c: ^clients] do
+    require pc[c] == :holding
+    free = true
+    pc   = update(pc, c, fn _ -> :done end)
+  end
+
+  invariant :mutual_exclusion do
+    Enum.count(^clients, fn c -> pc[c] == :holding end) <= 1
+  end
+
+  terminal :all_done do
+    Enum.all?(^clients, fn c -> pc[c] == :done end)
+  end
+end
+```
+
+<!-- tla:check module=Tutorial.OneShotLockDone expect=ok states=15 depth=7 -->
+```
+Tutorial.OneShotLockDone — verified
+  15 distinct states, 20 transitions, depth 7, 1ms
+```
+
+**The same fifteen states, the same twenty transitions** — the search did not change at all. What
+changed is that one of those states is now declared to be an ending. That is the whole mechanism,
+and it is worth being clear about what it does *not* do
+([§5.3](../../spec/02-dsl-semantics.md#5-3-terminal-states-are-declared-not-inferred)):
+
+- **Invariants are still checked** in a terminal state. Declaring an ending does not exempt it.
+- **No action is disabled** by it. A `terminal` is a claim about a state, not a stop instruction.
+- **For liveness it stutters forever**, so a `p ~> q` whose `q` has not happened by then is
+  violated there — which is the correct verdict, because it never will happen.
+
+There is also `check_deadlock: false`, which turns the whole check off. Prefer the declaration: it
+says *which* states are meant to be final and leaves deadlock detection on for every other state,
+which is where you want it.
+
+### A `terminal` that is too generous
+
+The declaration is a claim, and like any claim it can be wider than you meant. Suppose
+`someone_done` instead of `all_done` — one client finishing admits the state:
+
+<!-- tla:spec -->
+```elixir
+defmodule Tutorial.OneShotLockLoose do
+  use TLA.Spec
+
+  constant :clients, default: set([:alice, :bob])
+
+  variable :free, type: [true, false]
+  variable :pc,   type: [^clients ~> [:idle, :waiting, :holding, :done]]
+
+  init do
+    free = true
+    pc   = for_each(^clients, fn _ -> :idle end)
+  end
+
+  action :request, params: [c: ^clients] do
+    require pc[c] == :idle
+    pc = update(pc, c, fn _ -> :waiting end)
+  end
+
+  action :acquire, params: [c: ^clients] do
+    require pc[c] == :waiting
+    require free
+    free = false
+    pc   = update(pc, c, fn _ -> :holding end)
+  end
+
+  action :finish, params: [c: ^clients] do
+    require pc[c] == :holding
+    free = true
+    pc   = update(pc, c, fn _ -> :done end)
+  end
+
+  invariant :mutual_exclusion do
+    Enum.count(^clients, fn c -> pc[c] == :holding end) <= 1
+  end
+
+  # `any?`, not `all?` — one client finishing admits the state.
+  terminal :someone_done do
+    Enum.any?(^clients, fn c -> pc[c] == :done end)
+  end
+end
+```
+
+It still verifies, and the coverage report is where it shows up:
+
+<!-- tla:check module=Tutorial.OneShotLockLoose expect=ok states=15 -->
+```
+Tutorial.OneShotLockLoose — verified
+  15 distinct states, 20 transitions, depth 7, 1ms
+…
+1 warning. Re-run with --strict-coverage to fail on these.
+--------------------------------------------------------------------
+warning: terminal :someone_done admitted a live state
+```
+
+**`terminal_but_live`**: a state the predicate called final still had an enabled action. It is not
+an error — a system may legitimately be allowed to stop early — but it almost always means the
+predicate is broader than the end state it was written for, and a broad `terminal` is how a real
+deadlock gets admitted as an ending. `--strict-coverage` makes it exit 3.
 
 ---
 
