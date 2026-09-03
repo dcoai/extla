@@ -1,17 +1,6 @@
 # The DSL in practice
 
-Part 1 of 6 of the ExTLA tutorial.
-
-[Getting started](../getting-started.md) took one spec from `mix deps.get` to a counterexample.
-This is the long path: the DSL as it is used, what the coverage report can tell you about a
-verdict, temporal properties and the difference fairness makes to them, symmetry and who is
-responsible for it, and then the two layers that connect a specification to running code.
-
-One system runs through the whole of it — a lock with three clients — and each page adds
-something to it, so the pages are meant to be read in order. Every code block in this tutorial is
-compiled and run by ExTLA's own test suite, and every verdict the prose quotes is asserted
-against the run; the specification in [`spec/`](../../spec/README.md) remains the authority, and
-these pages link to it rather than restating it.
+Part 2 of 7 of the ExTLA tutorial. Previous: [Introduction](00-introduction.md).
 
 Here is the lock, for three clients this time. Each client is idle, waiting, or holding; the lock
 is free or not; any waiting client may take a free lock.

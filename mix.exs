@@ -15,7 +15,8 @@ defmodule ExTLA.MixProject do
       description: "TLA+-inspired formal verification for Elixir/OTP systems",
       package: [
         licenses: ["MIT"],
-        files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec guides)
+        files:
+          ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec guides research/tla-plus-primer.md)
       ],
       # `guides/` ships and renders beside `spec/` (#94): the guides teach, the spec is the
       # authority they link to. Every code block in a guide is compiled and its claimed verdict
@@ -28,14 +29,19 @@ defmodule ExTLA.MixProject do
         extras:
           ["README.md", "CHANGELOG.md"] ++
             Path.wildcard("guides/*.md") ++
-            Path.wildcard("guides/tutorial/*.md") ++ Path.wildcard("spec/*.md"),
+            Path.wildcard("guides/tutorial/*.md") ++
+            Path.wildcard("spec/*.md") ++ ["research/tla-plus-primer.md"],
         # `Guides` matches only the TOP level of `guides/`, so the list can be in reading order
         # -- getting-started, then the tutorial -- rather than in the order the patterns have to
         # be tried in. A bare `^guides\//` here would swallow every tutorial page.
         groups_for_extras: [
           Guides: ~r/^guides\/[^\/]+\.md$/,
           Tutorial: ~r/^guides\/tutorial\//,
-          Specification: ~r/^spec\//
+          Specification: ~r/^spec\//,
+          # The primer ships so that the introduction's links into it resolve for a reader of the
+          # published docs. It is background on TLA+ itself rather than an ExTLA specification,
+          # which is why it has a group of its own and lives outside `spec/`.
+          Background: ~r/^research\//
         ]
       ]
     ]
