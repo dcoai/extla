@@ -39,6 +39,16 @@ release it merely follows.
 
 ### Added
 
+- `guides/tutorial/09-when-it-explodes.md` — what to do when a run does not come back, every lever
+  measured on one specification: reading a bounded run, shrinking constants (1,331 states to 64),
+  symmetry (1,331 to 286), `--workers` and when it costs more than it saves, `--safety-only`,
+  `state_constraint` with the two lessons people miss — a constraint that excludes little buys nothing, and one that restricts the
+  variables your property is about buys a green run that means nothing — and fingerprint width.
+- `guides/tutorial/10-in-your-project.md` — where specifications live, `assert_spec` with
+  `strict_coverage`, what to run in CI and why a slow gate belongs outside `mix test`,
+  `mix tla.visualize` with a real graph, `TLA.PropertyTest`, and `mix tla.replay --captured` for
+  after an incident (#104, #111).
+
 - `guides/tutorial/08-modelling.md` — deriving a specification from a system, on a job runner the
   tutorial has not already solved: which fields are state and which are derivable (with the
   measurement that a derivable field costs no states but buys an obligation, and a counterexample
