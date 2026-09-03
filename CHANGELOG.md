@@ -16,6 +16,11 @@ release it merely follows.
 
 ### Added
 
+- A gate over the **built** documentation: every internal link in `doc/*.html` must resolve, and a
+  `docs` CI job builds the docs so it actually runs. It found ExDoc's sidebar home link 404ing on
+  all 84 generated pages, and the README's `LICENSE` link 404ing on the front page — neither
+  visible to a gate over source markdown, because the generator writes those links itself
+  (#102, #103).
 - `guides/tutorial/01-mathematics.md` — states, behaviours and actions; the specification formula
   and stuttering; safety versus liveness and why their counterexamples have different shapes;
   ENABLED and the two fairness strengths; refinement as implication; how a model check verifies an
@@ -51,6 +56,12 @@ release it merely follows.
 - CI records the memory ceiling, host memory, load and core count in every job log (#86, #88).
 
 ### Fixed
+
+- The documentation's home link. `README.md` and `spec/README.md` both derived the id `readme`,
+  ExDoc disambiguated them to `readme-1`/`readme-2`, and `main: "readme"` went on naming a page no
+  build produced. The spec index is now `spec-readme` with a real sidebar title, leaving `readme`
+  to the page that should own it; `LICENSE` ships as an extra so the README's link to it resolves
+  (#102, #103).
 
 - The coverage task's drift and missing-file branches are tested; both had never executed (#84).
 - `README.md`, the phase-4 handoff and `.gitlab-ci.yml`'s header each asserted something no

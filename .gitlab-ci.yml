@@ -209,6 +209,25 @@ tla-coverage-drift:
   script:
     - mix tla.coverage --check
 
+# The only job that builds the documentation, and the only place the built-docs link gate can
+# run (#102, #103).
+#
+# It cannot live in `test`: `ex_doc` is `only: :dev` and every other job sets MIX_ENV=test, so
+# `mix docs` is not available to them. So the docs are built under dev and the gate — which reads
+# `doc/*.html` and needs no ex_doc of its own — is run under test, in this one job.
+#
+# Without it the gate would be a local courtesy: `TLA.DocLinks.check/1` returns `:not_built` when
+# nothing has been generated, and the test says so rather than passing. A check that never runs in
+# CI is the shape #75 and #90 were raised about, and #102 is what it costs — ExDoc's sidebar home
+# link 404'd on all 84 generated pages, invisible to every gate this project had, because a gate
+# over source markdown cannot see a link the generator writes itself.
+docs:
+  extends: .elixir
+  stage: verify
+  script:
+    - MIX_ENV=dev mix docs
+    - mix test test/docs
+
 tlc-corpus:
   stage: verify
   image: eclipse-temurin:21-jre
