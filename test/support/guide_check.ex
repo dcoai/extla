@@ -17,17 +17,28 @@ defmodule TLA.GuideCheck do
   this module enforces exactly that:
 
       <!-- tla:spec -->                                  compiles; later blocks may refer to it
-      <!-- tla:check module=M expect=ok -->              the run reports :ok
-      <!-- tla:check module=M expect=ok states=8 depth=4 -->   ...and found that many, that deep
-      <!-- tla:check module=M expect=violation length=6 -->    violated, shortest trace that long
-      <!-- tla:check module=M expect=violation invariant=at_most_two -->   by THAT invariant
-      <!-- tla:check module=M expect=deadlock -->        a reachable state nothing admits
-      <!-- tla:liveness module=M expect=violation -->    check_liveness: true, refuted
       <!-- tla:compile_error match="not declared" -->    MEANT to fail; the message must match
       <!-- tla:skip reason=... -->                       not executable, and the reason is on the page
 
-  `tla:check` and `tla:liveness` claim a run rather than code, so their comment may stand alone,
-  beside the command whose output the page quotes; the other kinds annotate the fence below them.
+      <!-- tla:check module=M expect=ok -->              the run reports :ok
+      <!-- tla:check module=M expect=ok states=8 depth=4 -->   ...and found that many, that deep
+      <!-- tla:check module=M expect=ok never_enabled=cancel -->  ...with THAT action never enabled
+      <!-- tla:check module=M expect=ok symmetry=clients states=7 -->  under the reduction
+      <!-- tla:check module=M expect=unsound_symmetry symmetry=clients -->  verify_symmetry refuses it
+      <!-- tla:check module=M expect=violation length=6 -->    violated, shortest trace that long
+      <!-- tla:check module=M expect=violation property=at_most_two -->   by THAT property
+      <!-- tla:check module=M expect=deadlock -->        a reachable state nothing admits
+      <!-- tla:liveness module=M expect=violation property=no_starvation -->   refuted, that one
+      <!-- tla:liveness module=M expect=ok -->           every temporal property holds
+
+      <!-- tla:simulate module=Server expect=ok -->      random traces find nothing (seeded)
+      <!-- tla:simulate module=Server expect=violation match="DIVERGED" -->   ...or find that
+      <!-- tla:run expect=ok -->                         the block evaluates without raising
+      <!-- tla:run expect=raise match="only the holder releases" -->   it raises, with that message
+
+  `tla:check`, `tla:liveness` and `tla:simulate` claim a run rather than code, so their comment
+  may stand alone, beside the command whose output the page quotes; the other kinds annotate the
+  fence below them.
 
   **An unannotated `elixir` block is an unchecked claim and is rejected.** Requiring an explicit
   `tla:skip reason=` makes a gap visible instead of silent — the principle `TLA_COVERAGE.md`
@@ -51,16 +62,21 @@ defmodule TLA.GuideCheck do
   asserting more than the design promises.
   """
 
-  alias TLA.{ModelChecker, Spec}
+  alias TLA.{ModelChecker, Simulation, Spec}
 
   # An optional `<!-- tla:... -->` on the line IMMEDIATELY before a ```elixir fence, then the
   # fence's trailing info string (which must be empty — see the moduledoc), then the code.
   @fence ~r/(?:^[ \t]*<!--[ \t]*(tla:[^\n]*?)[ \t]*-->[ \t]*\n)?^```elixir([^\n]*)\n(.*?)^```/ms
 
-  # A `tla:check` or `tla:liveness` with no fence under it. It claims a run, not code, so it
-  # stands beside the command whose output the page quotes rather than above an empty block —
-  # which `mix docs` would render as an empty grey box.
-  @bare_claim ~r/^[ \t]*<!--[ \t]*(tla:(?:check|liveness)[^\n]*?)[ \t]*-->[ \t]*$(?!\n```elixir)/m
+  # A run-claim with no fence under it. It claims a run, not code, so it stands beside the
+  # command whose output the page quotes rather than above an empty block — which `mix docs`
+  # would render as an empty grey box.
+  @bare_claim ~r/^[ \t]*<!--[ \t]*(tla:(?:check|liveness|simulate)[^\n]*?)[ \t]*-->[ \t]*$(?!\n```elixir)/m
+
+  # `mix tla.simulate`'s own defaults, and a fixed seed: a claim about a random walk is only a
+  # claim if the walk is the same one every time — and with these, it is the walk the page
+  # quotes from `mix tla.simulate Server --seed 1`.
+  @simulate_defaults %{traces: 100, max_steps: 25, seed: 1}
 
   @doc """
   Every `elixir` block and every bare run-claim in a guide, in order, as
@@ -98,14 +114,29 @@ defmodule TLA.GuideCheck do
   Check one guide. Returns a list of failure strings — empty when the guide tells the truth.
   """
   def check(path) do
-    path
-    |> blocks()
-    |> Enum.flat_map(fn {annotation, code, line} ->
-      case verify(annotation, code) do
-        :ok -> []
-        {:error, why} -> ["#{path}:#{line}: #{why}"]
-      end
-    end)
+    # A guide that shows the tool refusing something crashes a process on purpose — a
+    # `compile_error` block, a Layer 1 precondition, a leaky server under simulation — and the
+    # emulator's crash report for each would land in the test output as though something had gone
+    # wrong. Every crash here is read out of a DOWN reason and reported as a failure string if it
+    # was not the one claimed, so nothing is lost by not logging it; the report is noise.
+    level = Logger.level()
+    Logger.configure(level: :none)
+
+    failures =
+      path
+      |> blocks()
+      |> Enum.flat_map(fn {annotation, code, line} ->
+        case verify(annotation, code) do
+          :ok -> []
+          {:error, why} -> ["#{path}:#{line}: #{why}"]
+        end
+      end)
+
+    # The emulator delivers a crash report asynchronously; without the flush it would arrive
+    # after the level is restored and print anyway.
+    Logger.flush()
+    Logger.configure(level: level)
+    failures
   end
 
   # --- the annotations ------------------------------------------------------------------
@@ -121,8 +152,8 @@ defmodule TLA.GuideCheck do
     do:
       {:error,
        "an `elixir` block with no annotation is an unchecked claim. Give it one on the line " <>
-         "before the fence (<!-- tla:spec -->, tla:check, tla:liveness, tla:compile_error) " <>
-         "or <!-- tla:skip reason=... -->"}
+         "before the fence (<!-- tla:spec -->, tla:check, tla:liveness, tla:compile_error, " <>
+         "tla:simulate, tla:run) or <!-- tla:skip reason=... -->"}
 
   defp verify(%{kind: :skip}, _code), do: :ok
 
@@ -140,25 +171,108 @@ defmodule TLA.GuideCheck do
         {:error, "tla:compile_error compiled successfully, so the guide's error is not real"}
 
       {:raised, message} ->
-        expected = annotation[:match]
+        matched(message, annotation[:match], "the error")
+    end
+  end
 
-        if expected == nil or String.contains?(message, expected) do
-          :ok
-        else
-          {:error, "expected the error to contain #{inspect(expected)}, got:\n    #{message}"}
-        end
+  # A block that runs — a GenServer driven by hand, a replay — and either returns or raises.
+  # `expect=raise` is how a guide shows Layer 1 refusing a call: the server's exception arrives
+  # here as the caller's exit, and `describe/1` digs it out.
+  defp verify(%{kind: :run} = annotation, code) do
+    case {annotation[:expect], evaluate(code)} do
+      {"ok", {:ok, _value}} ->
+        :ok
+
+      {"ok", {:raised, message}} ->
+        {:error, "the guide claims this runs, but it raised: #{message}"}
+
+      {"raise", {:raised, message}} ->
+        matched(message, annotation[:match], "the exception")
+
+      {"raise", {:ok, value}} ->
+        {:error, "the guide claims this raises, but it returned #{inspect(value)}"}
+
+      {other, _} ->
+        {:error, "unknown expect=#{inspect(other)} for tla:run (ok or raise)"}
+    end
+  end
+
+  defp verify(%{kind: :simulate} = annotation, _code) do
+    module = Module.concat([annotation.module])
+
+    config =
+      Enum.reduce([traces: :traces, steps: :max_steps, seed: :seed], @simulate_defaults, fn
+        {key, config_key}, acc ->
+          case annotation[key] do
+            nil -> acc
+            value -> Map.put(acc, config_key, String.to_integer(value))
+          end
+      end)
+
+    case {annotation[:expect], simulate(module, config)} do
+      {_, {:raised, message}} ->
+        {:error, "the simulation raised: #{message}"}
+
+      {"ok", {:ok, %{status: :ok}}} ->
+        :ok
+
+      {"ok", {:ok, result}} ->
+        {:error,
+         "the guide claims the simulation finds nothing, but it reports " <>
+           "#{inspect(result.status)}" <> simulation_finding(result)}
+
+      {"violation", {:ok, %{status: :violation} = result}} ->
+        matched(result.violation.message, annotation[:match], "the violation")
+
+      {"violation", {:ok, result}} ->
+        {:error,
+         "the guide claims the simulation finds a violation, but it reports " <>
+           "#{inspect(result.status)}"}
+
+      {other, _} ->
+        {:error, "unknown expect=#{inspect(other)} for tla:simulate (ok or violation)"}
     end
   end
 
   defp verify(%{kind: kind} = annotation, _code) when kind in [:check, :liveness] do
     module = Module.concat([annotation.module])
-    config = if kind == :liveness, do: %{check_liveness: true}, else: %{}
 
-    case run(module, config) do
-      {:raised, message} -> {:error, "the run raised: #{message}"}
-      {:ok, result} -> with(:ok <- compare(result, annotation), do: census(result, annotation))
+    case {annotation[:expect], run(module, config(kind, annotation))} do
+      {"unsound_symmetry", {:raised, message}} ->
+        if message =~ "is not sound" do
+          :ok
+        else
+          {:error, "the run raised, but not because the symmetry was unsound: #{message}"}
+        end
+
+      {"unsound_symmetry", {:ok, result}} ->
+        {:error,
+         "the guide claims the symmetry declaration is unsound, but the run reported " <>
+           "#{inspect(result.status)} with and without the reduction"}
+
+      {_, {:raised, message}} ->
+        {:error, "the run raised: #{message}"}
+
+      {_, {:ok, result}} ->
+        with :ok <- compare(result, annotation), do: census(result, annotation)
     end
   end
+
+  defp config(kind, annotation) do
+    %{}
+    |> Map.merge(if kind == :liveness, do: %{check_liveness: true}, else: %{})
+    |> Map.merge(symmetry_config(annotation))
+  end
+
+  defp symmetry_config(%{symmetry: names} = annotation) do
+    %{
+      symmetry: names |> String.split(",", trim: true) |> Enum.map(&String.to_atom/1),
+      verify_symmetry:
+        annotation[:verify_symmetry] == "true" or annotation[:expect] == "unsound_symmetry"
+    }
+  end
+
+  defp symmetry_config(_annotation), do: %{}
 
   defp compare(result, %{expect: "ok"} = _annotation) do
     if result.status == :ok do
@@ -171,20 +285,23 @@ defmodule TLA.GuideCheck do
   end
 
   defp compare(result, %{expect: "violation"} = annotation) do
+    # `invariant=` is the name #95 gave this claim; `property=` is the one that also reads
+    # right for a refuted temporal property. Both mean "violated by THAT one".
+    claimed = annotation[:property] || annotation[:invariant]
+
     cond do
       result.status != :violation ->
         {:error, "the guide claims a violation, but the run reports #{inspect(result.status)}"}
 
-      annotation[:length] && result.violation.length != String.to_integer(annotation[:length]) ->
+      annotation[:length] && trace_length(result) != String.to_integer(annotation[:length]) ->
         {:error,
          "the guide claims a #{annotation[:length]}-step counterexample, " <>
-           "but the shortest is #{result.violation.length}"}
+           "but the shortest is #{inspect(trace_length(result))}"}
 
-      annotation[:invariant] &&
-          to_string(result.violation.property) != annotation[:invariant] ->
+      claimed && to_string(violated_property(result)) != claimed ->
         {:error,
-         "the guide claims #{annotation[:invariant]} is violated, " <>
-           "but the violated property is #{inspect(result.violation.property)}"}
+         "the guide claims #{claimed} is violated, " <>
+           "but the violated property is #{inspect(violated_property(result))}"}
 
       true ->
         :ok
@@ -192,7 +309,7 @@ defmodule TLA.GuideCheck do
   end
 
   # A deadlock is worth teaching in its own right, and it does not fit `expect=violation
-  # invariant=`: it arrives as a trace whose `property` is nil and whose `type` is :deadlock.
+  # property=`: it arrives as a trace whose `property` is nil and whose `type` is :deadlock.
   defp compare(result, %{expect: "deadlock"}) do
     case result.violation do
       %{type: :deadlock} ->
@@ -208,9 +325,9 @@ defmodule TLA.GuideCheck do
   defp compare(_result, annotation),
     do: {:error, "unknown expect=#{inspect(annotation[:expect])}"}
 
-  # The numbers a guide quotes from the run's summary line. A reader will believe "8 distinct
-  # states, depth 4" exactly as much as the verdict beside it, so a block may claim them and
-  # then they are held to.
+  # The numbers a guide quotes from the run's summary line and coverage table. A reader will
+  # believe "8 distinct states, depth 4" exactly as much as the verdict beside it, so a block
+  # may claim them and then they are held to.
   defp census(result, annotation) do
     cond do
       annotation[:states] && result.distinct_states != String.to_integer(annotation[:states]) ->
@@ -222,18 +339,54 @@ defmodule TLA.GuideCheck do
         {:error,
          "the guide claims depth #{annotation[:depth]}, but the run reached #{result.diameter}"}
 
+      annotation[:never_enabled] && never_enabled(annotation) != result.coverage.never_enabled ->
+        {:error,
+         "the guide claims #{inspect(never_enabled(annotation))} were never enabled, " <>
+           "but the run reports #{inspect(result.coverage.never_enabled)}"}
+
       true ->
         :ok
     end
   end
 
-  defp violated_by(%{violation: %{property: property}}) when property != nil,
-    do: " (#{property} is violated)"
+  defp never_enabled(%{never_enabled: names}),
+    do: names |> String.split(",", trim: true) |> Enum.map(&String.to_atom/1) |> Enum.sort()
+
+  # A safety counterexample is a trace; a liveness one is a lasso, and the property it refutes
+  # is on the prefix.
+  defp violated_property(%{violation: %{prefix: %{property: property}}}), do: property
+  defp violated_property(%{violation: %{property: property}}), do: property
+  defp violated_property(_result), do: nil
+
+  defp trace_length(%{violation: %{prefix: _}}), do: :"a lasso, not a trace"
+  defp trace_length(%{violation: %{length: length}}), do: length
 
   defp violated_by(%{violation: %{type: :deadlock}}),
     do: " (a state has no successors and no `terminal` admits it)"
 
+  defp violated_by(%{violation: _} = result) do
+    case violated_property(result) do
+      nil -> ""
+      property -> " (#{property} is violated)"
+    end
+  end
+
   defp violated_by(_), do: ""
+
+  defp simulation_finding(%{violation: %{message: message}}),
+    do: ":\n    " <> (message |> String.split("\n") |> hd())
+
+  defp simulation_finding(_result), do: ""
+
+  defp matched(message, nil, _what), do: if(message, do: :ok, else: {:error, "no message"})
+
+  defp matched(message, expected, what) do
+    if String.contains?(message, expected) do
+      :ok
+    else
+      {:error, "expected #{what} to contain #{inspect(expected)}, got:\n    #{message}"}
+    end
+  end
 
   # --- running things that may blow up --------------------------------------------------
 
@@ -241,6 +394,11 @@ defmodule TLA.GuideCheck do
   # out of the DOWN reason rather than caught, so nothing is swallowed and a crash that was not
   # expected still surfaces as one.
   defp compile(code), do: isolated(fn -> Code.compile_string(code, "guide") end)
+
+  defp evaluate(code),
+    do: isolated(fn -> code |> Code.eval_string([], file: "guide") |> elem(0) end)
+
+  defp simulate(module, config), do: isolated(fn -> Simulation.run(module, config) end)
 
   # Constants come from `default:` the way a reader's `mix tla.check` takes them, through the same
   # `Spec.Compiled.resolve_constants/1` the task calls. A guide spec whose constant has no default
@@ -283,10 +441,23 @@ defmodule TLA.GuideCheck do
     end
   end
 
-  defp describe({exception, _stacktrace}) when is_exception(exception),
-    do: Exception.message(exception)
+  # The exception may be the reason itself, or nested inside an exit — a `GenServer.call` whose
+  # server raised exits the caller with `{{exception, stacktrace}, {GenServer, :call, args}}`.
+  # An Erlang error (`{:function_clause, stacktrace}`) is not a struct; `format_exit/1` renders
+  # those the way a crash report would.
+  defp describe(reason) do
+    case find_exception(reason) do
+      nil -> Exception.format_exit(reason)
+      exception -> Exception.message(exception)
+    end
+  end
 
-  defp describe(other), do: inspect(other)
+  defp find_exception(term) when is_exception(term), do: term
+
+  defp find_exception(term) when is_tuple(term),
+    do: term |> Tuple.to_list() |> Enum.find_value(&find_exception/1)
+
+  defp find_exception(_term), do: nil
 
   # --- parsing --------------------------------------------------------------------------
 
