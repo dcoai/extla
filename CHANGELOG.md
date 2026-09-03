@@ -14,6 +14,14 @@ does not restate it.
 `mix.exs` reads `0.2.0-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Changed
+
+- The tutorial's pages carry subheadings throughout, so every one has sidebar sub-entries and can
+  be scanned; `05-symmetry.md` and `06-layer1.md` had none. `assert_spec` moves off the symmetry
+  page — it is how a specification stays true as code changes, which nobody looks for under
+  symmetry reduction — and the brittle "Part N of 8" headers are gone: a page states its
+  predecessor, so adding one no longer renumbers the rest (#107).
+
 ### Added
 
 - A gate over the **built** documentation: every internal link in `doc/*.html` must resolve, and a
