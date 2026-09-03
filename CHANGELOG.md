@@ -17,10 +17,13 @@ release it merely follows.
 ### Added
 
 - `guides/getting-started.md` — installation to a deliberate invariant violation, read action
-  by action. Every code block in a guide is compiled from the page itself and its claimed
-  verdict, invariant, counterexample length and state count are asserted by the test suite,
-  so a guide that drifts from the tool fails the build (#95, #96). Ships in the package and
-  renders under `mix docs` in a Guides group.
+  by action — and `guides/tutorial.md`: the DSL in practice, the coverage report, weak against
+  strong fairness on one spec, symmetry and `--verify-symmetry`, Layer 1 on a GenServer, and
+  Layer 3 conformance through simulation and replay. Every code block in a guide is compiled
+  from the page itself and its claimed verdict — status, property, counterexample length,
+  state count, never-enabled actions, an unsound symmetry, a simulation finding, a raise — is
+  asserted by the test suite, so a guide that drifts from the tool fails the build (#95, #96,
+  #97). Both ship in the package and render under `mix docs` in a Guides group.
 - `TLA.Spec.Deps` — each action's read and write variable sets, and each invariant's read set,
   derived from the block AST at compile time and carried on the compiled spec. Widening is the
   default: a read set is `:all` unless every node is recognised (#91).
@@ -56,10 +59,13 @@ compatibility promise.
 ### Added
 
 - `guides/getting-started.md` — installation to a deliberate invariant violation, read action
-  by action. Every code block in a guide is compiled from the page itself and its claimed
-  verdict, invariant, counterexample length and state count are asserted by the test suite,
-  so a guide that drifts from the tool fails the build (#95, #96). Ships in the package and
-  renders under `mix docs` in a Guides group.
+  by action — and `guides/tutorial.md`: the DSL in practice, the coverage report, weak against
+  strong fairness on one spec, symmetry and `--verify-symmetry`, Layer 1 on a GenServer, and
+  Layer 3 conformance through simulation and replay. Every code block in a guide is compiled
+  from the page itself and its claimed verdict — status, property, counterexample length,
+  state count, never-enabled actions, an unsound symmetry, a simulation finding, a raise — is
+  asserted by the test suite, so a guide that drifts from the tool fails the build (#95, #96,
+  #97). Both ship in the package and render under `mix docs` in a Guides group.
 - **Phase 1 — the DSL and safety checking.** Specifications written as Elixir
   (`TLA.Spec`), exhaustive breadth-first model checking (`TLA.ModelChecker`), the implicit
   `type_ok` invariant, shortest-counterexample traces, and `TLA.Coverage` reporting what a
