@@ -16,6 +16,10 @@ release it merely follows.
 
 ### Added
 
+- `guides/tutorial/00-introduction.md` — the history and purpose of formal verification, TLA and
+  TLA+ and where they come from, a survey of the other tool families and of the Elixir/Erlang work,
+  and where ExTLA sits in both. It summarises and links `spec/00-prior-art.md` rather than copying
+  it, and `research/tla-plus-primer.md` now ships and renders so its citations resolve (#100).
 - The tutorial is a multi-page guide under `guides/tutorial/`, read in order, and guides are
   checked in sorted path order — a page may use a module an earlier page compiled, and the
   numbering is that dependency (#99).

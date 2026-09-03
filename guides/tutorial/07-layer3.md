@@ -1,6 +1,6 @@
 # Layer 3 — does the implementation conform?
 
-Part 6 of 6 of the ExTLA tutorial. Previous: [Layer 1 — invariants on a running GenServer](06-layer1.md).
+Part 7 of 7 of the ExTLA tutorial. Previous: [Layer 1 — invariants on a running GenServer](06-layer1.md).
 
 A specification describes abstract states and the steps between them. An implementation has
 concrete state — a map with `holder` and `waiting` in it — and messages. Conformance means that

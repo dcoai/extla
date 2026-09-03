@@ -308,7 +308,8 @@ code, and it is the question the tool exists to make you answer.
 
 ## Where to next
 
-- [The tutorial](tutorial/02-dsl.md) — the same lock, taken further: the coverage report,
+- [The tutorial](tutorial/00-introduction.md) — where this comes from and what it is for,
+  then the same lock taken further: the coverage report,
   liveness and what fairness does to it, symmetry, and then checking a running GenServer against
   the spec.
 - `mix help tla.check` — the flags, and the exit codes.

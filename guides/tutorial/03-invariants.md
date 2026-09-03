@@ -1,6 +1,6 @@
 # Invariants
 
-Part 2 of 6 of the ExTLA tutorial. Previous: [The DSL in practice](02-dsl.md).
+Part 3 of 7 of the ExTLA tutorial. Previous: [The DSL in practice](02-dsl.md).
 
 An `invariant` is a boolean over the variables that must hold in every reachable state. The
 checker evaluates each one in each state it discovers, and stops at the first state where one is
