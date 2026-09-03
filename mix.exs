@@ -23,8 +23,20 @@ defmodule ExTLA.MixProject do
       # build rather than teaching an API that does not exist.
       docs: [
         main: "readme",
-        extras: ["README.md", "CHANGELOG.md" | Path.wildcard("{guides,spec}/*.md")],
-        groups_for_extras: [Guides: ~r/^guides\//, Specification: ~r/^spec\//]
+        # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
+        # and the order here is the order the sidebar lists them in.
+        extras:
+          ["README.md", "CHANGELOG.md"] ++
+            Path.wildcard("guides/*.md") ++
+            Path.wildcard("guides/tutorial/*.md") ++ Path.wildcard("spec/*.md"),
+        # `Guides` matches only the TOP level of `guides/`, so the list can be in reading order
+        # -- getting-started, then the tutorial -- rather than in the order the patterns have to
+        # be tried in. A bare `^guides\//` here would swallow every tutorial page.
+        groups_for_extras: [
+          Guides: ~r/^guides\/[^\/]+\.md$/,
+          Tutorial: ~r/^guides\/tutorial\//,
+          Specification: ~r/^spec\//
+        ]
       ]
     ]
   end

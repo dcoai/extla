@@ -255,10 +255,11 @@ defmodule TLA.GuideCheckTest do
   end
 
   describe "the real guides/" do
-    # This is the test that will matter once #96 and #97 land. It is written now so the harness
-    # is wired before the prose exists -- nobody retrofits a gate to a guide that already passes.
+    # Written before any guide existed (#95), so the gate was wired before the prose -- nobody
+    # retrofits a gate to a guide that already passes. It now covers getting-started (#96) and
+    # every page of the tutorial (#97, #99).
     test "every guide in guides/ tells the truth" do
-      guides = Path.wildcard("guides/*.md")
+      guides = GuideCheck.guides()
 
       if guides == [] do
         # Stated rather than skipped. A silently vacuous test is the "gate that cannot fail"
@@ -272,6 +273,55 @@ defmodule TLA.GuideCheckTest do
         assert failures == [],
                "guides make claims the code does not support:\n\n" <> Enum.join(failures, "\n")
       end
+    end
+  end
+
+  describe "pages are checked in sorted path order" do
+    # The tutorial's Layer 3 page checks a server against the lock its DSL page declares, so the
+    # order pages are checked in is a dependency, and `guides/0` fixes it by sorting paths.
+
+    # Named deliberately rather than by unique integer: the point is the ORDER the names sort in.
+    defp page(tmp, name, body) do
+      path = Path.join(tmp, name)
+      File.write!(path, body)
+      path
+    end
+
+    test "a page may use a module an earlier page compiled", %{tmp_dir: tmp} do
+      m = "GuideOrder.Forward#{System.unique_integer([:positive])}"
+
+      pages = [
+        page(tmp, "02-declares.md", working_spec(m)),
+        page(tmp, "03-checks.md", claim("tla:check module=#{m} expect=ok"))
+      ]
+
+      # Sorted, the declaring page comes first and the module exists by the time the claim runs.
+      assert Enum.flat_map(Enum.sort(pages), &GuideCheck.check/1) == []
+    end
+
+    test "and is checked before it is defined if the walk does not sort", %{tmp_dir: tmp} do
+      # A DIFFERENT module from the test above: once compiled, a module stays in the VM, so
+      # reusing one would make this pass for the wrong reason.
+      m = "GuideOrder.Reverse#{System.unique_integer([:positive])}"
+
+      pages = [
+        page(tmp, "02-declares.md", working_spec(m)),
+        page(tmp, "03-checks.md", claim("tla:check module=#{m} expect=ok"))
+      ]
+
+      assert [failure] = Enum.flat_map(Enum.sort(pages, :desc), &GuideCheck.check/1)
+      assert failure =~ "the run raised"
+    end
+
+    test "guides/0 returns the tree sorted, so the tutorial is in reading order" do
+      guides = GuideCheck.guides()
+
+      assert guides == Enum.sort(guides)
+      assert "guides/getting-started.md" in guides
+      assert "guides/tutorial/02-dsl.md" in guides
+
+      tutorial = Enum.filter(guides, &String.starts_with?(&1, "guides/tutorial/"))
+      assert length(tutorial) >= 6
     end
   end
 
