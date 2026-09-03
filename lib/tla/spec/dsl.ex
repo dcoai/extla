@@ -12,7 +12,7 @@ defmodule TLA.Spec.DSL do
   checker in a state where a diagnostic would have to be a runtime surprise.
   """
 
-  alias TLA.Spec.{Block, CompileError, Params, Rewriter, Temporal}
+  alias TLA.Spec.{Block, CompileError, Deps, Params, Rewriter, Temporal}
 
   @reserved [:state, :old, :new]
 
@@ -148,10 +148,14 @@ defmodule TLA.Spec.DSL do
     guard_fun = :"__tla_action_#{name}_guard__"
     transition_fun = :"__tla_action_#{name}_transition__"
 
+    deps = Deps.block(classified, declared_names(caller, :tla_variables), caller)
+
     put(caller, :tla_actions, %{
       name: name,
       guard_fun: guard_fun,
       transition_fun: transition_fun,
+      reads: deps.reads,
+      writes: deps.writes,
       param_funs:
         Enum.map(generators, fn {param, _} ->
           {param, :"__tla_action_#{name}_param_#{param}__"}
@@ -407,6 +411,9 @@ defmodule TLA.Spec.DSL do
     near_miss = if kind == "invariant", do: Block.near_miss(desugared)
     near_miss_fun = if near_miss, do: :"__tla_invariant_#{name}_near_miss__"
 
+    reads =
+      Deps.expression(desugared, declared_names(caller, :tla_variables), MapSet.new(), caller)
+
     entry =
       case kind do
         "invariant" ->
@@ -415,11 +422,12 @@ defmodule TLA.Spec.DSL do
             description: description || "",
             fun: fun,
             near_miss_fun: near_miss_fun,
+            reads: reads,
             line: caller.line
           }
 
         "terminal" ->
-          %{name: name, fun: fun, line: caller.line}
+          %{name: name, fun: fun, reads: reads, line: caller.line}
       end
 
     put(caller, attribute, entry)

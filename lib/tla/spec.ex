@@ -157,14 +157,20 @@ defmodule TLA.Spec do
           params: unquote(params),
           param_sources: unquote(Macro.escape(action.param_sources)),
           guard: &(__MODULE__.unquote(action.guard_fun) / 3),
-          transition: &(__MODULE__.unquote(action.transition_fun) / 3)
+          transition: &(__MODULE__.unquote(action.transition_fun) / 3),
+          # #87/#91: which variables this action reads and writes, derived from the body's AST
+          # while it still existed. Carried but not yet consulted -- the cone of influence is
+          # #92 and projected fingerprinting is #93.
+          reads: unquote(Macro.escape(action.reads)),
+          writes: unquote(Macro.escape(action.writes))
         }
       end
     end
   end
 
   defp compiled_invariants(invariants) do
-    for %{name: name, description: description, fun: fun, near_miss_fun: near_miss} <- invariants do
+    for %{name: name, description: description, fun: fun, near_miss_fun: near_miss} = inv <-
+          invariants do
       near_miss =
         if near_miss, do: quote(do: &(__MODULE__.unquote(near_miss) / 2)), else: nil
 
@@ -173,7 +179,11 @@ defmodule TLA.Spec do
           name: unquote(name),
           description: unquote(description),
           predicate: &(__MODULE__.unquote(fun) / 2),
-          near_miss: unquote(near_miss)
+          near_miss: unquote(near_miss),
+          # #87/#91. `type_ok` is the exception that matters: it reads every variable by
+          # construction, so a cone built naively from invariants is always the whole state.
+          # #92 handles it separately rather than letting it collapse every projection.
+          reads: unquote(Macro.escape(inv.reads))
         }
       end
     end
