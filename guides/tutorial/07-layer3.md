@@ -225,30 +225,8 @@ That is the whole pipeline
 ([§Full verification pipeline](../../spec/05-layer3-conformance.md#full-verification-pipeline)): model
 check the spec, so design bugs are found before the code exists; simulate the implementation against
 it, so the code is held to the design; replay any counterexample against the code, so a finding at
-either level is a fact about both. `TLA.PropertyTest` hands the spec's own generators to a
-`check all` of your own, for the property tests that keep it that way in CI.
-
-## Checking a specification from your test suite
-
-A specification is only worth having while it stays true, which means running it where the rest of
-your tests run. `assert_spec` takes the same configuration `mix tla.check` does, fails the test on
-a violation, and — deliberately — fails it on a run that hit a state limit, because an unfinished
-run is not a pass:
-
-<!-- tla:run expect=ok -->
-```elixir
-import TLA.Spec.Test
-
-assert_spec Tutorial.StrongLock, %{
-  constants: %{clients: MapSet.new([:alice, :bob, :carol])},
-  symmetry: [:clients],
-  verify_symmetry: true
-}
-```
-
-That is the whole of the tutorial's mechanics. What remains is the judgement: deciding what to
-put in a model in the first place, which the [next page](08-modelling.md) derives on a system this
-tutorial has not already solved.
+either level is a fact about both. Running all of that from your own suite, and keeping it running,
+is [Putting a specification in your project](10-in-your-project.md).
 
 ## Where to next
 
