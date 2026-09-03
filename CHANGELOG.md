@@ -87,6 +87,20 @@ release it merely follows.
 
 ### Fixed
 
+- An `action_property` counterexample pointed at the wrong step. The trace was built from the
+  post-state's graph id, so when that state had already been discovered by a shorter route the
+  parent pointers described *that* route: the offending step was absent and the step the trace
+  marked could satisfy the property it was offered as a refutation of. It is now built from the
+  pre-state's path with the offending step appended. Invariant and deadlock traces are unchanged
+  and correctly so — those are claims about a state, where any path reaching it is a fair
+  counterexample (#112, #113).
+- `TLA.Trace.validate/3` now requires a **safety** trace to refute the property it names — an
+  invariant false in the final state, an action property false over the final step. It previously
+  checked only that a trace was a legal path from an initial state, which a fabricated
+  counterexample passes; that is how the defect above went unnoticed. The docstring's
+  "deliberately does not check" section is corrected to say the exclusion is liveness-only, where
+  `TLA.TemporalCheck` is an independent implementation (#112, #113).
+
 - The near-miss column's documentation. `getting-started.md` called it opt-in and said an
   invariant "declares what a near miss would be"; it is **derived** from the invariant's shape —
   a top-level `or` yields a probe and anything else reports `nil`, meaning *not measured*. The

@@ -444,7 +444,7 @@ defmodule TLA.ModelChecker do
              run.config.action_properties
            ) do
         {:violation, name} ->
-          {:halt, {:violation, run, action_property_trace(run, next_id, name)}}
+          {:halt, {:violation, run, action_property_trace(run, id, action.name, params, name)}}
 
         :ok ->
           distinct = if status == :new, do: distinct + 1, else: distinct
@@ -668,8 +668,18 @@ defmodule TLA.ModelChecker do
   defp describe_violation(_spec, _constants, name, _state),
     do: "invariant #{inspect(name)} does not hold in this state"
 
-  defp action_property_trace(run, id, name) do
-    Trace.generate(run.graph, id,
+  # Built from the PRE-state's path with the offending step appended, not from the
+  # post-state's id (#112). `Trace.generate/3` walks parent pointers back from one state,
+  # which is the right shape for an invariant or a deadlock — those are claims about a
+  # STATE, and any path reaching it is a fair counterexample. An action property is a claim
+  # about a STEP, and the step is exactly what that walk loses: when the post-state was
+  # already discovered by a shorter route, the pointers describe THAT route, the offending
+  # step is absent, and the step the trace marks can satisfy the property. `pre_id` is the
+  # node currently being expanded, so its pointers describe the route actually taken.
+  defp action_property_trace(run, pre_id, action, params, name) do
+    {init_index, steps} = StateGraph.path_to(run.graph, pre_id)
+
+    Trace.replay(run.graph, init_index, steps ++ [{action, params}],
       type: :safety,
       property: name,
       message: "action property #{inspect(name)} does not hold over the last step"
