@@ -55,6 +55,16 @@ defmodule TLA.GuideCheck do
   the harness sees the claim. A fence with anything after `elixir` is rejected here for the same
   reason, so the mistake cannot be made again quietly.
 
+  ## Pages are checked in sorted path order, and that order is a dependency
+
+  `guides/` is a tree: the tutorial is `guides/tutorial/NN-name.md`, read in order. A page may
+  refer to a module an **earlier** page compiled — the tutorial's Layer 3 page checks a server
+  against the lock declared on its DSL page — so `guides/0` walks `guides/**/*.md` sorted by path,
+  which for `NN-` names is reading order. The numbering IS the dependency.
+
+  The alternative was to re-show every module on every page that mentions it. That is more copies
+  of one spec, which is the defect this module exists to prevent (#94).
+
   ## What is deliberately NOT asserted
 
   Only what a block claims. A block declaring `expect=ok` and no `states=` is not failed for its
@@ -62,6 +72,7 @@ defmodule TLA.GuideCheck do
   asserting more than the design promises.
   """
 
+  alias TLA.GuideCheck.Links
   alias TLA.{ModelChecker, Simulation, Spec}
 
   # An optional `<!-- tla:... -->` on the line IMMEDIATELY before a ```elixir fence, then the
@@ -111,6 +122,12 @@ defmodule TLA.GuideCheck do
   defp part(source, {start, len}), do: binary_part(source, start, len)
 
   @doc """
+  Every guide, in the order they must be checked in: sorted by path, which for the tutorial's
+  `NN-` names is reading order.
+  """
+  def guides, do: Enum.sort(Path.wildcard("guides/**/*.md"))
+
+  @doc """
   Check one guide. Returns a list of failure strings — empty when the guide tells the truth.
   """
   def check(path) do
@@ -122,15 +139,15 @@ defmodule TLA.GuideCheck do
     level = Logger.level()
     Logger.configure(level: :none)
 
-    failures =
-      path
-      |> blocks()
-      |> Enum.flat_map(fn {annotation, code, line} ->
+    claims =
+      Enum.flat_map(blocks(path), fn {annotation, code, line} ->
         case verify(annotation, code) do
           :ok -> []
           {:error, why} -> ["#{path}:#{line}: #{why}"]
         end
       end)
+
+    failures = claims ++ Links.check(path)
 
     # The emulator delivers a crash report asynchronously; without the flush it would arrive
     # after the level is restored and print anyway.

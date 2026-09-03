@@ -308,8 +308,9 @@ code, and it is the question the tool exists to make you answer.
 
 ## Where to next
 
-- [The tutorial](tutorial.md) — the same lock, taken further: the coverage report, liveness and
-  what fairness does to it, symmetry, and then checking a running GenServer against the spec.
+- [The tutorial](tutorial/02-dsl.md) — the same lock, taken further: the coverage report,
+  liveness and what fairness does to it, symmetry, and then checking a running GenServer against
+  the spec.
 - `mix help tla.check` — the flags, and the exit codes.
 - [`02-dsl-semantics.md`](../spec/02-dsl-semantics.md) — the DSL, normatively: the three name
   classes, what an action body means, where nondeterminism comes from, types.

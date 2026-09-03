@@ -16,8 +16,14 @@ release it merely follows.
 
 ### Added
 
+- The tutorial is a multi-page guide under `guides/tutorial/`, read in order, and guides are
+  checked in sorted path order — a page may use a module an earlier page compiled, and the
+  numbering is that dependency (#99).
+- Every relative link in a guide is checked: the file exists and the anchor is a heading it has,
+  using ExDoc's own slug. The check #96 and #97 ran by hand, made a test — it caught eleven links
+  the split had broken before anyone read the page (#99).
 - `guides/getting-started.md` — installation to a deliberate invariant violation, read action
-  by action — and `guides/tutorial.md`: the DSL in practice, the coverage report, weak against
+  by action — and the tutorial: the DSL in practice, the coverage report, weak against
   strong fairness on one spec, symmetry and `--verify-symmetry`, Layer 1 on a GenServer, and
   Layer 3 conformance through simulation and replay. Every code block in a guide is compiled
   from the page itself and its claimed verdict — status, property, counterexample length,
@@ -58,14 +64,6 @@ compatibility promise.
 
 ### Added
 
-- `guides/getting-started.md` — installation to a deliberate invariant violation, read action
-  by action — and `guides/tutorial.md`: the DSL in practice, the coverage report, weak against
-  strong fairness on one spec, symmetry and `--verify-symmetry`, Layer 1 on a GenServer, and
-  Layer 3 conformance through simulation and replay. Every code block in a guide is compiled
-  from the page itself and its claimed verdict — status, property, counterexample length,
-  state count, never-enabled actions, an unsound symmetry, a simulation finding, a raise — is
-  asserted by the test suite, so a guide that drifts from the tool fails the build (#95, #96,
-  #97). Both ship in the package and render under `mix docs` in a Guides group.
 - **Phase 1 — the DSL and safety checking.** Specifications written as Elixir
   (`TLA.Spec`), exhaustive breadth-first model checking (`TLA.ModelChecker`), the implicit
   `type_ok` invariant, shortest-counterexample traces, and `TLA.Coverage` reporting what a
