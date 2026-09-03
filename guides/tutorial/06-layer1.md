@@ -1,6 +1,6 @@
 # Layer 1 — invariants on a running GenServer
 
-Part 6 of 7 of the ExTLA tutorial. Previous: [Symmetry, and who is responsible for it](05-symmetry.md).
+Part 7 of 8 of the ExTLA tutorial. Previous: [Symmetry, and who is responsible for it](05-symmetry.md).
 
 Everything so far has been about the specification. The implementation has not existed. Layer 1
 is the smallest step towards it: state a property of a GenServer's state *in the GenServer*, and

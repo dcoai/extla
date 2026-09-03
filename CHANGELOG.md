@@ -16,6 +16,14 @@ release it merely follows.
 
 ### Added
 
+- `guides/tutorial/01-mathematics.md` — states, behaviours and actions; the specification formula
+  and stuttering; safety versus liveness and why their counterexamples have different shapes;
+  ENABLED and the two fairness strengths; refinement as implication; how a model check verifies an
+  algorithm, and what a green run, a counterexample and a bounded run each claim — with the
+  bounded run demonstrated rather than described. Plus what the method is and is not useful for
+  (#101).
+- The guide harness takes `max_states=` and `expect=incomplete`, so a page teaching that a bounded
+  run is not a verdict must produce one (#101).
 - `guides/tutorial/00-introduction.md` — the history and purpose of formal verification, TLA and
   TLA+ and where they come from, a survey of the other tool families and of the Elixir/Erlang work,
   and where ExTLA sits in both. It summarises and links `spec/00-prior-art.md` rather than copying

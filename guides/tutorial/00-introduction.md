@@ -1,6 +1,6 @@
 # Introduction: what this is, and where it comes from
 
-Part 1 of 7 of the ExTLA tutorial. It assumes you write Elixir and have never written a formal
+Part 1 of 8 of the ExTLA tutorial. It assumes you write Elixir and have never written a formal
 specification.
 
 [Getting started](../getting-started.md) is the shorter path — install, one spec, one
@@ -212,4 +212,4 @@ series, and the AWS paper.
 
 ---
 
-Next: [The DSL in practice](02-dsl.md).
+Next: [The mathematics of TLA](01-mathematics.md).

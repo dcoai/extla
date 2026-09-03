@@ -25,6 +25,7 @@ defmodule TLA.GuideCheck do
       <!-- tla:check module=M expect=ok never_enabled=cancel -->  ...with THAT action never enabled
       <!-- tla:check module=M expect=ok symmetry=clients states=7 -->  under the reduction
       <!-- tla:check module=M expect=unsound_symmetry symmetry=clients -->  verify_symmetry refuses it
+      <!-- tla:check module=M expect=incomplete max_states=100 -->   the run was BOUNDED, not verified
       <!-- tla:check module=M expect=violation length=6 -->    violated, shortest trace that long
       <!-- tla:check module=M expect=violation property=at_most_two -->   by THAT property
       <!-- tla:check module=M expect=deadlock -->        a reachable state nothing admits
@@ -279,7 +280,14 @@ defmodule TLA.GuideCheck do
     %{}
     |> Map.merge(if kind == :liveness, do: %{check_liveness: true}, else: %{})
     |> Map.merge(symmetry_config(annotation))
+    |> Map.merge(max_states_config(annotation))
   end
+
+  # A guide teaching what a BOUND does to a verdict has to be able to impose one.
+  defp max_states_config(%{max_states: limit}),
+    do: %{max_states: String.to_integer(limit)}
+
+  defp max_states_config(_annotation), do: %{}
 
   defp symmetry_config(%{symmetry: names} = annotation) do
     %{
@@ -322,6 +330,20 @@ defmodule TLA.GuideCheck do
 
       true ->
         :ok
+    end
+  end
+
+  # "The run ran out of budget" is a THIRD outcome beside verified and violated, and the guide
+  # that explains it must be able to claim it — otherwise the page teaching that a green run is a
+  # proof about the model would itself be making an unchecked claim.
+  defp compare(result, %{expect: "incomplete"}) do
+    if result.status in [:max_states_reached, :constrained] do
+      :ok
+    else
+      {:error,
+       "the guide claims the run was bounded, but it reports #{inspect(result.status)}" <>
+         violated_by(result) <>
+         " — an `expect=incomplete` claim needs `max_states=` small enough to bite"}
     end
   end
 
