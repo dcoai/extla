@@ -151,8 +151,17 @@ with no cancellation in it — every invariant holds, and none of them was teste
 you wrote the action for. `--strict-coverage` turns that warning into exit code 3.
 
 For each invariant, **`evaluated`** is the number of states it was checked in, and it should equal
-the number of distinct states. The **`near-miss`** column is `-` here because neither invariant
-declares what a near miss would be; it is opt-in, and not needed today.
+the number of distinct states. The **`near-miss`** column counts the states in which an invariant
+held *only just* — and whether it can be counted at all is **derived from the invariant's shape**,
+not declared anywhere. An invariant whose final expression is a top-level `or` gets a probe: the
+near misses are the states where the left side was false, so the right side had to carry it. Both
+invariants here are plain comparisons, so there is no non-trivial branch to count and the column
+reads `-`, which means *not measured* rather than *measured as zero*.
+
+The distinction matters, because zero is a finding and "not measured" is not: an invariant that
+**is** measured and reports `0` was never once pressed against, which makes it indistinguishable
+from `true`. Write a property as an implication — `nobody is holding, or the lock is taken` — and
+the column starts telling you whether it was ever load-bearing.
 
 ## 4. Break it on purpose
 
