@@ -209,26 +209,54 @@ Note what an invariant could *not* have caught. Every state this spec reaches is
 none, a log of some length, and `holder_is_logged` holds throughout. There is no bad state to find
 — only a bad step, from a log of two entries to a log of one.
 
-<!-- tla:check module=Tutorial.AuditedLock expect=violation property=log_only_grows -->
+<!-- tla:check module=Tutorial.AuditedLock expect=violation property=log_only_grows length=5 -->
 ```
 Tutorial.AuditedLock — VIOLATION: log_only_grows
+  10 distinct states, 10 transitions, depth 5, 7ms
+
+═══ VIOLATION: log_only_grows ══════════════════════════════════════
+
+State 1 (Init):
+  holder = :none
+  log    = []
+
+── acquire(c: :alice) ────────────────────
+
+State 2:
+  holder = :alice   ← changed
+  log    = [:alice]   ← changed
+
+── release ────────────────────
+
+State 3:
+  holder = :none   ← changed
+  log    = [:alice]
+
+── acquire(c: :alice) ────────────────────
+
+State 4:
+  holder = :alice   ← changed
+  log    = [:alice, :alice]   ← changed
+
+── compact ────────────────────
+
+State 5 [VIOLATION]:
+  holder = :alice
+  log    = [:alice]   ← changed
+
+════════════════════════════════════════════════════════════════════
 ```
 
-The refuted property is named, and the step that refutes it is the `compact` that runs when the
-log holds two entries: `[:alice, :bob]` becomes `[:alice]`, and `len(new.log) >= len(old.log)` is
-`1 >= 2`. Delete the `compact` action and the spec verifies.
+Read the last step, because that is where the whole finding is: the log holds two entries, and
+`compact` replaces it with one. `len(new.log) >= len(old.log)` is `1 >= 2`, and false.
 
-> #### The trace for this one is not to be trusted yet {: .warning}
->
-> The verdict above is correct, and this page deliberately does not print the counterexample. An
-> `action_property` violation's trace is currently generated from the **post-state**, so when that
-> state was already reachable by a shorter route the trace shows *that* route and the offending
-> step is absent — the step it marks can even satisfy the property. Found while writing this page
-> and filed as **#112**, with the fix and a guard: for a safety trace, assert that the named
-> property actually fails where the trace says it does.
->
-> Invariant and deadlock traces are unaffected, and correctly so: those are claims about a
-> *state*, and any path that reaches it is a fair counterexample.
+Every state in that trace is legal. State 4 is a perfectly good state — a client holding the lock,
+two entries logged — and so is State 5. **The counterexample is the arrow between them**, which is
+why the trace for an action property is read differently from the trace for an invariant: for an
+invariant you look at where it ended, and for an action property you look at the last thing that
+happened.
+
+Delete the `compact` action and the spec verifies.
 
 `02-dsl-semantics.md` [§4](../../spec/02-dsl-semantics.md#4-action_property-uses-old-and-new) is
 normative on `old` and `new` — in particular that a bare variable name inside an

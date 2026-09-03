@@ -192,13 +192,24 @@ defmodule TLA.Trace do
     4. For a lasso, additionally: the cycle starts where the prefix ends, its steps are
        legal, and it **closes** — applying them returns to its own first state.
 
+  ## A safety trace must also refute the property it names
+
+  A legal path from an initial state is not yet a counterexample. #112 was exactly that
+  distinction going unmade: an action-property trace built from the wrong end described a
+  perfectly legal route to a state whose final step *satisfied* the property it was
+  offered as a refutation of, and every check above passed it. So a safety trace is
+  additionally required to fail where it says it fails — a named invariant false in the
+  final state, a named action property false over the final step. Neither needs a second
+  implementation of anything: both predicates are already compiled on the spec.
+
   ## What it deliberately does not check
 
-  Whether the property is genuinely refuted along the behaviour, and whether the cycle
-  satisfies the spec's fairness. Both are already checked, by `TLA.TemporalCheck`, which
-  shares no code with `TLA.ModelChecker.Liveness` and is what makes that agreement
-  evidence. A third implementation of the same semantics here would add a place for them
-  to disagree and no new information.
+  For a **temporal** property, whether it is genuinely refuted along the behaviour, and
+  whether the cycle satisfies the spec's fairness. Both are already checked, by
+  `TLA.TemporalCheck`, which shares no code with `TLA.ModelChecker.Liveness` and is what
+  makes that agreement evidence. A third implementation of the same semantics here would
+  add a place for them to disagree and no new information — which is why the requirement
+  above is scoped to safety.
 
   Returns `:ok`, or `{:error, message}` naming the step and what was wrong with it.
   """
@@ -208,7 +219,8 @@ defmodule TLA.Trace do
     spec = compiled(spec)
 
     with :ok <- from_init(spec, constants, trace),
-         do: legal_steps(spec, constants, trace, "the trace")
+         :ok <- legal_steps(spec, constants, trace, "the trace"),
+         do: refutes_its_property(spec, constants, trace)
   end
 
   def validate(%{prefix: prefix, cycle: nil}, spec, constants) do
@@ -265,6 +277,57 @@ defmodule TLA.Trace do
 
   # Zipped rather than indexed, so a trace whose `actions` and `states` disagree in length
   # is caught here as a shape error rather than silently checking the shorter of the two.
+  # A trace naming no property claims nothing to refute — a captured behaviour, or a
+  # deadlock, whose finding is the absence of successors rather than a false predicate.
+  defp refutes_its_property(_spec, _constants, %__MODULE__{property: nil}), do: :ok
+
+  defp refutes_its_property(_spec, _constants, %__MODULE__{type: :liveness}), do: :ok
+
+  defp refutes_its_property(spec, constants, %__MODULE__{property: name} = trace) do
+    invariant = Enum.find(spec.invariants, &(&1.name == name))
+    action_property = Enum.find(spec.action_properties, &(&1.name == name))
+
+    cond do
+      invariant != nil -> refutes_invariant(invariant, constants, trace)
+      action_property != nil -> refutes_action_property(action_property, constants, trace)
+      # A property the spec does not DECLARE is not this function's finding to make — which
+      # includes the implicit `type_ok`, derived from the `type:` annotations rather than
+      # declared. Harmless: an invariant trace is built from the violating state's own id,
+      # and for a claim about a state any path reaching it is a fair counterexample.
+      true -> :ok
+    end
+  end
+
+  defp refutes_invariant(invariant, constants, %__MODULE__{states: states, property: name}) do
+    if invariant.predicate.(constants, List.last(states)) do
+      {:error,
+       "the trace names #{inspect(name)} as violated, but that invariant HOLDS in its " <>
+         "final state. A legal path to a state is not a counterexample for a property the " <>
+         "state satisfies."}
+    else
+      :ok
+    end
+  end
+
+  defp refutes_action_property(property, constants, %__MODULE__{states: states, property: name}) do
+    case Enum.take(states, -2) do
+      [old_state, new_state] ->
+        if property.predicate.(constants, old_state, new_state) do
+          {:error,
+           "the trace names #{inspect(name)} as violated, but that action property HOLDS " <>
+             "over its final step. An action property is a claim about a STEP, so the " <>
+             "offending step has to be the one the trace ends with (#112)."}
+        else
+          :ok
+        end
+
+      _ ->
+        {:error,
+         "the trace names the action property #{inspect(name)} as violated but has fewer " <>
+           "than two states, so it contains no step for the property to be false over."}
+    end
+  end
+
   defp legal_steps(spec, constants, %__MODULE__{} = trace, what) do
     if length(trace.actions) != length(trace.states) - 1 or
          length(trace.bindings) != length(trace.actions) do
