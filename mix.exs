@@ -26,11 +26,31 @@ defmodule ExTLA.MixProject do
         main: "readme",
         # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
         # and the order here is the order the sidebar lists them in.
+        #
+        # `filename:` rather than title alone, because the id -- and so the output filename -- is
+        # what `main:` and every generated link name. `README.md` and `spec/README.md` both derive
+        # `readme`, ExDoc disambiguates them to `readme-1`/`readme-2`, and `main: "readme"` then
+        # named a page no build produced: the sidebar's home link 404'd on every page (#102).
+        # Naming the spec index explicitly leaves `readme` to the one page that should own it.
+        #
+        # LICENSE is here because README.md links it. ExDoc renders an extension-less file as
+        # preformatted text; without it that link is a 404 in the published docs, which is the
+        # second defect the built-docs gate found.
         extras:
           ["README.md", "CHANGELOG.md"] ++
             Path.wildcard("guides/*.md") ++
             Path.wildcard("guides/tutorial/*.md") ++
-            Path.wildcard("spec/*.md") ++ ["research/tla-plus-primer.md"],
+            Enum.map(Path.wildcard("spec/*.md"), fn
+              "spec/README.md" ->
+                {:"spec/README.md", filename: "spec-readme", title: "Specification index"}
+
+              path ->
+                path
+            end) ++
+            [
+              "research/tla-plus-primer.md",
+              {:LICENSE, filename: "license", title: "License"}
+            ],
         # `Guides` matches only the TOP level of `guides/`, so the list can be in reading order
         # -- getting-started, then the tutorial -- rather than in the order the patterns have to
         # be tried in. A bare `^guides\//` here would swallow every tutorial page.
@@ -41,7 +61,8 @@ defmodule ExTLA.MixProject do
           # The primer ships so that the introduction's links into it resolve for a reader of the
           # published docs. It is background on TLA+ itself rather than an ExTLA specification,
           # which is why it has a group of its own and lives outside `spec/`.
-          Background: ~r/^research\//
+          Background: ~r/^research\//,
+          License: ~r/^LICENSE$/
         ]
       ]
     ]
