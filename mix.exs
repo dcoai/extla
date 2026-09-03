@@ -13,10 +13,18 @@ defmodule ExTLA.MixProject do
       deps: deps(),
       name: "ExTLA",
       description: "TLA+-inspired formal verification for Elixir/OTP systems",
-      package: [licenses: ["MIT"], files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec)],
+      package: [
+        licenses: ["MIT"],
+        files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec guides)
+      ],
+      # `guides/` ships and renders beside `spec/` (#94): the guides teach, the spec is the
+      # authority they link to. Every code block in a guide is compiled and its claimed verdict
+      # asserted by `test/guides/`, so a guide that drifts from the code it teaches fails the
+      # build rather than teaching an API that does not exist.
       docs: [
         main: "readme",
-        extras: ["README.md", "CHANGELOG.md" | Path.wildcard("spec/*.md")]
+        extras: ["README.md", "CHANGELOG.md" | Path.wildcard("{guides,spec}/*.md")],
+        groups_for_extras: [Guides: ~r/^guides\//, Specification: ~r/^spec\//]
       ]
     ]
   end

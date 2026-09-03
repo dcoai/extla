@@ -16,6 +16,11 @@ release it merely follows.
 
 ### Added
 
+- `guides/getting-started.md` — installation to a deliberate invariant violation, read action
+  by action. Every code block in a guide is compiled from the page itself and its claimed
+  verdict, invariant, counterexample length and state count are asserted by the test suite,
+  so a guide that drifts from the tool fails the build (#95, #96). Ships in the package and
+  renders under `mix docs` in a Guides group.
 - `TLA.Spec.Deps` — each action's read and write variable sets, and each invariant's read set,
   derived from the block AST at compile time and carried on the compiled spec. Widening is the
   default: a read set is `:all` unless every node is recognised (#91).
@@ -50,6 +55,11 @@ compatibility promise.
 
 ### Added
 
+- `guides/getting-started.md` — installation to a deliberate invariant violation, read action
+  by action. Every code block in a guide is compiled from the page itself and its claimed
+  verdict, invariant, counterexample length and state count are asserted by the test suite,
+  so a guide that drifts from the tool fails the build (#95, #96). Ships in the package and
+  renders under `mix docs` in a Guides group.
 - **Phase 1 — the DSL and safety checking.** Specifications written as Elixir
   (`TLA.Spec`), exhaustive breadth-first model checking (`TLA.ModelChecker`), the implicit
   `type_ok` invariant, shortest-counterexample traces, and `TLA.Coverage` reporting what a

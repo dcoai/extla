@@ -13,48 +13,86 @@ defmodule TLA.GuideCheck do
 
   Compiling is not the claim worth checking. A guide can compile perfectly and still narrate "this
   reports `:ok`" about a spec that reports a violation — and a reader trusts the prose over the
-  code. So each block says what it expects and this module enforces exactly that:
+  code. So each block says what it expects, in an HTML comment on the line before its fence, and
+  this module enforces exactly that:
 
-      tla:spec                                      compiles; later blocks may refer to it
-      tla:check module=M expect=ok                  the run reports :ok
-      tla:check module=M expect=violation length=6  violated, shortest trace that long
-      tla:check module=M expect=violation invariant=at_most_two   violated, by THAT invariant
-      tla:liveness module=M expect=violation        check_liveness: true, refuted
-      tla:compile_error match="not declared"        MEANT to fail; the message must match
-      tla:skip reason=...                           not executable, and the reason is on the page
+      <!-- tla:spec -->                                  compiles; later blocks may refer to it
+      <!-- tla:check module=M expect=ok -->              the run reports :ok
+      <!-- tla:check module=M expect=ok states=8 depth=4 -->   ...and found that many, that deep
+      <!-- tla:check module=M expect=violation length=6 -->    violated, shortest trace that long
+      <!-- tla:check module=M expect=violation invariant=at_most_two -->   by THAT invariant
+      <!-- tla:check module=M expect=deadlock -->        a reachable state nothing admits
+      <!-- tla:liveness module=M expect=violation -->    check_liveness: true, refuted
+      <!-- tla:compile_error match="not declared" -->    MEANT to fail; the message must match
+      <!-- tla:skip reason=... -->                       not executable, and the reason is on the page
+
+  `tla:check` and `tla:liveness` claim a run rather than code, so their comment may stand alone,
+  beside the command whose output the page quotes; the other kinds annotate the fence below them.
 
   **An unannotated `elixir` block is an unchecked claim and is rejected.** Requiring an explicit
   `tla:skip reason=` makes a gap visible instead of silent — the principle `TLA_COVERAGE.md`
   applies to spec items, applied to prose: something nobody verified is recorded as unverified,
   never omitted.
 
+  ## Why a comment, and not the fence's info string
+
+  The first version of this harness put the annotation on the fence itself — `` ```elixir
+  tla:spec ``. Earmark, which renders the guides under `mix docs`, accepts a single word after the
+  backticks and nothing else: `` ```elixir tla:spec `` is not a fence to it, and the whole block
+  came out as one run of inline text. Found by #96, the first guide to meet `mix docs`. An HTML
+  comment is dropped by Earmark and by GitLab alike, so the reader sees a plain `elixir` block and
+  the harness sees the claim. A fence with anything after `elixir` is rejected here for the same
+  reason, so the mistake cannot be made again quietly.
+
   ## What is deliberately NOT asserted
 
-  Only what a block claims. A block declaring `expect=ok` and no state count is not failed for its
+  Only what a block claims. A block declaring `expect=ok` and no `states=` is not failed for its
   state count. An over-tight harness makes guides unwritable, and #79 is the precedent for a check
   asserting more than the design promises.
   """
 
-  alias TLA.ModelChecker
+  alias TLA.{ModelChecker, Spec}
 
-  @fence ~r/^```elixir([^\n]*)\n(.*?)^```/ms
+  # An optional `<!-- tla:... -->` on the line IMMEDIATELY before a ```elixir fence, then the
+  # fence's trailing info string (which must be empty — see the moduledoc), then the code.
+  @fence ~r/(?:^[ \t]*<!--[ \t]*(tla:[^\n]*?)[ \t]*-->[ \t]*\n)?^```elixir([^\n]*)\n(.*?)^```/ms
+
+  # A `tla:check` or `tla:liveness` with no fence under it. It claims a run, not code, so it
+  # stands beside the command whose output the page quotes rather than above an empty block —
+  # which `mix docs` would render as an empty grey box.
+  @bare_claim ~r/^[ \t]*<!--[ \t]*(tla:(?:check|liveness)[^\n]*?)[ \t]*-->[ \t]*$(?!\n```elixir)/m
 
   @doc """
-  Every annotated block in a guide, in order, as `{annotation_map, code, line}`.
+  Every `elixir` block and every bare run-claim in a guide, in order, as
+  `{annotation_map, code, line}`. A bare claim's code is `""`.
   """
   def blocks(path) do
     source = File.read!(path)
 
-    @fence
-    |> Regex.scan(source, return: :index)
-    |> Enum.map(fn [{whole_start, _}, {info_start, info_len}, {code_start, code_len}] ->
-      {
-        parse_annotation(binary_part(source, info_start, info_len)),
-        binary_part(source, code_start, code_len),
-        line_of(source, whole_start)
-      }
-    end)
+    fences =
+      @fence
+      |> Regex.scan(source, return: :index)
+      |> Enum.map(fn [{start, _}, annotation, {info_start, info_len}, {code_start, code_len}] ->
+        {start,
+         parse_annotation(part(source, annotation), binary_part(source, info_start, info_len)),
+         binary_part(source, code_start, code_len)}
+      end)
+
+    bare =
+      @bare_claim
+      |> Regex.scan(source, return: :index)
+      |> Enum.map(fn [{start, _}, annotation] ->
+        {start, parse_tla(part(source, annotation)), ""}
+      end)
+
+    (fences ++ bare)
+    |> Enum.sort()
+    |> Enum.map(fn {start, annotation, code} -> {annotation, code, line_of(source, start)} end)
   end
+
+  # An unmatched optional group comes back as `{-1, 0}`.
+  defp part(_source, {-1, 0}), do: nil
+  defp part(source, {start, len}), do: binary_part(source, start, len)
 
   @doc """
   Check one guide. Returns a list of failure strings — empty when the guide tells the truth.
@@ -72,11 +110,19 @@ defmodule TLA.GuideCheck do
 
   # --- the annotations ------------------------------------------------------------------
 
+  defp verify(%{kind: :bad_fence, info: info}, _code),
+    do:
+      {:error,
+       "```elixir#{info} is not a fence Earmark recognises, so `mix docs` renders the block " <>
+         "as inline text. Put the annotation in an HTML comment on the line before: " <>
+         "<!-- tla:... -->"}
+
   defp verify(%{kind: :none}, _code),
     do:
       {:error,
-       "an `elixir` block with no annotation is an unchecked claim. Give it one " <>
-         "(tla:spec, tla:check, tla:liveness, tla:compile_error) or `tla:skip reason=...`"}
+       "an `elixir` block with no annotation is an unchecked claim. Give it one on the line " <>
+         "before the fence (<!-- tla:spec -->, tla:check, tla:liveness, tla:compile_error) " <>
+         "or <!-- tla:skip reason=... -->"}
 
   defp verify(%{kind: :skip}, _code), do: :ok
 
@@ -110,7 +156,7 @@ defmodule TLA.GuideCheck do
 
     case run(module, config) do
       {:raised, message} -> {:error, "the run raised: #{message}"}
-      {:ok, result} -> compare(result, annotation)
+      {:ok, result} -> with(:ok <- compare(result, annotation), do: census(result, annotation))
     end
   end
 
@@ -162,6 +208,25 @@ defmodule TLA.GuideCheck do
   defp compare(_result, annotation),
     do: {:error, "unknown expect=#{inspect(annotation[:expect])}"}
 
+  # The numbers a guide quotes from the run's summary line. A reader will believe "8 distinct
+  # states, depth 4" exactly as much as the verdict beside it, so a block may claim them and
+  # then they are held to.
+  defp census(result, annotation) do
+    cond do
+      annotation[:states] && result.distinct_states != String.to_integer(annotation[:states]) ->
+        {:error,
+         "the guide claims #{annotation[:states]} distinct states, " <>
+           "but the run found #{result.distinct_states}"}
+
+      annotation[:depth] && result.diameter != String.to_integer(annotation[:depth]) ->
+        {:error,
+         "the guide claims depth #{annotation[:depth]}, but the run reached #{result.diameter}"}
+
+      true ->
+        :ok
+    end
+  end
+
   defp violated_by(%{violation: %{property: property}}) when property != nil,
     do: " (#{property} is violated)"
 
@@ -177,7 +242,25 @@ defmodule TLA.GuideCheck do
   # expected still surfaces as one.
   defp compile(code), do: isolated(fn -> Code.compile_string(code, "guide") end)
 
-  defp run(module, config), do: isolated(fn -> ModelChecker.run(module, config) end)
+  # Constants come from `default:` the way a reader's `mix tla.check` takes them, through the same
+  # `Spec.Compiled.resolve_constants/1` the task calls. A guide spec whose constant has no default
+  # is a spec the reader cannot run, and it fails here rather than working by way of a config file
+  # the page never showed.
+  defp run(module, config) do
+    isolated(fn ->
+      spec = Spec.Compiled.from_module(module)
+
+      case Spec.Compiled.resolve_constants(spec) do
+        {:ok, constants} ->
+          ModelChecker.run(spec, Map.put(config, :constants, constants))
+
+        {:error, missing} ->
+          raise ArgumentError,
+                "#{inspect(module)} has no assignment for #{inspect(missing)}; a guide spec " <>
+                  "must declare `default:` beside each constant, because the reader has no config"
+      end
+    end)
+  end
 
   defp isolated(fun) do
     parent = self()
@@ -207,13 +290,13 @@ defmodule TLA.GuideCheck do
 
   # --- parsing --------------------------------------------------------------------------
 
-  defp parse_annotation(info) do
-    info = String.trim(info)
-
+  # The fence's own info string is checked first: a block that will not render is wrong before
+  # its claim is even read.
+  defp parse_annotation(comment, info) do
     cond do
-      info == "" -> %{kind: :none}
-      String.starts_with?(info, "tla:") -> parse_tla(info)
-      true -> %{kind: :none}
+      String.trim(info) != "" -> %{kind: :bad_fence, info: info}
+      comment == nil -> %{kind: :none}
+      true -> parse_tla(comment)
     end
   end
 
