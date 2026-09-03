@@ -399,6 +399,46 @@ defmodule TLA.GuideCheckClaimsTest do
     end
   end
 
+  describe "tla:check expect=incomplete claims a BOUNDED run" do
+    # The mathematics page (#101) teaches that a green run is a proof about the model, and a
+    # bounded one is not a verdict at all. That page's own demonstration has to be checked, or it
+    # would be prose asserting exactly what it warns against.
+    test "a run cut short by max_states can say so", %{tmp_dir: tmp} do
+      m = unique("Claims.Bounded")
+
+      path =
+        guide(
+          tmp,
+          lock(m, "") <> claim("tla:check module=#{m} expect=incomplete max_states=5 states=7")
+        )
+
+      assert GuideCheck.check(path) == []
+    end
+
+    test "claiming a bound on a run that completed is rejected", %{tmp_dir: tmp} do
+      m = unique("Claims.NotBounded")
+
+      path = guide(tmp, lock(m, "") <> claim("tla:check module=#{m} expect=incomplete"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "claims the run was bounded"
+      assert failure =~ ":ok"
+      assert failure =~ "max_states="
+    end
+
+    test "claiming :ok for a bounded run is rejected — the confusion the exit codes exist for",
+         %{tmp_dir: tmp} do
+      m = unique("Claims.BoundedNotOk")
+
+      path =
+        guide(tmp, lock(m, "") <> claim("tla:check module=#{m} expect=ok max_states=5"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "claims this reports :ok"
+      assert failure =~ ":max_states_reached"
+    end
+  end
+
   describe "tla:run evaluates a block, and a raise is a claim" do
     test "a block that runs may say so, and one that raises must say what", %{tmp_dir: tmp} do
       n = System.unique_integer([:positive])

@@ -1,6 +1,6 @@
 # Symmetry, and who is responsible for it
 
-Part 5 of 7 of the ExTLA tutorial. Previous: [Temporal properties, and the difference fairness makes](04-temporal.md).
+Part 6 of 8 of the ExTLA tutorial. Previous: [Temporal properties, and the difference fairness makes](04-temporal.md).
 
 Alice, Bob and Carol are interchangeable. A state in which Alice holds the lock and Bob waits is,
 for every property in the spec, the same state as one in which Bob holds it and Alice waits — and

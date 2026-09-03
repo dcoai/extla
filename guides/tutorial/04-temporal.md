@@ -1,6 +1,6 @@
 # Temporal properties, and the difference fairness makes
 
-Part 4 of 7 of the ExTLA tutorial. Previous: [Invariants](03-invariants.md).
+Part 5 of 8 of the ExTLA tutorial. Previous: [Invariants](03-invariants.md).
 
 Nothing so far says the lock ever *does* anything. A spec in which every client waits forever
 satisfies `mutual_exclusion` perfectly. Liveness is the other half: what must eventually happen.
