@@ -18,10 +18,17 @@ defmodule TLA.GuideCheckTest do
     path
   end
 
+  # The annotation goes on the line before the fence, as an HTML comment — see the moduledoc
+  # for why the fence itself cannot carry it.
+  defp block(annotation, code), do: "<!-- #{annotation} -->\n```elixir\n#{code}```\n"
+
+  # A run-claim stands alone, with no fence under it -- the shape the guides use beside a
+  # `mix tla.check` command.
+  defp claim(annotation), do: "\n<!-- #{annotation} -->\n"
+
   # A spec with an invariant a reachable state refutes, at a known depth.
   defp broken_spec(name) do
-    """
-    ```elixir tla:spec
+    block("tla:spec", """
     defmodule #{name} do
       use TLA.Spec
 
@@ -40,13 +47,11 @@ defmodule TLA.GuideCheckTest do
         n <= 2
       end
     end
-    ```
-    """
+    """)
   end
 
   defp working_spec(name) do
-    """
-    ```elixir tla:spec
+    block("tla:spec", """
     defmodule #{name} do
       use TLA.Spec
 
@@ -72,18 +77,29 @@ defmodule TLA.GuideCheckTest do
         n == 2
       end
     end
-    ```
-    """
+    """)
   end
 
   describe "a guide that tells the truth" do
     test "passes when a working example is claimed to work", %{tmp_dir: tmp} do
       m = "GuideTruth.Works#{System.unique_integer([:positive])}"
 
-      path =
-        guide(tmp, working_spec(m) <> "\n```elixir tla:check module=#{m} expect=ok\n```\n")
+      path = guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=ok"))
 
       assert GuideCheck.check(path) == []
+    end
+
+    test "a run-claim may also sit on a fence, and is then checked once", %{tmp_dir: tmp} do
+      m = "GuideTruth.Fenced#{System.unique_integer([:positive])}"
+
+      path =
+        guide(
+          tmp,
+          working_spec(m) <> "\n" <> block("tla:check module=#{m} expect=ok states=99", "")
+        )
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "claims 99 distinct states"
     end
 
     test "passes when a failing example is claimed to fail, at the right depth and property",
@@ -94,8 +110,17 @@ defmodule TLA.GuideCheckTest do
         guide(
           tmp,
           broken_spec(m) <>
-            "\n```elixir tla:check module=#{m} expect=violation invariant=at_most_two\n```\n"
+            claim("tla:check module=#{m} expect=violation length=4 invariant=at_most_two")
         )
+
+      assert GuideCheck.check(path) == []
+    end
+
+    test "passes when the quoted census is the real one", %{tmp_dir: tmp} do
+      m = "GuideTruth.Census#{System.unique_integer([:positive])}"
+
+      path =
+        guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=ok states=3 depth=3"))
 
       assert GuideCheck.check(path) == []
     end
@@ -105,7 +130,7 @@ defmodule TLA.GuideCheckTest do
     test "rejects claiming :ok for a spec that is violated", %{tmp_dir: tmp} do
       m = "GuideLies.NotOk#{System.unique_integer([:positive])}"
 
-      path = guide(tmp, broken_spec(m) <> "\n```elixir tla:check module=#{m} expect=ok\n```\n")
+      path = guide(tmp, broken_spec(m) <> claim("tla:check module=#{m} expect=ok"))
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "claims this reports :ok"
@@ -115,8 +140,7 @@ defmodule TLA.GuideCheckTest do
     test "rejects claiming a violation for a spec that holds", %{tmp_dir: tmp} do
       m = "GuideLies.NotViolated#{System.unique_integer([:positive])}"
 
-      path =
-        guide(tmp, working_spec(m) <> "\n```elixir tla:check module=#{m} expect=violation\n```\n")
+      path = guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=violation"))
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "claims a violation"
@@ -127,11 +151,7 @@ defmodule TLA.GuideCheckTest do
       m = "GuideLies.WrongLength#{System.unique_integer([:positive])}"
 
       path =
-        guide(
-          tmp,
-          broken_spec(m) <>
-            "\n```elixir tla:check module=#{m} expect=violation length=99\n```\n"
-        )
+        guide(tmp, broken_spec(m) <> claim("tla:check module=#{m} expect=violation length=99"))
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "claims a 99-step counterexample"
@@ -144,7 +164,7 @@ defmodule TLA.GuideCheckTest do
         guide(
           tmp,
           broken_spec(m) <>
-            "\n```elixir tla:check module=#{m} expect=violation invariant=something_else\n```\n"
+            claim("tla:check module=#{m} expect=violation invariant=something_else")
         )
 
       assert [failure] = GuideCheck.check(path)
@@ -152,22 +172,43 @@ defmodule TLA.GuideCheckTest do
       assert failure =~ "at_most_two"
     end
 
+    test "rejects a wrong state count", %{tmp_dir: tmp} do
+      m = "GuideLies.WrongStates#{System.unique_integer([:positive])}"
+
+      path = guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=ok states=99"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "claims 99 distinct states"
+      assert failure =~ "found 3"
+    end
+
+    test "rejects a wrong depth", %{tmp_dir: tmp} do
+      m = "GuideLies.WrongDepth#{System.unique_integer([:positive])}"
+
+      path = guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=ok depth=99"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "claims depth 99"
+      assert failure =~ "reached 3"
+    end
+
     test "rejects a tla:spec that does not compile", %{tmp_dir: tmp} do
       path =
-        guide(tmp, """
-        ```elixir tla:spec
-        defmodule Guide.Nonsense do
-          use TLA.Spec
-          variable :n, type: 0..2
-          init do
-            n = 0
+        guide(
+          tmp,
+          block("tla:spec", """
+          defmodule Guide.Nonsense do
+            use TLA.Spec
+            variable :n, type: 0..2
+            init do
+              n = 0
+            end
+            action :tick do
+              n = undeclared_variable_here
+            end
           end
-          action :tick do
-            n = undeclared_variable_here
-          end
-        end
-        ```
-        """)
+          """)
+        )
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "does not compile"
@@ -177,13 +218,14 @@ defmodule TLA.GuideCheckTest do
       m = "GuideLies.Compiles#{System.unique_integer([:positive])}"
 
       path =
-        guide(tmp, """
-        ```elixir tla:compile_error match="something"
-        defmodule #{m} do
-          def fine, do: :ok
-        end
-        ```
-        """)
+        guide(
+          tmp,
+          block(~s(tla:compile_error match="something"), """
+          defmodule #{m} do
+            def fine, do: :ok
+          end
+          """)
+        )
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "compiled successfully"
@@ -191,20 +233,21 @@ defmodule TLA.GuideCheckTest do
 
     test "rejects a compile error whose message is not the one claimed", %{tmp_dir: tmp} do
       path =
-        guide(tmp, """
-        ```elixir tla:compile_error match="a message it will never produce"
-        defmodule Guide.AlsoNonsense do
-          use TLA.Spec
-          variable :n, type: 0..2
-          init do
-            n = 0
+        guide(
+          tmp,
+          block(~s(tla:compile_error match="a message it will never produce"), """
+          defmodule Guide.AlsoNonsense do
+            use TLA.Spec
+            variable :n, type: 0..2
+            init do
+              n = 0
+            end
+            action :tick do
+              n = undeclared_variable_here
+            end
           end
-          action :tick do
-            n = undeclared_variable_here
-          end
-        end
-        ```
-        """)
+          """)
+        )
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "expected the error to contain"
@@ -237,24 +280,22 @@ defmodule TLA.GuideCheckTest do
       m = "GuideDeadlock.Stuck#{System.unique_integer([:positive])}"
 
       path =
-        guide(tmp, """
-        ```elixir tla:spec
-        defmodule #{m} do
-          use TLA.Spec
-          variable :n, type: 0..2
-          init do
-            n = 0
+        guide(
+          tmp,
+          block("tla:spec", """
+          defmodule #{m} do
+            use TLA.Spec
+            variable :n, type: 0..2
+            init do
+              n = 0
+            end
+            action :tick do
+              require n < 2
+              n = n + 1
+            end
           end
-          action :tick do
-            require n < 2
-            n = n + 1
-          end
-        end
-        ```
-
-        ```elixir tla:check module=#{m} expect=deadlock
-        ```
-        """)
+          """) <> claim("tla:check module=#{m} expect=deadlock")
+        )
 
       assert GuideCheck.check(path) == []
     end
@@ -262,8 +303,7 @@ defmodule TLA.GuideCheckTest do
     test "claiming a deadlock for a spec that has none is rejected", %{tmp_dir: tmp} do
       m = "GuideDeadlock.Fine#{System.unique_integer([:positive])}"
 
-      path =
-        guide(tmp, working_spec(m) <> "\n```elixir tla:check module=#{m} expect=deadlock\n```\n")
+      path = guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=deadlock"))
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ "claims a deadlock"
@@ -281,9 +321,30 @@ defmodule TLA.GuideCheckTest do
 
     test "tla:skip is accepted, so a gap is visible on the page rather than silent",
          %{tmp_dir: tmp} do
-      path = guide(tmp, "```elixir tla:skip reason=illustrative-pseudocode\n:whatever\n```\n")
+      path = guide(tmp, block("tla:skip reason=illustrative-pseudocode", ":whatever\n"))
 
       assert GuideCheck.check(path) == []
+    end
+
+    test "a comment that is not on the line before the fence does not annotate it",
+         %{tmp_dir: tmp} do
+      path = guide(tmp, "<!-- tla:skip reason=too-far-away -->\n\n```elixir\n:unclaimed\n```\n")
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "unchecked claim"
+    end
+  end
+
+  describe "a block that will not render is wrong before its claim is read" do
+    # The first harness put the annotation on the fence: ```elixir tla:spec. Earmark accepts one
+    # word after the backticks and nothing else, so under `mix docs` that block was not a block
+    # at all -- its code came out as one run of inline text (#96).
+    test "an annotation on the fence's info string is rejected, with the reason", %{tmp_dir: tmp} do
+      path = guide(tmp, "```elixir tla:skip reason=old-style\n:whatever\n```\n")
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "not a fence Earmark recognises"
+      assert failure =~ "mix docs"
     end
   end
 end
