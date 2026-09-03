@@ -126,6 +126,13 @@ consumer-compile:
     # `before_script` already ran `mix deps.get`, and it ran it with MIX_ENV=prod, so what
     # is on disk is the dependency set a consumer would have.
     - mix compile --force --warnings-as-errors
+    # Compiling those branches is not running them (#89, #90). The three `stream_data`
+    # fallbacks exist ONLY in this environment, and their ArgumentError messages are the whole
+    # consumer-facing experience of a missing optional dependency -- the function name, the dep
+    # spec, the version. Until this script they had never been executed anywhere, so a typo in
+    # any of them would have reached a consumer with nothing here to notice. Same defect class
+    # as #84.
+    - mix run --no-start bin/check-stream-data-fallbacks.exs
 
 # What the gates catch (#46). The mutation harness copies the checker, breaks it on
 # purpose, and reports which gate noticed — so it compiles the project several times over
