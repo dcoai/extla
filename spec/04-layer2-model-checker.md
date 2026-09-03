@@ -903,15 +903,17 @@ defmodule TLA.Coverage do
     never_enabled: [atom()],
 
     # Per invariant: states in which it was evaluated, and its NEAR MISSES —
-    # states in which it held only through its non-trivial branch. Each
-    # top-level `or` (including the `p != x or q` and `unless` shapes, which
-    # are implications) is a branch; a near miss is a state in which the left
-    # disjunct was false, so the right one had to carry the invariant. For an
-    # invariant with no top-level `or`, a near miss is a state in which some
-    # atomic bound (`x <= n`, `size(s) < k`) held with equality at its edge.
+    # states in which it held only through its non-trivial branch. A top-level
+    # `or` (including the `p != x or q` and `unless` shapes, which are
+    # implications) is such a branch; a near miss is a state in which the left
+    # disjunct was false, so the right one had to carry the invariant. An
+    # invariant with no near misses was never pressed against, and is suspect.
     # (An earlier draft said "a false conjunct without the whole being false",
-    # which for a conjunction is impossible.) An invariant with no near misses
-    # was never pressed against, and is suspect.
+    # which for a conjunction is impossible.)
+    #
+    # The top-level `or` is the ONLY shape derived. An invariant without one --
+    # a bare `x <= n` -- reports `nil`, not zero: see §Deferred past v1 in
+    # 06-architecture.md for the atomic-bound probe that would measure it.
     # `near_misses: nil` means NOT MEASURED, which the report renders differently
     # from zero. Only the top-level-`or` shape is derived; zero near misses is a
     # finding, and "we did not look" is not.

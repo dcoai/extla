@@ -382,7 +382,18 @@ defmodule TLA.Spec.Block do
 
   Only the top-level `or` shape is derived here. For an invariant without one,
   `nil` means *not measured* — which the coverage report must render differently
-  from zero, since zero is the finding and "not measured" is not.
+  from zero, since zero is the finding and "not measured" is not. The
+  atomic-bound shape that would measure a bare `count <= max` is deferred rather
+  than rejected (`06-architecture.md` §Deferred past v1), and these two outcomes
+  are pinned so that adding it has to update the test recording its absence:
+
+      # An implication gets a probe: the negated left disjunct.
+      iex> TLA.Spec.Block.near_miss(quote(do: a or b)) |> Macro.to_string()
+      "not a"
+
+      # A bare comparison does not, and `nil` means NOT MEASURED.
+      iex> TLA.Spec.Block.near_miss(quote(do: count <= max))
+      nil
   """
   def near_miss(desugared) do
     {leading, final} = split_final(desugared)

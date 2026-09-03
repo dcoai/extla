@@ -57,6 +57,13 @@ release it merely follows.
 
 ### Fixed
 
+- The near-miss column's documentation. `getting-started.md` called it opt-in and said an
+  invariant "declares what a near miss would be"; it is **derived** from the invariant's shape —
+  a top-level `or` yields a probe and anything else reports `nil`, meaning *not measured*. The
+  guide now says which shape produces one, `spec/04` no longer contradicts itself about the
+  atomic-bound case, and that case is recorded as deferred rather than described as though it
+  worked. `near_miss/1`'s two outcomes are pinned by doctests (#105, #106).
+
 - The documentation's home link. `README.md` and `spec/README.md` both derived the id `readme`,
   ExDoc disambiguated them to `readme-1`/`readme-2`, and `main: "readme"` went on naming a page no
   build produced. The spec index is now `spec-readme` with a real sidebar title, leaving `readme`

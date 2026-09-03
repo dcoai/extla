@@ -403,6 +403,7 @@ differential corpus holds throughout.
 | View abstraction | Easy to make unsound; symmetry covers the common case |
 | HTML/D3 visualizer | DOT is enough, and a bespoke viewer is a maintenance sink |
 | Generated test *files* | `mix tla.gen.test` writes code someone then has to maintain; the property helpers give most of the value without that |
+| Atomic-bound near-miss probes | `TLA.Coverage` derives a near-miss probe only from a top-level `or`, so an invariant written as a bare bound (`count <= max`, `size(s) < k`) reports `nil` — not measured. Pressing such a bound to equality is exactly the near miss the column exists to report, and deriving it means recognising the comparison and its edge rather than negating a disjunct. Deferred, not rejected: the shape is worth having, and reporting `nil` is honest in the meantime |
 
 ---
 
