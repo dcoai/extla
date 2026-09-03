@@ -16,6 +16,14 @@ release it merely follows.
 
 ### Changed
 
+- `guides/tutorial/06-layer1.md` now covers what a team needs in order to adopt Layer 1: the
+  smallest useful step (one invariant on a server you already have, no specification at all), a
+  plain invariant violation, the three modes as real per-environment configuration and what
+  `:disabled` actually means, `enabled:`/`callbacks:` for cost, `TLA.Invariant.Test` — including
+  `refute_invariant`, because an invariant never seen false is indistinguishable from `true` —
+  telemetry, and the other OTP behaviours including why an `Agent`'s checks cannot be compiled
+  away (#104, #109).
+
 - `guides/tutorial/03-invariants.md` now teaches writing properties, not only reading the report:
   a method for choosing what to assert, `desc:`, `action_property` as a section of its own with a
   step no invariant could catch — and **deadlock and `terminal`**, which is the first failure a
