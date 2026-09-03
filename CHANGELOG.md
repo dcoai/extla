@@ -16,6 +16,13 @@ release it merely follows.
 
 ### Changed
 
+- `guides/tutorial/03-invariants.md` now teaches writing properties, not only reading the report:
+  a method for choosing what to assert, `desc:`, `action_property` as a section of its own with a
+  step no invariant could catch — and **deadlock and `terminal`**, which is the first failure a
+  reader meets and had two dismissive sentences in the whole tutorial. A one-shot lock that
+  finishes its work is shown refuted as a DEADLOCK, fixed by declaring its end state at the same
+  fifteen states, and then with a `terminal` broad enough to admit a live state (#104, #108).
+
 - The tutorial's pages carry subheadings throughout, so every one has sidebar sub-entries and can
   be scanned; `05-symmetry.md` and `06-layer1.md` had none. `assert_spec` moves off the symmetry
   page — it is how a specification stays true as code changes, which nobody looks for under
