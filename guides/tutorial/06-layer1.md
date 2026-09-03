@@ -1,6 +1,6 @@
 # Layer 1 — invariants on a running GenServer
 
-Part 7 of 8 of the ExTLA tutorial. Previous: [Symmetry, and who is responsible for it](05-symmetry.md).
+ExTLA tutorial. Previous: [Symmetry, and who is responsible for it](05-symmetry.md).
 
 Everything so far has been about the specification. The implementation has not existed. Layer 1
 is the smallest step towards it: state a property of a GenServer's state *in the GenServer*, and
@@ -40,6 +40,8 @@ defmodule Tutorial.LockServer do
 end
 ```
 
+## What the four declarations mean
+
 The blocks are bare boolean expressions, the same shape as a spec's, with one difference: `state`
 is written explicitly. A spec has `variable` declarations to resolve a bare name against, and an
 arbitrary GenServer has none, so Layer 1 does not guess
@@ -47,6 +49,8 @@ arbitrary GenServer has none, so Layer 1 does not guess
 every callback; a `precondition` is matched against the incoming message — its pattern binds `c` —
 and checked before the callback runs; a `postcondition` sees `old`, `new` and the pattern's
 bindings after it returns. `action_property` is there too, with `old` and `new`.
+
+## Used correctly, nothing changes
 
 Used correctly, nothing is different:
 
@@ -58,7 +62,9 @@ Used correctly, nothing is different:
 :ok = GenServer.call(pid, {:release, :alice})
 ```
 
-Used wrongly, the callback never runs. Bob releasing a lock Alice holds:
+## Used wrongly, the callback never runs
+
+Bob releasing a lock Alice holds:
 
 <!-- tla:run expect=raise match="only the holder releases" -->
 ```elixir
@@ -78,11 +84,15 @@ GenServer.call(pid, {:release, :bob})
     waiting = []
 ```
 
+## The three modes
+
 The server raises, which in a supervised system means it restarts and the caller's `call` exits
 with the violation as its reason. That is the `:enabled` mode. `:log_only` logs the same report and
 lets the callback proceed, and `:disabled` — the default under `MIX_ENV=prod` — compiles the checks
 out entirely: a module compiled `:disabled` is the module its author wrote, which is what "zero
 production cost" means. The mode is `config :extla, mode: …`, read at compile time.
+
+## What Layer 1 cannot tell you
 
 Layer 1 knows nothing about `Tutorial.Lock`. It checks the properties you wrote *about the
 implementation*, in the implementation's own terms, which is useful and is also the limit of it:

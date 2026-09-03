@@ -1,6 +1,6 @@
 # Layer 3 — does the implementation conform?
 
-Part 8 of 8 of the ExTLA tutorial. Previous: [Layer 1 — invariants on a running GenServer](06-layer1.md).
+ExTLA tutorial. Previous: [Layer 1 — invariants on a running GenServer](06-layer1.md).
 
 A specification describes abstract states and the steps between them. An implementation has
 concrete state — a map with `holder` and `waiting` in it — and messages. Conformance means that
@@ -227,6 +227,27 @@ check the spec, so design bugs are found before the code exists; simulate the im
 it, so the code is held to the design; replay any counterexample against the code, so a finding at
 either level is a fact about both. `TLA.PropertyTest` hands the spec's own generators to a
 `check all` of your own, for the property tests that keep it that way in CI.
+
+## Checking a specification from your test suite
+
+A specification is only worth having while it stays true, which means running it where the rest of
+your tests run. `assert_spec` takes the same configuration `mix tla.check` does, fails the test on
+a violation, and — deliberately — fails it on a run that hit a state limit, because an unfinished
+run is not a pass:
+
+<!-- tla:run expect=ok -->
+```elixir
+import TLA.Spec.Test
+
+assert_spec Tutorial.StrongLock, %{
+  constants: %{clients: MapSet.new([:alice, :bob, :carol])},
+  symmetry: [:clients],
+  verify_symmetry: true
+}
+```
+
+That is the whole of the tutorial's mechanics. Where specs live in a project, what belongs in
+CI and what it costs are the next thing to settle.
 
 ## Where to next
 

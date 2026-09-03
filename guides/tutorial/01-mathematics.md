@@ -1,6 +1,6 @@
 # The mathematics of TLA, and what it is good for
 
-Part 2 of 8 of the ExTLA tutorial. Previous: [Introduction](00-introduction.md).
+ExTLA tutorial. Previous: [Introduction](00-introduction.md).
 
 A verdict is only worth as much as you understand it. `verified` does not mean "correct", and
 knowing exactly what it *does* mean — and what a counterexample proves, and what a bound takes

@@ -1,6 +1,6 @@
 # Symmetry, and who is responsible for it
 
-Part 6 of 8 of the ExTLA tutorial. Previous: [Temporal properties, and the difference fairness makes](04-temporal.md).
+ExTLA tutorial. Previous: [Temporal properties, and the difference fairness makes](04-temporal.md).
 
 Alice, Bob and Carol are interchangeable. A state in which Alice holds the lock and Bob waits is,
 for every property in the spec, the same state as one in which Bob holds it and Alice waits — and
@@ -9,6 +9,8 @@ apart, and the checker then keeps one representative of each set of states that 
 permutation of them. For *n* interchangeable elements the state space shrinks by up to *n*!, and
 that is the difference between tractable and not for exactly the systems this tool is for
 ([§Symmetry](../../spec/04-layer2-model-checker.md#symmetry)).
+
+## Declaring it
 
 The declaration sits beside the constants, in config:
 
@@ -47,6 +49,8 @@ warning: liveness was not checked: symmetry reduction and liveness are not sound
 Seven states instead of twenty, and the same verdict on every invariant. Two things in that output
 deserve a closer look.
 
+## Why liveness is refused alongside it
+
 The second warning is [D-22](../../spec/08-decisions.md): symmetry and liveness are refused
 together. The reduced graph identifies states, so a path that leaves an orbit and one that returns
 to it look alike, and the quotient can contain cycles the real system does not have — and a cycle
@@ -54,6 +58,8 @@ is exactly what a liveness verdict is read off. Rather than answer with somethin
 behind, the checker checks safety under the reduction and tells you to check the temporal
 properties in a run without it. (`--workers` is refused alongside liveness for a neighbouring
 reason, [D-27](../../spec/08-decisions.md).)
+
+## Soundness is yours, and the flag is what makes a mistake visible
 
 The first thing is the flag on the command line. **Nothing can establish that a `symmetry:`
 declaration is sound.** A constant flows into arbitrary Elixir, and whether some invariant or
@@ -63,6 +69,8 @@ draft of this project promised to, and was promising the undecidable
 What `--verify-symmetry` does is make a wrong declaration **detectable**: it runs the model both
 ways and fails if any verdict differs — the status, what was refuted, which actions never fired.
 Not the counts; a sound reduction changes those on purpose.
+
+## A declaration that is wrong
 
 Here is a declaration that is wrong, on a spec whose one invariant can tell the clients apart:
 
@@ -136,20 +144,6 @@ statically (08-decisions.md D-17); this is the check that catches it.
 Exit code 1, the same as a violation, because the answer the reduced run gave cannot be trusted.
 The check is cheap on a small constant assignment; run it once per spec before trusting the
 reduction on the large one.
-
-In a test, the same run is `assert_spec` with a config, which fails the test on a violation and —
-deliberately — on a run that hit a state limit, because an unfinished run is not a pass:
-
-<!-- tla:run expect=ok -->
-```elixir
-import TLA.Spec.Test
-
-assert_spec Tutorial.StrongLock, %{
-  constants: %{clients: MapSet.new([:alice, :bob, :carol])},
-  symmetry: [:clients],
-  verify_symmetry: true
-}
-```
 
 ---
 

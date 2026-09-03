@@ -1,6 +1,6 @@
 # The DSL in practice
 
-Part 3 of 8 of the ExTLA tutorial. Previous: [The mathematics of TLA](01-mathematics.md).
+ExTLA tutorial. Previous: [The mathematics of TLA](01-mathematics.md).
 
 Here is the lock, for three clients this time. Each client is idle, waiting, or holding; the lock
 is free or not; any waiting client may take a free lock.

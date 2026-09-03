@@ -1,6 +1,7 @@
 # Introduction: what this is, and where it comes from
 
-Part 1 of 8 of the ExTLA tutorial. It assumes you write Elixir and have never written a formal
+The ExTLA tutorial starts here. It assumes you write Elixir and have never written a formal
+specification.
 specification.
 
 [Getting started](../getting-started.md) is the shorter path — install, one spec, one
