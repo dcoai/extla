@@ -12,6 +12,24 @@
 # of this comment anticipated it as "one more job in this stage"; it arrived
 # somewhere else, and a reader looking for it in `verify` would not find it
 # (#73/#80).
+#
+# MERGE GATE (#70, #72). Two project settings are ON, recorded here because a setting nobody can
+# see from a checkout is one that gets switched off without anyone noticing -- the same class of
+# problem as the incident that produced it:
+#
+#   only_allow_merge_if_pipeline_succeeds = true
+#   allow_merge_on_skipped_pipeline       = false
+#
+# The second matters as much as the first, and is the whole lesson of this milestone. Between #64
+# and #71 this pipeline failed at `mix deps.get`, so `verify` never started and `mutation`,
+# `tla-coverage-drift` and `tlc-corpus` reported **skipped**. FIVE merge requests landed on `main`
+# that way. A skipped gate and a passing gate look identical in a merge request, and without the
+# second setting GitLab would treat one as the other -- which is the same confusion between
+# presence and evidence that TLA_COVERAGE.md exists to prevent one layer down.
+#
+# `only_allow_merge_if_all_discussions_are_resolved` is deliberately OFF. The defect was about
+# pipeline status, not review threads; turning it on would add a blocking condition for a problem
+# this project has not had. Revisit if review becomes multi-person.
 
 stages:
   - check

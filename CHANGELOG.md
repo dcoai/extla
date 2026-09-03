@@ -11,8 +11,33 @@ does not restate it.
 
 ## [Unreleased]
 
-Nothing yet. `mix.exs` reads `0.2.0-dev`: the `-dev` suffix is what keeps a commit from
-claiming to be the release it merely follows.
+`mix.exs` reads `0.2.0-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
+release it merely follows.
+
+### Added
+
+- `TLA.Spec.Deps` — each action's read and write variable sets, and each invariant's read set,
+  derived from the block AST at compile time and carried on the compiled spec. Widening is the
+  default: a read set is `:all` unless every node is recognised (#91).
+- `bin/check-stream-data-fallbacks.exs`, run by CI's `consumer-compile` job: the three
+  `stream_data` fallback functions now execute on every pipeline and are asserted to raise with
+  a message naming the missing dependency. They had never been run anywhere (#90).
+- CI records the memory ceiling, host memory, load and core count in every job log (#86, #88).
+
+### Fixed
+
+- The coverage task's drift and missing-file branches are tested; both had never executed (#84).
+- `README.md`, the phase-4 handoff and `.gitlab-ci.yml`'s header each asserted something no
+  longer true. Phase status now lives only in `spec/06-architecture.md` §Implementation Phases
+  (#80).
+- Test artifacts under `tmp/` are untracked and ignored (#81).
+
+### Infrastructure
+
+- CI fetches the `surfex` dependency over the CI job token; it had been declared over SSH, which
+  the runner image cannot use, leaving `main` red for five merges with all three `verify` gates
+  reporting `skipped` rather than `success` (#71).
+- Merges now require a passing pipeline, and a **skipped** pipeline does not count (#72).
 
 ## [0.1.0] — 2026-09-02
 
