@@ -9,10 +9,22 @@ All notable changes to ExTLA are recorded here, following
 which is the single source of truth for that. This file records what *changed* and when, and
 does not restate it.
 
-## [Unreleased]
+## [0.2.0] — 2026-09-04
 
-`mix.exs` reads `0.2.0-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
-release it merely follows.
+The documentation release. A getting-started guide and an eleven-page tutorial, with every
+code block compiled from the page itself and every claimed verdict — status, property,
+counterexample length, state count, never-enabled actions — asserted by the test suite, so a
+guide that drifts from the tool fails the build. The gate came first and a throwaway guide
+proved it went red, because nobody retrofits a gate to prose that already passes.
+
+Two library changes travel with it. `TLA.Spec.Deps` records each block's read and write
+variable sets at compile time — the foundation property-directed slicing needs (#87), and
+sound by widening rather than by narrowing. And `TLA.Trace.validate/3` now requires a
+**safety** trace to refute the property it names, a stricter contract than v0.1.0's and the
+check that would have caught #112.
+
+Still pre-1.0: the public surface may still move, and `spec/06-architecture.md` §Deferred is
+written in terms of "past v1". Still not on Hex — that remains a separate decision.
 
 ### Changed
 
@@ -189,5 +201,5 @@ compatibility promise.
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view
   abstraction are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
-[Unreleased]: https://gitlab.conet.yarina.org/dco-tek/extla/-/compare/v0.1.0...main
+[0.2.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.2.0
 [0.1.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.1.0
