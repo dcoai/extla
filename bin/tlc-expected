@@ -218,8 +218,44 @@ generate() {
     echo "    property $prop"
     prop_out="$(run_tlc "$dir" "$module" "-config $prop_cfg$deadlock_flag")"
 
-    if printf '%s\n' "$prop_out" | grep -q '^Error: Temporal properties were violated\.'; then
+    # The ORDER below is the substance, not a formality (#125).
+    #
+    # ` distinct states found` is printed by a run that refuted a property just as
+    # it is by one that did not -- TLC reports the violation and then finishes its
+    # accounting. So a branch reading that line as `holds` is testing for a token
+    # the two outcomes SHARE, and it is correct only for as long as every
+    # refutation happens to match the pattern above it. That held while every
+    # property in the corpus was a temporal one, and stops holding the moment a
+    # property has another form: TLC announces
+    #
+    #     Error: Action property NeverDecreases is violated.
+    #
+    # for a property written `[][P]_vars`, which the temporal pattern does not
+    # match -- and ` distinct states found` sits a few lines below it in the same
+    # output. Read in the old order, TLC refuting a property was recorded as
+    # `holds`. That is a lie in the one direction nothing can catch: an absent
+    # verdict is visible in expected.json, and a wrong one is not.
+    #
+    # So every refutation is now matched POSITIVELY, and `holds` additionally
+    # requires that TLC reported no error at all. Anything else reaches a `die`.
+    # An oracle that guesses is worse than one that stops, because D-9 makes these
+    # files the definition of "correct" -- there is nothing above them to appeal to.
+    if printf '%s\n' "$prop_out" | grep -q '^Error: Action property .* is violated\.'; then
+      # Recognised, and deliberately not recorded. Writing `violated` here would put
+      # a verdict with no counterexample LENGTH into `properties`, and length is what
+      # D-9 compares. The note above explains why a temporal verdict carries none --
+      # a lasso is not canonical -- and that reasoning does not reach this shape:
+      # `[][P]_vars` is a safety property, so TLC hands back a finite, breadth-first
+      # shortest prefix ending at the offending step, exactly like an invariant's.
+      # A lengthless verdict would therefore be both wrong and finished-looking.
+      # Giving the category its proper shape is #126; until then, stop.
+      printf '%s\n' "$prop_out" >&2
+      die "$name: $prop is an action property (\`[][P]_vars\`), whose verdict this script cannot record yet -- see #126"
+    elif printf '%s\n' "$prop_out" | grep -q '^Error: Temporal properties were violated\.'; then
       verdicts+="$prop violated"$'\n'
+    elif printf '%s\n' "$prop_out" | grep -q '^Error:'; then
+      printf '%s\n' "$prop_out" >&2
+      die "$name: TLC reported an error for $prop that this script does not recognise"
     elif printf '%s\n' "$prop_out" | grep -q ' distinct states found'; then
       verdicts+="$prop holds"$'\n'
     else
