@@ -125,6 +125,7 @@ declaration of record: it is what `PROPERTIES` is read from.
 | `raft_election` | `spec/07-examples.md` Example 2 (its liveness property is refuted by the term bound, by design) | ✅ | ✅ |
 | `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | ✅ |
 | `paxos` | Lamport, *Paxos Made Simple* TLA+ | ✅ | ✅ |
+| `audit_log` | #112's reproduction — the only entry written for this corpus rather than translated into it | ✅ | ✅ |
 
 No entry declares a `SYMMETRY` in its `.cfg`. Three of them could — processes, resources
 and servers are interchangeable — but TLC's symmetry sets and its `PROPERTIES` are not
@@ -137,13 +138,31 @@ The oracle column is filled in ahead of the ExTLA column deliberately: with the 
 answers already in the repository, every piece of the checker is measured against truth
 from the day it is written, rather than against its own output a phase later.
 
-All six agree, which is what D-9 asks of Phase 1. Each entry was chosen for a different
+All seven agree, which is what D-9 asks of Phase 1. Each entry was chosen for a different
 way the checker could be wrong: `die_hard` for the shortest counterexample,
 `two_phase_commit` for a state count too large to eyeball, `distributed_lock` for a
 product of param sets and a tuple in state, `raft_election` for params drawn from the
 pre-state and an end state that is not a deadlock, `bounded_buffer` for a sequence,
 where order distinguishes states a set would not, and `paxos` for a guard that
 quantifies over a subset of the messages in flight.
+
+`audit_log` is the exception to that sentence and to the shape of this corpus, and both
+deliberately (#114). Every other entry is a system someone would want to verify,
+translated into TLA+ so TLC can be asked about it. `audit_log` is three states and was
+written *for* the corpus, because the thing it holds the checker to is a **declaration
+kind** rather than an algorithm: an `action_property` is a predicate over a step, which
+TLC checks as a `PROPERTY` and not as an `INVARIANT`, and it was the one Layer 2 feature
+no entry had ever put to TLC. #112 is what that absence cost — an `action_property`
+counterexample built from the wrong end of the step, alive for as long as the feature was.
+
+Its content is one decoy. `compact` empties the log, so the offending step's post-state
+**is** the initial state, reachable at depth 1 by a route that never touches the offending
+step. A checker that walks parent pointers back from the post-state therefore hands back a
+one-state trace with no violation in it, and a correct one hands back four states ending in
+`compact` — a difference in **length**, which is what D-9 compares and what a comparison of
+verdicts alone cannot see. Reintroducing #112 fails this entry with `ExTLA returned 1 states`
+against TLC's 4 while leaving the other six green, which is the measurement that says the
+decoy is doing the work and not the entry's mere presence.
 
 ## Writing an entry
 

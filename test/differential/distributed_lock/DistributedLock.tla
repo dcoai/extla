@@ -106,6 +106,23 @@ HoldingMeansOwner ==
     \A r \in Resources : pc[p] = <<holding, r>> => owner[r] = p
 
 (***************************************************************************)
+(* The action property the ExTLA spec has always declared and TLC has never *)
+(* been shown (#114).  `[][P]_vars` is what an ExTLA `action_property` is:  *)
+(* a predicate over a STEP, which TLC checks as a PROPERTY and not as an    *)
+(* INVARIANT.                                                               *)
+(*                                                                          *)
+(* It says a lock is never handed straight from one process to another --   *)
+(* every change of owner passes through `none`.  That is a claim about the  *)
+(* PAIR of states, so no invariant can express it: `owner[r] = p` is not    *)
+(* wrong in any single state, only in one that followed the wrong one.      *)
+(***************************************************************************)
+LockNotStolen ==
+  [][\A r \in Resources :
+       \/ owner'[r] = owner[r]
+       \/ owner[r] = none
+       \/ owner'[r] = none]_vars
+
+(***************************************************************************)
 (* Liveness. `Holding(p)` spells out what the ExTLA side writes as         *)
 (* `match?({:holding, _}, pc[p])`: holding SOMETHING, whichever resource.  *)
 (***************************************************************************)

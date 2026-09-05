@@ -14,6 +14,28 @@ defmodule TLA.DifferentialCase do
 
   An `entry` is `%{name:, module:, constants:, names:}`, described in
   `test/differential/differential_test.exs`.
+
+  ## Every comparison runs in isolation, and that is why `action_properties: []`
+  ## is everywhere
+
+  A comparison selects the one declaration it is about and deselects everything
+  else — one invariant name, or one temporal, or one action property, with the
+  other lists empty. Both checkers halt at the first violation, so a run checking
+  two things reports on whichever it met first, and a length compared out of such
+  a run is a length for a different question.
+
+  So a bare `action_properties: []` beside `invariants: [name]` is not an
+  oversight; it is the same deselection as the `invariants: []` beside
+  `temporals: names` in `check_liveness/2`. #114 read the seven `[]`s as the
+  defect, and they are not it: the defect was that **no call site anywhere passed
+  a non-empty list**, so the one declaration kind with its own compile path, its
+  own runtime check and its own counterexample shape was never compared to
+  anything. `check_action_properties/2` is that site, and #112 — an
+  `action_property` counterexample built from the wrong end of the step, alive for
+  as long as the feature was — is what its absence cost.
+
+  The `setup_all` search is the one exception with a *different* reason, given
+  where it happens.
   """
 
   defmacro __using__(opts) do
@@ -32,9 +54,12 @@ defmodule TLA.DifferentialCase do
           |> Jason.decode!()
 
         # The state-count comparison must run with nothing selected on either
-        # side. An ExTLA action property that TLC's module does not have would
-        # otherwise halt the search early and make the counts differ for a
-        # reason that is not a bug.
+        # side, and this `[]` is the one in the file with a reason of its own
+        # rather than the isolation reason in the moduledoc: a selected property
+        # that is REFUTED halts the search, and a truncated search counts fewer
+        # states for a reason that is not a bug. `audit_log` is where that stops
+        # being hypothetical — its `log_only_grows` is refuted at the third step,
+        # so selecting it here would compare 2 states against TLC's 3.
         # `liveness_graph: true` so the edge table exists for `TLA.GraphAudit` to audit.
         # Built here rather than in that test, because building it there meant exploring
         # `raft_election` a second time — 20 seconds of this suite for a graph this one
@@ -128,7 +153,16 @@ defmodule TLA.DifferentialCase do
       # comparing the same LIST. A `temporal` added to `spec.ex` and not to the
       # module would otherwise sit there unchecked, and the verdict comparison
       # would pass by not looking at it.
-      test "declares the temporal properties TLC was given, and no others", ctx do
+      #
+      # It covers `action_property` as well as `temporal` (#114), because TLC's
+      # PROPERTIES section holds both — `[][P]_vars` is checked as a property and
+      # not as an invariant — and because an action property is exactly what it
+      # was failing to notice. `distributed_lock` declared `lock_not_stolen` for
+      # as long as the entry existed, `DistributedLock.tla` had no counterpart,
+      # and this test passed the whole time by looking only at `spec.temporals`.
+      # A test that establishes presence is worth having only over the full list;
+      # over part of it, it certifies the part it looks at and hides the rest.
+      test "declares the properties TLC was given, and no others", ctx do
         spec = TLA.Spec.Compiled.from_module(@entry.module)
 
         checked =
@@ -136,10 +170,11 @@ defmodule TLA.DifferentialCase do
           |> Map.keys()
           |> MapSet.new(&TLA.DifferentialCase.dsl_name(&1, @entry))
 
-        declared = MapSet.new(spec.temporals, &Atom.to_string(&1.name))
+        declared =
+          MapSet.new(spec.temporals ++ spec.action_properties, &Atom.to_string(&1.name))
 
         assert MapSet.equal?(declared, checked),
-               "the two sides declare different temporal properties -- only in " <>
+               "the two sides declare different properties -- only in " <>
                  "#{inspect(@entry.module)}: " <>
                  inspect(Enum.sort(MapSet.difference(declared, checked))) <>
                  ", only in #{ctx.expected["module"]}.cfg: " <>
@@ -153,14 +188,16 @@ defmodule TLA.DifferentialCase do
       test "agrees with TLC on every temporal property", ctx do
         spec = TLA.Spec.Compiled.from_module(@entry.module)
 
+        # `properties` holds both kinds, because it records the .cfg section they
+        # came from. Which kind a name is, is a question about the ExTLA spec and
+        # is answered there rather than written into the fixture.
         {holding, violated} =
-          Enum.split_with(ctx.expected["properties"], fn {_, verdict} -> verdict == "holds" end)
+          spec
+          |> TLA.DifferentialCase.properties_of_kind(ctx.expected, @entry, :temporal)
+          |> Enum.split_with(fn {_, verdict} -> verdict == "holds" end)
 
         if holding != [] do
-          names =
-            Enum.map(holding, fn {tlc_name, _} ->
-              TLA.DifferentialCase.temporal_name!(spec, tlc_name, @entry)
-            end)
+          names = Enum.map(holding, &elem(&1, 0))
 
           result = TLA.DifferentialCase.check_liveness(@entry, names)
 
@@ -171,12 +208,11 @@ defmodule TLA.DifferentialCase do
 
         # The row that distinguishes a working liveness checker from one that answers
         # "holds" to everything.
-        for {tlc_name, "violated"} <- violated do
-          name = TLA.DifferentialCase.temporal_name!(spec, tlc_name, @entry)
+        for {name, "violated"} <- violated do
           result = TLA.DifferentialCase.check_liveness(@entry, [name])
 
           assert result.status == :violation,
-                 "TLC refutes #{tlc_name}, but ExTLA reported #{inspect(result.status)}"
+                 "TLC refutes #{name}, but ExTLA reported #{inspect(result.status)}"
 
           assert TLA.DifferentialCase.refuted(result) == name
           assert result.violation.prefix.length > 0
@@ -200,6 +236,54 @@ defmodule TLA.DifferentialCase do
         end
       end
 
+      # The comparison the corpus did not have (#114), and the reason #112 lived as long
+      # as the feature did.
+      #
+      # Shaped like the INVARIANT comparison rather than the temporal one, because an
+      # action property is a safety property. `[][P]_vars` is refuted by a finite prefix
+      # ending at the offending step, and TLC reports the breadth-first shortest one — so
+      # the LENGTH is a fixture two correct checkers must agree on, exactly as it is for
+      # an invariant, and unlike a lasso, which is not canonical. That length is the whole
+      # point: #112's defect returned the right VERDICT from the wrong trace, so a
+      # comparison of verdicts alone would have passed it.
+      test "agrees with TLC on every action property", ctx do
+        spec = TLA.DifferentialCase.run_spec(@entry)
+
+        {holding, violated} =
+          spec
+          |> TLA.DifferentialCase.properties_of_kind(ctx.expected, @entry, :action_property)
+          |> Enum.split_with(fn {_, verdict} -> verdict == "holds" end)
+
+        # Several that hold share one run, for the reason several invariants do: a run
+        # that checks them all and completes has established every one, because nothing
+        # stopped it early.
+        if holding != [] do
+          names = Enum.map(holding, &elem(&1, 0))
+          result = TLA.DifferentialCase.check_action_properties(@entry, names)
+
+          assert result.status == :ok,
+                 "every one of #{inspect(names)} holds under TLC, but ExTLA reported " <>
+                   "#{inspect(result.status)}#{TLA.DifferentialCase.describe(result.violation)}"
+        end
+
+        # A refuted one needs a run of its own, because both checkers halt at the first
+        # violation and the shortest counterexample for THIS property is only what a run
+        # checking only it reports.
+        for {name, %{"violated_at" => depth}} <- violated do
+          result = TLA.DifferentialCase.check_action_properties(@entry, [name])
+
+          assert result.status == :violation,
+                 "TLC refutes #{name}, but ExTLA reported #{inspect(result.status)}"
+
+          assert result.violation.property == name
+
+          assert result.violation.length == depth,
+                 "TLC refutes #{name} with a #{depth}-state behaviour and ExTLA returned " <>
+                   "#{result.violation.length} states. A counterexample that ends anywhere " <>
+                   "but at the offending step is a legal path to an innocent state (#112)."
+        end
+      end
+
       # Every violation the entry produces, safety and liveness alike, checked against the
       # spec rather than against a fixture. Until this existed, nothing checked that a
       # counterexample's consecutive states were connected by the actions it names: the
@@ -218,12 +302,31 @@ defmodule TLA.DifferentialCase do
                  "the safety counterexample for #{name} is not a behaviour of the spec"
         end
 
-        for {tlc_name, "violated"} <- ctx.expected["properties"] do
-          name = TLA.DifferentialCase.temporal_name!(spec, tlc_name, @entry)
+        for {name, "violated"} <-
+              TLA.DifferentialCase.properties_of_kind(spec, ctx.expected, @entry, :temporal) do
           result = TLA.DifferentialCase.check_liveness(@entry, [name])
 
           assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
                  "the lasso for #{name} is not a behaviour of the spec"
+        end
+
+        # The sharpest of the three, because of what `validate/3` became in #113: a
+        # SAFETY trace must now refute the property it names, and an action property's
+        # trace refutes it only if its final STEP does. That is precisely the assertion
+        # a fabricated counterexample fails — #112's trace was a legal path to an
+        # innocent state, which the pre-#113 `validate/3` accepted.
+        for {name, %{"violated_at" => _}} <-
+              TLA.DifferentialCase.properties_of_kind(
+                spec,
+                ctx.expected,
+                @entry,
+                :action_property
+              ) do
+          result = TLA.DifferentialCase.check_action_properties(@entry, [name])
+
+          assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
+                 "the counterexample for the action property #{name} is not a behaviour " <>
+                   "of the spec, or does not refute it"
         end
       end
 
@@ -332,6 +435,23 @@ defmodule TLA.DifferentialCase do
     check(entry, invariants: [], action_properties: [], check_liveness: true, temporals: names)
   end
 
+  @doc """
+  Check `names` as action properties with nothing else selected.
+
+  The call site #114 found missing. Every other comparison in this module deselects
+  action properties; until this existed none selected them, so the corpus contained an
+  `action_property` declaration (`distributed_lock`'s `lock_not_stolen`) that no run ever
+  evaluated and no oracle ever saw.
+
+  `invariants: []` for the same reason `check_liveness/2` passes it: the checker halts at
+  the first violation, so an invariant refuted earlier in the search would end the run
+  before the action property was reached and the length compared would answer a different
+  question.
+  """
+  def check_action_properties(entry, names) do
+    check(entry, invariants: [], action_properties: names)
+  end
+
   @doc "The property a liveness violation refuted, or `nil`."
   def refuted(%{violation: %{prefix: prefix}}), do: prefix.property
   def refuted(_result), do: nil
@@ -371,24 +491,62 @@ defmodule TLA.DifferentialCase do
   end
 
   @doc """
-  The ExTLA name of a TLC temporal property.
+  The entries of `expected["properties"]` that are of `kind` on the ExTLA side, as
+  `{name, verdict}` with the name already translated.
+
+  `expected.json` records a `.cfg`'s whole PROPERTIES section under one key, because that
+  is where TLC read it from, and that section holds two different kinds: a `temporal`
+  property, and an `action_property`, which is `[][P]_vars` and which TLC checks as a
+  PROPERTY rather than as an INVARIANT. They are compared differently — one by verdict
+  alone, the other by verdict and counterexample length — so they have to be told apart.
+
+  Which kind a name is, is a question about the **ExTLA spec**, and it is answered from
+  the spec rather than recorded in the fixture. A shape written down in two places is a
+  shape that can disagree with itself, and the fixture is generated by a tool that has no
+  business classifying the user's declarations.
+  """
+  def properties_of_kind(spec, expected, entry, kind) do
+    for {tlc_name, verdict} <- Map.fetch!(expected, "properties"),
+        {^kind, name} <- [property_kind!(spec, tlc_name, entry)],
+        do: {name, verdict}
+  end
+
+  @doc """
+  Which kind of declaration a TLC property name is on the ExTLA side, and its name there.
 
   Resolved through the compiled spec for the reason `invariant_name!/3` is: a property TLC
   checked that the ExTLA spec does not declare would otherwise pass by not being compared.
   """
-  def temporal_name!(spec, tlc_name, entry) do
+  def property_kind!(spec, tlc_name, entry) do
     underscored = dsl_name(tlc_name, entry)
+    named? = &(Atom.to_string(&1.name) == underscored)
 
-    case Enum.find(spec.temporals, &(Atom.to_string(&1.name) == underscored)) do
-      nil ->
+    case {Enum.find(spec.temporals, named?), Enum.find(spec.action_properties, named?)} do
+      {%{name: name}, nil} ->
+        {:temporal, name}
+
+      {nil, %{name: name}} ->
+        {:action_property, name}
+
+      {nil, nil} ->
         raise ExUnit.AssertionError,
           message:
-            "TLC checked the temporal property #{tlc_name}, but #{inspect(spec.module)} " <>
-              "declares no `temporal #{underscored}`. Declared: " <>
-              Enum.map_join(spec.temporals, ", ", &inspect(&1.name)) <> "."
+            "TLC checked the property #{tlc_name}, but #{inspect(spec.module)} declares " <>
+              "neither `temporal #{underscored}` nor `action_property #{underscored}`. " <>
+              "Declared temporals: " <>
+              Enum.map_join(spec.temporals, ", ", &inspect(&1.name)) <>
+              ". Declared action properties: " <>
+              Enum.map_join(spec.action_properties, ", ", &inspect(&1.name)) <> "."
 
-      temporal ->
-        temporal.name
+      # Uniqueness is checked per kind (`TLA.Spec.check_unique_names!/3`), so one name can
+      # legally be both — and then the .cfg's single entry does not say which one TLC
+      # checked, and the comparison would silently pick one.
+      {%{}, %{}} ->
+        raise ExUnit.AssertionError,
+          message:
+            "#{inspect(spec.module)} declares both `temporal #{underscored}` and " <>
+              "`action_property #{underscored}`, so #{tlc_name} in the .cfg is ambiguous. " <>
+              "Rename one."
     end
   end
 

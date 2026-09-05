@@ -22,6 +22,7 @@
     "HoldingMeansOwner": "holds"
   },
   "properties": {
+    "LockNotStolen": "holds",
     "NoStarvation": "holds",
     "LockEventuallyReleased": "holds"
   }

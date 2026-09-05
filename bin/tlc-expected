@@ -6,7 +6,11 @@
 #   bin/tlc-expected --check         re-run TLC and fail on any drift (CI)
 #
 # It records the safety verdicts (state counts, deadlock, invariants) and, from
-# a run of its own per property, TLC's verdict on each temporal property.
+# a run of its own per property, TLC's verdict on each property the PROPERTIES
+# section names -- temporal or action. A refuted temporal property is recorded as
+# `violated` and a refuted action property as `{"violated_at": n}`, because the
+# second has a counter-example whose length two correct checkers must agree on
+# and the first does not (see the note above the classifier).
 #
 # expected.json is what TLC reported, never hand-edited: it is the oracle ExTLA
 # is measured against (spec/08-decisions.md D-9), so a human editing it to make a
@@ -91,6 +95,37 @@ parse_violations() {
       n = $2; sub(/:$/, "", n); if (n + 0 > depth) depth = n + 0
     }
     END { flush(); for (i = 1; i <= k; i++) print order[i], seen[order[i]] }
+  '
+}
+
+# The length of the counter-example TLC reported for an ACTION property, in
+# states:
+#
+#   Error: Action property LogOnlyGrows is violated.
+#   Error: The behavior up to this point is:
+#   State 1: <Initial predicate>
+#   ...
+#   State 4: <Compact ...>
+#
+# read as the highest `State N:` inside the FIRST such report. First, for the
+# reason `parse_violations` takes the first invariant report: TLC searches
+# breadth-first, so the first is the shortest and any later one is at the same
+# depth or deeper. A separate function from `parse_violations` rather than
+# another rule inside it, because the two read different streams -- that one
+# reads the safety pass, which has the PROPERTIES section removed and therefore
+# cannot contain this line at all.
+action_property_depth() {
+  awk '
+    /^Error: Action property .* is violated\.$/ {
+      if (started) finished = 1; else started = 1
+      next
+    }
+    finished { next }
+    /^[0-9]+ states generated/ { finished = 1; next }
+    started && /^State [0-9]+:/ {
+      n = $2; sub(/:$/, "", n); if (n + 0 > depth) depth = n + 0
+    }
+    END { print depth + 0 }
   '
 }
 
@@ -205,12 +240,25 @@ generate() {
 
   local violations; violations="$(printf '%s\n' "$output" | parse_violations)"
 
-  # One pass per temporal property. The verdict is `holds` or `violated` and
-  # nothing more: TLC's counter-example is a lasso, but its lasso is not
+  # One pass per property. A TEMPORAL property's verdict is `holds` or `violated`
+  # and nothing more: TLC's counter-example is a lasso, but its lasso is not
   # canonical the way a breadth-first shortest counter-example is, so two
   # correct checkers can hand back different cycles. A fixture the checker
   # cannot be expected to match is worse than no fixture.
-  local verdicts="" prop prop_cfg prop_out
+  #
+  # An ACTION property is the other case, and it takes a length (#126). `[][P]_vars`
+  # is a SAFETY property: its counter-example is a finite prefix ending at the
+  # offending step, and TLC reports the breadth-first shortest one -- exactly the
+  # shape of an invariant's, and nothing like a lasso. So the argument above does
+  # not reach it, and dropping the length would discard the one thing D-9 compares.
+  # It is therefore recorded in the same `{"violated_at": n}` form the `invariants`
+  # section uses, because it is the same kind of answer.
+  #
+  # Both live under `properties`, because that is the section of the .cfg TLC read
+  # them from. Which one a name IS is not recorded here and does not need to be:
+  # the ExTLA side knows, since the name is declared as one or the other in its
+  # spec, and a shape written down twice is a shape that can disagree with itself.
+  local verdicts="" prop prop_cfg prop_out prop_depth
   while IFS= read -r prop; do
     [[ -n "$prop" ]] || continue
     prop_cfg="$WORK/$name-$prop.cfg"
@@ -241,16 +289,12 @@ generate() {
     # An oracle that guesses is worse than one that stops, because D-9 makes these
     # files the definition of "correct" -- there is nothing above them to appeal to.
     if printf '%s\n' "$prop_out" | grep -q '^Error: Action property .* is violated\.'; then
-      # Recognised, and deliberately not recorded. Writing `violated` here would put
-      # a verdict with no counterexample LENGTH into `properties`, and length is what
-      # D-9 compares. The note above explains why a temporal verdict carries none --
-      # a lasso is not canonical -- and that reasoning does not reach this shape:
-      # `[][P]_vars` is a safety property, so TLC hands back a finite, breadth-first
-      # shortest prefix ending at the offending step, exactly like an invariant's.
-      # A lengthless verdict would therefore be both wrong and finished-looking.
-      # Giving the category its proper shape is #126; until then, stop.
-      printf '%s\n' "$prop_out" >&2
-      die "$name: $prop is an action property (\`[][P]_vars\`), whose verdict this script cannot record yet -- see #126"
+      prop_depth="$(printf '%s\n' "$prop_out" | action_property_depth)"
+      if [[ "$prop_depth" -lt 1 ]]; then
+        printf '%s\n' "$prop_out" >&2
+        die "$name: TLC refuted $prop but printed no behaviour to measure"
+      fi
+      verdicts+="$prop violated_at $prop_depth"$'\n'
     elif printf '%s\n' "$prop_out" | grep -q '^Error: Temporal properties were violated\.'; then
       verdicts+="$prop violated"$'\n'
     elif printf '%s\n' "$prop_out" | grep -q '^Error:'; then
@@ -309,12 +353,20 @@ generate() {
 
     printf '  "properties": {'
     first=1
-    local verdict
+    local verdict prop_at
     while IFS= read -r prop; do
       [[ -n "$prop" ]] || continue
       verdict="$(printf '%s\n' "$verdicts" | awk -v p="$prop" '$1 == p { print $2; exit }')"
+      prop_at="$(printf '%s\n' "$verdicts" | awk -v p="$prop" '$1 == p { print $3; exit }')"
       [[ $first -eq 1 ]] || printf ','
-      printf '\n    "%s": "%s"' "$(json_escape "$prop")" "$verdict"
+      # Two shapes, and which one appears says which kind of property this is --
+      # derived from what TLC reported rather than from a classification kept by
+      # hand, so it cannot fall out of step with the .cfg.
+      if [[ "$verdict" == "violated_at" ]]; then
+        printf '\n    "%s": {"violated_at": %s}' "$(json_escape "$prop")" "$prop_at"
+      else
+        printf '\n    "%s": "%s"' "$(json_escape "$prop")" "$verdict"
+      fi
       first=0
     done < <(declared_properties "$cfg")
     [[ $first -eq 1 ]] && echo '}' || printf '\n  }\n'
