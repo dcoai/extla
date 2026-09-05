@@ -89,3 +89,116 @@ for entry <- entries do
     use TLA.DifferentialCase, entry: entry
   end
 end
+
+defmodule TLA.DifferentialTest.DeclarationKinds do
+  @moduledoc """
+  A claim about the corpus as a whole rather than about any one entry: **every kind of
+  declaration the DSL has is put to TLC somewhere** (#114).
+
+  It exists because an absence is invisible by construction. `action_property` was a
+  first-class declaration with its own compile path, its own runtime check and its own
+  counterexample shape, and no corpus entry had ever asked TLC about one — which left no
+  failing test, no line in a golden and nothing in any diff. #112 lived there for as long
+  as the feature had existed, and was found by someone happening to look. #75 and #90 were
+  found the same way.
+
+  Nothing here checks that the checker is *right*; the per-entry comparisons do that. This
+  checks that each kind is inside the set of things being checked at all, which is the one
+  question those comparisons cannot ask about themselves.
+  """
+  use ExUnit.Case, async: true
+
+  @entries entries
+  @corpus Path.expand(".", __DIR__)
+
+  # The kinds this test knows how to look for, kept beside the `exercised?/3` clauses and
+  # compared against the DSL's own enumeration below. A hand-written copy of that
+  # enumeration would pass on the day a sixth kind was added, which is the exact day it
+  # needs to fail.
+  @routed [:action, :invariant, :temporal, :action_property, :terminal]
+
+  test "there is a stated route to TLC for every declaration kind the DSL has" do
+    declared = MapSet.new(TLA.Spec.Hash.kinds())
+    routed = MapSet.new(@routed)
+
+    assert MapSet.equal?(declared, routed), """
+    The DSL and this test disagree about which declaration kinds exist.
+
+      only in TLA.Spec.Hash.kinds/0: #{inspect(Enum.sort(MapSet.difference(declared, routed)))}
+      only in @routed:               #{inspect(Enum.sort(MapSet.difference(routed, declared)))}
+
+    A kind in the first list is a declaration the differential corpus has no oracle for.
+    That is the state `action_property` was in until #114, and #112 is what it cost: the
+    counterexample was built from the wrong end of the step for as long as the feature had
+    existed, and nothing could notice, because D-9's corpus — the project's acceptance
+    criterion — had never asked TLC about one.
+
+    Add an `exercised?/3` clause saying how the kind reaches TLC's recorded answer, and add
+    it to @routed. If there is no such route, that is the finding: the kind has no oracle.
+    """
+  end
+
+  test "every declaration kind is put to TLC by some corpus entry" do
+    loaded =
+      Enum.map(@entries, fn entry ->
+        expected =
+          [@corpus, entry.name, "expected.json"]
+          |> Path.join()
+          |> File.read!()
+          |> Jason.decode!()
+
+        {entry, TLA.Spec.Compiled.from_module(entry.module), expected}
+      end)
+
+    # `@routed` rather than `TLA.Spec.Hash.kinds/0`: the test above owns the claim that the
+    # two agree, and iterating the DSL's list here would blow up with a FunctionClauseError
+    # on a kind that has no clause instead of leaving that failure where its message is.
+    for kind <- @routed do
+      covering =
+        for {entry, spec, expected} <- loaded,
+            exercised?(kind, spec, expected),
+            do: entry.name
+
+      assert covering != [], """
+      No corpus entry puts `#{kind}` to TLC.
+
+      Declaring one somewhere is not enough — `distributed_lock` declared
+      `action_property :lock_not_stolen` from the day it was written, `DistributedLock.tla`
+      had no counterpart, and every gate in the project passed for the entry's whole life.
+      The entry has to reach TLC's recorded answer in `expected.json`.
+
+      See `test/differential/README.md` §Writing an entry, and `audit_log` for the smallest
+      one there is — three states, written for this corpus rather than translated into it,
+      because what it holds the checker to is a declaration kind and not an algorithm.
+      """
+    end
+  end
+
+  # How each kind reaches TLC's oracle. Four of the five have a per-item verdict recorded in
+  # `expected.json`; `:action` is the one that does not, and that is a fact about TLC rather
+  # than a gap here — TLC has no per-action report. What it has instead is the state count
+  # and the search depth, which are a function of the transition relation the actions ARE,
+  # and which every entry compares. So the clause is weak-looking and honest: an entry with
+  # a wrong action does not agree with TLC on `distinct_states`.
+  defp exercised?(:action, spec, expected),
+    do: spec.actions != [] and is_integer(expected["distinct_states"])
+
+  defp exercised?(:invariant, spec, expected),
+    do: spec.invariants != [] and expected["invariants"] not in [nil, %{}]
+
+  # `properties` holds both temporal and action properties, because it records the .cfg
+  # section they came from; `properties_of_kind/4` splits them by which list the name is
+  # declared in on the ExTLA side. It raises on a name that is in neither, which is the
+  # right behaviour here too — a fixture naming a property the spec does not declare is a
+  # finding, not something to return `false` for.
+  defp exercised?(kind, spec, expected) when kind in [:temporal, :action_property] do
+    TLA.DifferentialCase.properties_of_kind(spec, expected, %{names: %{}}, kind) != []
+  end
+
+  # A `terminal` is compared through `deadlock`: TLC calls any successor-less state a
+  # deadlock, ExTLA reports one only where no `terminal` admits it, and the two are held to
+  # each other by "stops where TLC stops, and every stuck state was declared". An entry that
+  # declares a terminal and whose TLC run never deadlocked would not have exercised it.
+  defp exercised?(:terminal, spec, expected),
+    do: spec.terminals != [] and expected["deadlock"] == true
+end
