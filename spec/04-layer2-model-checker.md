@@ -1039,8 +1039,82 @@ defmodule TLA.Trace do
   """
   @spec to_diffs(t()) :: [%{action: atom(), changed: map(), full_state: map()}]
   def to_diffs(trace)
+
+  @doc """
+  Evaluate named expressions at every state, as a table.
+  """
+  @spec explore(t() | lasso(), keyword((TLA.State.t() -> term())), keyword()) :: String.t()
+  def explore(trace_or_lasso, expressions, opts \\ [])
 end
 ```
+
+### Exploring a trace
+
+`format/1` prints every variable of every state. That is the right default and it is not
+enough for the traces that matter: `raft_election`'s counterexample is nineteen states of
+five variables, several of them maps over three servers. The question a reader actually
+has — *when did the quorum first form*, *how many acceptors had promised by state 12* — is
+a **function of the state**, and answering it from the dumps means reading nineteen blocks
+and doing arithmetic by hand.
+
+`explore/3` evaluates the reader's own expressions instead, one row each, one column per
+state:
+
+```elixir
+TLA.Trace.explore(trace,
+  waiting: &length(&1.waiting),
+  holder:  & &1.holder,
+  quorum?: &(map_size(&1.votes) * 2 > 3)
+)
+```
+
+```
+═══ EXPLORE: mutual_exclusion ══════════════════════════════════
+
+                  1        2        3        4        5
+               init  request  request  acquire  release
+  ──────────────────────────────────────────────────────
+  waiting         0        1        2        1        1
+  holder        nil      nil      nil   :alice      nil
+  quorum?     false    false    false    false    false
+
+  Bindings:
+    2  request(client: :alice)
+    3  request(client: :bob)
+    4  acquire(client: :alice)
+    5  release(client: :alice)
+════════════════════════════════════════════════════════════════
+```
+
+TLA+ answers the same question with the Toolbox's **Trace Explorer**, which lists the
+expressions, generates a spec in which they are extra definitions, re-runs TLC and shows
+the result in an Eclipse panel. **None of that apparatus is needed here.** A `TLA.State.t()`
+is a plain map and an arbitrary expression over one is an anonymous function, so what needs
+spec regeneration and a checker re-run in TLA+ is `Enum.map/2` over `states`. It is
+terminal-native for the same reason `to_dot/2` emits DOT rather than HTML (§Deferred): the
+value is in the *evaluation*, not in the widget.
+
+Four properties the rendering is required to have:
+
+- **Expressions are a keyword list and rows keep that order.** The order a reader asked
+  their questions in is information; sorting it would throw that away.
+- **Columns are chunked to a width budget** (`:width`, default 68 — the width the banners
+  are ruled at), each group repeating the name column. Nineteen states at eight characters
+  a column is 152, so a renderer emitting one column per state cannot render the trace this
+  exists for. The promise is about the number of states, not about one value: a value wider
+  than the budget is printed in full, because truncating it would make the table lie.
+- **`changed_only: true`** hides rows whose value never moves, the way `format/1` marks
+  `← changed`. A wide trace is mostly repetition and the interesting row is the one that
+  moved; a row that moves at *every* step is never hidden.
+- **An expression that raises is reported, not propagated.** A counterexample is being
+  explored *because* something is wrong, so an expression that assumes an invariant the
+  trace violates is the normal case rather than an error. That cell is marked `⚠` and the
+  exception's message printed under the table against its state and its name; the rest of
+  the table still renders.
+
+A `lasso()` is accepted wherever a `t()` is, flattened exactly as `format/1` flattens one,
+with the repeating columns marked `↺` and the same loop note beneath. A lasso whose `cycle`
+is `nil` is a prefix and is given no cycle marking — there is nothing there to repeat.
 
 ### Example Trace Output
 

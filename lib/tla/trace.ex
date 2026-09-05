@@ -416,16 +416,8 @@ defmodule TLA.Trace do
   """
   def format(%{prefix: prefix, cycle: nil}), do: format(prefix)
 
-  def format(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do
-    back_to = length(prefix.states)
-
-    joined = %{
-      prefix
-      | states: prefix.states ++ tl(cycle.states),
-        actions: prefix.actions ++ cycle.actions,
-        bindings: prefix.bindings ++ cycle.bindings,
-        length: prefix.length + cycle.length - 1
-    }
+  def format(%{prefix: _, cycle: %__MODULE__{}} = lasso) do
+    {joined, {back_to, cycle}} = join(lasso)
 
     format(joined) <> loop_note(cycle, back_to)
   end
@@ -445,14 +437,79 @@ defmodule TLA.Trace do
     header <> "\n\n" <> body <> "\n" <> String.duplicate("═", 68) <> "\n"
   end
 
+  @doc """
+  Evaluate your own named expressions at every state of a counterexample, as a table.
+
+      TLA.Trace.explore(trace,
+        waiting: &length(&1.waiting),
+        holder:  & &1.holder,
+        quorum?: &(map_size(&1.votes) * 2 > 3)
+      )
+
+  `format/1` prints every variable of every state, which is the right default and is what
+  nineteen states of five variables makes unreadable. The question a reader actually has —
+  *when did the quorum first form*, *how many acceptors had promised by state 12* — is a
+  **function of the state**, and this evaluates it at each one and prints a row.
+
+  TLA+ answers the same question with the Toolbox's Trace Explorer, which needs a generated
+  spec, a TLC re-run and a GUI panel. Here a `TLA.State.t()` is a plain map and an arbitrary
+  expression over one is an anonymous function, so the apparatus is `Enum.map/2`.
+
+  `expressions` is a **keyword list**, rendered in the order given: the caller's order is
+  information, and sorting it would throw that away. Accepts a `lasso/0` as readily as a
+  `t/0`, marking the states that repeat.
+
+  ## Options
+
+    * `:changed_only` — hide rows whose value is the same at every state. A wide trace is
+      mostly repetition and the interesting row is the one that moved. Defaults to `false`.
+    * `:width` — the column budget, defaulting to 68, the width `format/1` rules its banners
+      at. States are chunked into groups that fit it, each group repeating the name column.
+      This is a promise about the number of states, not about a single value: a value wider
+      than the budget is printed in full, because truncating it would make the table lie.
+
+  ## An expression that raises is reported, not swallowed
+
+  A counterexample is being explored *because* something is wrong, so an expression that
+  assumes an invariant the trace violates is the normal case rather than an error. That cell
+  is marked `⚠` and the exception's message is printed under the table, naming the state and
+  the expression — the rest of the table still renders.
+  """
+  defdelegate explore(trace_or_lasso, expressions, opts \\ []), to: TLA.Trace.Explore
+
+  # ── Shared with TLA.Trace.Explore ───────────────────────────────────────────
+  #
+  # These four exist so the two renderings of a trace agree rather than drift: the same
+  # lasso flattening, the same `action(binding)` shape, the same banner rule and the same
+  # sentence about what happens after the last state printed. `@doc false` because they
+  # are the shape of the output, not public API.
+
+  @doc false
+  def join(%__MODULE__{} = trace), do: {trace, nil}
+
+  def join(%{prefix: prefix, cycle: nil}), do: {prefix, nil}
+
+  def join(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do
+    joined = %{
+      prefix
+      | states: prefix.states ++ tl(cycle.states),
+        actions: prefix.actions ++ cycle.actions,
+        bindings: prefix.bindings ++ cycle.bindings,
+        length: prefix.length + cycle.length - 1
+    }
+
+    {joined, {length(prefix.states), cycle}}
+  end
+
+  @doc false
   # The whole point of a lasso: what happens after the last state printed. Without this
   # line the trace reads as though it ended, and "ended" is the one thing it did not do.
-  defp loop_note(%__MODULE__{actions: []}, back_to) do
+  def loop_note(%__MODULE__{actions: []}, back_to) do
     "\nState #{back_to} has no successors: the behaviour stutters there forever " <>
       "(02-dsl-semantics.md §5.3).\n"
   end
 
-  defp loop_note(%__MODULE__{states: states}, back_to) do
+  def loop_note(%__MODULE__{states: states}, back_to) do
     "\n↺ back to state #{back_to} — states #{back_to}-#{back_to + length(states) - 2} " <>
       "repeat forever.\n"
   end
@@ -461,7 +518,8 @@ defmodule TLA.Trace do
   defp header(%{type: :safety, property: property}), do: banner("VIOLATION: #{property}")
   defp header(%{type: :liveness, property: property}), do: banner("LIVENESS: #{property}")
 
-  defp banner(title) do
+  @doc false
+  def banner(title) do
     line = String.duplicate("═", max(0, 68 - String.length(title) - 5))
     "═══ " <> title <> " " <> line
   end
@@ -503,9 +561,10 @@ defmodule TLA.Trace do
     transition <> label <> "\n" <> variables <> "\n"
   end
 
-  defp call(action, params) when map_size(params) == 0, do: "#{action}"
+  @doc false
+  def call(action, params) when map_size(params) == 0, do: "#{action}"
 
-  defp call(action, params) do
+  def call(action, params) do
     arguments =
       params
       |> Enum.sort_by(fn {name, _} -> name end)
