@@ -13,7 +13,7 @@ defmodule TLA.CheckJsonSchemaTest do
   @envelope_keys ~w(schema_version specs)
   @entry_keys ~w(
     spec status message distinct_states states_found transitions diameter deadlock
-    duration_ms fingerprint_bits collision_estimate warnings coverage violation
+    duration_ms fingerprint_bits collision_estimate warnings coverage profile violation
   )
   @coverage_keys ~w(actions never_enabled invariants vacuous terminal_but_live bounded_by)
 

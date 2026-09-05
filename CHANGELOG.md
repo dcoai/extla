@@ -14,6 +14,37 @@ does not restate it.
 `mix.exs` reads `0.2.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Added
+
+- `TLA.Profile` and `mix tla.check --profile` — what each of *your* declarations cost, per
+  invariant, action guard, transition, action property and terminal (#116, #130). `TLA.Coverage`
+  says how often the checker asked; this says what the answer cost, which is the half a spec
+  author can act on.
+
+  **Measured in reductions, not milliseconds.** Every performance number this project had was
+  caveated by a CPU model and a load average — `bench/search_profile.baseline.md` records a
+  `raft` run swinging from 23.4 s to 30.5 s on machine load alone — and a ranking that changes
+  with the load average is not a finding. Under 32 competing processes the same fixed workload
+  spread 100.3% in wall time and not at all in reductions.
+
+  The cost reported is the per-evaluation **floor** times the evaluations, not the accumulated
+  total: accumulating gave spreads of 26.7% and 47.8% between identical runs, while every
+  declaration's floor came back a single value across eight loaded runs. Anything above the floor
+  in one evaluation is the scheduler, not the predicate. A predicate whose cost genuinely varies
+  with the state is the one thing a floor cannot see, so it is flagged rather than averaged away.
+
+  Off by default, and free when off — the closures `TLA.Spec.Compiled` already holds are wrapped
+  only when a profile is asked for, so no macro work and no recompilation is involved.
+
+### Changed
+
+- **`mix tla.check --format json` is now `schema_version: 2`**, gaining a `profile` key that is
+  `null` unless the run was profiled. Purely additive, and it bumps anyway: "additive changes do
+  not count" is the reasoning that makes a version stop meaning anything, and this one exists so
+  a reader can refuse a shape it does not know rather than misread it. `TLA.Mix.TraceFile`
+  refuses a version-1 document naming both versions, and re-running `mix tla.check --format json`
+  regenerates it.
+
 ## [0.2.0] — 2026-09-04
 
 The documentation release. A getting-started guide and an eleven-page tutorial, with every

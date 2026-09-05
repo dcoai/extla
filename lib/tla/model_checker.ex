@@ -28,7 +28,7 @@ defmodule TLA.ModelChecker do
   alias TLA.Spec.Type
   alias TLA.Temporal
   alias TLA.Temporal.Fairness
-  alias TLA.{Coverage, Fingerprint, Spec, State, StateGraph, Symmetry, Trace}
+  alias TLA.{Coverage, Fingerprint, Profile, Spec, State, StateGraph, Symmetry, Trace}
 
   @type config :: %{
           optional(:constants) => map(),
@@ -54,6 +54,11 @@ defmodule TLA.ModelChecker do
           optional(:verify_symmetry) => boolean(),
           optional(:state_constraint) => (State.t() -> boolean()) | nil,
           optional(:fingerprint_bits) => 64 | 128,
+
+          # Per-declaration cost in reductions (#116). Off by default and free when off: the
+          # closures are wrapped only when it is asked for, so an unprofiled run calls exactly
+          # the functions `TLA.Spec.Compiled` holds.
+          optional(:profile) => boolean(),
 
           # Which of the spec's invariants to check; `:all` by default. The
           # differential corpus uses it to reproduce TLC's per-invariant reports
@@ -85,6 +90,11 @@ defmodule TLA.ModelChecker do
           # What the run actually exercised. A green check mark is only as good
           # as what was behind it.
           coverage: Coverage.t(),
+
+          # What each declaration cost, in reductions (#116). `nil` when `profile:` was not
+          # asked for — absent-because-not-measured is not zero, the same distinction
+          # `TLA.Coverage` makes for a near-miss count.
+          profile: Profile.t() | nil,
           warnings: [String.t()],
           fingerprint_bits: pos_integer(),
           collision_estimate: float()
@@ -108,6 +118,7 @@ defmodule TLA.ModelChecker do
     verify_symmetry: false,
     state_constraint: nil,
     fingerprint_bits: 64,
+    profile: false,
     invariants: :all,
     action_properties: :all,
     temporals: :all
@@ -168,7 +179,13 @@ defmodule TLA.ModelChecker do
     # declared.
     spec = %{spec | invariants: checked_invariants(spec, config.constants)}
 
+    # Calibrated BEFORE the run's reduction bracket opens, because calibrating spends
+    # reductions of its own and they are not part of the search (#130).
+    profile = if config.profile, do: Profile.init(spec), else: nil
+    spec = if profile, do: Profile.instrument(spec), else: spec
+
     started = System.monotonic_time(:millisecond)
+    reductions_before = if profile, do: Profile.reductions(), else: 0
 
     graph =
       StateGraph.new(spec, config.constants,
@@ -178,7 +195,14 @@ defmodule TLA.ModelChecker do
 
     run = spec |> search(config, graph) |> check_temporals()
 
-    result = finish(run, System.monotonic_time(:millisecond) - started)
+    profile =
+      if profile do
+        profile
+        |> Profile.collect()
+        |> Profile.finalize(Profile.reductions() - reductions_before)
+      end
+
+    result = finish(run, System.monotonic_time(:millisecond) - started, profile)
 
     {result, run.graph}
   end
@@ -598,7 +622,7 @@ defmodule TLA.ModelChecker do
 
   # ── Results ─────────────────────────────────────────────────────────────────
 
-  defp finish(run, duration) do
+  defp finish(run, duration, profile) do
     graph = run.graph
     config = run.config
     deadlock? = MapSet.size(graph.deadlocked) > 0
@@ -639,6 +663,7 @@ defmodule TLA.ModelChecker do
       duration_ms: duration,
       violation: violation,
       coverage: coverage,
+      profile: profile,
       warnings: warnings(run.spec, config, safety_status) ++ Coverage.warnings(coverage),
       fingerprint_bits: config.fingerprint_bits,
       collision_estimate:

@@ -42,6 +42,12 @@ defmodule Mix.Tasks.Tla.Check do
                            and fail if any verdict differs. Nothing can establish a
                            symmetry declaration's soundness statically, so this is
                            the check that catches a wrong one (08-decisions.md D-17).
+      --profile            Report what each of YOUR declarations cost, in reductions
+                           (`TLA.Profile`). Off by default and free when off. In
+                           reductions rather than milliseconds because a reduction is
+                           a function of the code and the data and not of the machine
+                           or its load — so two profiles are comparable, and a wall
+                           time taken on a busy box is not.
       --format             human (default) or json.
 
   ## Exit codes
@@ -61,7 +67,7 @@ defmodule Mix.Tasks.Tla.Check do
   use Mix.Task
 
   alias TLA.Mix.SpecTarget
-  alias TLA.{Coverage, ModelChecker, Spec, Trace}
+  alias TLA.{Coverage, ModelChecker, Profile, Spec, Trace}
 
   @switches [
     max_states: :integer,
@@ -71,6 +77,7 @@ defmodule Mix.Tasks.Tla.Check do
     allow_incomplete: :boolean,
     safety_only: :boolean,
     verify_symmetry: :boolean,
+    profile: :boolean,
     format: :string
   ]
 
@@ -126,7 +133,12 @@ defmodule Mix.Tasks.Tla.Check do
       spec.temporals != [] and not Keyword.get(opts, :safety_only, false) and symmetry == [] and
         workers(opts) == 1
 
-    %{constants: constants, check_liveness: check_liveness?, workers: workers(opts)}
+    %{
+      constants: constants,
+      check_liveness: check_liveness?,
+      workers: workers(opts),
+      profile: Keyword.get(opts, :profile, false)
+    }
     |> maybe_put(:max_states, opts[:max_states])
     |> maybe_put(:fingerprint_bits, opts[:fingerprint_bits])
     |> maybe_symmetry(symmetry, Keyword.get(opts, :verify_symmetry, false))
@@ -212,6 +224,14 @@ defmodule Mix.Tasks.Tla.Check do
       "\n" <> Coverage.format(result.coverage, title: "COVERAGE: #{inspect(module)}")
     )
 
+    # Only when it was asked for. `nil` is not an empty profile — it is the absence of a
+    # measurement, the distinction `TLA.Coverage` already makes for a near-miss count.
+    if result.profile do
+      Mix.shell().info(
+        "\n" <> Profile.format(result.profile, title: "PROFILE: #{inspect(module)}")
+      )
+    end
+
     for warning <- result.warnings, do: Mix.shell().info("warning: " <> warning)
   end
 
@@ -237,7 +257,13 @@ defmodule Mix.Tasks.Tla.Check do
   # `specs` is a sorted LIST of self-describing entries rather than a map keyed by module name:
   # a consumer iterating results should not have to know that the key was a module, and the
   # order is stable so two runs diff cleanly.
-  @schema_version 1
+  # Bumped to 2 by #130, which added `profile`. A purely ADDITIVE key, and it bumps anyway:
+  # "additive changes do not count" is the reasoning that makes a version stop meaning
+  # anything, and this one exists so a reader can refuse a shape it does not know rather than
+  # misread it. The cost is bounded and self-repairing -- `TLA.Mix.TraceFile` refuses a v1
+  # document with a message naming both versions and telling the reader to re-run
+  # `mix tla.check --format json`, which regenerates it.
+  @schema_version 2
 
   defp encode(results) do
     specs =
@@ -280,6 +306,7 @@ defmodule Mix.Tasks.Tla.Check do
           terminal_but_live: result.coverage.terminal_but_live,
           bounded_by: result.coverage.bounded_by
         },
+        profile: profile_json(result.profile),
         violation: violation_json(result.violation)
     }
   end
@@ -302,7 +329,35 @@ defmodule Mix.Tasks.Tla.Check do
       collision_estimate: nil,
       warnings: [],
       coverage: nil,
+      profile: nil,
       violation: nil
+    }
+  end
+
+  # `nil` rather than an empty map when profiling was off: not-measured is not zero, and a
+  # consumer that reads `%{}` as "nothing cost anything" would be wrong in the one direction
+  # that matters. The key is `{kind, name}` on the struct and cannot be a JSON object key, so
+  # each declaration is written self-describing -- the same reason `specs` is a list.
+  defp profile_json(nil), do: nil
+
+  defp profile_json(profile) do
+    %{
+      run_reductions: profile.run_reductions,
+      otp_version: profile.otp_version,
+      calibration: profile.calibration,
+      declarations:
+        profile.declarations
+        |> Enum.map(fn {{kind, name}, entry} ->
+          %{
+            kind: kind,
+            name: name,
+            evaluations: entry.evaluations,
+            reductions: entry.reductions,
+            per_eval: entry.per_eval,
+            observed: entry.observed
+          }
+        end)
+        |> Enum.sort_by(&{&1.kind, &1.name})
     }
   end
 
