@@ -115,6 +115,14 @@ compile:
     # Warnings are errors here for the same reason they are locally: an unused
     # alias or an unreachable clause is usually a half-finished edit.
     - mix compile --force --warnings-as-errors
+    # A lock entry outliving the dependency that pulled it in is the same kind of
+    # half-finished edit, one file over. #69 removed dialyxir and left its
+    # transitive `erlex` behind, where it sat until #117 -- inert, but nothing
+    # asked. This runs in `compile` rather than in a job of its own because it is
+    # a pure comparison of mix.lock against mix.exs: it needs neither fetched deps
+    # nor compiled code, so its own job would spend a container start-up on a
+    # sub-second string comparison.
+    - mix deps.unlock --check-unused
 
 test:
   extends: .elixir
