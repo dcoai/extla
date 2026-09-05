@@ -39,7 +39,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
   use Mix.Task
 
-  alias TLA.{Replay, State, Trace}
+  alias TLA.{Replay, State}
 
   @switches [trace: :string, captured: :string, format: :string, init_arg: :string]
 
@@ -88,57 +88,11 @@ defmodule Mix.Tasks.Tla.Replay do
   defp module!([]), do: Mix.raise("name the TLA.GenServer module to replay against.")
   defp module!(many), do: Mix.raise("one module at a time; got #{Enum.join(many, ", ")}.")
 
-  # `mix tla.check --format json` writes an object keyed by spec module, each with a
-  # `violation`. A file holding one lifted-out trace is accepted too, because that is what
-  # someone who has already found the counterexample they care about will have.
+  # `mix tla.check --format json` writes a versioned envelope; a file holding one lifted-out
+  # trace is accepted too. `TLA.Mix.TraceFile` holds the reading, shared with
+  # `mix tla.explore` so the two cannot drift on what they accept or how they refuse it.
   defp read_trace!(path, module) do
-    data = decode_file!(path)
-    spec = inspect(module.__tla_spec_module__())
-
-    case data do
-      %{"states" => _} ->
-        Trace.from_json!(data)
-
-      %{"prefix" => _} ->
-        Trace.from_json!(data)
-
-      # The versioned envelope `mix tla.check --format json` writes (#66). This is the
-      # `05-layer3-conformance.md` pipeline: check writes, replay reads.
-      #
-      # The version is CHECKED rather than ignored, which is the entire reason it exists. A
-      # reader that parses optimistically discovers a shape change by getting a wrong answer
-      # from it; refusing an unknown version turns that into a message naming both versions.
-      %{"schema_version" => version, "specs" => specs} when is_list(specs) ->
-        unless version == Mix.Tasks.Tla.Check.schema_version() do
-          Mix.raise(
-            "#{path} was written by schema version #{version}; this ExTLA reads version " <>
-              "#{Mix.Tasks.Tla.Check.schema_version()}. Re-run `mix tla.check --format json`."
-          )
-        end
-
-        case Enum.find(specs, &(&1["spec"] == spec)) do
-          nil ->
-            Mix.raise(
-              "#{path} has no result for #{spec}. It carries: " <>
-                "#{specs |> Enum.map_join(", ", & &1["spec"])}."
-            )
-
-          %{"violation" => nil} ->
-            Mix.raise("#{path} records no counterexample for #{spec}: the spec was verified.")
-
-          %{"violation" => violation} ->
-            Trace.from_json!(violation)
-        end
-
-      %{} = results ->
-        Mix.raise(
-          "#{path} has no result for #{spec}. It carries: " <>
-            "#{results |> Map.keys() |> Enum.join(", ")}."
-        )
-
-      _other ->
-        Mix.raise("#{path} is not a trace written by `mix tla.check --format json`.")
-    end
+    TLA.Mix.TraceFile.read!(path, inspect(module.__tla_spec_module__()))
   end
 
   defp read_capture!(path) do

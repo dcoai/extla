@@ -263,6 +263,83 @@ normative on `old` and `new` — in particular that a bare variable name inside 
 `action_property` is a compile error, because there it would be ambiguous which of the two you
 meant.
 
+## When the trace is too big to read
+
+That trace was five states of two variables and you read it by eye. Real ones are not like
+that. A Raft election counterexample is nineteen states of five variables, several of them
+maps over three servers, and the question you actually have — *when did the quorum first
+form*, *how many acceptors had promised by state 12* — is a **function of the state**.
+Answering it from the dumps means reading nineteen blocks and doing arithmetic by hand.
+
+So ask the function instead. `TLA.Trace.explore/3` takes your own expressions, one row each,
+and evaluates them at every state:
+
+<!-- tla:run expect=ok -->
+```elixir
+result = TLA.ModelChecker.run(Tutorial.AuditedLock, %{constants: %{clients: MapSet.new([:alice, :bob])}})
+trace = result.violation
+
+TLA.Trace.explore(trace,
+  holder: & &1.holder,
+  logged: &length(&1.log),
+  held?: &(&1.holder != :none)
+)
+```
+
+```
+═══ EXPLORE: log_only_grows ════════════════════════════════════════
+
+              1        2        3        4        5
+           init  acquire  release  acquire  compact
+  ─────────────────────────────────────────────────
+  holder  :none   :alice    :none   :alice   :alice
+  logged      0        1        1        2        1
+  held?   false     true    false     true     true
+
+  Bindings:
+    2  acquire(c: :alice)
+    4  acquire(c: :alice)
+════════════════════════════════════════════════════════════════════
+```
+
+`logged` going `2 → 1` at the last step is the whole finding, on one line.
+
+TLA+ has the same tool — the Toolbox's **Trace Explorer** — and there it needs a generated
+specification, a second TLC run and a GUI panel, because a TLA+ state is not a value your
+program can hold. Here a state is a plain map and an expression over one is an anonymous
+function, so the whole apparatus is `Enum.map/2`.
+
+Three things worth knowing:
+
+- **`changed_only: true`** hides the rows that never move. On a wide trace most rows never
+  move, and the one that does is the one you are looking for.
+- **A lasso works too.** The repeating states are marked `↺`, so a liveness counterexample
+  does not read as though it ended.
+- **An expression that raises is reported at the state it raised in**, and the rest of the
+  table still renders. You are exploring this trace *because* something in it is wrong, so an
+  expression that assumes an invariant this trace violates is the normal case, not an error.
+
+### Without re-running the checker
+
+A counterexample from a CI run or an incident months ago can be explored from the file:
+
+```
+mix tla.check Tutorial.AuditedLock --format json > ce.json
+
+mix tla.explore Tutorial.AuditedLock --trace ce.json \
+  --expr "logged: length(log)" \
+  --expr "held?: holder != :none"
+```
+
+`--expr` is repeatable, and inside one the state is in scope as each variable by its own name
+and as `state`, the whole map. It compiles and evaluates what you typed, which is what the
+Toolbox does with the expressions typed into its panel — there is no way to put an anonymous
+function on a command line.
+
+Nothing is searched: the states are read off disk. The module argument is there because the
+trace's atoms are resolved against the ones the system already has, so the spec must be
+loaded before its counterexample can be decoded.
+
 ## Deadlock, and the `terminal` you will need
 
 This is the first thing that will go wrong for you, so it is worth meeting deliberately.

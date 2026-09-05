@@ -1324,6 +1324,47 @@ than a static gate — exhaustive verification over a bounded model, and
 machine-checked refinement — and a stable schema is all a consumer needs to place
 `model_checked` and `refinement_checked` above its own classes.
 
+### Mix Task: `mix tla.explore`
+
+Explores a counterexample `mix tla.check --format json` already wrote, evaluating expressions
+the caller supplies over the states already in it. **It searches nothing** — `explore` means
+state-space exploration everywhere else in this document, and this is the Toolbox's *Trace
+Explorer*, not TLC. The task's `@shortdoc` is required to say so, because the task name is the
+one place the word appears unqualified.
+
+```
+mix tla.explore Specs.DistributedLock --trace counterexample.json \
+  --expr "waiting: length(waiting)" \
+  --expr "quorum?: map_size(votes) * 2 > 3" \
+  --changed-only
+```
+
+`--trace` takes the versioned envelope, a single trace object lifted out of it, or a lasso.
+
+**The module argument is load-bearing.** `TLA.Trace.from_json!/1` resolves the trace's atoms
+with `String.to_existing_atom/1`, so the spec has to be loaded before its counterexample can
+be decoded; a trace from another spec fails naming the atom that did not resolve rather than
+decoding into something else. `mix tla.replay` takes one for the same reason.
+
+**`--expr` is repeatable and is compiled and evaluated**, which is what the Toolbox does with
+the expressions typed into its panel and the only thing that can work: an expression over a
+state is an anonymous function, and a command line carries text. Inside one, the state is in
+scope as each variable by its own name and as `state`, the whole map — the latter being the
+only way to reach a spec variable that is itself called `state`. `name: expression` labels the
+row; without a label the expression's own text is the label. The label is recognised by
+**parsing the text inside brackets**, not by splitting on a colon, so `state.pc[:alice]` is one
+unlabelled expression rather than a row called `state.pc[`.
+
+**A compile error and a runtime error are not the same finding.** A runtime error depends on
+the state and belongs in the cell at the state it happened in, which is `TLA.Trace.explore/3`'s
+job. A misspelled variable does not depend on the state at all, so the task checks that each
+expression compiles once, against one state, and refuses with the diagnostic and the names
+actually in scope — rather than the same typo reported once per state in cells reading
+`cannot compile file (errors have been logged)`.
+
+Exit codes: `0` when the table was rendered, `1` for a bad `--expr` or a file that is not a
+counterexample for this spec.
+
 ### ExUnit Integration
 
 ```elixir
