@@ -991,6 +991,104 @@ verified, and it verified a system with no cancellation in it.
 
 ---
 
+## Per-declaration cost — `TLA.Profile`
+
+`TLA.Coverage` answers how often the checker asked a declaration. `TLA.Profile` answers what the
+answer cost, which is the half a spec author can act on: "invariant checking is 3.2%" is a fact
+about the checker, and "`quorum_agrees` costs 2,400 reductions each of 58,359 times" is a fact
+about the spec in front of them.
+
+```elixir
+@spec init(TLA.Spec.Compiled.t()) :: t()
+@spec instrument(TLA.Spec.Compiled.t()) :: TLA.Spec.Compiled.t()
+@spec collect(t()) :: t()
+@spec merge(t(), t()) :: t()
+@spec finalize(t(), non_neg_integer()) :: t()
+@spec format(t(), keyword()) :: String.t()
+```
+
+Enabled by `profile: true` (`mix tla.check --profile`) and **off by default**: `instrument/1`
+wraps the closures `TLA.Spec.Compiled` already holds, so no macro work and no recompilation is
+involved, and an unprofiled run calls the functions the compiled spec holds and pays nothing.
+
+### The unit is reductions, and that is the point
+
+Every other performance number in this project is caveated by a CPU model and a load average —
+`bench/search_profile.baseline.md` states the rule ("A number without the machine it was taken on
+is not a measurement") and records a `raft` run swinging from 23.4 s to 30.5 s on load alone. A
+per-declaration report in milliseconds would inherit that, and a ranking that changes with the
+load average is not a finding.
+
+A reduction is the BEAM's own unit of work: the counter is incremented on function calls and BIF
+work and consults neither the clock nor the CPU. Measured under 32 competing processes, the same
+fixed workload spread **100.3% in wall time and not at all in reductions**.
+
+### Four properties the measurement keeps
+
+1. **The cost is the per-evaluation floor times the evaluations, not the accumulated total.**
+   Accumulating gave spreads of 26.7% and 47.8% between identical runs under load; the floor came
+   back a single value for every declaration across eight such runs. Anything above the floor in
+   a given evaluation is the scheduler interrupting the measurement, not the predicate doing more
+   work. Two runs of an unchanged spec on one build therefore agree on every evaluation count
+   exactly, and on every cost to within two reductions per evaluation — an **absolute** margin
+   that does not grow with load, where an accumulated total's does. A floor can only be pushed
+   up, never down.
+2. **The instrumentation is calibrated and subtracted.** Reading the counter twice around a call
+   is not free; only the second read lands inside the bracket, so the constant is one BIF call.
+   It is measured at start-up per arity and removed, because uncalibrated every cheap declaration
+   reports the harness rather than itself.
+3. **A state-dependent predicate is flagged, not averaged.** A floor cannot see a predicate that
+   short-circuits on most states and does the work on a few, so `observed` is carried beside the
+   attributed cost and a row whose gap is large is marked. That gap is a finding — it names the
+   most interesting predicate in the spec — and hiding it in a mean would be the worse answer.
+4. **Exactly one wall-time figure survives**, the share of the run all declarations together
+   accounted for. It cannot be expressed in reductions and it is the line that sends a reader to
+   `guides/tutorial/09-when-it-explodes.md` when the honest answer is that the model is too big
+   rather than the predicates too slow.
+
+What this does **not** measure is the checker's own machinery: `bench/search_profile.exs` profiles
+that, in milliseconds, and continues to. Its phases are ETS and NIF work rather than user code,
+and whether reductions describe those well is a separate question nobody has measured.
+
+### Example profile output
+
+```
+--- PROFILE: Specs.DistributedLock ----------------------------------
+
+Invariants                evaluations  reductions   reds/eval
+  type_ok                           34       4,726         139
+  mutual_exclusion                  34       3,162          93
+  holding_means_owner               34       1,054          31
+
+Action properties         evaluations  reductions   reds/eval
+  lock_not_stolen                   76       2,812          37
+
+Guards                    evaluations  reductions   reds/eval
+  acquire_lock                     136         680           5   <-- varies by state
+  release_lock                     136         680           5
+
+Transitions                   applied  reductions   reds/eval
+  acquire_lock                      20         440          22
+  request_lock                      24         384          16
+
+All declarations: 16,336 reductions, 20.7% of the run's 79,001.
+The rest is the checker's own machinery. Your declarations are not the problem —
+see guides/tutorial/09-when-it-explodes.md before optimising one.
+
+Cost is the per-evaluation floor times the evaluations, which is exactly reproducible;
+anything above the floor in a given evaluation is the scheduler, not your predicate.
+Instrumentation calibrated at 1/1 reductions per evaluation (arity 2/3) and subtracted. OTP 29.
+--------------------------------------------------------------------
+```
+
+Sub-expression attribution — cost per source location *inside* a declaration, as TLC reports it —
+is **deferred**. It needs a compile-time source transform in `TLA.Spec.Block`, since the AST is
+gone by runtime by design (D-5), and it needs a granularity argument nobody has had yet. It also
+optimises the wrong tenth: on a large model the declarations together are well under a fifth of
+the run.
+
+---
+
 ## Module: `TLA.Trace`
 
 Counterexample trace generation.
@@ -1226,6 +1324,14 @@ defmodule Mix.Tasks.Tla.Check do
       --verify-symmetry    Run with and without the symmetry reduction and fail
                            if they disagree (§Symmetry).
 
+  ## Other options
+
+      --profile            Report what each of the spec's own declarations cost,
+                           in reductions (`TLA.Profile`). Off by default, and the
+                           closures are wrapped only when it is asked for, so an
+                           unprofiled run calls exactly the functions
+                           `TLA.Spec.Compiled` holds.
+
   ## Exit codes
 
       0  verified
@@ -1265,7 +1371,7 @@ does not know rather than misread it:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "specs": [
     {
       "spec": "Specs.TransferProtocol",
@@ -1289,11 +1395,37 @@ does not know rather than misread it:
         "terminal_but_live": [],
         "bounded_by": "none"
       },
+      "profile": null,
       "violation": null
     }
   ]
 }
 ```
+
+`profile` is `null` unless the run was asked for one (`--profile`). When present it carries
+`run_reductions`, `otp_version`, `calibration`, and `declarations` — a sorted list of
+self-describing entries, for the same reason `specs` is one:
+
+```json
+"profile": {
+  "run_reductions": 84117,
+  "otp_version": "29",
+  "calibration": {"2": 1, "3": 1},
+  "declarations": [
+    {"kind": "invariant", "name": "conservation_of_money",
+     "evaluations": 3612, "reductions": 505680, "per_eval": 140, "observed": 511204}
+  ]
+}
+```
+
+`reductions` is `per_eval * evaluations`, where `per_eval` is the **minimum** cost observed
+across the evaluations rather than their mean. That is what makes it reproducible: measured
+under machine load, accumulated totals spread by up to 47.8% between identical runs while every
+declaration's floor came back a single value, and a floor's residual error is a fixed couple of
+reductions rather than a proportion. `observed` is what the counter actually
+accumulated, kept beside it so the gap stays inspectable — a predicate whose cost genuinely
+varies with the state is the one case a floor cannot see, and `TLA.Profile` flags such a row
+rather than averaging it away.
 
 Four rules the schema keeps, each of which a consumer depends on:
 
@@ -1317,6 +1449,12 @@ Four rules the schema keeps, each of which a consumer depends on:
 `duration_ms` is wall time and therefore varies between runs. It belongs to a
 report, not to a comparison: two runs of an unchanged spec differ in it, so
 nothing should gate on it.
+
+`profile.declarations` is the opposite, and deliberately so: it is a function of the code, the
+data and the OTP release rather than of the machine, so two runs of an unchanged spec on one
+build agree to within two reductions per evaluation and something could gate on them. `otp_version` is carried because a reduction count is
+only comparable within one release — BIF costs change between them — which is the same reason
+`bin/tlc-expected` pins `TLA_TOOLS_VERSION`.
 
 This exists so ExTLA can be an evidence **producer** for another project's
 coverage ladder without the two being merged. ExTLA produces evidence stronger
