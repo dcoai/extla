@@ -178,6 +178,20 @@ defmodule TLA.Profile do
   end
 
   @doc """
+  The same accumulator with every count back at zero, and this process's dictionary cleared.
+
+  What `TLA.ModelChecker.Parallel` hands a worker, for the reason it hands one a zeroed
+  `TLA.Coverage`: a worker given the coordinator's totals would return them plus its own, and
+  merging that counts the seed twice. Keeps the calibration and the OTP release, which are facts
+  about the machine rather than about the work, so a worker does not pay to recalibrate.
+  """
+  def zero(%__MODULE__{} = profile) do
+    Enum.each(Map.keys(profile.declarations), &Process.delete(dict_key(&1)))
+
+    %{profile | declarations: Map.new(profile.declarations, fn {key, _} -> {key, zero()} end)}
+  end
+
+  @doc """
   This process's contribution, read out of its dictionary.
 
   Raw: the calibration is subtracted by `finalize/2`, after any merging, so the constant is

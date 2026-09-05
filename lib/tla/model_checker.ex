@@ -193,12 +193,17 @@ defmodule TLA.ModelChecker do
         symmetry: symmetry_mappings(config)
       )
 
-    run = spec |> search(config, graph) |> check_temporals()
+    run = spec |> search(config, graph, profile) |> check_temporals()
 
+    # The workers' contributions are already summed into `run.profile` by
+    # `TLA.ModelChecker.Parallel.merge/2`; this adds the COORDINATOR's own, which is the
+    # seeding of the initial states and their invariant checks. One code path for both
+    # cases: on a single-worker run `run.profile` is still the zeroed accumulator and every
+    # count is in this process's dictionary.
     profile =
       if profile do
-        profile
-        |> Profile.collect()
+        run.profile
+        |> Profile.merge(Profile.collect(profile))
         |> Profile.finalize(Profile.reductions() - reductions_before)
       end
 
@@ -245,11 +250,12 @@ defmodule TLA.ModelChecker do
       :found,
       :outcome,
       :invariants,
-      :liveness
+      :liveness,
+      :profile
     ]
   end
 
-  defp search(spec, config, graph) do
+  defp search(spec, config, graph, profile) do
     invariants = Safety.selected(spec.invariants, config.invariants)
 
     run = %Run{
@@ -261,7 +267,8 @@ defmodule TLA.ModelChecker do
       frontier: :queue.new(),
       found: 0,
       outcome: :ok,
-      liveness: nil
+      liveness: nil,
+      profile: profile
     }
 
     run = seed(run)
