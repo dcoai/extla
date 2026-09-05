@@ -23,9 +23,9 @@ No durations, dates, seeds or machine names appear here. A golden is a stable fu
 source; anything varying independently makes it drift against itself on a quiet day.
 
 
-**31 specs · 119 items** · model_checked 82 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 37
+**32 specs · 122 items** · model_checked 84 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 38
 
-**freshness** · fresh 5 · stale 0 · unstamped 114
+**freshness** · fresh 5 · stale 0 · unstamped 117
 
 ## TLA.Conformance.Counter.BuggySpec — 3 items · gap 0 · LOWER BOUNDS (violation)
 
@@ -43,6 +43,13 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `in_bounds` | `:invariant` | `200ddd0f` | `:model_checked` | `:fresh` | not measured | `test/conformance/counter/spec.ex` |
 | `increment` | `:action` | `7db7349d` | `:model_checked` | `:fresh` | enabled in 5 | `test/conformance/counter/spec.ex` |
 | `reset` | `:action` | `164e9589` | `:model_checked` | `:fresh` | enabled in 6 | `test/conformance/counter/spec.ex` |
+## TLA.Differential.AuditLog — 3 items · gap 1 · LOWER BOUNDS (violation)
+
+| Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
+|---|---|---|---|---|---|---|
+| `bounded_log` | `:invariant` | `d2aa2ae8` | `:model_checked` | `:unstamped` | ≥ not measured | `test/differential/audit_log/spec.ex` |
+| `compact` | `:action` | `bac5f93b` | `:nothing` | `:unstamped` | ≥ never enabled | `test/differential/audit_log/spec.ex` |
+| `record` | `:action` | `dfc969dd` | `:model_checked` | `:unstamped` | ≥ enabled in 2 | `test/differential/audit_log/spec.ex` |
 ## TLA.Differential.BoundedBuffer — 15 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |

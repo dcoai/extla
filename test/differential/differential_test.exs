@@ -21,6 +21,18 @@
 # from the DSL spec is reported instead of silently skipped.
 entries = [
   %{name: "die_hard", module: TLA.Differential.DieHard, constants: %{}, names: %{}},
+  # The smallest entry, and the only one whose subject is a declaration KIND rather than an
+  # algorithm: `action_property` is the one Layer 2 feature the oracle had never seen, which
+  # is how #112 survived for as long as the feature had existed. Its `compact` empties the
+  # log, so the offending step's post-state IS the initial state — the decoy that makes a
+  # counterexample built from the wrong end of the step come back a different LENGTH rather
+  # than merely a different path. See `AuditLog.tla`.
+  %{
+    name: "audit_log",
+    module: TLA.Differential.AuditLog,
+    constants: %{max_entries: 2},
+    names: %{}
+  },
   %{
     name: "two_phase_commit",
     module: TLA.Differential.TwoPhaseCommit,

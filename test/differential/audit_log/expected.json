@@ -1,0 +1,19 @@
+{
+  "generated_by": "bin/tlc-expected",
+  "tla_tools_version": "v1.7.4",
+  "tlc_version": "2.19",
+  "module": "AuditLog",
+  "constants": {
+    "MaxEntries": "2"
+  },
+  "distinct_states": 3,
+  "diameter": 3,
+  "deadlock": false,
+  "invariants": {
+    "TypeOK": "holds",
+    "BoundedLog": "holds"
+  },
+  "properties": {
+    "LogOnlyGrows": {"violated_at": 4}
+  }
+}

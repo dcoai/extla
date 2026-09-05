@@ -67,9 +67,9 @@ finds one, and prints what the run actually exercised.
 
 The acceptance criterion is not "the tests pass" but [D-9](spec/08-decisions.md): the
 checker must agree with TLC on **every** spec in the differential corpus. It does, on
-all six — distinct states, search depth, where the search stops, every invariant, every
-temporal property, and for `die_hard` the shortest counterexample, which is the same
-six-step trace action for action.
+all seven — distinct states, search depth, where the search stops, every invariant, every
+temporal property, every action property, and for `die_hard` the shortest counterexample,
+which is the same six-step trace action for action.
 
 | Entry | Distinct states | Depth | Agreement |
 |---|---|---|---|
@@ -79,6 +79,18 @@ six-step trace action for action.
 | `raft_election` | 58,359 | 19 | ✅ including where it ends |
 | `bounded_buffer` | 4,460 | 29 | ✅ including where it ends |
 | `paxos` | 3,921 | 17 | ✅ |
+| `audit_log` | 3 | 3 | ✅ including the counterexample |
+
+`audit_log` is three states and is not there to be an interesting system. It is the
+corpus's only entry whose subject is a **declaration kind** rather than an algorithm:
+`action_property` — a predicate over a *step*, which TLC checks as a `PROPERTY` and not
+as an `INVARIANT` — was the one Layer 2 feature the oracle had never been shown, which
+is how #112 lived for as long as the feature had. Its `compact` action empties the log,
+so the offending step's post-state *is* the initial state; a checker that builds the
+counterexample from the wrong end of the step therefore returns a different **length**
+rather than merely a different path, and D-9's comparison can see it. Reintroducing #112
+on this entry turns a passing suite into `ExTLA returned 1 states` against TLC's 4, while
+all six other entries stay green.
 
 These are measurements, not assertions: `expected.json` is TLC's own output, CI
 regenerates it from TLC on every pipeline, and a corpus entry that drifts fails the
