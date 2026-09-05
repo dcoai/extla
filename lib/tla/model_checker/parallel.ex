@@ -76,7 +76,7 @@ defmodule TLA.ModelChecker.Parallel do
   its batch). Nothing is counted twice because nothing is *done* twice.
   """
 
-  alias TLA.{Coverage, ModelChecker, StateGraph}
+  alias TLA.{Coverage, ModelChecker, Profile, StateGraph}
 
   @doc """
   Explore from a seeded run — one whose `frontier` holds the initial states — and return
@@ -167,11 +167,18 @@ defmodule TLA.ModelChecker.Parallel do
         # would return it plus its own contribution, and merging that would count the
         # seed twice. `TLA.Coverage.merge/2` is written for contributions.
         coverage: Coverage.init(run.spec, run.config.constants, run.invariants),
+
+        # Zeroed for the same reason, and it also clears this process dictionary. A task is a
+        # fresh process so the dictionary is empty already; doing it anyway means the zeroing
+        # and the accumulator agree by construction rather than by assumption about how
+        # `Task.async_stream/3` allocates processes.
+        profile: run.profile && Profile.zero(run.profile),
         found: 0,
         frontier: :queue.new()
     }
 
-    Enum.reduce_while(batch, run, fn {id, state}, run ->
+    batch
+    |> Enum.reduce_while(run, fn {id, state}, run ->
       # `max_states` is checked here, before each state, against the count in the SHARED
       # table — so it means on eight processes what it means on one: the search stops once
       # the graph has passed the budget, and the overshoot is whatever the other workers
@@ -187,6 +194,10 @@ defmodule TLA.ModelChecker.Parallel do
         end
       end
     end)
+    # Read out of the dictionary before the process ends and takes it with it. This is the
+    # whole of what makes the profile survive `--workers`: the counts live per-process, which
+    # is exactly the boundary a contribution is defined at.
+    |> then(fn run -> %{run | profile: run.profile && Profile.collect(run.profile)} end)
   end
 
   defp zeroed(graph) do
@@ -237,8 +248,14 @@ defmodule TLA.ModelChecker.Parallel do
       run
       | graph: graph,
         coverage: Coverage.merge(run.coverage, worker.coverage),
+        profile: merge_profile(run.profile, worker.profile),
         found: run.found + worker.found,
         outcome: outcome
     }
   end
+
+  # `nil` is the unprofiled run, which is the common one. Both sides are nil or neither is:
+  # the coordinator decides once, in `search_and_finish/2`.
+  defp merge_profile(nil, nil), do: nil
+  defp merge_profile(into, from), do: Profile.merge(into, from)
 end

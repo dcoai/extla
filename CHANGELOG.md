@@ -36,6 +36,11 @@ release it merely follows.
   Off by default, and free when off — the closures `TLA.Spec.Compiled` already holds are wrapped
   only when a profile is asked for, so no macro work and no recompilation is involved.
 
+  Correct under `--workers` (#131): reductions are per-process, so each task collects its own
+  contribution and `TLA.ModelChecker.Parallel.merge/2` sums them beside `TLA.Coverage.merge/2`.
+  Per-declaration evaluation counts under `--workers 8` are identical to the single-worker
+  counts, which is the property a merge can silently break while leaving the totals plausible.
+
 ### Changed
 
 - **`mix tla.check --format json` is now `schema_version: 2`**, gaining a `profile` key that is

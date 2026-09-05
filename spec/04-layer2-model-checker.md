@@ -1046,6 +1046,29 @@ fixed workload spread **100.3% in wall time and not at all in reductions**.
    `guides/tutorial/09-when-it-explodes.md` when the honest answer is that the model is too big
    rather than the predicates too slow.
 
+### Under `--workers`
+
+Reductions are per-process, so a profiled parallel run sums one contribution per worker rather
+than reporting whichever process happened to be asked. Each `expand_batch` runs in its own task,
+starts from a zeroed accumulator with its dictionary cleared, and reads its own counts out before
+the process ends; `TLA.ModelChecker.Parallel.merge/2` sums them beside `TLA.Coverage.merge/2`.
+The coordinator's own contribution — seeding the initial states and checking their invariants —
+is merged in at the end, so a single-worker run and an eight-worker run travel one code path.
+
+Per-declaration evaluation counts under `--workers n` are **identical** to the single-worker
+counts: they are a function of the search, and a count that moved would mean the parallel run
+explored something different. Costs agree to the same two reductions per evaluation as any two
+runs do.
+
+`run_reductions` remains the **coordinator's** figure, so the share derived from it is a share of
+the coordinator's work rather than of the whole run. That is what was measured, and inflating it
+with a sum the coordinator never observed would make the one wall-adjacent number in the report
+the least trustworthy thing in it.
+
+No shared mutable counter touches the expansion path. An atomic `:counters` reference would
+remove the merge entirely, and it was rejected: it puts a contended write on the hottest path in
+the checker, and it would make this the one accumulator that does not compose like the others.
+
 What this does **not** measure is the checker's own machinery: `bench/search_profile.exs` profiles
 that, in milliseconds, and continues to. Its phases are ETS and NIF work rather than user code,
 and whether reductions describe those well is a separate question nobody has measured.
