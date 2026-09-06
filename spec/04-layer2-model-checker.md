@@ -1316,12 +1316,12 @@ defmodule Mix.Tasks.Tla.Check do
       mix tla.check Specs.TransferProtocol
       mix tla.check Specs.TransferProtocol --max-states 100000
       mix tla.check Specs.TransferProtocol --safety-only
-      mix tla.check Specs.TransferProtocol --graph dot --output transfer.dot
+      mix tla.check Specs.TransferProtocol --workers 8
+      mix tla.check Specs.TransferProtocol --format json
 
-  `--workers` and `--graph`/`--output` are NOT flags of the task: the first waits
-  on `TLA.ModelChecker.Parallel` and the second on `mix tla.visualize`, both
-  Phase 4. `OptionParser` is strict, so either is refused by name rather than
-  accepted and dropped.
+  `--graph`/`--output` are NOT flags of this task. Drawing a graph is
+  `mix tla.visualize`, which owns its own options; `OptionParser` here is strict,
+  so either is refused by name rather than accepted and dropped.
 
   ## Where the constants come from
 
@@ -1349,11 +1349,23 @@ defmodule Mix.Tasks.Tla.Check do
 
   ## Other options
 
+      --max-states         State limit for the run. Exceeding it is `status:
+                           :max_states_reached` and exit 2, never a verdict.
+      --workers            Explore on N processes (default 1;
+                           `TLA.ModelChecker.Parallel`). Refused together with
+                           liveness, so a spec that declares a `temporal` has its
+                           safety checked in parallel and is told the temporal
+                           properties were not.
+      --safety-only        Skip liveness, and with it the liveness graph the
+                           check needs. Liveness is otherwise checked whenever
+                           the spec declares a `temporal`.
       --profile            Report what each of the spec's own declarations cost,
                            in reductions (`TLA.Profile`). Off by default, and the
                            closures are wrapped only when it is asked for, so an
                            unprofiled run calls exactly the functions
                            `TLA.Spec.Compiled` holds.
+      --format             human (default) or json. The JSON shape is
+                           §The JSON result schema.
 
   ## Exit codes
 
