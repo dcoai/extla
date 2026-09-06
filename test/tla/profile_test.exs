@@ -44,6 +44,44 @@ defmodule TLA.ProfileTest.Spec do
   end
 end
 
+defmodule TLA.ProfileTest.LiveSpec do
+  @moduledoc """
+  A chain with a way back, so the graph has no deadlocked state and `check_liveness: true`
+  actually reaches `TLA.ModelChecker.Liveness.check/3`.
+
+  Its own module rather than a temporal added to `TLA.ProfileTest.Spec`: `check_liveness`
+  defaults to false, so a spec that declares a temporal and is run without it collects the
+  "declared and not checked" warning on every other test in this file.
+  """
+  use TLA.Spec
+
+  constant :max, default: 5
+
+  variable :n, type: 0..^max
+
+  init do
+    n = 0
+  end
+
+  action :tick do
+    require n < ^max
+
+    n = n + 1
+  end
+
+  action :reset do
+    require n == ^max
+
+    n = 0
+  end
+
+  fairness(:weak, [:tick])
+
+  temporal :two_leads_to_four do
+    (n == 2) ~> (n == 4)
+  end
+end
+
 defmodule TLA.ProfileTest do
   @moduledoc """
   `TLA.Profile` — what each of the user's declarations cost, in reductions (#116, #130).
@@ -116,6 +154,81 @@ defmodule TLA.ProfileTest do
         assert cost(result.profile, {:invariant, name}).evaluations == result.distinct_states,
                "#{name} was not evaluated once per distinct state"
       end
+    end
+
+    # The assertion above is correct and was incomplete, which is the pairing worth naming: it
+    # checks INVARIANTS, which replay never evaluates, on a spec that VERIFIES, so no
+    # counterexample is ever generated and the replay path is unreachable. The property it was
+    # written to establish never met the condition under which it failed (#133).
+    #
+    # `audit_log` is the fixture because it is refuted by construction. Its trace replays
+    # `record, record, compact`, and before the fix each of those applications was counted a
+    # second time: `record` reported 4 against a search that applied it twice, `compact` 2
+    # against one.
+    test "a refuted spec counts what the search applied, not what replaying its trace re-applied" do
+      result =
+        ModelChecker.run(TLA.Differential.AuditLog, %{
+          constants: %{max_entries: 2},
+          profile: true
+        })
+
+      assert result.status == :violation
+      assert result.violation.actions == [:record, :record, :compact]
+
+      # From `<<>>` and from `<<1>>`; `<<1,2>>` fails `record`'s guard.
+      assert cost(result.profile, {:transition, :record}).evaluations == 2
+
+      # Only `<<1,2>>` passes `compact`'s guard.
+      assert cost(result.profile, {:transition, :compact}).evaluations == 1
+    end
+
+    # The other half of the same fix: `Trace.from/4` applies transitions and nothing else, so
+    # guards, invariants and action properties were never inflated. Asserted so that a future
+    # attempt to close the window by subtracting rather than by not counting cannot pass — that
+    # would have to guess at these, and guessing wrong is invisible without them.
+    test "the kinds replay never touches were right before the fix and stay right after it" do
+      result =
+        ModelChecker.run(TLA.Differential.AuditLog, %{
+          constants: %{max_entries: 2},
+          profile: true
+        })
+
+      for key <- [
+            {:guard, :record},
+            {:guard, :compact},
+            {:invariant, :bounded_log},
+            {:invariant, :type_ok},
+            {:action_property, :log_only_grows}
+          ] do
+        assert cost(result.profile, key).evaluations == result.distinct_states,
+               "#{inspect(key)} moved; only {:transition, _} was ever inflated"
+      end
+    end
+
+    # The larger half of #133, and the one its own probe first appeared to rule out. Liveness
+    # evaluates its predicates by materializing EVERY state through `graph.spec`'s transitions
+    # (`Liveness.evaluate/2` → `materialize/3`), once per node of the spanning tree — so before
+    # the fix a liveness run was inflated by roughly a whole extra search, with no violation
+    # required and no counterexample involved. Measured on this spec: `tick` reported 10 against
+    # a search that applied it 5 times.
+    #
+    # It hid behind `check_liveness: false`, which is the default. A probe that does not pass it
+    # never reaches `check_temporals/1`'s third clause and sees no inflation at all, which is a
+    # fixture failing to produce the condition — the same shape as the gap above.
+    test "a liveness run counts the search, not the states liveness rebuilt to evaluate over" do
+      result =
+        ModelChecker.run(TLA.ProfileTest.LiveSpec, %{
+          constants: %{max: 5},
+          profile: true,
+          check_liveness: true
+        })
+
+      assert result.status == :ok
+      assert result.distinct_states == 6
+
+      # The search: `tick` from n=0..4, `reset` from n=5 back to an already-seen n=0.
+      assert cost(result.profile, {:transition, :tick}).evaluations == 5
+      assert cost(result.profile, {:transition, :reset}).evaluations == 1
     end
 
     test "the OTP release is recorded, because a count is only comparable within one" do

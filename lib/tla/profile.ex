@@ -67,6 +67,28 @@ defmodule TLA.Profile do
   describe *those* well is a separate question nobody has measured. This module wraps the closures
   `TLA.Spec.Compiled` holds and nothing else.
 
+  ## Where the window opens and closes, and why there is no `bounded_by` here
+
+  The window is the **search**, and only the search. It opens where `search_and_finish/2`
+  instruments a copy of the spec and closes where that copy stops being called; the graph keeps
+  the *uninstrumented* spec, because everything that consults `graph.spec` runs after the search
+  has stopped. `TLA.StateGraph`'s moduledoc says what it is for: replay — turning a `path_to/2`
+  back into states means applying transitions. Regenerating a counterexample, or materializing
+  every state so a liveness predicate can be evaluated over it, is not work the spec's transitions
+  did while exploring, and #133 is what it cost when the two were one value: a refuted run charged
+  each trace step twice, and a `check_liveness: true` run charged roughly a whole second search.
+
+  That boundary is what lets this module say something `TLA.Coverage` cannot. Coverage's
+  `bounded_by` exists because a halted search leaves the **state space** incompletely described:
+  its counts are a floor on a question about the spec. This module's counts are not a claim about
+  the state space at all — they are a census of **work performed**, and a search that halted
+  performed exactly the work it performed, its partial last expansion included. That number is
+  complete under every halt condition, so there is deliberately no `bounded_by` on a profile: it
+  would qualify a count that is not uncertain.
+
+  A reader who needs to know the run stopped early has `status` and `coverage.bounded_by` on the
+  same result struct, which is the honest place for it.
+
   ## Why the process dictionary
 
   The closures are called from inside `TLA.ModelChecker.Safety.check_invariants/4`,

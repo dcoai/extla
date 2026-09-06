@@ -182,18 +182,28 @@ defmodule TLA.ModelChecker do
     # Calibrated BEFORE the run's reduction bracket opens, because calibrating spends
     # reductions of its own and they are not part of the search (#130).
     profile = if config.profile, do: Profile.init(spec), else: nil
-    spec = if profile, do: Profile.instrument(spec), else: spec
+    searched = if profile, do: Profile.instrument(spec), else: spec
 
     started = System.monotonic_time(:millisecond)
     reductions_before = if profile, do: Profile.reductions(), else: 0
 
+    # The GRAPH gets the uninstrumented spec, and the search gets the wrapped one. They were the
+    # same value until #133, and that is what made the profile count work the search never did:
+    # `StateGraph`'s own moduledoc says the graph carries a spec because REPLAY needs it — turning
+    # a `path_to/2` back into states means applying transitions — and every consumer of
+    # `graph.spec` runs after the search has stopped. Regenerating a counterexample through a
+    # counter charged each of its steps to the spec a second time.
+    #
+    # Nothing is lost by the split. The search reads `run.spec`, never `graph.spec`, so this moves
+    # no search work out of the window; it only stops replay from being counted as if it were in
+    # it.
     graph =
       StateGraph.new(spec, config.constants,
         fingerprint_bits: config.fingerprint_bits,
         symmetry: symmetry_mappings(config)
       )
 
-    run = spec |> search(config, graph, profile) |> check_temporals()
+    run = searched |> search(config, graph, profile) |> check_temporals()
 
     # The workers' contributions are already summed into `run.profile` by
     # `TLA.ModelChecker.Parallel.merge/2`; this adds the COORDINATOR's own, which is the
