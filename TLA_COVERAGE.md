@@ -148,13 +148,13 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `increment` | `:action` | `25a96c81` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `reset` | `:action` | `c0adcaa8` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `within_bounds` | `:invariant` | `61f771c5` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-## TLA.TestSpecs.Cube — 3 items · gap 0 · LOWER BOUNDS (violation)
+## TLA.TestSpecs.Cube — 3 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `bump_a` | `:action` | `a4537368` | `:model_checked` | `:unstamped` | ≥ enabled in 4 | `test/support/specs.ex` |
-| `bump_b` | `:action` | `d2d99f55` | `:model_checked` | `:unstamped` | ≥ enabled in 4 | `test/support/specs.ex` |
-| `bump_c` | `:action` | `5049eec5` | `:model_checked` | `:unstamped` | ≥ enabled in 4 | `test/support/specs.ex` |
+| `bump_a` | `:action` | `a4537368` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
+| `bump_b` | `:action` | `d2d99f55` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
+| `bump_c` | `:action` | `5049eec5` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Deadlocking — CANNOT RUN: no assignment for :max
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -175,17 +175,17 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `advance` | `:action` | `e4623413` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
 | `eventually_two` | `:temporal` | `1f6c393b` | `:model_checked` | `:unstamped` | checked | `test/support/specs.ex` |
 | `spin` | `:action` | `971901a2` | `:model_checked` | `:unstamped` | enabled in 2 | `test/support/specs.ex` |
-## TLA.TestSpecs.LetScopes — 1 items · gap 0 · LOWER BOUNDS (violation)
+## TLA.TestSpecs.LetScopes — 1 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `bump` | `:action` | `c80dbb62` | `:model_checked` | `:unstamped` | ≥ enabled in 3 | `test/support/specs.ex` |
-## TLA.TestSpecs.NoBranch — 2 items · gap 0 · LOWER BOUNDS (violation)
+| `bump` | `:action` | `c80dbb62` | `:model_checked` | `:unstamped` | enabled in 3 | `test/support/specs.ex` |
+## TLA.TestSpecs.NoBranch — 2 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `non_negative` | `:invariant` | `d3220c4a` | `:model_checked` | `:unstamped` | ≥ not measured | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | ≥ enabled in 6 | `test/support/specs.ex` |
+| `non_negative` | `:invariant` | `d3220c4a` | `:model_checked` | `:unstamped` | not measured | `test/support/specs.ex` |
+| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | enabled in 6 | `test/support/specs.ex` |
 ## TLA.TestSpecs.OutsideDomain — RAISED TLA.Spec.DomainError: nothing verified
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -239,11 +239,11 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `fail_transfer` | `:action` | `459450bc` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `no_stuck_pending` | `:temporal` | `b9a16c09` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `reset` | `:action` | `c0adcaa8` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-## TLA.TestSpecs.TwoStarts — 1 items · gap 0 · LOWER BOUNDS (violation)
+## TLA.TestSpecs.TwoStarts — 1 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `step` | `:action` | `754f31a5` | `:model_checked` | `:unstamped` | ≥ enabled in 4 | `test/support/specs.ex` |
+| `step` | `:action` | `754f31a5` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Unbounded — 1 items · gap 0 · LOWER BOUNDS (max_states)
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |

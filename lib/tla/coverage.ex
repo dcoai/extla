@@ -458,16 +458,8 @@ defmodule TLA.Coverage do
   # the report either way, because it is data; what a truncated run may not do is accuse, and
   # `--strict-coverage` may not fail a build on it.
   #
-  # `:violation` is deliberately NOT in this list, even though it is a `bounded_by` value. It
-  # conflates two runs: one that halted mid-expansion on an invariant, whose counts really are
-  # lower bounds, and one whose search COMPLETED and then reported a deadlock, whose counts are
-  # exact (#136). Suppressing on it would quietly weaken `--strict-coverage` for every spec that
-  # deadlocks — `TLA.TestSpecs.Typo`, whose whole purpose is to be caught, is one. The two cases
-  # need telling apart before anything can lean on that value; `:max_states` and
-  # `:state_constraint` are unambiguous and are enough for the case #128 is about.
-  defp accusable(%{bounded_by: bound}) when bound in [:max_states, :state_constraint], do: []
-
-  defp accusable(coverage), do: coverage.never_enabled
+  defp accusable(%{bounded_by: :none} = coverage), do: coverage.never_enabled
+  defp accusable(_bounded), do: []
 
   @doc """
   The warnings, one line each.
@@ -480,12 +472,12 @@ defmodule TLA.Coverage do
           do: "invariant #{inspect(name)} was never at risk"
   end
 
-  defp never_enabled_line(name, bound) when bound in [:max_states, :state_constraint] do
+  defp never_enabled_line(name, :none), do: "action #{inspect(name)} was never enabled"
+
+  defp never_enabled_line(name, bound) do
     "action #{inspect(name)} was not enabled in any state this run reached — the run was " <>
       "bounded by #{inspect(bound)}, so this is not a finding about the spec"
   end
-
-  defp never_enabled_line(name, _bound), do: "action #{inspect(name)} was never enabled"
 
   defp vacuity_line(%{property: property, binding: nil, reason: reason}),
     do: "property #{inspect(property)} is VACUOUS: #{reason(reason)}"
