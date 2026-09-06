@@ -379,6 +379,30 @@ defmodule TLA.Invariant.Violation do
 end
 ```
 
+### A violation under `:enabled` terminates the process
+
+`:enabled` raises, and it raises **inside the callback**, so the server dies of it. That is the
+same outcome in every callback — there is no cast-specific or info-specific handling, and no
+branch on which callback is executing.
+
+The distinction worth stating is not what happens to the *server* but what the **caller** sees:
+
+| callback | the server | the caller |
+|---|---|---|
+| `handle_call/3` | terminates | the `:EXIT` propagates from `GenServer.call/3`, which re-raises it |
+| `handle_cast/2` | terminates | nothing — a cast has no reply channel, so the caller learns only by monitoring |
+| `handle_info/2` | terminates | nothing, for the same reason |
+
+A cast is therefore the case where a violation is **silent at the call site** and loud only in the
+supervisor's report and the logs. It is not a case where the violation is skipped, and it is not a
+case where the process survives with the offending state.
+
+This is worth writing down because the alternative reading — that a violation with nowhere to be
+reported is somehow tolerated — is the natural guess, and a test in this repository was written
+around it for as long as the feature existed (#129). Under `:log_only` the process does survive,
+with the offending state, by design: that is the mode's whole purpose, and it is the setting for
+environments where staying up matters more than the report being unmissable.
+
 ---
 
 ## Supported OTP Behaviors

@@ -1,7 +1,7 @@
 defmodule TLA.InvariantTest do
   use ExUnit.Case, async: true
 
-  alias TLA.Invariant.Runtime
+  alias TLA.Invariant.{Runtime, Violation}
   alias TLA.TestServers.{Account, Quiet}
 
   setup do
@@ -38,13 +38,53 @@ defmodule TLA.InvariantTest do
     # runs and declines — there is no call to check `audited` in the `handle_cast` wrapper
     # at all.
     test "one restricted to a callback is not checked in the others", %{account: account} do
-      # `:skim` leaves an unlogged movement, which `audited` would refuse — but `audited`
-      # is declared `callbacks: [:handle_call]`.
+      # `:skim` leaves an unlogged movement AND takes the balance to -900, so both invariants
+      # have something to say about the post-state. Only one of them is asked: `audited` is
+      # declared `callbacks: [:handle_call]`, so the `handle_cast` wrapper contains no call to
+      # it. That the reported violation is `never_negative` is the whole assertion.
+      #
+      # Monitored BEFORE the cast, and the verdict read from the exit reason. The violation
+      # raises inside the server (`Violation.report!/2` under `:enabled`), so the cast is fatal
+      # and there is nothing to send a second message to — an earlier version of this test sent
+      # a `{:deposit, 1}` call and read the violation off the resulting `:DOWN`, which raced the
+      # server's death and failed as `{:exit, :noproc}` roughly one full-suite run in five (#129).
+      ref = Process.monitor(account)
       GenServer.cast(account, :skim)
-      assert {:violation, violation} = call(account, {:deposit, 1})
 
-      # It survived the cast; the invariant that does apply to a cast is what caught it.
+      assert_receive {:DOWN, ^ref, :process, ^account, {%Violation{} = violation, _stacktrace}}
+
       assert violation.name == :never_negative
+
+      # From `:skim` alone: 100 - 1_000. The number is load-bearing — it is what distinguishes
+      # "the cast's own violation" from "a violation some later callback found", which is the
+      # reading the old comment here got wrong.
+      assert violation.state.balance == -900
+    end
+
+    test "calling a server that is already gone says so, rather than reporting an exit" do
+      # The distinction #129 turned on. `{:exit, :noproc}` reads as "the call failed"; it in
+      # fact means the call never happened, and a test that gets it has raced something.
+      {:ok, pid} = Account.start_link(balance: 100)
+      Process.unlink(pid)
+      ref = Process.monitor(pid)
+      GenServer.cast(pid, :skim)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
+
+      assert {:dead_on_arrival, :noproc} = call(pid, {:deposit, 1})
+    end
+
+    test "a violation in a cast is fatal, because there is no reply channel to report it on" do
+      # Stated directly rather than inferred from a later call's failure. `:enabled` raises
+      # (`spec/03-layer1-invariants.md` §Modes), and a raise in `handle_cast/2` terminates the
+      # server — the same outcome as in a call, where the caller additionally gets the exit.
+      {:ok, pid} = Account.start_link(balance: 100)
+      Process.unlink(pid)
+      ref = Process.monitor(pid)
+
+      GenServer.cast(pid, :skim)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, {%Violation{}, _stacktrace}}
+      refute Process.alive?(pid)
     end
 
     test "and is checked in the callback it was restricted to", %{account: account} do
