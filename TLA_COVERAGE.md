@@ -23,7 +23,7 @@ No durations, dates, seeds or machine names appear here. A golden is a stable fu
 source; anything varying independently makes it drift against itself on a quiet day.
 
 
-**32 specs · 122 items** · model_checked 84 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 38
+**32 specs · 122 items** · model_checked 85 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 37
 
 **freshness** · fresh 5 · stale 0 · unstamped 117
 
@@ -33,7 +33,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 |---|---|---|---|---|---|---|
 | `at_most_two` | `:invariant` | `5a576f2d` | `:model_checked` | `:unstamped` | ≥ not measured | `test/conformance/counter/spec.ex` |
 | `done` | `:action` | `f34e6f35` | `:model_checked` | `:unstamped` | ≥ enabled in 2 | `test/conformance/counter/spec.ex` |
-| `increment` | `:action` | `7db7349d` | `:model_checked` | `:unstamped` | ≥ enabled in 2 | `test/conformance/counter/spec.ex` |
+| `increment` | `:action` | `7db7349d` | `:model_checked` | `:unstamped` | ≥ enabled in 3 | `test/conformance/counter/spec.ex` |
 ## TLA.Conformance.Counter.Spec — 5 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -43,12 +43,12 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `in_bounds` | `:invariant` | `200ddd0f` | `:model_checked` | `:fresh` | not measured | `test/conformance/counter/spec.ex` |
 | `increment` | `:action` | `7db7349d` | `:model_checked` | `:fresh` | enabled in 5 | `test/conformance/counter/spec.ex` |
 | `reset` | `:action` | `164e9589` | `:model_checked` | `:fresh` | enabled in 6 | `test/conformance/counter/spec.ex` |
-## TLA.Differential.AuditLog — 3 items · gap 1 · LOWER BOUNDS (violation)
+## TLA.Differential.AuditLog — 3 items · gap 0 · LOWER BOUNDS (violation)
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `bounded_log` | `:invariant` | `d2aa2ae8` | `:model_checked` | `:unstamped` | ≥ not measured | `test/differential/audit_log/spec.ex` |
-| `compact` | `:action` | `bac5f93b` | `:nothing` | `:unstamped` | ≥ never enabled | `test/differential/audit_log/spec.ex` |
+| `compact` | `:action` | `bac5f93b` | `:model_checked` | `:unstamped` | ≥ enabled in 1 | `test/differential/audit_log/spec.ex` |
 | `record` | `:action` | `dfc969dd` | `:model_checked` | `:unstamped` | ≥ enabled in 2 | `test/differential/audit_log/spec.ex` |
 ## TLA.Differential.BoundedBuffer — 15 items · gap 0
 
@@ -73,7 +73,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `big_to_small` | `:action` | `67bfa5c8` | `:model_checked` | `:unstamped` | ≥ enabled in 11 | `test/differential/die_hard/spec.ex` |
+| `big_to_small` | `:action` | `67bfa5c8` | `:model_checked` | `:unstamped` | ≥ enabled in 12 | `test/differential/die_hard/spec.ex` |
 | `empty_big` | `:action` | `36cfcd86` | `:model_checked` | `:unstamped` | ≥ enabled in 12 | `test/differential/die_hard/spec.ex` |
 | `empty_small` | `:action` | `9ced723e` | `:model_checked` | `:unstamped` | ≥ enabled in 12 | `test/differential/die_hard/spec.ex` |
 | `fill_big` | `:action` | `d1c11792` | `:model_checked` | `:unstamped` | ≥ enabled in 12 | `test/differential/die_hard/spec.ex` |
@@ -138,7 +138,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `below_three` | `:invariant` | `9f82f32b` | `:model_checked` | `:unstamped` | ≥ not measured | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | ≥ enabled in 2 | `test/support/specs.ex` |
+| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | ≥ enabled in 3 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Counter — CANNOT RUN: no assignment for :max
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |

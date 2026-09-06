@@ -242,7 +242,16 @@ defmodule TLA.CoverageMergeTest do
 
       Enum.reduce(spec.actions, coverage, fn action, coverage ->
         bindings = ModelChecker.enabled_bindings(action, constants, state)
-        Coverage.observe_action(coverage, action.name, bindings, length(bindings), 1)
+
+        coverage
+        |> Coverage.observe_enabled(action.name, bindings)
+        |> then(fn c ->
+          # An action with no enabled binding generates nothing, and `observe_enabled/3`
+          # already declined to record it.
+          if bindings == [],
+            do: c,
+            else: Coverage.observe_generated(c, action.name, length(bindings), 1)
+        end)
       end)
     end)
   end

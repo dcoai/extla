@@ -449,6 +449,13 @@ defmodule TLA.ModelChecker do
   defp take_action(run, _action, [], _id, _state, _liveness?), do: {:ok, run, []}
 
   defp take_action(run, action, bindings, id, state, liveness?) do
+    # Enablement is recorded HERE, before any successor exists, and not with the counts below
+    # (#128). Reaching this clause means the guard admitted at least one binding, which is what
+    # "enabled" means — and it stays true even if the expansion halts on a violation. Recorded at
+    # the end instead, a run lost the enablement of the very action that halted it, and then
+    # warned the user that the action named in its own counterexample was never enabled.
+    run = %{run | coverage: Coverage.observe_enabled(run.coverage, action.name, bindings)}
+
     bindings
     |> Enum.reduce_while({:ok, run, 0, 0, []}, fn params,
                                                   {:ok, run, generated, distinct, edges} ->
@@ -500,8 +507,7 @@ defmodule TLA.ModelChecker do
     end)
     |> case do
       {:ok, run, generated, distinct, edges} ->
-        coverage =
-          Coverage.observe_action(run.coverage, action.name, bindings, generated, distinct)
+        coverage = Coverage.observe_generated(run.coverage, action.name, generated, distinct)
 
         {:ok, %{run | coverage: coverage}, edges}
 

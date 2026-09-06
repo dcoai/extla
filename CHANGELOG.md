@@ -41,6 +41,25 @@ release it merely follows.
   Per-declaration evaluation counts under `--workers 8` are identical to the single-worker
   counts, which is the property a merge can silently break while leaving the totals plausible.
 
+### Fixed
+
+- **A run that halted mid-expansion reported the offending action as never enabled** (#128). A
+  counterexample would name `compact` in its trace while the coverage report in the same result
+  called it never enabled and warned that its guard was broken. `TLA.Coverage.observe_action/5`
+  is replaced by `observe_enabled/3` and `observe_generated/4`, because *was this action enabled
+  here* and *how many states did it generate* are different facts known at different moments:
+  enablement is now recorded when the guard admits a binding, which is true whether or not the
+  expansion finishes.
+
+  It was an off-by-one for as long as the checker has existed and became a false claim only when
+  the true count is one — `die_hard`'s actions are enabled in eleven or twelve states, so losing
+  one left eleven and looked like nothing. `TLA_COVERAGE.md` moves accordingly: one action per
+  violating spec gains the occurrence it had been losing.
+
+  `--strict-coverage` no longer fails a build on an action that was never enabled in a run
+  bounded by `max_states` or a `state_constraint`: such a run cannot tell an action whose guard
+  is never true from one whose states it never reached. A **complete** run still accuses.
+
 ### Changed
 
 - **`mix tla.check --format json` is now `schema_version: 2`**, gaining a `profile` key that is
