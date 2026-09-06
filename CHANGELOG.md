@@ -16,6 +16,59 @@ release it merely follows.
 
 ### Added
 
+- **`TLA.Trace.explore/3` — evaluate your own named expressions at every state of a
+  counterexample** (#115, #120). A trace is nineteen raw variable dumps and the reader does the
+  arithmetic; this puts named expressions down the rows and states across the columns, so the
+  question a reader actually has ("when did quorum form?") is answered by looking rather than by
+  counting.
+
+  ```elixir
+  TLA.Trace.explore(trace,
+    waiting: &length(&1.waiting),
+    holder:  & &1.holder,
+    quorum?: &(map_size(&1.votes) * 2 > 3)
+  )
+  ```
+
+  Three arguments rather than two, deliberately: options live in `opts`, so an expression named
+  `:changed_only` stays representable and cannot silently become a flag. Rows render in the order
+  given — the caller's order is information, so it is not sorted.
+
+  **Columns are chunked to a width budget** (`width: 68`, matching `format/1`'s banners) with the
+  name column repeated in each chunk, because the trace that motivated the feature does not fit on
+  one screen and `changed_only: true` cannot be relied on to narrow it — an expression that moves
+  at every step is exactly the case that stays wide.
+
+  An expression that raises is reported **at the state it raised in**, carrying
+  `Exception.message/1`; the rest of the table still renders. A failure that is displayed and
+  attributed beats one swallowed into a blank cell. Lassos go through `to_behavior/1`, so the
+  repeating columns are marked, and a `cycle: nil` lasso is not given a fabricated cycle.
+
+- **`mix tla.explore` — the same table from the command line, over a saved counterexample**
+  (#115, #121).
+
+  ```
+  mix tla.explore Specs.DistributedLock --trace counterexample.json \
+    --expr "waiting: length(state.waiting)" \
+    --expr "quorum?: map_size(state.votes) * 2 > 3" \
+    --changed-only
+  ```
+
+  An expression is a function and cannot be written on a command line, so `--expr` is repeatable
+  and each one is compiled with the state's variables in scope — the TLA+ Toolbox's approach, and
+  it needs no DSL macro. Dropping the `name:` prefix uses the expression text as the row label. An
+  `--expr` that does not compile fails with the text, the reason, and **which** of several `--expr`
+  flags it was, rather than a bare `CompileError` from inside the task.
+
+  It reads what `mix tla.check --format json` writes, in either shape — the whole document or a
+  single trace lifted out of it — and lassos work. The `<module>` argument is required because
+  `Trace.from_json!/1` resolves atoms through `String.to_existing_atom/1`, so the spec module has
+  to be loaded before a saved trace can decode.
+
+  Note the word: this explores a **saved counterexample**, not the state space.
+  `TLA.ModelChecker.explore/2` is the other thing, and the task name is the one place `explore`
+  appears unqualified.
+
 - `TLA.Profile` and `mix tla.check --profile` — what each of *your* declarations cost, per
   invariant, action guard, transition, action property and terminal (#116, #130). `TLA.Coverage`
   says how often the checker asked; this says what the answer cost, which is the half a spec
@@ -42,6 +95,29 @@ release it merely follows.
   counts, which is the property a merge can silently break while leaving the totals plausible.
 
 ### Fixed
+
+- **The profile counted counterexample regeneration and liveness evaluation as if they were
+  search work, so per-declaration transition counts were too high** (#133). **The numbers change**
+  — a profile taken before this version is not comparable with one taken after it, and the
+  direction is always downward.
+
+  Two paths, and the larger was not the one that raised the issue. A **refuted** run replays its
+  counterexample to turn a path back into states, which applied each transition once more per
+  appearance in the trace: `audit_log` reported `record` 4 times against a search that applied it
+  twice. A **`check_liveness: true`** run rebuilds *every* state to evaluate predicates over it,
+  which inflated by roughly a whole extra search — 10 against 5 on a six-state spec — with no
+  violation and no counterexample involved.
+
+  The cause was one value doing two jobs: the instrumented spec was handed both to the search and
+  to `TLA.StateGraph`, and everything that consults the graph's spec runs *after* the search has
+  stopped. The graph now keeps the uninstrumented copy. Only `{:transition, _}` entries were ever
+  affected — replay applies transitions and nothing else, so guards, invariants and action
+  properties were always right.
+
+  Guarded by an identity rather than by fixtures (#139): for a profiled run the sum of transition
+  evaluations equals `result.transitions`, since the graph's counter is incremented on the line
+  after each application. Asserted across eleven configurations, including `--workers` and
+  `verify_symmetry`.
 
 - **`coverage.bounded_by` said the counts were partial when a completed search merely found a
   deadlock** (#136). A deadlock is detected after the frontier empties, so such a run has counted
@@ -73,6 +149,17 @@ release it merely follows.
   is never true from one whose states it never reached. A **complete** run still accuses.
 
 ### Changed
+
+- **`spec/04-layer2-model-checker.md` now documents `mix tla.check`'s options correctly** (#132,
+  #134). The spec denied that `--workers` was a flag — it has been one since Phase 4, and the same
+  file documents `workers:` nine hundred lines earlier, so it disagreed with the code and with
+  itself. Four of the nine switches were missing from the option lists (`--format`, `--max-states`,
+  `--safety-only`, `--workers`), and the Usage block demonstrated two that have never existed
+  (`--graph`, `--output`; `mix tla.visualize` is the task that draws graphs).
+
+  No behaviour changes here — this is documentation catching up with the task. It is recorded
+  because an example that cannot be run is worse than an absent one: a reader tries it and gets
+  `OptionParser` refusing a flag the specification just showed them.
 
 - **`mix tla.check --format json` is now `schema_version: 2`**, gaining a `profile` key that is
   `null` unless the run was profiled. Purely additive, and it bumps anyway: "additive changes do
