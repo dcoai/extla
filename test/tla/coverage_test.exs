@@ -220,9 +220,23 @@ defmodule TLA.CoverageTest do
     end
 
     # The fix must not buy its correctness by going quiet: a COMPLETE run still accuses.
-    # `check_deadlock: false` because `Typo` deadlocks once `tick` runs out, and a deadlock is
-    # reported as `bounded_by: :violation` even though the search finished (#136).
+    #
+    # `Typo` deadlocks once `tick` runs out, and until #136 that read as `bounded_by: :violation`
+    # even though the search had finished — so this test had to pass `check_deadlock: false` to
+    # get a run it could make the point with. It does not any more: a completed search reports
+    # `:none` whatever it found, which is what the field was always supposed to mean.
     test "whereas a complete run still does both" do
+      coverage = coverage(Typo, %{constants: %{modes: MapSet.new([:a, :b])}, invariants: []})
+
+      assert coverage.bounded_by == :none
+      refute Coverage.clean?(coverage)
+      assert Enum.any?(Coverage.warnings(coverage), &(&1 =~ "action :switch was never enabled"))
+    end
+
+    # Same spec, deadlock check off. The verdict changes and the coverage judgement does not,
+    # which is the point: `--strict-coverage` is about what the search covered, not about what
+    # it concluded.
+    test "and a deadlocking spec is caught with or without the deadlock check" do
       coverage =
         coverage(Typo, %{
           constants: %{modes: MapSet.new([:a, :b])},
@@ -231,18 +245,6 @@ defmodule TLA.CoverageTest do
         })
 
       assert coverage.bounded_by == :none
-      refute Coverage.clean?(coverage)
-      assert Enum.any?(Coverage.warnings(coverage), &(&1 =~ "action :switch was never enabled"))
-    end
-
-    # And a run that halted on a violation is left alone, deliberately. `:violation` conflates a
-    # truncated search with a completed one that found a deadlock (#136), so nothing here leans
-    # on it — which means `--strict-coverage` is exactly as strong for a deadlocking spec as it
-    # was before #135.
-    test "a deadlocking spec is still caught by --strict-coverage" do
-      coverage = coverage(Typo, %{constants: %{modes: MapSet.new([:a, :b])}, invariants: []})
-
-      assert coverage.bounded_by == :violation
       refute Coverage.clean?(coverage)
     end
   end
@@ -423,6 +425,27 @@ defmodule TLA.CoverageTest do
     # are a lower bound for exactly the same reason a bounded run's are.
     test "names a violation" do
       assert coverage(TLA.TestSpecs.Broken, %{}).bounded_by == :violation
+    end
+
+    # The pair that separates the two runs one `:violation` used to cover (#136). They differ in
+    # exactly this and in nothing else, which is what makes them a pair: `Deadlocking` empties
+    # its frontier and only then reports a stuck state, so its counts are a census; `Broken`
+    # stops mid-expansion on an invariant, so they are a floor. Only the second bounded
+    # anything, and the field is about the counts rather than about the verdict.
+    test "a completed search that found a deadlock bounded nothing" do
+      result = ModelChecker.run(TLA.TestSpecs.Deadlocking, %{constants: %{max: 3}})
+
+      assert result.status == :violation
+      assert result.deadlock
+      assert result.coverage.bounded_by == :none
+    end
+
+    test "whereas one that halted mid-expansion did" do
+      result = ModelChecker.run(TLA.TestSpecs.Broken, %{})
+
+      assert result.status == :violation
+      refute result.deadlock
+      assert result.coverage.bounded_by == :violation
     end
   end
 

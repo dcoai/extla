@@ -664,7 +664,13 @@ defmodule TLA.ModelChecker do
         _ -> {safety_status, safety_violation}
       end
 
-    coverage = Coverage.finalize(run.coverage, bounded_by(safety_status, config))
+    # From the SEARCH's outcome, not from the verdict derived above (#136). `safety_status` has
+    # already merged two runs this field must tell apart: one that halted mid-expansion, whose
+    # counts are a floor, and one whose frontier emptied and which only then reported a stuck
+    # state, whose counts are a census. Both reach `:violation` there; `run.outcome` still has
+    # them separate. `check_temporals/1` does not touch it, so the existing rule that coverage is
+    # bounded by what the SAFETY pass did survives unchanged.
+    coverage = Coverage.finalize(run.coverage, bounded_by(run.outcome, config))
 
     %{
       status: status,
@@ -685,9 +691,9 @@ defmodule TLA.ModelChecker do
   end
 
   defp bounded_by(:max_states_reached, _config), do: :max_states
-  defp bounded_by(:violation, _config), do: :violation
-  defp bounded_by(_status, %{state_constraint: nil}), do: :none
-  defp bounded_by(_status, _config), do: :state_constraint
+  defp bounded_by({:violation, _trace}, _config), do: :violation
+  defp bounded_by(_outcome, %{state_constraint: nil}), do: :none
+  defp bounded_by(_outcome, _config), do: :state_constraint
 
   defp invariant_trace(run, id, name, state) do
     Trace.generate(run.graph, id,

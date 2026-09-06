@@ -43,6 +43,18 @@ release it merely follows.
 
 ### Fixed
 
+- **`coverage.bounded_by` said the counts were partial when a completed search merely found a
+  deadlock** (#136). A deadlock is detected after the frontier empties, so such a run has counted
+  everything — but it reached the same `:violation` as a run that stopped mid-expansion on an
+  invariant, and `TLA_COVERAGE.md` marked its sections `LOWER BOUNDS` with a `≥` on every count
+  that was in fact exact. The value is now derived from the search's own outcome rather than
+  from the verdict it produced, so a completed search reports `:none` whatever it found.
+
+  No new value and no schema change: the field means *are these counts complete, and if not why*,
+  and `status: :violation` with `bounded_by: :none` is the correct pair — a problem was found,
+  and everything was searched. Four of the ten `LOWER BOUNDS` sections in the golden lose the
+  marking; the six that were genuinely truncated keep it.
+
 - **A run that halted mid-expansion reported the offending action as never enabled** (#128). A
   counterexample would name `compact` in its trace while the coverage report in the same result
   called it never enabled and warned that its guard was broken. `TLA.Coverage.observe_action/5`
