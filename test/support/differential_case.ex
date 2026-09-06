@@ -330,6 +330,45 @@ defmodule TLA.DifferentialCase do
         end
       end
 
+      # Two records of the same run, held to each other (#128). A counterexample names the
+      # actions it took; the coverage report names the actions it believes were never enabled.
+      # Those sets cannot both be right and overlap — and they did, because enablement was
+      # recorded where an expansion COMPLETED rather than where the guard admitted a binding, so
+      # a violation that halted the expansion lost the enablement of the action that caused it.
+      #
+      # Asserted over every entry that produces a violation rather than only the one that
+      # exhibited it. `audit_log` is where it shows, because its `compact` is enabled in exactly
+      # one state; `die_hard` is where it hid, because losing one of twelve looks like nothing.
+      # A guard that covers only the entry that failed is a guard against one instance.
+      test "no counterexample names an action the coverage report calls never-enabled", ctx do
+        spec = TLA.DifferentialCase.run_spec(@entry)
+
+        runs =
+          for {tlc_name, %{"violated_at" => _}} <- ctx.expected["invariants"] do
+            name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+            TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+          end ++
+            for {name, %{"violated_at" => _}} <-
+                  TLA.DifferentialCase.properties_of_kind(
+                    spec,
+                    ctx.expected,
+                    @entry,
+                    :action_property
+                  ) do
+              TLA.DifferentialCase.check_action_properties(@entry, [name])
+            end
+
+        for result <- runs do
+          named = MapSet.new(result.violation.actions)
+          claimed = MapSet.new(result.coverage.never_enabled)
+
+          assert MapSet.disjoint?(named, claimed),
+                 "the run took #{inspect(MapSet.to_list(named))} and reported " <>
+                   "#{inspect(MapSet.to_list(claimed))} as never enabled — an action cannot be " <>
+                   "both in the counterexample and absent from the model"
+        end
+      end
+
       # The two records that are self-consistent when wrong. #54's sweep found
       # `drops_a_liveness_edge` surviving every gate: a missing out-edge makes some cycle
       # unfindable, and an unfindable cycle is indistinguishable from a property that

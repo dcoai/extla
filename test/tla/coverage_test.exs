@@ -115,6 +115,138 @@ defmodule TLA.CoverageTest do
     end
   end
 
+  defmodule HaltsOnItsOnlyEnablement do
+    @moduledoc """
+    `reset` is enabled in exactly one state, and taking it is what violates the property. That
+    combination is the whole of #128: an action whose enablement is lost when the expansion halts
+    reports `enabled_in: 0`, and zero is not an undercount but a false claim.
+
+    Every corpus entry before `audit_log` was too big to show it — `die_hard`'s actions are
+    enabled in eleven or twelve states, so losing one leaves eleven and nothing looks wrong.
+    """
+    use TLA.Spec
+
+    variable :n, type: 0..3
+
+    init do
+      n = 0
+    end
+
+    action :step do
+      require n < 3
+
+      n = n + 1
+    end
+
+    action :reset do
+      require n == 3
+
+      n = 0
+    end
+
+    action_property :never_decreases do
+      new.n >= old.n
+    end
+  end
+
+  describe "an action whose expansion halted" do
+    setup do
+      %{result: ModelChecker.run(HaltsOnItsOnlyEnablement, %{})}
+    end
+
+    test "is not reported as never enabled", %{result: result} do
+      assert result.status == :violation
+      assert result.violation.actions |> List.last() == :reset
+
+      # Before #135 this was `[:reset]` — the run named `reset` in its counterexample and told
+      # the user in the same breath that its guard never held.
+      assert result.coverage.never_enabled == []
+      assert result.coverage.actions[:reset].enabled_in == 1
+    end
+
+    test "and no warning accuses it", %{result: result} do
+      refute Enum.any?(Coverage.warnings(result.coverage), &(&1 =~ "reset"))
+    end
+
+    test "the actions a counterexample names and never_enabled are disjoint", %{result: result} do
+      # The property stated directly, because it is the one worth carrying into the corpus: it is
+      # about the result object alone, so it costs nothing to assert wherever a violation exists.
+      named = MapSet.new(result.violation.actions)
+      claimed = MapSet.new(result.coverage.never_enabled)
+
+      assert MapSet.disjoint?(named, claimed)
+    end
+
+    # The counts the split moved apart must still both be recorded. `reset` generated one state
+    # before the property refused it; `step` generated three.
+    test "enablement and what it generated are both still counted", %{result: result} do
+      assert result.coverage.actions[:step].enabled_in == 3
+      assert result.coverage.actions[:step].states_generated == 3
+      assert result.coverage.actions[:reset].enabled_in == 1
+    end
+  end
+
+  describe "a bounded run may not accuse" do
+    # A truncated search cannot tell an action whose guard is never true from one whose states it
+    # never reached, so `never_enabled` stays in the report as data and stops being a finding.
+    setup do
+      %{
+        coverage:
+          coverage(Typo, %{
+            constants: %{modes: MapSet.new([:a, :b])},
+            invariants: [],
+            max_states: 2
+          })
+      }
+    end
+
+    test "the list is still reported, because it is data", %{coverage: coverage} do
+      assert coverage.bounded_by == :max_states
+      assert coverage.never_enabled == [:switch]
+    end
+
+    test "but the warning says the run was bounded rather than blaming the spec", %{
+      coverage: coverage
+    } do
+      [line] = Enum.filter(Coverage.warnings(coverage), &(&1 =~ "switch"))
+
+      assert line =~ "not enabled in any state this run reached"
+      assert line =~ "bounded by :max_states"
+      refute line =~ "was never enabled"
+    end
+
+    test "and --strict-coverage does not fail a build on it", %{coverage: coverage} do
+      assert Coverage.clean?(coverage)
+    end
+
+    # The fix must not buy its correctness by going quiet: a COMPLETE run still accuses.
+    # `check_deadlock: false` because `Typo` deadlocks once `tick` runs out, and a deadlock is
+    # reported as `bounded_by: :violation` even though the search finished (#136).
+    test "whereas a complete run still does both" do
+      coverage =
+        coverage(Typo, %{
+          constants: %{modes: MapSet.new([:a, :b])},
+          invariants: [],
+          check_deadlock: false
+        })
+
+      assert coverage.bounded_by == :none
+      refute Coverage.clean?(coverage)
+      assert Enum.any?(Coverage.warnings(coverage), &(&1 =~ "action :switch was never enabled"))
+    end
+
+    # And a run that halted on a violation is left alone, deliberately. `:violation` conflates a
+    # truncated search with a completed one that found a deadlock (#136), so nothing here leans
+    # on it — which means `--strict-coverage` is exactly as strong for a deadlocking spec as it
+    # was before #135.
+    test "a deadlocking spec is still caught by --strict-coverage" do
+      coverage = coverage(Typo, %{constants: %{modes: MapSet.new([:a, :b])}, invariants: []})
+
+      assert coverage.bounded_by == :violation
+      refute Coverage.clean?(coverage)
+    end
+  end
+
   describe "invariants" do
     test "record how many states each was evaluated in" do
       coverage = coverage(Properties, %{})

@@ -137,20 +137,27 @@ defmodule TLA.Coverage do
   end
 
   @doc """
-  Record what expanding one state produced for one action.
-  """
-  def observe_action(coverage, _name, [], _generated, _distinct), do: coverage
+  Record that this action was enabled in a state, and with which bindings.
 
-  def observe_action(coverage, name, bindings, generated, distinct) do
-    actions =
-      Map.update!(coverage.actions, name, fn entry ->
-        %{
-          entry
-          | enabled_in: entry.enabled_in + 1,
-            states_generated: entry.states_generated + generated,
-            distinct_generated: entry.distinct_generated + distinct
-        }
-      end)
+  Called *before* the successors are generated, and that is the whole point (#128). Enablement is
+  established the moment the guard admits a binding: it is true before any successor exists, and
+  it stays true whether or not the expansion finishes. Recording it at the end instead meant a
+  violation that halted the expansion lost the enablement of the action that caused it — so a run
+  reported `never_enabled: [:compact]` while naming `compact` in its counterexample, and warned
+  the user that the offending action had a broken guard.
+
+  It was invisible for as long as it was because every earlier case had another witness:
+  `die_hard`'s actions are enabled in eleven or twelve states each, so losing one leaves eleven
+  and nothing looks wrong. It becomes a false claim rather than an undercount only when the true
+  count is one, which no corpus entry was small enough to produce until `audit_log`.
+
+  `seen_bindings` belongs here too: it is a fact about the bindings the guard admitted, not about
+  what expanding them produced.
+  """
+  def observe_enabled(coverage, _name, []), do: coverage
+
+  def observe_enabled(coverage, name, bindings) do
+    actions = Map.update!(coverage.actions, name, &%{&1 | enabled_in: &1.enabled_in + 1})
 
     seen =
       Map.update!(coverage.seen_bindings, name, fn set ->
@@ -158,6 +165,27 @@ defmodule TLA.Coverage do
       end)
 
     %{coverage | actions: actions, seen_bindings: seen}
+  end
+
+  @doc """
+  Record what expanding one state through one action produced.
+
+  The other half of `observe_enabled/3`, and deliberately not the same call: *was this action
+  enabled here* and *how many states did it generate* are different facts, known at different
+  moments. This one stays where the numbers are known — after the expansion — because a halt
+  there legitimately means the count is not known, which is what `bounded_by` already says.
+  """
+  def observe_generated(coverage, name, generated, distinct) do
+    actions =
+      Map.update!(coverage.actions, name, fn entry ->
+        %{
+          entry
+          | states_generated: entry.states_generated + generated,
+            distinct_generated: entry.distinct_generated + distinct
+        }
+      end)
+
+    %{coverage | actions: actions}
   end
 
   @doc """
@@ -293,7 +321,7 @@ defmodule TLA.Coverage do
   end
 
   # The cap is a bound on the REPORT, not on the search, so it is applied here the way
-  # `observe_action/5` applies it: once past it, stop growing the set rather than trim it.
+  # `observe_enabled/3` applies it: once past it, stop growing the set rather than trim it.
   defp merge_bindings(a, b) do
     if MapSet.size(a) > @universe_cap, do: a, else: MapSet.union(a, b)
   end
@@ -419,21 +447,45 @@ defmodule TLA.Coverage do
   Whether this run found anything worth a warning.
   """
   def clean?(coverage) do
-    coverage.never_enabled == [] and coverage.vacuous == [] and
+    accusable(coverage) == [] and coverage.vacuous == [] and
       coverage.terminal_but_live == [] and
       Enum.all?(coverage.invariants, fn {_, entry} -> entry.near_misses != 0 end)
   end
+
+  # A never-enabled action is a finding about the SPEC — "a typo in a guard", as the moduledoc
+  # puts it — and a run that stopped early cannot support that claim. It cannot tell an action
+  # whose guard is never true from one whose states it never reached (#128). The list stays in
+  # the report either way, because it is data; what a truncated run may not do is accuse, and
+  # `--strict-coverage` may not fail a build on it.
+  #
+  # `:violation` is deliberately NOT in this list, even though it is a `bounded_by` value. It
+  # conflates two runs: one that halted mid-expansion on an invariant, whose counts really are
+  # lower bounds, and one whose search COMPLETED and then reported a deadlock, whose counts are
+  # exact (#136). Suppressing on it would quietly weaken `--strict-coverage` for every spec that
+  # deadlocks — `TLA.TestSpecs.Typo`, whose whole purpose is to be caught, is one. The two cases
+  # need telling apart before anything can lean on that value; `:max_states` and
+  # `:state_constraint` are unambiguous and are enough for the case #128 is about.
+  defp accusable(%{bounded_by: bound}) when bound in [:max_states, :state_constraint], do: []
+
+  defp accusable(coverage), do: coverage.never_enabled
 
   @doc """
   The warnings, one line each.
   """
   def warnings(coverage) do
-    Enum.map(coverage.never_enabled, &"action #{inspect(&1)} was never enabled") ++
+    Enum.map(coverage.never_enabled, &never_enabled_line(&1, coverage.bounded_by)) ++
       Enum.map(coverage.vacuous, &vacuity_line/1) ++
       Enum.map(coverage.terminal_but_live, &"terminal #{inspect(&1)} admitted a live state") ++
       for {name, %{near_misses: 0}} <- coverage.invariants,
           do: "invariant #{inspect(name)} was never at risk"
   end
+
+  defp never_enabled_line(name, bound) when bound in [:max_states, :state_constraint] do
+    "action #{inspect(name)} was not enabled in any state this run reached — the run was " <>
+      "bounded by #{inspect(bound)}, so this is not a finding about the spec"
+  end
+
+  defp never_enabled_line(name, _bound), do: "action #{inspect(name)} was never enabled"
 
   defp vacuity_line(%{property: property, binding: nil, reason: reason}),
     do: "property #{inspect(property)} is VACUOUS: #{reason(reason)}"
