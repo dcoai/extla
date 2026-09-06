@@ -277,6 +277,12 @@ defmodule Mix.Tasks.Tla.Check do
   @doc false
   def schema_version, do: @schema_version
 
+  @doc false
+  # Exposed for `TLA.SpecOptionsTest`, which holds `spec/04`'s documented option list and this
+  # to each other. A module attribute is not readable at runtime, and the alternative — the test
+  # parsing this file's source for `@switches` — would be a second parser to keep working.
+  def switches, do: @switches
+
   defp result_json({:unsound_symmetry, error}) do
     %{
       empty_result()
