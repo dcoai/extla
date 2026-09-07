@@ -108,6 +108,28 @@ format:
   script:
     - mix format --check-formatted
 
+changelog:
+  extends: .elixir
+  stage: check
+  variables:
+    # The guard diffs against the MERGE BASE, which a shallow clone does not have. Without
+    # this the `git diff` fails rather than returning nothing -- the script halts 2 and says
+    # so, deliberately, because an empty result would read as "no lib/ change" and pass. A
+    # gate that reports success when it could not run is the defect #70 cost five merges to
+    # learn (#122 is the same shape through a third door).
+    GIT_DEPTH: 0
+  script:
+    # #124: four of the eight most recent merges touching lib/ carried no CHANGELOG entry,
+    # including two that shipped new public API. Investigating for #142 found there had never
+    # been a rule to break -- the eighteen-work-item run that looked like one was the
+    # documentation milestones, fourteen of which touched no lib/ at all -- so this
+    # establishes the rule rather than restoring it.
+    #
+    # `Changelog-none: <reason>` in a commit message is the way to answer rather than obey.
+    # The reason is required and lands in the history beside the diff, which is the property
+    # that separates an escape hatch from a bypass.
+    - elixir bin/changelog_guard.exs
+
 compile:
   extends: .elixir
   stage: check
