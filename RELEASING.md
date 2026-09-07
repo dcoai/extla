@@ -109,10 +109,37 @@ everything that needs fixing:
 `--tag` additionally prompts before acting, because a tag is permanent. The escapes are
 `--no-ci-check`, `--no-changelog`, `--no-push` and `--yes`.
 
+## When an entry gets written: at the change, not at the release
+
+**A merge that touches `lib/` writes its `[Unreleased]` entry in the same merge request.** CI
+enforces it — the `changelog` job in the `check` stage runs `bin/changelog_guard.exs`, which
+compares the merge base against the branch and fails when `lib/` moved and `CHANGELOG.md` did
+not.
+
+If the change genuinely has nothing to say to anyone outside the repository — a pure refactor,
+an internal rename — answer the check instead of obeying it, with a trailer in a commit message:
+
+```
+Changelog-none: internal rename, no behaviour or API change
+```
+
+The reason is required. It goes in the commit message rather than a label or a CI variable so
+that it lands in the history beside the diff, where a reviewer reads it: answering has to cost
+the same visibility as complying, or the hatch becomes a bypass and the gate becomes theatre.
+
+Why a gate rather than a note in a checklist: #124 read the history as a habit that broke, and
+#142 found there had never been a habit. The eighteen consecutive work items that appeared to
+establish one were the documentation milestones — fourteen touched no `lib/` at all, and wrote
+entries because writing prose *was* the work — while `issue-91-dependency-sets`, in the same
+era, changed three files under `lib/` and wrote nothing. No issue, skill or `CLAUDE.md` section
+has ever mentioned the CHANGELOG. So this rule is new, and the gate is what makes it a rule.
+
 ## What stays a human decision
 
 - **The CHANGELOG content.** The tool closes a section; it never writes one, and an empty
-  entry is refused. What changed and why it matters is not derivable from the diff.
+  entry is refused. What changed and why it matters is not derivable from the diff — which is
+  the whole argument for writing the entry while the work is in hand, and the reason the gate
+  above sits at the change rather than at the release.
 - **Minor versus patch.** `--minor` is always explicit.
 - **A minor's tag message.** v0.1.0 and v0.2.0 are hand-written prose. Patch tags take the
   changelog section automatically.
