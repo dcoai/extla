@@ -269,8 +269,28 @@ tlc-corpus:
     key: tla2tools-$TLA_TOOLS_VERSION
     paths:
       - .tla
-  before_script:
-    - apt-get update -qq
-    - apt-get install -y -qq --no-install-recommends curl ca-certificates
+  # No `before_script`, and the absence is the fix (#122, #143).
+  #
+  # This job used to `apt-get update && apt-get install curl ca-certificates`. Measured against
+  # the image it actually runs, both were already there:
+  #
+  #     $ docker run --rm eclipse-temurin:21-jre which curl wget
+  #     /usr/bin/curl
+  #     /usr/bin/wget
+  #
+  # and a real HTTPS fetch of tla2tools.jar succeeds in the bare image, checksum and all, so
+  # `ca-certificates` was present too. The install downloaded nothing and changed nothing --
+  # it existed only to reach a public archive.
+  #
+  # That archive is what failed in pipeline #1171: `apt-get update` got a Packages.gz one byte
+  # short of what the Release file declared, and `tlc-corpus` went red on `main` for hours. The
+  # job was taking an unnecessary dependency on the outside world before doing any work, and it
+  # is the only thing that ever broke here.
+  #
+  # `bin/tlc-expected` reaches for `curl` only on a cache MISS -- `ensure_jar` returns early when
+  # the jar is present and checksums -- so on the overwhelming majority of runs nothing is
+  # fetched at all. If a future base image drops curl, the miss path fails loudly with
+  # `curl: not found`, which is the right way round: a missing tool should stop the job, not
+  # quietly reintroduce an archive round-trip on every pipeline.
   script:
     - bin/tlc-expected --check
