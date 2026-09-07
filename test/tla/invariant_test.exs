@@ -12,6 +12,19 @@ defmodule TLA.InvariantTest do
 
   defp call(pid, message), do: TLA.TestCall.call(pid, message)
 
+  # How long to wait for a server to die of a violation, matching `TLA.TestCall.call/3`'s own
+  # timeout — the two wait for the same event and should not disagree about how long it can take.
+  #
+  # `assert_receive`'s default is 100 ms, and that is too tight here (#145). Under
+  # `max_cases: 32` the server has to be scheduled, run the callback, raise, and have `:DOWN`
+  # delivered, and on a loaded run that does not always fit — which showed up as an empty mailbox
+  # in one of three seeded full-suite runs.
+  #
+  # This is not a `sleep` and not a race being papered over. #140 removed the race; what is left
+  # is a deadline, and a deadline set generously costs the passing case nothing because the
+  # assertion returns as soon as the message lands.
+  @down 5_000
+
   describe "a transition that holds" do
     test "returns what the callback returned, untouched", %{account: account} do
       assert {:ok, 150} = call(account, {:deposit, 50})
@@ -51,7 +64,8 @@ defmodule TLA.InvariantTest do
       ref = Process.monitor(account)
       GenServer.cast(account, :skim)
 
-      assert_receive {:DOWN, ^ref, :process, ^account, {%Violation{} = violation, _stacktrace}}
+      assert_receive {:DOWN, ^ref, :process, ^account, {%Violation{} = violation, _stacktrace}},
+                     @down
 
       assert violation.name == :never_negative
 
@@ -68,7 +82,7 @@ defmodule TLA.InvariantTest do
       Process.unlink(pid)
       ref = Process.monitor(pid)
       GenServer.cast(pid, :skim)
-      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, @down
 
       assert {:dead_on_arrival, :noproc} = call(pid, {:deposit, 1})
     end
@@ -83,7 +97,7 @@ defmodule TLA.InvariantTest do
 
       GenServer.cast(pid, :skim)
 
-      assert_receive {:DOWN, ^ref, :process, ^pid, {%Violation{}, _stacktrace}}
+      assert_receive {:DOWN, ^ref, :process, ^pid, {%Violation{}, _stacktrace}}, @down
       refute Process.alive?(pid)
     end
 
