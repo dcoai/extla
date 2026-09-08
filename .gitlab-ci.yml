@@ -30,6 +30,38 @@
 # `only_allow_merge_if_all_discussions_are_resolved` is deliberately OFF. The defect was about
 # pipeline status, not review threads; turning it on would add a blocking condition for a problem
 # this project has not had. Revisit if review becomes multi-person.
+#
+# WHAT THE MERGE GATE DOES NOT SAY (#122, #144). "Merges are gated" and "`main` is green" are
+# different claims, and #72 only makes the first. The gate proves a branch was green WHEN IT WAS
+# MERGED; it says nothing about `main` afterwards, and `main` goes red afterwards for reasons that
+# live outside this repository -- pipeline #1083 (an unsigned Debian index) and #1171 (an Ubuntu
+# mirror caught mid-sync) were both post-merge pipelines on `main`, both sat red for hours, and
+# both were found by accident. Nothing watches the branch that merges land on.
+#
+# Two things now do, and one of them is a project setting, so it is recorded here for the same
+# reason the merge-gate settings are:
+#
+#   pipeline schedule #2  "Is main green now?"   ref: main   cron: 0 5 * * * (UTC)   active
+#
+# A scheduled run answers "is `main` green NOW", which is a better question than "was it green
+# when merged": it catches a break that arrived with no merge at all, and keeps reporting it
+# until it is fixed. It runs every job below unchanged -- a job with no `rules:` runs on every
+# pipeline source, and `changelog` diffs `origin/main...HEAD`, which on `main` is empty.
+#
+# The failed pipeline is the record, not the announcement. GitLab's own failed-pipeline email went
+# out for #1083 and #1171 (both authored by the project owner at notification level
+# `participating`) and reached nobody in a way they acted on, so the announcement is the second
+# thing: `/session-startup` runs `~/Projects/claude-tools/main_verdict.exs` before triaging any
+# issue, which reads the latest finished pipeline on `main`, prints the failed jobs with their
+# log tails, and WARNS if this schedule is missing, inactive or overdue -- a detector that has
+# gone quiet is indistinguishable from good news, and that is the confusion it exists to remove.
+#
+# Demonstrated firing on a genuinely red `main` in #144: the schedule was run once with
+# ELIXIR_IMAGE overridden to a tag that does not exist, so every `check` job failed to pull its
+# image and every `verify` gate behind them was skipped -- the #1083 shape exactly, a break from
+# outside the repository with no merge involved -- and the verdict tool reported the red, named
+# the jobs, and listed the gates that did not run. Then the variable was removed and the schedule
+# run again green, so `main`'s last recorded verdict is not the demonstration.
 
 stages:
   - check
