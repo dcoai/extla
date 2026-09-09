@@ -138,6 +138,94 @@ defmodule TLA.DifferentialTest.DeclarationKinds do
     """
   end
 
+  # The enumeration above is a hand-written list; `bin/tlc-expected` enumerates the corpus
+  # directory independently, and nothing compared the two (#174). Deleting `die_hard` and
+  # `raft_election` — between them EVERY violation in the corpus — took this suite from 104
+  # passed to 80 passed, exit 0, removing the only violated-invariant comparison, the only
+  # violated-temporal comparison, and both independent-oracle cross-checks. `tlc-expected
+  # --check` stayed green because it verifies whatever directories remain.
+  #
+  # So the list is now derived-and-compared rather than trusted, and it fails BOTH ways: a
+  # directory nobody runs is as much a finding as an entry with no directory.
+  test "the entry list and the corpus directory are the same set" do
+    on_disk =
+      @corpus
+      |> File.ls!()
+      |> Enum.filter(&File.dir?(Path.join(@corpus, &1)))
+      |> MapSet.new()
+
+    listed = MapSet.new(@entries, & &1.name)
+
+    assert MapSet.equal?(on_disk, listed), """
+    The corpus directory and this file's entry list disagree.
+
+      on disk, not run:     #{inspect(Enum.sort(MapSet.difference(on_disk, listed)))}
+      listed, not on disk:  #{inspect(Enum.sort(MapSet.difference(listed, on_disk)))}
+
+    The first list is the dangerous one: those models are regenerated and verified against
+    TLC by `bin/tlc-expected --check`, and compared to ExTLA by nothing. Removing an entry
+    from the list above does not fail anything — the suite simply gets smaller.
+
+    Add the entry, or delete the directory.
+    """
+  end
+
+  # The list being complete is not the same as the corpus still containing the comparisons
+  # that make it evidence. Four of the seven comparison classes have exactly ONE instance:
+  # one violated invariant, one violated temporal, one violated action property. The test
+  # above would not notice the last one going away, because the entry would still be listed
+  # and still be compared — for the verdicts it has left.
+  #
+  # D-9 makes agreement with TLC the acceptance gate, and a corpus where TLC never refutes
+  # anything agrees with a checker that answers "holds" to everything.
+  test "the corpus still contains TLC's refutations" do
+    refuting =
+      Enum.flat_map(@entries, fn entry ->
+        expected =
+          [@corpus, entry.name, "expected.json"]
+          |> Path.join()
+          |> File.read!()
+          |> Jason.decode!()
+
+        for section <- ["invariants", "properties"],
+            {declaration, verdict} <- Map.get(expected, section) || %{},
+            refuted?(verdict),
+            do: {entry.name, section, declaration}
+      end)
+
+    invariants = Enum.filter(refuting, fn {_e, section, _d} -> section == "invariants" end)
+    properties = Enum.filter(refuting, fn {_e, section, _d} -> section == "properties" end)
+    entries = refuting |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
+
+    assert invariants != [], refutation_message("invariant", refuting)
+    assert properties != [], refutation_message("property", refuting)
+
+    # Today: die_hard (an invariant), raft_election (a temporal), audit_log (an action
+    # property). Each carries exactly one, so losing any entry loses a whole comparison
+    # class — which is what made deleting two of them cost 24 tests and no failure.
+    assert length(entries) >= 3, refutation_message("third distinct", refuting)
+  end
+
+  defp refuted?("violated"), do: true
+  defp refuted?(%{"violated_at" => _}), do: true
+  defp refuted?(_), do: false
+
+  defp refutation_message(what, refuting) do
+    """
+    The corpus no longer records enough of TLC's refutations (missing: #{what}).
+
+    Refutations found:
+    #{Enum.map_join(refuting, "\n", fn {e, s, d} -> "  #{e}: #{s}.#{d}" end)}
+
+    A corpus in which TLC never refutes anything agrees with a checker that answers "holds"
+    to everything, and D-9 makes that agreement the project's acceptance criterion. Four of
+    the seven comparison classes have exactly one instance, so removing one entry can remove
+    a whole class silently.
+
+    Restore the entry, or add one TLC refutes.
+    """
+  end
+
   test "every declaration kind is put to TLC by some corpus entry" do
     loaded =
       Enum.map(@entries, fn entry ->
