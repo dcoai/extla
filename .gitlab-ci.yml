@@ -181,6 +181,23 @@ compile:
 test:
   extends: .elixir
   stage: check
+  variables:
+    # `mix test` reads this repository's own history, so it cannot run on a shallow clone
+    # (#147). `test/tla/changelog_guard_test.exs` pins eight real merges and asserts what the
+    # guard says about each -- #142 chose real merges over fixtures deliberately, so that the
+    # regression cannot agree with itself -- and the oldest reaches back 39 commits.
+    #
+    # The depth is a PROJECT SETTING and is invisible from a checkout, which is why it is
+    # recorded here beside the merge-gate settings:
+    #
+    #   ci_default_git_depth = 20
+    #
+    # That is generations of the commit graph, not commits, so with a merge per work item the
+    # horizon lands near 38 -- and the pinned shas sat at 17 through 39. The oldest was ONE
+    # commit inside it. Pipeline #254 is what that cost: a release commit added one commit,
+    # `01e1604^1` fell off the end, and a green suite went red on a merge that had not
+    # changed. Any merge would have done it; the next would have taken the one after that.
+    GIT_DEPTH: 0
   script:
     - mix test
 
