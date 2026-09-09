@@ -356,8 +356,48 @@ defmodule TLA.Spec.Block do
     )
   end
 
-  defp desugar_statement!({:=, meta, [{name, _, var_ctx}, _rhs]} = statement, ctx)
-       when is_atom(name) and is_atom(var_ctx) do
+  defp desugar_statement!({:=, _meta, _args} = statement, ctx) do
+    reject_assignment!(statement, ctx)
+    statement
+  end
+
+  defp desugar_statement!(statement, _ctx), do: statement
+
+  @doc """
+  Reject `=` on a declared variable, where there is no post-state for it to mean.
+
+  §1.2 permits assignment only in `init` and `action`. In a predicate or a
+  temporal formula there is no post-state, so `=` on a declared variable is
+  almost always a mistyped `==`.
+
+  **Public because two paths need the same rule, and one of them did not have
+  it.** The check used to live only inside `desugar_statement!/2`, which is
+  reached from `desugar_predicate!/2` — so `invariant`, `terminal` and
+  `action_property` were guarded and `temporal` was not: `dsl.ex` routes a
+  temporal block to `TLA.Spec.Temporal.parse!/2`, which never desugars.
+
+  A `temporal` whose body was an assignment therefore compiled, and the result
+  is the worst shape a missing check can have (#150). An invariant that never
+  fires is visible in the coverage report; a temporal formula built from an
+  assignment is not refutable, so the run reports that the property **holds**.
+  The reader gets a green verdict for a property that checked nothing, which is
+  Design Principle 6 defeated by one character.
+
+  Returns `:ok`, or raises `TLA.Spec.CompileError`. Anything that is not an
+  assignment to a declared variable passes through.
+
+  ## Scope, and what is deliberately not checked
+
+  This walks the statements a block is made of, not the expressions inside
+  them — so `always(status = :done)` is not caught, in a `temporal` or in an
+  `invariant`. That limit is shared by both paths rather than differing between
+  them, which is the property that matters here: the two forms now agree about
+  what the rule is. Widening it to a full prewalk is a separate decision, since
+  `=` nested inside a call is legal Elixir that a spec author could conceivably
+  mean.
+  """
+  def reject_assignment!({:=, meta, [{name, _, var_ctx}, _rhs]}, ctx)
+      when is_atom(name) and is_atom(var_ctx) do
     if MapSet.member?(ctx.variables, name) do
       bad!(ctx, meta, "assignment to variable #{inspect(name)} outside `init`/`action`",
         hint:
@@ -367,10 +407,10 @@ defmodule TLA.Spec.Block do
       )
     end
 
-    statement
+    :ok
   end
 
-  defp desugar_statement!(statement, _ctx), do: statement
+  def reject_assignment!(_statement, _ctx), do: :ok
 
   @doc """
   The near-miss expression of an invariant, or `nil` when there is none.

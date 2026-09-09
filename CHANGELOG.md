@@ -14,6 +14,27 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Fixed
+
+- **A `temporal` block accepted an assignment, so one mistyped `==` produced a property that
+  always passed** (#150). `02-dsl-semantics.md` §1.2 makes `=` on a declared variable a compile
+  error outside `init` and `action`, and that rule was enforced for `invariant`, `terminal` and
+  `action_property` — all three reach it through `TLA.Spec.Block.desugar_predicate!/2`.
+  `temporal` does not desugar; it goes to `TLA.Spec.Temporal.parse!/2`, which never saw the
+  check. So `temporal :no_starvation do waiting = [] end` compiled.
+
+  **It is the one declaration whose failure is silent.** An invariant that never fires shows up
+  in the coverage report as never enabled. A temporal formula built from an assignment is not
+  refutable, so the search reports that the property *holds* — a green verdict for a property
+  that checked nothing, which is Design Principle 6 defeated by one character, underneath the
+  vacuity detection that exists to catch exactly this one layer down.
+
+  The rule now lives in one place, `TLA.Spec.Block.reject_assignment!/2`, called from both
+  paths, so the two forms cannot drift into two dialects again. Neither path descends into
+  nested expressions — `always(x = 1)` is still accepted — and that limit is now shared rather
+  than differing between them; widening it is a separate decision, since `=` inside a call is
+  legal Elixir a spec author could conceivably mean.
+
 ## [0.3.20] — 2026-09-09
 
 **A minor line, and the patch number does not start at zero.** Two of the changes below move

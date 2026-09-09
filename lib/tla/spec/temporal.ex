@@ -19,7 +19,7 @@ defmodule TLA.Spec.Temporal do
   habit and it means the same thing.
   """
 
-  alias TLA.Spec.{CompileError, Rewriter}
+  alias TLA.Spec.{Block, CompileError, Rewriter}
 
   @formula_ops [:always, :eventually, :~>]
 
@@ -39,7 +39,19 @@ defmodule TLA.Spec.Temporal do
     )
   end
 
-  def parse!(ast, ctx), do: formula(unwrap(ast), ctx)
+  def parse!(ast, ctx) do
+    single = unwrap(ast)
+
+    # The same rule the predicate forms take, from the same function, so the two
+    # paths cannot disagree about it again (#150). They did: this path never
+    # desugars, so it never saw `Block.desugar_statement!/2`'s check, and a
+    # `temporal` whose body was `status = :done` compiled into a formula that
+    # cannot be refuted -- reporting that the property holds, having checked
+    # nothing.
+    Block.reject_assignment!(single, ctx)
+
+    formula(single, ctx)
+  end
 
   defp unwrap({:__block__, _, [single]}), do: single
   defp unwrap(other), do: other
