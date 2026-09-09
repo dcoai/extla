@@ -16,6 +16,17 @@ release it merely follows.
 
 ### Fixed
 
+- **An unknown option on a Layer 1 declaration was stored and ignored rather than refused**
+  (#149). `callbaks: [:handle_cast]` compiled, and the invariant applied to every callback.
+  The cause is the one above, one step subtler: options were consulted by name with
+  `Keyword.get/3` defaults, so a key nobody reads and a key nobody wrote are the same thing.
+
+  The accepted set is now per declaration kind, and the message names the offending key and
+  what that kind takes. `callbacks:` is included for `invariant` and `action_property` and
+  **excluded for `precondition` and `postcondition`**, which never consulted it — they are
+  emitted from `__tla_conditions__/1` and do not reach the wrapper's `applicable/2`. Accepted
+  and ignored is the same defect as unknown, so it is refused rather than documented.
+
 - **`enabled:` on a Layer 1 declaration only ever worked for a literal `false`, so the
   documented way to compile out an expensive check did nothing** (#149). `03-layer1-invariants.md`
   §162 specifies the option as evaluated at compile time, and §634 gives the idiom:

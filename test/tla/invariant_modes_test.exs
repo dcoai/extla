@@ -193,6 +193,89 @@ defmodule TLA.InvariantModesTest do
     end
   end
 
+  # #149 item 2, and the same root cause as the option above: declaration options were stored
+  # wholesale and consulted by name with `Keyword.get/3` defaults, so a key nobody reads and a
+  # key nobody wrote were indistinguishable.
+  describe "unknown declaration options are refused" do
+    defp refuse_options(source) do
+      assert_raise CompileError, fn -> Code.compile_string(source) end
+    end
+
+    test "a typo'd option names the key and what the declaration accepts" do
+      error =
+        refuse_options("""
+        defmodule OptionTypo do
+          use GenServer
+          use TLA.Invariant
+
+          invariant :i, callbaks: [:handle_cast] do
+            state.n >= 0
+          end
+
+          def init(a), do: {:ok, a}
+        end
+        """)
+
+      assert error.description =~ "invariant :i"
+      assert error.description =~ "unknown option :callbaks"
+      assert error.description =~ ":desc, :enabled, :callbacks"
+    end
+
+    # `callbacks:` is honoured only where `applicable/2` is reached, which is the wrapper —
+    # so invariants and action properties. Preconditions and postconditions are emitted from
+    # `__tla_conditions__/1` and never consult it, so it used to be accepted and ignored.
+    # Accepted-and-ignored is the same defect as unknown, one step subtler.
+    test "an option that exists but is not honoured here is refused too" do
+      error =
+        refuse_options("""
+        defmodule OptionNotHonoured do
+          use GenServer
+          use TLA.Invariant
+
+          precondition {:withdraw, _n}, callbacks: [:handle_cast] do
+            true
+          end
+
+          def init(a), do: {:ok, a}
+        end
+        """)
+
+      assert error.description =~ "precondition"
+      assert error.description =~ "unknown option :callbacks"
+      assert error.description =~ ":desc, :enabled"
+    end
+
+    test "every accepted option still compiles on every kind that takes it" do
+      [{module, _}] =
+        Code.compile_string("""
+        defmodule OptionsAllAccepted do
+          use GenServer
+          use TLA.Invariant
+
+          invariant :i, desc: "d", enabled: true, callbacks: [:handle_cast] do
+            state.n >= 0
+          end
+
+          action_property :ap, desc: "d", enabled: true, callbacks: [:handle_cast] do
+            new.n >= old.n
+          end
+
+          precondition {:withdraw, _n}, desc: "d", enabled: true do
+            true
+          end
+
+          postcondition {:withdraw, _n}, desc: "d", enabled: true do
+            true
+          end
+
+          def init(a), do: {:ok, a}
+        end
+        """)
+
+      assert module.__tla_invariant__(:i, %{n: 1})
+    end
+  end
+
   describe "telemetry" do
     test "a violation is announced" do
       module = compile(TelemetryCounter, :log_only)

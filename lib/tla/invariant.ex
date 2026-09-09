@@ -223,8 +223,23 @@ defmodule TLA.Invariant do
   #     -- is Elixir's own compile error at the declaration's line. That one does not carry
   #     the declaration name, and adding it would mean wrapping the evaluation in a rescue,
   #     which would swallow real bugs to improve a message.
-  defp pop_enabled!(opts, _caller, _declaration) when is_list(opts),
-    do: Keyword.pop(opts, :enabled, true)
+  # Which options each declaration kind actually consumes. `callbacks:` is honoured only for
+  # invariants and action properties -- `applicable/2` is reached from the wrapper, and
+  # preconditions and postconditions do not go through it, they are emitted from
+  # `__tla_conditions__/1`. So `precondition {:x, n}, callbacks: [:handle_cast]` used to be
+  # accepted and silently ignored, which is the same defect as an unknown key: an option
+  # nobody reads is indistinguishable from an option nobody wrote (#149 item 2).
+  @accepted_options %{
+    "invariant" => [:desc, :enabled, :callbacks],
+    "action_property" => [:desc, :enabled, :callbacks],
+    "precondition" => [:desc, :enabled],
+    "postcondition" => [:desc, :enabled]
+  }
+
+  defp pop_enabled!(opts, caller, declaration) when is_list(opts) do
+    reject_unknown_options!(opts, caller, declaration)
+    Keyword.pop(opts, :enabled, true)
+  end
 
   defp pop_enabled!(opts, caller, declaration) do
     raise CompileError.exception(
@@ -235,6 +250,39 @@ defmodule TLA.Invariant do
                 "#{Macro.to_string(opts)}. `enabled:` is read at compile time, so the list " <>
                 "cannot be built at runtime."
           )
+  end
+
+  # A key nobody reads and a key nobody wrote look the same to a `Keyword.get/3` with a
+  # default, which is how `callbaks: [:handle_cast]` came to compile into an invariant that
+  # applied to every callback. The accepted set is small and fixed, so saying which key is
+  # wrong and what was expected costs nothing and is the whole difference between a typo
+  # found at compile time and a check quietly doing something else.
+  defp reject_unknown_options!(opts, caller, declaration) do
+    kind = declaration |> String.split(" ") |> hd()
+    accepted = Map.fetch!(@accepted_options, kind)
+
+    unless Keyword.keyword?(opts) do
+      raise CompileError.exception(
+              file: caller.file,
+              line: caller.line,
+              description: "#{declaration}: options must be a keyword list, got #{inspect(opts)}"
+            )
+    end
+
+    case opts |> Keyword.keys() |> Enum.uniq() |> Enum.reject(&(&1 in accepted)) do
+      [] ->
+        :ok
+
+      unknown ->
+        raise CompileError.exception(
+                file: caller.file,
+                line: caller.line,
+                description:
+                  "#{declaration}: unknown option#{if length(unknown) > 1, do: "s"} " <>
+                    "#{Enum.map_join(unknown, ", ", &inspect/1)}. " <>
+                    "#{kind} accepts #{Enum.map_join(accepted, ", ", &inspect/1)}."
+              )
+    end
   end
 
   @doc false
