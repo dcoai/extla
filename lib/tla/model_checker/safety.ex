@@ -60,6 +60,44 @@ defmodule TLA.ModelChecker.Safety do
   """
   def selected(declarations, :all), do: declarations
 
-  def selected(declarations, names) when is_list(names),
-    do: Enum.filter(declarations, &(&1.name in names))
+  def selected(declarations, names) when is_list(names) do
+    reject_unmatched!(declarations, names)
+    Enum.filter(declarations, &(&1.name in names))
+  end
+
+  @doc """
+  Refuse a selection naming something the spec does not declare.
+
+  Without this, a typo checks **nothing** and the run reports `:ok` (#166):
+
+      invariants: [:cap]         status=:violation
+      invariants: [:capp] (typo) status=:ok  warnings=[]
+
+  The filter matched no declaration, the coverage table came out empty, and the search had
+  nothing to evaluate — so the run is green because it verified nothing, which is the one
+  outcome Design Principle 6 exists to make impossible.
+
+  It matters beyond a hand-typed config. `TLA.DifferentialCase` drives the whole TLC corpus
+  through these selections using names read from `expected.json`, and D-9 makes agreement
+  with TLC the Phase 1 acceptance gate. A misspelled name in a fixture makes
+  `assert result.status == :ok` pass having compared nothing at all.
+  """
+  def reject_unmatched!(declarations, names) do
+    declared = MapSet.new(declarations, & &1.name)
+
+    case Enum.reject(names, &MapSet.member?(declared, &1)) do
+      [] ->
+        :ok
+
+      unmatched ->
+        raise ArgumentError, """
+        selection names #{Enum.map_join(unmatched, ", ", &inspect/1)}, which this spec does not declare.
+
+        Declared: #{declared |> Enum.sort() |> Enum.map_join(", ", &inspect/1)}.
+
+        A selection that matches nothing checks nothing, and the run would report `:ok`
+        having verified none of what you asked for.
+        """
+    end
+  end
 end

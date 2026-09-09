@@ -68,6 +68,7 @@ defmodule TLA.ModelChecker.Liveness do
   """
 
   alias TLA.{Spec, StateGraph, Temporal, Trace}
+  alias TLA.ModelChecker.Safety
 
   @type verdict :: :ok | {:violation, atom(), Trace.lasso()}
 
@@ -146,7 +147,14 @@ defmodule TLA.ModelChecker.Liveness do
   end
 
   defp select(temporals, :all), do: temporals
-  defp select(temporals, names), do: Enum.filter(temporals, &(&1.name in names))
+
+  # Shares `Safety.reject_unmatched!/2` rather than repeating the check, so a temporal
+  # selection and an invariant selection cannot disagree about what a name that matched
+  # nothing means (#166).
+  defp select(temporals, names) do
+    Safety.reject_unmatched!(temporals, names)
+    Enum.filter(temporals, &(&1.name in names))
+  end
 
   # ── The fragment ────────────────────────────────────────────────────────────
 

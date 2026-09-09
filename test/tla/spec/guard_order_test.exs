@@ -229,4 +229,74 @@ defmodule TLA.Spec.GuardOrderTest do
       assert %{prefix: _, cycle: _} = result.violation
     end
   end
+
+  # #166. A selection naming something the spec does not declare checked NOTHING and reported
+  # `:ok`:
+  #
+  #     invariants: [:cap]         status=:violation
+  #     invariants: [:capp] (typo) status=:ok  warnings=[]
+  #
+  # It matters beyond a hand-typed config. `TLA.DifferentialCase` drives the whole TLC corpus
+  # through these selections using names read from `expected.json`, and D-9 makes agreement
+  # with TLC the acceptance gate — so a misspelled name in a fixture made
+  # `assert result.status == :ok` pass having compared nothing.
+  describe "a selection that matched nothing (#166)" do
+    defmodule Selectable do
+      use TLA.Spec
+
+      variable :n, type: 0..3
+
+      init do
+        n = 0
+      end
+
+      action :bump do
+        require n < 3
+        n = n + 1
+      end
+
+      terminal :done do
+        n == 3
+      end
+
+      invariant :cap do
+        n < 2
+      end
+
+      temporal :reaches_three do
+        eventually(n == 3)
+      end
+    end
+
+    test "an invariant name the spec does not declare is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          TLA.ModelChecker.run(Selectable, %{invariants: [:capp]})
+        end
+
+      assert error.message =~ ":capp"
+      assert error.message =~ "which this spec does not declare"
+      assert error.message =~ ":cap"
+      assert error.message =~ "checks nothing"
+    end
+
+    test "a temporal name the spec does not declare is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          TLA.ModelChecker.run(Selectable, %{
+            check_liveness: true,
+            invariants: [],
+            temporals: [:reaches_four]
+          })
+        end
+
+      assert error.message =~ ":reaches_four"
+      assert error.message =~ ":reaches_three"
+    end
+
+    test "a correct selection still selects" do
+      assert TLA.ModelChecker.run(Selectable, %{invariants: [:cap]}).status == :violation
+      assert TLA.ModelChecker.run(Selectable, %{invariants: []}).status == :ok
+    end
+  end
 end

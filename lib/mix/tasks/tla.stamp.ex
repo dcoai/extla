@@ -35,7 +35,7 @@ defmodule Mix.Tasks.Tla.Stamp do
 
   @impl Mix.Task
   def run(argv) do
-    {opts, _, _} = OptionParser.parse(argv, strict: @switches)
+    {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
     stamps = states()
 
     if opts[:restamp], do: restamp(stamps), else: report(stamps)
