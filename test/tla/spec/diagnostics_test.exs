@@ -208,6 +208,78 @@ defmodule TLA.Spec.DiagnosticsTest do
     end
   end
 
+  # #160. Options were popped by name and the remainder discarded or stored unread, so a key
+  # nobody reads and a key nobody wrote were the same thing: `variable :n, type: :nat, bogus: 1`
+  # compiled. The accepted set records CONSUMPTION rather than intent — an option accepted and
+  # ignored is the same defect one step subtler.
+  describe "declaration options" do
+    test "an unknown option names the key and what the declaration accepts" do
+      error =
+        refuse("""
+        variable :x, type: :nat, bogus: 1
+        init do
+          x = 0
+        end
+        """)
+
+      assert error =~ "variable :x"
+      assert error =~ "unknown option: :bogus"
+      assert error =~ "`variable` accepts :type"
+    end
+
+    test "several unknown keys are all named" do
+      error =
+        refuse("""
+        constant :c, default: 1, one: 2, two: 3
+        variable :x
+        init do
+          x = 0
+        end
+        """)
+
+      assert error =~ "unknown options: :one, :two"
+      assert error =~ "`constant` accepts :default"
+    end
+
+    # A block reaches these macros as a `do:` entry in the same keyword list, so a check that
+    # ran before `pop_do!/3` would reject every declaration in the project.
+    test "the block itself is not mistaken for an unknown option" do
+      assert accepts("""
+             variable :x, type: :nat
+             init do
+               x = 0
+             end
+             action :bump do
+               x = x + 1
+             end
+             invariant :nonneg, desc: "never below zero" do
+               x >= 0
+             end
+             terminal :done, desc: "finished" do
+               x == 1
+             end
+             """)
+    end
+
+    # `temporal` used to discard its options entirely, so `desc:` there was accepted and
+    # ignored. It is now stored the way the other predicate forms store theirs, which is what
+    # makes accepting it honest rather than silence.
+    test "a temporal carries its description rather than dropping it" do
+      assert accepts("""
+             variable :x, type: :nat
+             init do
+               x = 0
+             end
+             action :bump do
+               x = x + 1
+             end
+             temporal :eventually_one, desc: "x reaches one" do
+               eventually(x == 1)
+             end
+             """)
+    end
+  end
+
   describe "invariants, terminals and action properties" do
     test "an invariant may not assign a variable" do
       assert refuse("""

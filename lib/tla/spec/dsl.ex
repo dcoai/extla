@@ -39,6 +39,7 @@ defmodule TLA.Spec.DSL do
     check_name!(caller, "constant", name)
     check_reserved!(caller, "constant", name)
     check_fresh!(caller, name)
+    check_options!(opts, caller, "constant", name)
 
     put(caller, :tla_constants, %{name: name, opts: opts, line: caller.line})
   end
@@ -59,6 +60,7 @@ defmodule TLA.Spec.DSL do
     check_reserved!(caller, "variable", name)
     check_fresh!(caller, name)
 
+    check_options!(opts, caller, "variable", name)
     {type, rest} = pop_option(opts, :type, caller, "variable #{inspect(name)}")
 
     put(caller, :tla_variables, %{name: name, type: type, opts: rest, line: caller.line})
@@ -112,6 +114,7 @@ defmodule TLA.Spec.DSL do
     caller = __CALLER__
     check_name!(caller, "action", name)
     {block, opts} = pop_do!(merge_opts(opts, block, caller, "action"), caller, "action")
+    check_options!(opts, caller, "action", name)
     {params_ast, _rest} = pop_option(opts, :params, caller, "action #{inspect(name)}")
 
     constants = Macro.var(:tla_constants, __MODULE__)
@@ -243,6 +246,7 @@ defmodule TLA.Spec.DSL do
     {block, opts} =
       pop_do!(merge_opts(opts, block, caller, "action_property"), caller, "action_property")
 
+    check_options!(opts, caller, "action_property", name)
     {description, _} = pop_option(opts, :desc, caller, "action_property #{inspect(name)}")
 
     constants = Macro.var(:tla_constants, __MODULE__)
@@ -295,6 +299,7 @@ defmodule TLA.Spec.DSL do
     caller = __CALLER__
     check_name!(caller, "temporal", name)
     {block, opts} = pop_do!(merge_opts(opts, block, caller, "temporal"), caller, "temporal")
+    check_options!(opts, caller, "temporal", name)
 
     constants = Macro.var(:tla_constants, __MODULE__)
 
@@ -307,8 +312,15 @@ defmodule TLA.Spec.DSL do
 
     formula = Temporal.parse!(block, ctx)
     fun = :"__tla_temporal_#{name}__"
+    {description, _} = pop_option(opts, :desc, caller, "temporal #{inspect(name)}")
 
-    put(caller, :tla_temporals, %{name: name, opts: opts, fun: fun, line: caller.line})
+    put(caller, :tla_temporals, %{
+      name: name,
+      description: description || "",
+      opts: opts,
+      fun: fun,
+      line: caller.line
+    })
 
     quote generated: true do
       @doc false
@@ -392,6 +404,7 @@ defmodule TLA.Spec.DSL do
     check_name!(caller, kind, name)
     check_reserved_invariant!(caller, kind, name)
     {block, opts} = pop_do!(opts, caller, kind)
+    check_options!(opts, caller, kind, name)
     {description, _} = pop_option(opts, :desc, caller, "#{kind} #{inspect(name)}")
 
     constants = Macro.var(:tla_constants, __MODULE__)
@@ -631,27 +644,78 @@ defmodule TLA.Spec.DSL do
 
   # Pops an option out of the QUOTED keyword list, because some option values —
   # `type:` above all — must be kept as syntax rather than evaluated.
-  defp pop_option(opts, key, caller, declaration) when is_list(opts) do
-    case Keyword.pop(opts, key) do
-      {nil, rest} -> {nil, rest}
-      {value, rest} -> {value, rest}
-    end
-  rescue
-    _ ->
+  #
+  # `Keyword.keyword?/1` rather than a `rescue`. The earlier version wrapped a `case` whose
+  # two branches were identical in a bare `rescue _`, which meant any failure inside — not
+  # only a malformed list — was reported as "options must be a literal keyword list". A
+  # diagnostic that can be wrong about what went wrong is worse than none in the DSL
+  # compiler's own error path, which is where an author is already confused. Asking the
+  # question directly answers it exactly, and surfaces a real bug as itself (#160).
+  defp pop_option(opts, key, caller, declaration) do
+    unless keyword_list?(opts) do
       CompileError.raise!(
         module: caller.module,
         declaration: declaration,
         line: caller.line,
-        problem: "options must be a literal keyword list"
+        problem: "options must be a literal keyword list, got: #{Macro.to_string(opts)}"
       )
+    end
+
+    Keyword.pop(opts, key)
   end
 
-  defp pop_option(other, _key, caller, declaration) do
-    CompileError.raise!(
-      module: caller.module,
-      declaration: declaration,
-      line: caller.line,
-      problem: "options must be a literal keyword list, got: #{Macro.to_string(other)}"
-    )
+  # What each declaration CONSUMES, established by reading the consumers rather than the
+  # documentation: `:default` at `TLA.Spec.Compiled.defaults/1`, `:type` and `:params` popped
+  # here, `:desc` popped for the three predicate forms. `temporal` reads none.
+  #
+  # An option nobody reads and an option nobody wrote are the same thing to a `Keyword.pop/2`
+  # with a default, which is how `variable :n, type: :nat, bogus: 1` came to compile. The list
+  # therefore records consumption, not intent: `desc:` is NOT accepted on `temporal`, `action`,
+  # `variable` or `constant`, because nothing there would ever read it. Accepting it would put
+  # back exactly the silence this closes.
+  @accepted_options %{
+    "constant" => [:default],
+    "variable" => [:type],
+    "action" => [:params],
+    "invariant" => [:desc],
+    "terminal" => [:desc],
+    "action_property" => [:desc],
+    "temporal" => [:desc]
+  }
+
+  # Call AFTER `pop_do!/3`: a block reaches these macros as a `:do` entry in the same list, so
+  # validating before it is removed would reject every declaration in the project.
+  defp check_options!(opts, caller, kind, name) do
+    accepted = Map.fetch!(@accepted_options, kind)
+    declaration = "#{kind} #{inspect(name)}"
+
+    unless keyword_list?(opts) do
+      CompileError.raise!(
+        module: caller.module,
+        declaration: declaration,
+        line: caller.line,
+        problem: "options must be a literal keyword list, got: #{Macro.to_string(opts)}"
+      )
+    end
+
+    case opts |> Keyword.keys() |> Enum.uniq() |> Enum.reject(&(&1 in accepted)) do
+      [] ->
+        :ok
+
+      unknown ->
+        CompileError.raise!(
+          module: caller.module,
+          declaration: declaration,
+          line: caller.line,
+          problem: "unknown option#{if length(unknown) > 1, do: "s"}: #{keys(unknown)}",
+          hint: accepts_hint(kind, accepted)
+        )
+    end
   end
+
+  defp accepts_hint(kind, accepted), do: "`#{kind}` accepts #{keys(accepted)}."
+
+  defp keys(list), do: Enum.map_join(list, ", ", &inspect/1)
+
+  defp keyword_list?(opts), do: is_list(opts) and Keyword.keyword?(opts)
 end
