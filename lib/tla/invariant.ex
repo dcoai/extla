@@ -130,10 +130,14 @@ defmodule TLA.Invariant do
   (compile time — false emits nothing), and `callbacks:` to restrict it to some of them.
   """
   defmacro invariant(name, opts \\ [], do: block) do
+    declaration = "invariant #{inspect(name)}"
+    {enabled, opts} = pop_enabled!(opts, __CALLER__, declaration)
+
     quote do
       @tla_invariants %{
         name: unquote(name),
         opts: unquote(Macro.escape(opts)),
+        enabled: TLA.Invariant.__enabled__!(unquote(enabled), unquote(declaration)),
         block: unquote(Macro.escape(block))
       }
     end
@@ -143,10 +147,14 @@ defmodule TLA.Invariant do
   A property of a transition. `old` and `new` are bound; same options as `invariant/3`.
   """
   defmacro action_property(name, opts \\ [], do: block) do
+    declaration = "action_property #{inspect(name)}"
+    {enabled, opts} = pop_enabled!(opts, __CALLER__, declaration)
+
     quote do
       @tla_action_properties %{
         name: unquote(name),
         opts: unquote(Macro.escape(opts)),
+        enabled: TLA.Invariant.__enabled__!(unquote(enabled), unquote(declaration)),
         block: unquote(Macro.escape(block))
       }
     end
@@ -161,10 +169,14 @@ defmodule TLA.Invariant do
   two are reported differently.
   """
   defmacro precondition(pattern, opts \\ [], do: block) do
+    declaration = "precondition"
+    {enabled, opts} = pop_enabled!(opts, __CALLER__, declaration)
+
     quote do
       @tla_preconditions %{
         pattern: unquote(Macro.escape(pattern)),
         opts: unquote(Macro.escape(opts)),
+        enabled: TLA.Invariant.__enabled__!(unquote(enabled), unquote(declaration)),
         block: unquote(Macro.escape(block))
       }
     end
@@ -175,13 +187,67 @@ defmodule TLA.Invariant do
   bindings are in scope.
   """
   defmacro postcondition(pattern, opts \\ [], do: block) do
+    declaration = "postcondition"
+    {enabled, opts} = pop_enabled!(opts, __CALLER__, declaration)
+
     quote do
       @tla_postconditions %{
         pattern: unquote(Macro.escape(pattern)),
         opts: unquote(Macro.escape(opts)),
+        enabled: TLA.Invariant.__enabled__!(unquote(enabled), unquote(declaration)),
         block: unquote(Macro.escape(block))
       }
     end
+  end
+
+  # `enabled:` is the one declaration option whose VALUE matters rather than its syntax, and
+  # that difference is why it did not work (#149).
+  #
+  # Every other option is stored with `Macro.escape/1` and read back as a literal: `desc: "x"`
+  # escapes to the string, `callbacks: [:handle_cast]` to the list. `enabled: Mix.env() == :test`
+  # escapes to a `{:==, _, _}` TUPLE -- and `Enum.filter/2` keeps everything but `false` and
+  # `nil`, so the tuple was truthy and the declaration was always emitted. The option worked
+  # for a literal `false` and for nothing else, which is the one input for which it is useless,
+  # since a literal `false` is indistinguishable from deleting the declaration.
+  #
+  # So `enabled:` is popped out and spliced UNESCAPED into the caller's module body, where it
+  # is evaluated at the caller's compile time in the caller's context. `Mix.env()` resolves;
+  # `Application.compile_env/3` resolves and registers its recompilation dependency properly,
+  # which manual evaluation here would not.
+  #
+  # Two failure modes, both loud:
+  #
+  #   * an expression that does not evaluate to a boolean is caught by `__enabled__!/2` below,
+  #     naming the declaration;
+  #   * an expression that does not evaluate at all -- an undefined variable, a missing module
+  #     -- is Elixir's own compile error at the declaration's line. That one does not carry
+  #     the declaration name, and adding it would mean wrapping the evaluation in a rescue,
+  #     which would swallow real bugs to improve a message.
+  defp pop_enabled!(opts, _caller, _declaration) when is_list(opts),
+    do: Keyword.pop(opts, :enabled, true)
+
+  defp pop_enabled!(opts, caller, declaration) do
+    raise CompileError.exception(
+            file: caller.file,
+            line: caller.line,
+            description:
+              "#{declaration}: options must be a literal keyword list, got " <>
+                "#{Macro.to_string(opts)}. `enabled:` is read at compile time, so the list " <>
+                "cannot be built at runtime."
+          )
+  end
+
+  @doc false
+  # Called in the caller's module body with `enabled:`'s evaluated value. A non-boolean is a
+  # mistake worth naming -- before #149 it was silently truthy, which is how `Mix.env() == :test`
+  # read as "always on".
+  def __enabled__!(value, _declaration) when is_boolean(value), do: value
+
+  def __enabled__!(value, declaration) do
+    raise ArgumentError,
+          "#{declaration}: `enabled:` must evaluate to a boolean at compile time, got " <>
+            "#{inspect(value)}. It decides whether this declaration is emitted at all, so a " <>
+            "truthy non-boolean cannot be accepted as `true` -- that is the defect #149 fixed."
   end
 
   @doc false
@@ -231,12 +297,14 @@ defmodule TLA.Invariant do
     end
   end
 
-  # `enabled: false` is resolved here and the declaration never reaches the emitted code.
+  # `enabled:` is resolved in the CALLER, at its compile time -- see `pop_enabled!/3`. By the
+  # time a declaration reaches here its `:enabled` is a real boolean, so a false one never
+  # reaches the emitted code.
   defp declared(env, attribute) do
     env.module
     |> Module.get_attribute(attribute, [])
     |> Enum.reverse()
-    |> Enum.filter(&Keyword.get(&1.opts, :enabled, true))
+    |> Enum.filter(& &1.enabled)
   end
 
   # ── The predicates ──────────────────────────────────────────────────────────

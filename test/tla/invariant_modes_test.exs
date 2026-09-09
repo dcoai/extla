@@ -86,6 +86,113 @@ defmodule TLA.InvariantModesTest do
     assert_raise FunctionClauseError, fn -> module.__tla_invariant__(:costly, %{balance: 1}) end
   end
 
+  # #149. The test above passed for the whole life of the option and proved nothing about the
+  # idiom `spec/03:634` documents, because a literal `false` is the ONE input that worked.
+  #
+  # Options are stored with `Macro.escape/1`, so `enabled: Mix.env() == :test` was kept as a
+  # `{:==, _, _}` tuple and `Enum.filter/2` keeps everything but `false` and `nil`. Every
+  # expression was truthy, so "compile this out except in test" emitted the check everywhere —
+  # including `:dev`, which is `:enabled` by default and is where the lever is most obviously
+  # meant to help.
+  #
+  # These assert on what was EMITTED, not on what the checker later reports: the whole claim
+  # is that no code exists, and a runtime assertion cannot tell "absent" from "present and
+  # false".
+  describe "`enabled:` is an expression, not a literal (#149)" do
+    @expression_source """
+    defmodule <NAME> do
+      use GenServer
+      use TLA.Invariant
+
+      invariant :off_here, enabled: Mix.env() == :prod do
+        raise "this must never be compiled in"
+      end
+
+      invariant :on_here, enabled: Mix.env() == :test do
+        state.balance >= 0
+      end
+
+      def init(balance), do: {:ok, %{balance: balance}}
+    end
+    """
+
+    defp compile_expression(name) do
+      source = String.replace(@expression_source, "<NAME>", inspect(name))
+      [{module, _}] = Code.compile_string(source)
+      module
+    end
+
+    test "an expression that is false at compile time emits nothing" do
+      module = compile_expression(EnabledFalseByExpression)
+
+      assert_raise FunctionClauseError, fn ->
+        module.__tla_invariant__(:off_here, %{balance: 1})
+      end
+    end
+
+    test "an expression that is true at compile time emits the check" do
+      module = compile_expression(EnabledTrueByExpression)
+
+      assert module.__tla_invariant__(:on_here, %{balance: 1})
+    end
+
+    test "a non-boolean value is refused rather than treated as true" do
+      source = """
+      defmodule EnabledNonBoolean do
+        use GenServer
+        use TLA.Invariant
+
+        invariant :bad, enabled: :yes do
+          state.balance >= 0
+        end
+
+        def init(balance), do: {:ok, %{balance: balance}}
+      end
+      """
+
+      error = assert_raise ArgumentError, fn -> Code.compile_string(source) end
+
+      assert error.message =~ "invariant :bad"
+      assert error.message =~ "must evaluate to a boolean at compile time"
+      assert error.message =~ ":yes"
+    end
+
+    # The option is filtered for all four declaration kinds by `declared/2`, and before #149
+    # three of them had no coverage of it at all.
+    test "it applies to action properties, preconditions and postconditions too" do
+      source = """
+      defmodule EnabledEveryKind do
+        use GenServer
+        use TLA.Invariant
+
+        action_property :ap_off, enabled: Mix.env() == :prod do
+          raise "never compiled in"
+        end
+
+        precondition {:withdraw, _n}, enabled: Mix.env() == :prod do
+          raise "never compiled in"
+        end
+
+        postcondition {:withdraw, _n}, enabled: Mix.env() == :prod do
+          raise "never compiled in"
+        end
+
+        def init(balance), do: {:ok, %{balance: balance}}
+      end
+      """
+
+      [{module, _}] = Code.compile_string(source)
+
+      # Every declaration in the module was filtered, so the predicate function is not
+      # merely clause-less — it is never defined. That is the strongest form of the claim
+      # `:disabled emits nothing` makes, and the one a runtime check cannot make.
+      refute function_exported?(module, :__tla_action_property__, 3)
+
+      assert module.__tla_conditions__(:precondition) == []
+      assert module.__tla_conditions__(:postcondition) == []
+    end
+  end
+
   describe "telemetry" do
     test "a violation is announced" do
       module = compile(TelemetryCounter, :log_only)

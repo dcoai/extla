@@ -16,6 +16,40 @@ release it merely follows.
 
 ### Fixed
 
+- **`enabled:` on a Layer 1 declaration only ever worked for a literal `false`, so the
+  documented way to compile out an expensive check did nothing** (#149). `03-layer1-invariants.md`
+  §162 specifies the option as evaluated at compile time, and §634 gives the idiom:
+
+  ```elixir
+  invariant :expensive_check, enabled: Mix.env() == :test do
+    deep_structural_audit(state)
+  end
+  ```
+
+  Declaration options are stored with `Macro.escape/1` and read back as literals, which is
+  right for `desc:` and `callbacks:`. It is wrong for this one: `Mix.env() == :test` was kept
+  as a `{:==, _, _}` tuple, and the filter that decides emission keeps everything but `false`
+  and `nil`. A tuple is truthy, so **every expression enabled the declaration**, whatever it
+  evaluated to. The option worked for the one input that makes it pointless, since a literal
+  `false` is indistinguishable from deleting the declaration.
+
+  **A stock production release was not affected** — `MIX_ENV=prod` resolves the whole layer to
+  `:disabled`, so lever 3 saved what lever 1 did not. What paid for it was `:dev`, which is
+  `:enabled` by default and is where "compile this out except in test" most obviously means
+  something, and any deployment setting `mode:` explicitly, `:log_only` in staging being the
+  documented case.
+
+  `enabled:` is now evaluated in the caller at its compile time, so `Mix.env()`, a module
+  attribute and `Application.compile_env/3` all work — the last of which also registers its
+  recompilation dependency properly, which evaluating it by hand would not. A value that is
+  not a boolean is refused naming the declaration rather than accepted as truthy. The option
+  covers all four declaration kinds, three of which had no test for it at all.
+
+  **This changes behaviour for existing code.** A declaration carrying
+  `enabled: <any expression>` was being emitted regardless and now is not, if the expression
+  is false where the module compiles. That is the point, and it is worth checking against any
+  suite that was passing because a check it thought disabled was in fact running.
+
 - **A `temporal` block accepted an assignment, so one mistyped `==` produced a property that
   always passed** (#150). `02-dsl-semantics.md` §1.2 makes `=` on a declared variable a compile
   error outside `init` and `action`, and that rule was enforced for `invariant`, `terminal` and
