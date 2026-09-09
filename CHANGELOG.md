@@ -16,6 +16,26 @@ release it merely follows.
 
 ### Fixed
 
+- **An unknown option on a spec DSL declaration was discarded rather than refused, and
+  `temporal` dropped its description** (#160). `variable :n, type: :nat, bogus: 1` compiled.
+  Each macro popped the key it wanted and either stored the remainder unread or threw it
+  away, so a typo was indistinguishable from an option nobody wrote.
+
+  The accepted set is now per macro and records **what is consumed**, not what looks
+  plausible: `constant` takes `default:`, `variable` takes `type:`, `action` takes `params:`,
+  and `invariant`, `terminal`, `action_property` and `temporal` take `desc:`.
+
+  `temporal` is the one that changed rather than merely gained a check. It discarded its
+  options entirely, so `desc:` there was accepted and silently dropped — the corpus's
+  `no_starvation` carried one and nothing kept it. It is now stored the way the other
+  predicate forms store theirs, which is what makes accepting it honest.
+
+- **`TLA.Spec.DSL`'s option helper reported every failure as one diagnostic** (#160). It
+  wrapped a `case` whose two branches were identical in a bare `rescue _`, so any error
+  inside became "options must be a literal keyword list" — in the DSL compiler's own error
+  path, where a wrong message costs an author the most. It now asks `Keyword.keyword?/1`
+  directly, which answers the question exactly and lets a real bug surface as itself.
+
 - **An unknown option on a Layer 1 declaration was stored and ignored rather than refused**
   (#149). `callbaks: [:handle_cast]` compiled, and the invariant applied to every callback.
   The cause is the one above, one step subtler: options were consulted by name with
