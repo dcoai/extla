@@ -35,6 +35,30 @@ git describe --match 'v[0-9]*.[0-9]*.0' --long   →   v0.2.0-17-gabc1234
 `n` is the commit count since the **minor base tag**. The `--match` glob is the whole point:
 it selects only `.0` tags.
 
+### The base tag is a marker, and it need not be a release
+
+`v0.3.0` is the first case where the minor line opened at a commit that was **not** itself
+released. The five surface-moving changes of the 0.3 line all landed by `bf14e81` (#135), and
+twenty commits of fixes and CI work followed before anyone cut a release — so the first tag on
+the line is `v0.3.20`, and `v0.3.0` was tagged retroactively at `bf14e81` to mark where the
+surface moved.
+
+That tag is doing a job, not claiming a release. `bf14e81`'s own `mix.exs` reads `0.2.1-dev`
+and it has no section in the CHANGELOG, because nothing was published from it.
+
+**It is not decoration — without it the numbering goes backwards.** `v0.3.20` does not match
+`v[0-9]*.[0-9]*.0`, so `git describe` would skip it and keep counting from `v0.2.0`:
+
+| tags present | `describe --match` | next patch |
+|---|---|---|
+| `v0.2.0`, `v0.3.20` | `v0.2.0-49-g…` | `v0.2.49` ❌ **below the release just cut** |
+| `v0.2.0`, `v0.3.0`, `v0.3.20` | `v0.3.0-25-g…` | `v0.3.25` ✅ |
+
+This is the same trap as the one above, reached through the other door: there, the count reset
+at a patch tag; here, it never re-bases because the line has no `.0` to re-base onto. The rule
+that falls out of both: **opening a minor line means tagging its `.0`, whether or not anything
+was released from that commit.**
+
 ### The trap it avoids
 
 Plain `git describe` counts from the **last** tag, so the count resets at every patch tag:
