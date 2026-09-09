@@ -222,6 +222,51 @@ defmodule TLA.Spec.DiagnosticsTest do
              """) =~ "assignment to variable :x outside `init`/`action`"
     end
 
+    # #150. `temporal` reaches `TLA.Spec.Temporal.parse!/2`, which does not desugar, so it
+    # never saw the check above and a temporal whose body was an assignment COMPILED.
+    #
+    # This is the one declaration whose failure has no symptom. An invariant that never
+    # fires shows up in the coverage report; a temporal formula built from `=` is not
+    # refutable, so the run reports that the property HOLDS having checked nothing. The
+    # only evidence the gap is closed is a test that fails without the fix, which is why
+    # this exists rather than a runtime assertion.
+    test "a temporal may not assign a variable either, with the same message" do
+      error =
+        refuse("""
+        variable :x
+        init do
+          x = 0
+        end
+        temporal :t do
+          x = 1
+        end
+        """)
+
+      assert error =~ "assignment to variable :x outside `init`/`action`"
+      assert error =~ "temporal :t"
+    end
+
+    # The rule is shared rather than duplicated (`TLA.Spec.Block.reject_assignment!/2`), so
+    # the two forms cannot drift apart into two dialects again.
+    test "the temporal and invariant messages are the same text" do
+      body = fn declaration ->
+        """
+        variable :x
+        init do
+          x = 0
+        end
+        #{declaration}
+        """
+      end
+
+      invariant = refuse(body.("invariant :i do\n  x = 1\n  true\nend"))
+      temporal = refuse(body.("temporal :t do\n  x = 1\nend"))
+
+      hint = "there is no post-state here"
+      assert invariant =~ hint
+      assert temporal =~ hint
+    end
+
     test "a bare variable in an action_property names old. and new." do
       error =
         refuse("""
