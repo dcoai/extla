@@ -152,4 +152,10 @@ defmodule Mix.Tasks.Tla.Visualize do
   defp check_format!(other) do
     Mix.raise("unknown --format #{inspect(other)}; expected dot.")
   end
+
+  @doc false
+  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # for six work items its section was the only flag list in the spec that stayed correct.
+  def switches, do: @switches
 end

@@ -17,21 +17,33 @@ defmodule TLA.SpecOptionsTest do
   """
   use ExUnit.Case, async: true
 
-  @spec_file Path.expand("../../spec/04-layer2-model-checker.md", __DIR__)
+  @layer2 Path.expand("../../spec/04-layer2-model-checker.md", __DIR__)
+  @layer3 Path.expand("../../spec/05-layer3-conformance.md", __DIR__)
 
-  # One entry per task whose options the specification lists. `mix tla.explore` is deliberately
-  # absent: its section shows flags in a usage example rather than in an option list, and there
-  # is nothing to compare. Adding a task here is one line once its section grows a list.
-  @documented [{Mix.Tasks.Tla.Check, "defmodule Mix.Tasks.Tla.Check do"}]
+  # One entry per task whose options the specification lists: `{task, spec file, anchor}`.
+  #
+  # This covered ONE task until #163 — `mix tla.check`, gated at #134 — and that section was
+  # consequently the only flag list in the whole specification that stayed correct. Six more
+  # drifted in the meantime: `tla.simulate` documented none of its eight switches,
+  # `tla.replay` and `tla.visualize` were each missing one, and `tla.stamp` had no section
+  # anywhere. The blocker was never the parser; it was that `switches/0` existed on one task.
+  @documented [
+    {Mix.Tasks.Tla.Check, @layer2, "defmodule Mix.Tasks.Tla.Check do"},
+    {Mix.Tasks.Tla.Explore, @layer2, "defmodule Mix.Tasks.Tla.Explore do"},
+    {Mix.Tasks.Tla.Simulate, @layer3, "defmodule Mix.Tasks.Tla.Simulate do"},
+    {Mix.Tasks.Tla.Replay, @layer3, "defmodule Mix.Tasks.Tla.Replay do"},
+    {Mix.Tasks.Tla.Visualize, @layer3, "defmodule Mix.Tasks.Tla.Visualize do"},
+    {Mix.Tasks.Tla.Stamp, @layer3, "defmodule Mix.Tasks.Tla.Stamp do"}
+  ]
 
   describe "every task whose options the spec lists" do
-    for {task, anchor} <- @documented do
-      test "#{inspect(task)} declares exactly the switches #{Path.basename(@spec_file)} documents" do
-        documented = documented_options(unquote(anchor))
+    for {task, file, anchor} <- @documented do
+      test "#{inspect(task)} declares exactly the switches #{Path.basename(file)} documents" do
+        documented = documented_options(unquote(file), unquote(anchor))
         declared = declared_switches(unquote(task))
 
         assert MapSet.equal?(documented, declared), """
-        #{inspect(unquote(task))} and spec/04-layer2-model-checker.md disagree about its options.
+        #{inspect(unquote(task))} and #{Path.basename(unquote(file))} disagree about its options.
 
           in @switches, undocumented:  #{inspect(Enum.sort(MapSet.difference(declared, documented)))}
           documented, not a switch:    #{inspect(Enum.sort(MapSet.difference(documented, declared)))}
@@ -52,14 +64,14 @@ defmodule TLA.SpecOptionsTest do
     # returning an empty set, and that behaviour is asserted rather than assumed.
     test "raises when the anchor is absent rather than comparing against nothing" do
       assert_raise RuntimeError, ~r/no section anchored at/, fn ->
-        documented_options("defmodule Mix.Tasks.Tla.NoSuchTask do")
+        documented_options(@layer2, "defmodule Mix.Tasks.Tla.NoSuchTask do")
       end
     end
 
     test "raises when a section carries no option list at all" do
       assert_raise RuntimeError, ~r/no option lines/, fn ->
         # A real anchor whose section is prose and code, with no `--flag` definitions in it.
-        documented_options("defmodule TLA.Spec.Compiled do")
+        documented_options(@layer2, "defmodule TLA.Spec.Compiled do")
       end
     end
 
@@ -67,7 +79,7 @@ defmodule TLA.SpecOptionsTest do
       # `mix tla.check Specs.X --max-states 100000` is a usage line, and `--max-states` is also a
       # definition further down. The distinction matters: if usage lines counted, the `--graph`
       # example that started #132 would have read as documentation of a flag that does not exist.
-      options = documented_options("defmodule Mix.Tasks.Tla.Check do")
+      options = documented_options(@layer2, "defmodule Mix.Tasks.Tla.Check do")
 
       assert "--max-states" in options
       refute "--graph" in options
@@ -86,8 +98,8 @@ defmodule TLA.SpecOptionsTest do
   # An option DEFINITION is a line whose first non-space characters are the flag, followed by the
   # description. A usage example begins with the command, so `^\s+--` separates them without
   # needing to know anything else about the layout.
-  defp documented_options(anchor) do
-    section = section(anchor)
+  defp documented_options(file, anchor) do
+    section = section(file, anchor)
 
     options =
       ~r/^\s+(--[a-z][a-z-]*)\s/m
@@ -105,15 +117,15 @@ defmodule TLA.SpecOptionsTest do
 
   # From the anchor to the end of the fenced block that contains it, so a neighbouring task's
   # options cannot leak in.
-  defp section(anchor) do
-    contents = File.read!(@spec_file)
+  defp section(file, anchor) do
+    contents = File.read!(file)
 
     case String.split(contents, anchor, parts: 2) do
       [_before, after_anchor] ->
         after_anchor |> String.split("\n```", parts: 2) |> hd()
 
       _absent ->
-        raise "no section anchored at #{inspect(anchor)} in #{@spec_file}. The specification " <>
+        raise "no section anchored at #{inspect(anchor)} in #{file}. The specification " <>
                 "no longer reproduces this task, or the anchor changed."
     end
   end

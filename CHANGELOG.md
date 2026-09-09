@@ -16,6 +16,22 @@ release it merely follows.
 
 ### Fixed
 
+- **Five mix tasks had flags the specification did not mention, `mix tla.simulate` all eight
+  of them** (#163). Its section carried usage examples and no option list, so
+  `--inject-failures` and `--unrestricted` — two substantial Layer 3 capabilities, crash
+  recovery and testing that an implementation refuses what the spec forbids — were
+  undiscoverable from the documentation. `mix tla.stamp` had no section anywhere,
+  `mix tla.explore` no option list, and `tla.replay` and `tla.visualize` were each missing
+  one.
+
+  The gate that would have caught this has existed since #134 and covered one task, because
+  the accessor it reads was added to that task and nothing generalised it. All six are now
+  held to their documented lists, across both spec files.
+
+  One flag is documented as **not currently read**: `mix tla.replay --init-arg` is accepted
+  and ignored, so `TLA.Replay`'s `:server`, `:init_arg` and `:timeout` are unreachable from
+  the command line (#165). Stating that is less tidy than omitting it and more useful.
+
 - **The API reference's front page and the specification index both said the library was
   unbuilt** (#148). `TLA`'s moduledoc read "Phase 1 is in progress ... the model checker
   that consumes it does not exist yet", untouched since the third commit of the project, and
