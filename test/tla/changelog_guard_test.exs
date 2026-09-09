@@ -123,16 +123,42 @@ defmodule TLA.ChangelogGuardTest do
     @with_entry ~w(1942cd3 bf14e81 591063c c15b19b)
     @without_entry ~w(2698981 6805aa8 279afb4 01e1604)
 
+    # Exit 2 is the guard saying it COULD NOT RUN -- a shallow clone has no merge base, so
+    # `git diff` fails and `git!/1` halts 2 rather than returning nothing. Asserting only
+    # `== 1` reads that as "was not flagged", which says the guard passed a merge it should
+    # have caught. It says the opposite of what happened.
+    #
+    # #147 is what that cost. The oldest pinned sha sat one commit inside a depth-20 clone's
+    # horizon; a release commit pushed it out, and the suite reported `01e1604 shipped a lib/
+    # change with no CHANGELOG entry and was not flagged` about a merge nobody had touched.
+    # Distinguishing the two is the whole subject of this file one level up (#70), so the
+    # test that guards it must not make the same conflation.
+    defp verdict(sha) do
+      case guard(@project, "#{sha}^1", sha) do
+        2 ->
+          flunk("""
+          the guard could not run at #{sha} (exit 2), so this asserts nothing.
+
+          A shallow clone is the usual cause: `#{sha}^1` has to be present for the diff, and
+          the project's `ci_default_git_depth` is 20. The `test` job sets `GIT_DEPTH: 0` for
+          this reason (#147). Check that it still does.
+          """)
+
+        code ->
+          code
+      end
+    end
+
     test "it flags every merge that changed lib/ without an entry" do
       for sha <- @without_entry do
-        assert guard(@project, "#{sha}^1", sha) == 1,
+        assert verdict(sha) == 1,
                "#{sha} shipped a lib/ change with no CHANGELOG entry and was not flagged"
       end
     end
 
     test "it passes every merge that wrote one" do
       for sha <- @with_entry do
-        assert guard(@project, "#{sha}^1", sha) == 0,
+        assert verdict(sha) == 0,
                "#{sha} wrote a CHANGELOG entry and was flagged anyway"
       end
     end
