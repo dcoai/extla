@@ -457,12 +457,33 @@ defmodule TLA.ModelChecker do
     workers: pos_integer(),            # parallel workers (default: 1)
     check_deadlock: boolean(),         # report a successor-less state that no `terminal`
                                        # predicate admits (default: true)
-    check_liveness: boolean(),         # check temporal properties (default: true)
+    # DEFAULT FALSE. Liveness needs the whole state graph retained for SCC analysis, and
+    # the graph is not free -- so a caller asking for `run/2` gets what they asked for and
+    # nothing more. `mix tla.check` is the other way round and infers it; see below.
+    check_liveness: boolean(),         # check temporal properties (default: false)
     symmetry: [atom()] | nil,          # symmetric CONSTANT names (see §Symmetry)
     verify_symmetry: boolean(),        # also run unreduced and compare (see §Symmetry)
     state_constraint: (TLA.State.t() -> boolean()) | nil, # see §State constraints
     fingerprint_bits: 64 | 128         # state identity width (default: 64)
   }
+```
+
+#### The CLI infers `check_liveness`; the API does not
+
+`TLA.ModelChecker.run/2` defaults it to `false`. `mix tla.check` sets it to `true` when the
+spec declares a `temporal` **and** none of the three exclusions applies: `--safety-only`,
+a `symmetry:` declaration (D-22), or `workers:` above one (D-27).
+
+The asymmetry is deliberate. The task has the spec in hand and can tell that asking for
+liveness is what the author meant; a library caller is asking for exactly what they wrote,
+and silently building and retaining a whole state graph for them is not that.
+
+It is worth stating because the transition between the two is where a verdict goes missing.
+`TLA.Spec.Test.assert_spec/2` passes its config straight through, so a property that
+`mix tla.check` checks is **not** checked by the same spec under `assert_spec` unless the
+config says so. A suite can be green over a temporal property nothing evaluated.
+
+```elixir
 
   @type result :: %{
     status: :ok | :violation | :max_states_reached | :constrained | :error,

@@ -220,8 +220,40 @@ earlier `let`s. Only state-variable assignment is simultaneous.
 they are evaluated against the **pre-state** with the action's params bound. An action
 whose guard is false in a state is *not enabled* there and contributes no successor.
 
-`require` may appear anywhere in the block; it is not positional. Guards are always
-evaluated before any assignment, regardless of where they are written.
+`require` may appear anywhere in the block, and it **is** positional with respect to
+`let`: guards and bindings are evaluated in source order, so a `require` protects the
+`let`s that follow it and not the ones above it. Assignments are separate — they build
+the post-state and are evaluated only once the whole guard holds, so no `require` can be
+ordered after an assignment in any way that matters.
+
+The order is load-bearing rather than incidental, and §1.6 is why. Function application
+is strict, so `f[x]` outside `f`'s domain raises `TLA.Spec.DomainError` rather than
+returning `nil`. That makes this legal and necessary:
+
+```elixir
+action :consume do
+  require Map.has_key?(inbox, ^client)
+  let msg = inbox[^client]
+  require msg.seq == expected
+  ...
+end
+```
+
+The first `require` is what stops `inbox[^client]` raising, and it only stops it because
+the conjunction short-circuits over the binding. Hoisting the guards would evaluate the
+`let` first and raise on exactly the states the guard exists to exclude. So the choice is
+between a guard that can protect a binding and one that cannot, and the DSL takes the
+first (`TLA.Spec.Block.guard_body/2`).
+
+A `require` placed *after* the `let` it should have guarded is therefore a real error and
+not a style question: the action raises where it should have been disabled.
+
+One qualification, because it decides when the mistake is visible. The guard is built from
+the statements up to and including the **last** `require`, and `let`s that no guard reads
+are pruned out of it. So a badly-ordered `let` that only the *assignments* use never
+evaluates during the guard at all, and the misplacement costs nothing. It bites when the
+binding is consumed by a later `require` — which is exactly when the guard needed
+protecting.
 
 ---
 
