@@ -9,6 +9,11 @@ All notable changes to ExTLA are recorded here, following
 which is the single source of truth for that. This file records what *changed* and when, and
 does not restate it.
 
+## [Unreleased]
+
+`mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
+release it merely follows.
+
 ## [0.3.20] — 2026-09-09
 
 **A minor line, and the patch number does not start at zero.** Two of the changes below move
@@ -371,6 +376,7 @@ compatibility promise.
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view
   abstraction are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
+[Unreleased]: https://gitlab.conet.yarina.org/dco-tek/extla/-/compare/v0.3.20...main
 [0.3.20]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.3.20
 [0.2.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.2.0
 [0.1.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.1.0
