@@ -1559,6 +1559,33 @@ actually in scope — rather than the same typo reported once per state in cells
 Exit codes: `0` when the table was rendered, `1` for a bad `--expr` or a file that is not a
 counterexample for this spec.
 
+```elixir
+defmodule Mix.Tasks.Tla.Explore do
+  @moduledoc """
+  Evaluate your own expressions over a saved counterexample.
+
+  ## Usage
+
+      mix tla.explore Specs.DistributedLock --trace counterexample.json \\
+        --expr "waiting: length(waiting)" \\
+        --changed-only
+
+  ## Options
+
+      --trace         The counterexample to read: the versioned envelope, a
+                      single trace object lifted out of it, or a lasso.
+      --expr          An expression to evaluate at every state. Repeatable.
+                      `name: expression` labels the row; without a label the
+                      expression's own text is the label.
+      --changed-only  Show only the rows whose value moves.
+  """
+  use Mix.Task
+
+  @impl Mix.Task
+  def run(args)
+end
+```
+
 ### ExUnit Integration
 
 ```elixir

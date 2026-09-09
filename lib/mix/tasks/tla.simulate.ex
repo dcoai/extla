@@ -291,4 +291,10 @@ defmodule Mix.Tasks.Tla.Simulate do
   defp exit_with(%{status: :ok}), do: :ok
   defp exit_with(%{status: :violation}), do: exit({:shutdown, 1})
   defp exit_with(%{status: :error}), do: exit({:shutdown, 2})
+
+  @doc false
+  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # for six work items its section was the only flag list in the spec that stayed correct.
+  def switches, do: @switches
 end

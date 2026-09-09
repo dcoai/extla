@@ -1043,6 +1043,27 @@ defmodule Mix.Tasks.Tla.Simulate do
       mix tla.simulate MyApp.TransferServer --traces 5000 --steps 100
       mix tla.simulate MyApp.TransferServer --inject-failures --seed 42
       mix tla.simulate MyApp.TransferServer --against-graph
+
+  ## Options
+
+      --traces           How many traces to run (default: 100).
+      --steps            Maximum steps per trace (default: 25).
+      --seed             Seed the run. One seed per trace is derived from it and
+                         the trace's index, so a reported trace is reproducible.
+      --concurrency      How many traces to run at once (default: 1).
+      --inject-failures  Kill and restart the server mid-trace, and check that
+                         recovery lands in a state the spec's invariants admit.
+      --unrestricted     Also generate messages for actions the spec DISABLES in
+                         the current state, which asks whether the implementation
+                         refuses what the spec forbids.
+      --against-graph    Also check each trace against the spec's own state
+                         graph, one trace at a time (§Conformance).
+      --format           `human` (default) or `json`.
+
+  ## Exit codes
+
+  `0` conformant, `1` a divergence was found, `2` the run could not be set up --
+  no such module, no refinement mapping, a spec that does not compile.
   """
   use Mix.Task
 
@@ -1107,6 +1128,18 @@ defmodule Mix.Tasks.Tla.Replay do
   Requires `concrete_message/2` on the refinement module for `--trace`;
   `--captured` needs only `abstract/1` and `abstract_action/1`.
 
+  ## Options
+
+      --trace      A model-checker counterexample to replay (see below).
+      --captured   A captured trace from a running system (see below).
+      --format     `human` (default) or `json`.
+      --init-arg   Accepted and NOT currently read (#165). `TLA.Replay`'s
+                   `:server`, `:init_arg` and `:timeout` options are unreachable
+                   from this task, which passes none of them; the server is
+                   started with `[]`. Documented rather than omitted because it
+                   is in the task's `@switches` and `OptionParser` accepts it,
+                   so a user can pass it today and be silently ignored.
+
   ## The file formats
 
   `--trace` takes what `mix tla.check --format json` writes -- either the whole
@@ -1155,6 +1188,61 @@ defmodule Mix.Tasks.Tla.Gen.Test do
 end
 ```
 
+### `mix tla.stamp`
+
+Reports and updates the `spec_version:` stamps that `use TLA.GenServer` carries. A stamp
+records which version of a spec a refinement mapping was written against, and a stale one is
+a **compile error** — so the task that reports and repairs them is part of the layer's
+surface, not a convenience.
+
+It reads `.ex` source directly rather than loading modules, because a stale stamp means the
+project may not compile, and a tool for that situation cannot require the situation not to
+exist.
+
+```elixir
+defmodule Mix.Tasks.Tla.Stamp do
+  @moduledoc """
+  Report or update `spec_version:` stamps on refinement mappings.
+
+  ## Usage
+
+      mix tla.stamp             # report every mapping's status
+      mix tla.stamp --restamp   # rewrite stale stamps in place
+
+  Each mapping is reported as one of four statuses:
+
+  | Status | Meaning |
+  |---|---|
+  | `:fresh` | the stamp matches the spec's current hash |
+  | `:stale` | the spec changed since the mapping was written |
+  | `:unstamped` | no `spec_version:` was given |
+  | `:unverifiable` | the spec's hash could not be computed |
+
+  ## Options
+
+      --restamp   Rewrite stale stamps to the spec's current hash.
+  """
+  use Mix.Task
+
+  @impl Mix.Task
+  def run(args)
+end
+```
+
+`--restamp` **records a judgement rather than performing one.** A stale stamp means the spec
+moved and somebody has to decide whether the mapping still holds; the flag writes down that
+the decision was taken. It is deliberately not the default and deliberately not offered in the
+compile error's message — "an error message offering a one-key fix trains people to take the
+fix, and a stamp applied without reading is worse than no stamp, because it manufactures
+assurance."
+
+> The stamp mechanism itself — the `spec_version:` option, `TLA.Spec.Hash`, and the
+> compile-time check — is otherwise unspecified. This section covers the task's surface so it
+> is gated against drift; the feature's semantics need their own section, which is tracked
+> separately.
+
+---
+
 ### `mix tla.visualize`
 
 > **DOT only.** This section advertised `--format html` and `--format mermaid` until
@@ -1178,7 +1266,8 @@ defmodule Mix.Tasks.Tla.Visualize do
   ## Options
 
       --output       Write here instead of to stdout.
-      --max-states   Refuse past this many states, naming the true count.
+      --max-states   Refuse past this many states, naming the true count
+                     (default: 500).
       --format       dot, and only dot.
   """
   use Mix.Task
