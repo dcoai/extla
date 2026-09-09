@@ -40,8 +40,11 @@ The layers describe **verification power**, not build order. Build order is
 | [07-examples.md](07-examples.md) | The acceptance corpus: distributed lock, Raft election, producer-consumer, counter | Specified |
 | [00-prior-art.md](00-prior-art.md) | Survey of existing tools and the gap ExTLA fills | Specified |
 
-No implementation exists yet. Every "Specified" above means the design is written down,
-not that it is built.
+"Specified" above describes the **document**, not the code: it means the design is written
+down. What is built is recorded in
+[06-architecture.md §Implementation Phases](06-architecture.md#implementation-phases), and
+deliberately nowhere else — a second copy of build status is what let this page claim the
+project was unbuilt for four phases after it shipped.
 
 ### File naming
 

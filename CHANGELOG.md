@@ -16,6 +16,19 @@ release it merely follows.
 
 ### Fixed
 
+- **The API reference's front page and the specification index both said the library was
+  unbuilt** (#148). `TLA`'s moduledoc read "Phase 1 is in progress ... the model checker
+  that consumes it does not exist yet", untouched since the third commit of the project, and
+  `spec/README.md` said "No implementation exists yet". `TLA` sorts first in ExDoc's sidebar,
+  so that was the landing page for anyone asking what the API is, four phases out of date.
+
+  Neither gets a corrected status line, because a second copy is what produced this:
+  `06-architecture.md` §Implementation Phases is the only place build status is recorded, and
+  both pages now point at it. `TLA`'s moduledoc is rewritten as what it should have been —
+  the three layers, a specification that a reader can recognise, and the warning that the DSL
+  looks like Elixir and is not — with resolvable links to the getting-started guide and the
+  normative semantics rather than the bare paths it carried before.
+
 - **An unknown option on a spec DSL declaration was discarded rather than refused, and
   `temporal` dropped its description** (#160). `variable :n, type: :nat, bogus: 1` compiled.
   Each macro popped the key it wanted and either stored the remainder unread or threw it
