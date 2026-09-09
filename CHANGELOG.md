@@ -9,10 +9,21 @@ All notable changes to ExTLA are recorded here, following
 which is the single source of truth for that. This file records what *changed* and when, and
 does not restate it.
 
-## [Unreleased]
+## [0.3.20] — 2026-09-09
 
-`mix.exs` reads `0.2.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
-release it merely follows.
+**A minor line, and the patch number does not start at zero.** Two of the changes below move
+the public surface in ways a patch number promises not to: `TLA.Coverage`'s `observe_action/5`
+is gone, replaced by `observe_enabled/3` and `observe_generated/4`; and a `schema_version: 1`
+JSON document, which `mix tla.check` wrote under v0.2.0, is now refused rather than read. Three
+more are additions — `TLA.Trace.explore/3`, `mix tla.explore`, and `TLA.Profile` with
+`mix tla.check --profile`. `RELEASING.md`'s bar is whether someone decides the public surface
+moved, and it moved on five counts.
+
+The `20` is the commit count since the last of those five landed (#135, `bf14e81`), not since
+`v0.2.0`. Everything after it — #137 through #147 — is fixes and CI work that a patch number
+describes correctly, so the version says both things at once: the line opened there, and twenty
+commits of patch-level work followed. `v0.3.0` is tagged at `bf14e81` to mark the opening;
+`RELEASING.md` §*The base tag is a marker* says why that tag has to exist.
 
 ### Added
 
@@ -360,6 +371,6 @@ compatibility promise.
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view
   abstraction are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
-[Unreleased]: https://gitlab.conet.yarina.org/dco-tek/extla/-/compare/v0.2.0...main
+[0.3.20]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.3.20
 [0.2.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.2.0
 [0.1.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.1.0

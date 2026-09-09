@@ -1,7 +1,7 @@
 defmodule ExTLA.MixProject do
   use Mix.Project
 
-  @version "0.2.1-dev"
+  @version "0.3.20"
 
   def project do
     [
