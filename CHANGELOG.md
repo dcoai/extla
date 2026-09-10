@@ -31,6 +31,21 @@ release it merely follows.
   guide slug cross-check that has never run. That test **is** run by the `test` job; its
   problem is that it needs a built `doc/` and only another job builds one. A coverage check
   cannot see "needs an artifact another job produces". #156 fixes that one by moving it.
+- **Half the temporal fragment was refuted by nothing, and the Emerson–Lei strong split was
+  dead under test** (#174). Nulling the refutation clauses for a bare predicate, for
+  `always(eventually(P))` and for `eventually(always(P))` — so the checker answers "holds" to
+  all three — left the whole suite green. `eventually(always(P))` appeared in no spec anywhere
+  in the project; `always(eventually(P))` appeared once and was only ever verified.
+
+  Replacing the strong-fairness branch with `[]` was likewise green: the only strong-fairness
+  fixture is verified, and `[]` also yields success, so the test named "strong fairness is not
+  weak fairness" passed for the wrong reason and never exercised the subset search.
+
+  Four models now refute the four. The fairness one needs the split to find its refutation at
+  all: its component is unfair as a whole, and only restricting to the states where the
+  constrained action is disabled leaves a fair cycle. Each is small enough to check by
+  reading, and each carries a companion assertion that the model is otherwise sound, so the
+  refutation is evidence about the property rather than about a broken spec.
 
 - **A found violation could be discarded, and a skipped liveness pass said nothing** (#167).
   Four defects in the step that turns a completed search into a reported verdict.
