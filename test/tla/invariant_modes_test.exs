@@ -353,6 +353,78 @@ defmodule TLA.InvariantModesTest do
     end
   end
 
+  # #175. `invariant_test.exs`'s "one restricted to a callback is not checked in the others"
+  # does not discriminate on `callbacks:` at all: making `applicable/2` ignore the option
+  # entirely leaves it green. Its apparent discrimination comes from declaration ORDER —
+  # `never_negative` is declared before `audited` and raises first, so `audited` never gets a
+  # chance whether or not the restriction is honoured.
+  #
+  # Here the restricted invariant is declared FIRST, so honouring `callbacks:` and ignoring it
+  # produce different reported violations. That is the assertion the other test's name makes.
+  describe "`callbacks:` actually restricts (#175)" do
+    @restricted_first """
+    defmodule CallbacksRestrictedFirst do
+      use GenServer
+      use TLA.Invariant
+
+      # Declared FIRST, and restricted to a callback this test does not use. If the
+      # restriction were ignored this would fire, because :skim breaks it too.
+      invariant :audited, callbacks: [:handle_call] do
+        state.logged >= state.moved
+      end
+
+      invariant :never_negative do
+        state.balance >= 0
+      end
+
+      def init(_), do: {:ok, %{balance: 100, logged: 0, moved: 0}}
+
+      def handle_cast(:skim, s),
+        do: {:noreply, %{s | balance: s.balance - 1_000, moved: s.moved + 1}}
+    end
+    """
+
+    test "a restricted invariant does not fire in a callback it excludes" do
+      [{module, _}] = Code.compile_string(@restricted_first)
+
+      {:ok, pid} = GenServer.start_link(module, [])
+      Process.unlink(pid)
+      ref = Process.monitor(pid)
+
+      GenServer.cast(pid, :skim)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, {%TLA.Invariant.Violation{} = violation, _}},
+                     1_000
+
+      # Both invariants are broken by `:skim`. `audited` is declared first and would be
+      # reported first if `callbacks:` were ignored, so the NAME is the whole assertion.
+      assert violation.name == :never_negative,
+             "callbacks: was ignored — the restricted invariant fired in a callback it excludes"
+    end
+
+    test "and the excluded invariant really would have fired otherwise" do
+      # Without this the test above could pass because `audited` holds, which would make it
+      # assert nothing about the restriction.
+      unrestricted = String.replace(@restricted_first, ", callbacks: [:handle_call]", "")
+
+      unrestricted =
+        String.replace(unrestricted, "CallbacksRestrictedFirst", "CallbacksUnrestricted")
+
+      [{module, _}] = Code.compile_string(unrestricted)
+
+      {:ok, pid} = GenServer.start_link(module, [])
+      Process.unlink(pid)
+      ref = Process.monitor(pid)
+
+      GenServer.cast(pid, :skim)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, {%TLA.Invariant.Violation{} = violation, _}},
+                     1_000
+
+      assert violation.name == :audited
+    end
+  end
+
   describe "telemetry" do
     test "a violation is announced" do
       module = compile(TelemetryCounter, :log_only)
