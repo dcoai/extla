@@ -116,6 +116,50 @@ defmodule TLA.ConformanceAgainstGraphTest do
     end
   end
 
+  # #168. `Enum.zip(behaviour, tl(behaviour))` is `[]` for a one-state behaviour, so the fold
+  # returned its `:ok` seed and `explain/1` said "every observed state is in the graph" about
+  # a state that was not in it.
+  #
+  # Reachable in practice: a simulation trace whose first generated message times out or is
+  # refused yields exactly one state. And this is the module that already refuses a BOUNDED
+  # graph outright rather than report absence from it — the same discipline, missed at the
+  # other end of the input.
+  describe "a behaviour with no steps" do
+    test "a single state absent from the graph is a finding, not a pass", ctx do
+      bogus = %{count: 999, status: :nowhere}
+
+      assert StateGraph.id_of(ctx.graph, bogus) == nil,
+             "the fixture state must genuinely be absent or this test asserts nothing"
+
+      assert {:absent_state, detail} =
+               Conformance.against_graph(ctx.graph, [bogus], status: ctx.status)
+
+      assert detail.state == bogus
+      assert detail.position == :only
+
+      explanation = Conformance.explain({:absent_state, detail})
+      assert explanation =~ "the behaviour's only state"
+      refute explanation =~ "step 0"
+    end
+
+    test "a single state that IS in the graph is :ok", ctx do
+      {_result, behaviour} = Simulation.run_trace(Impl.Conforming, %{max_steps: 12, seed: 7})
+      first = hd(behaviour)
+
+      refute StateGraph.id_of(ctx.graph, first) == nil
+
+      assert Conformance.against_graph(ctx.graph, [first], status: ctx.status) == :ok
+    end
+
+    # Not `:ok`. Nothing was observed, so nothing contradicts the graph — but answering
+    # success about an empty observation is the shape that made the case above lie.
+    test "an empty behaviour is its own outcome, and says so", ctx do
+      assert Conformance.against_graph(ctx.graph, [], status: ctx.status) == :nothing_observed
+
+      assert Conformance.explain(:nothing_observed) =~ "not a pass"
+    end
+  end
+
   describe "a truncated graph" do
     test "is refused rather than answered from", ctx do
       {_result, behaviour} = Simulation.run_trace(Impl.Conforming, %{max_steps: 4, seed: 7})

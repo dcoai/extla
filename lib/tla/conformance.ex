@@ -76,15 +76,41 @@ defmodule TLA.Conformance do
               "false positive. Re-run without the bound, or do not ask."
     end
 
-    behaviour
-    |> Enum.zip(tl(behaviour))
-    |> Enum.with_index(1)
-    |> Enum.reduce_while(:ok, fn {{pre, post}, step}, :ok ->
-      case classify(graph, pre, post, step) do
-        :ok -> {:cont, :ok}
-        finding -> {:halt, finding}
-      end
-    end)
+    case behaviour do
+      [] ->
+        # Nothing was observed, so nothing can contradict the graph. Refusing would be the
+        # wrong shape -- this is not a question that could not be answered, it is a question
+        # with no subject -- but answering `:ok` silently is how the one-state case below
+        # came to lie, so it is its own outcome rather than a success (#168).
+        :nothing_observed
+
+      [only] ->
+        # A behaviour with no STEPS still makes a claim: that its state is one the spec can
+        # reach. The pairwise fold below produced `[]` for it and returned its `:ok` seed, so
+        # `against_graph(graph, [state_not_in_the_graph], status: :ok)` answered `:ok` and
+        # `explain/1` said "every observed state is in the graph" about a state that was not.
+        #
+        # Reachable in practice: a simulation trace whose first message times out or is
+        # refused yields exactly one state. And this is the module that already refuses a
+        # BOUNDED graph outright rather than report absence from it -- the same discipline,
+        # missed at the other end of the input.
+        if StateGraph.id_of(graph, only) == nil do
+          {:absent_state, %{step: 0, state: only, position: :only}}
+        else
+          :ok
+        end
+
+      _many ->
+        behaviour
+        |> Enum.zip(tl(behaviour))
+        |> Enum.with_index(1)
+        |> Enum.reduce_while(:ok, fn {{pre, post}, step}, :ok ->
+          case classify(graph, pre, post, step) do
+            :ok -> {:cont, :ok}
+            finding -> {:halt, finding}
+          end
+        end)
+    end
   end
 
   defp classify(graph, pre, post, step) do
@@ -128,6 +154,11 @@ defmodule TLA.Conformance do
   """
   def explain(:ok), do: "every observed state is in the graph, and every step is an edge."
 
+  def explain(:nothing_observed),
+    do:
+      "the behaviour is empty, so there is nothing to compare against the graph. This is " <>
+        "not a pass: no state was observed and no step was taken."
+
   def explain({:checker, %{step: step, from: from, to: to}}) do
     """
     CHECKER — step #{step} is a step the spec permits, and the graph does not have it.
@@ -144,7 +175,7 @@ defmodule TLA.Conformance do
 
   def explain({:absent_state, %{step: step, state: state, position: position}}) do
     """
-    ABSENT STATE — the #{position}-state of step #{step} is not in the graph at all.
+    ABSENT STATE — #{absent_where(position, step)} is not in the graph at all.
 
       #{inspect(state)}
 
@@ -166,4 +197,9 @@ defmodule TLA.Conformance do
     stops. Layer 3's own step check ran during the simulation and reports its reading.
     """
   end
+
+  # A one-state behaviour has no step to number, and saying "step 0" would invite the reader
+  # to look for a transition that does not exist.
+  defp absent_where(:only, _step), do: "the behaviour's only state"
+  defp absent_where(position, step), do: "the #{position}-state of step #{step}"
 end
