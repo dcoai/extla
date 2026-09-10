@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Tla.Coverage do
   @impl Mix.Task
   def run(argv) do
     Mix.Task.run("app.start")
-    {opts, _, _} = OptionParser.parse(argv, strict: @switches)
+    {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
 
     sections = Ledger.run()
     rendered = sections |> Ledger.render() |> IO.iodata_to_binary()

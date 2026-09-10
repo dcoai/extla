@@ -261,6 +261,8 @@ defmodule TLA.Invariant do
     kind = declaration |> String.split(" ") |> hd()
     accepted = Map.fetch!(@accepted_options, kind)
 
+    reject_unknown_callbacks!(opts, caller, declaration)
+
     unless Keyword.keyword?(opts) do
       raise CompileError.exception(
               file: caller.file,
@@ -283,6 +285,70 @@ defmodule TLA.Invariant do
                     "#{kind} accepts #{Enum.map_join(accepted, ", ", &inspect/1)}."
               )
     end
+  end
+
+  # A `callbacks:` VALUE naming a callback that does not exist deletes the declaration
+  # silently (#166). `applicable/2` keeps a name only where the callback matches, so a typo
+  # yields an empty name list for every wrapper and the invariant applies to nothing:
+  #
+  #     invariant :never_negative, callbacks: [:handle_cal] do   # typo
+  #
+  # Verified: a withdrawal of 999 against a balance of 100 returned `:ok` and left `-899`.
+  #
+  # This is #158's defect one level down -- there the KEY was unchecked, here the VALUE is --
+  # and the accepted set is just as small and fixed, so it gets the same treatment.
+  #
+  # Only a literal list is checkable here; anything else is left to `check_declared_callbacks!/2`
+  # after `@on_definition` has seen the module's definitions.
+  defp reject_unknown_callbacks!(opts, caller, declaration) do
+    with true <- Keyword.keyword?(opts),
+         names when is_list(names) <- Keyword.get(opts, :callbacks),
+         true <- Enum.all?(names, &is_atom/1) do
+      case Enum.reject(names, &Keyword.has_key?(@callbacks, &1)) do
+        [] ->
+          :ok
+
+        unknown ->
+          raise CompileError.exception(
+                  file: caller.file,
+                  line: caller.line,
+                  description:
+                    "#{declaration}: `callbacks:` names #{Enum.map_join(unknown, ", ", &inspect/1)}, " <>
+                      "which is not an instrumented callback. Accepted: " <>
+                      "#{@callbacks |> Keyword.keys() |> Enum.map_join(", ", &inspect/1)}. " <>
+                      "A callback that does not exist matches no wrapper, so the declaration " <>
+                      "would be emitted for nothing and never checked."
+                )
+      end
+    else
+      _not_a_literal_list -> :ok
+    end
+  end
+
+  # The other half, and the likelier one in a codebase that changes: a callback that EXISTS
+  # but this module does not define. `@tla_wrapped` is only complete at `@before_compile`, so
+  # this cannot run at declaration time.
+  #
+  # It is a warning rather than an error because it is legitimate in one case -- a callback
+  # added to the module later, in a subsequent edit -- and because raising would make the
+  # order of definitions load-bearing in a way the macro's own docs already warn is fragile.
+  defp check_declared_callbacks!(declarations, wrapped, env) do
+    defined = MapSet.new(wrapped, fn {name, _arity} -> name end)
+
+    for %{name: name, opts: opts} <- declarations,
+        requested = Keyword.get(opts, :callbacks),
+        is_list(requested),
+        missing = Enum.reject(requested, &MapSet.member?(defined, &1)),
+        missing != [] do
+      IO.warn(
+        "#{inspect(env.module)}: #{inspect(name)} is restricted to " <>
+          "#{Enum.map_join(missing, ", ", &inspect/1)}, which this module does not define, " <>
+          "so it will never be checked. Define the callback, or drop it from `callbacks:`.",
+        Macro.Env.stacktrace(env)
+      )
+    end
+
+    :ok
   end
 
   @doc false
@@ -463,6 +529,7 @@ defmodule TLA.Invariant do
 
   defp wrappers(env, invariants, action_properties, preconditions, postconditions, telemetry) do
     wrapped = env.module |> Module.get_attribute(:tla_wrapped, []) |> Enum.uniq()
+    check_declared_callbacks!(invariants ++ action_properties, wrapped, env)
 
     context = %{
       invariants: invariants,

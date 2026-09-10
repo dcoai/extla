@@ -40,6 +40,26 @@ release it merely follows.
   `:max_states_reached` before the worker carrying the violation dropped the counterexample —
   roughly 1 run in 80, and never at `workers: 1`, so the verdict was order-dependent. Both
   outcomes occur in the same level because the budget test reads the shared count.
+- **A name or flag that matched nothing was accepted, and the check it named never ran**
+  (#166). Three places, all verified by running code.
+
+  A **selection** naming a declaration the spec does not have checked nothing and reported
+  success — `invariants: [:capp]` for `:cap` gave `status: :ok, warnings: []` where the
+  correct name gives `:violation`. That reaches further than a hand-typed config: the TLC
+  differential corpus drives its selections from names in `expected.json`, and D-9 makes
+  agreement with TLC the acceptance gate, so a misspelled fixture name made the gate pass
+  having compared nothing. The corpus was audited after the fix and every name resolves.
+
+  A **`callbacks:` value** naming a callback that does not exist deleted the declaration:
+  `invariant :never_negative, callbacks: [:handle_cal]` let a balance reach `-899`. Naming a
+  real callback the module does not define now warns instead of failing, since adding it in a
+  later edit is legitimate — but silence is not.
+
+  Three tasks parsed argv **leniently** and dropped what they could not parse. Two are CI
+  gates: `mix tla.coverage --chek` printed the ledger and exited 0, which is the advisory
+  gate on a verification artifact D-10 forbids. All eight now parse strictly, asserted by a
+  test that **enumerates** the tasks rather than listing them, so one added later is covered
+  on the day it is added.
 
 - **Five mix tasks had flags the specification did not mention, `mix tla.simulate` all eight
   of them** (#163). Its section carried usage examples and no option list, so

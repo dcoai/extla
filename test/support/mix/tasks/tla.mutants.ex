@@ -44,7 +44,7 @@ defmodule Mix.Tasks.Tla.Mutants do
 
   @impl Mix.Task
   def run(args) do
-    {opts, _, _} = OptionParser.parse(args, strict: @switches)
+    {opts, _rest} = OptionParser.parse!(args, strict: @switches)
 
     # Refused before the sweep rather than after it: a minute of work followed by "that
     # was not a valid combination" is worse than the same message immediately.

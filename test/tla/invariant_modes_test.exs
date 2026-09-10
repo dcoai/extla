@@ -276,6 +276,83 @@ defmodule TLA.InvariantModesTest do
     end
   end
 
+  # #166. A `callbacks:` VALUE naming a callback that does not exist silently deleted the
+  # declaration: `applicable/2` keeps a name only where the callback matches, so a typo left
+  # every wrapper with an empty name list. Verified before the fix — a withdrawal of 999
+  # against a balance of 100 returned `:ok` and left `-899`, with the invariant declared.
+  #
+  # This is #158's defect one level down: there the option KEY was unchecked, here the VALUE.
+  describe "`callbacks:` values are checked (#166)" do
+    test "a callback that is not instrumented at all is a compile error" do
+      error =
+        assert_raise CompileError, fn ->
+          Code.compile_string("""
+          defmodule CallbacksTypo do
+            use GenServer
+            use TLA.Invariant
+
+            invariant :never_negative, callbacks: [:handle_cal] do
+              state.balance >= 0
+            end
+
+            def init(b), do: {:ok, %{balance: b}}
+            def handle_call({:withdraw, n}, _f, s), do: {:reply, :ok, %{s | balance: s.balance - n}}
+          end
+          """)
+        end
+
+      assert error.description =~ "invariant :never_negative"
+      assert error.description =~ ":handle_cal"
+      assert error.description =~ "not an instrumented callback"
+    end
+
+    test "a real callback the module does not define warns rather than failing" do
+      # Legitimate in one case — a callback added in a later edit — so this is a warning.
+      # Silence is what it must not be.
+      warning =
+        ExUnit.CaptureIO.capture_io(:stderr, fn ->
+          Code.compile_string("""
+          defmodule CallbacksUndefined do
+            use GenServer
+            use TLA.Invariant
+
+            invariant :never_negative, callbacks: [:handle_cast] do
+              state.balance >= 0
+            end
+
+            def init(b), do: {:ok, %{balance: b}}
+            def handle_call({:withdraw, n}, _f, s), do: {:reply, :ok, %{s | balance: s.balance - n}}
+          end
+          """)
+        end)
+
+      assert warning =~ ":never_negative"
+      assert warning =~ ":handle_cast"
+      assert warning =~ "will never be checked"
+    end
+
+    test "a correct callbacks: value still compiles silently" do
+      warning =
+        ExUnit.CaptureIO.capture_io(:stderr, fn ->
+          Code.compile_string("""
+          defmodule CallbacksFine do
+            use GenServer
+            use TLA.Invariant
+
+            invariant :never_negative, callbacks: [:handle_call] do
+              state.balance >= 0
+            end
+
+            def init(b), do: {:ok, %{balance: b}}
+            def handle_call({:withdraw, n}, _f, s), do: {:reply, :ok, %{s | balance: s.balance - n}}
+          end
+          """)
+        end)
+
+      refute warning =~ "never be checked"
+    end
+  end
+
   describe "telemetry" do
     test "a violation is announced" do
       module = compile(TelemetryCounter, :log_only)
