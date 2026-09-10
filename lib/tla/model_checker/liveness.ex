@@ -111,6 +111,24 @@ defmodule TLA.ModelChecker.Liveness do
   # `max_states`, held back by a state constraint or halted by a safety violation leaves
   # a graph whose missing edges are indistinguishable from a state that ends the spec —
   # which is precisely the shape that refutes a liveness property.
+  @doc """
+  Whether this graph can carry a liveness verdict at all.
+
+  The non-raising counterpart to the check below, so a caller can decline to ask rather than
+  crash after the search (#167). A `state_constraint:` holds states back without expanding
+  them, so a constrained run reaches the end with a graph that has fewer edge entries than
+  states — and `check_liveness: true` alongside it used to die with `ArgumentError` there,
+  taking the valid safety result with it.
+
+  The pairing is only *conditionally* bad: a constraint that never actually holds a state
+  back leaves a complete graph and liveness works. That is why this is a predicate the
+  caller consults rather than an up-front refusal like symmetry's and workers' — those are
+  unconditionally incompatible and can be rejected before any work happens.
+  """
+  def answerable?(graph) do
+    StateGraph.liveness?(graph) and map_size(graph.edges) == graph.state_count
+  end
+
   defp complete!(graph) do
     unless StateGraph.liveness?(graph) do
       raise ArgumentError,

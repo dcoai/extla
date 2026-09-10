@@ -134,4 +134,99 @@ defmodule TLA.Spec.GuardOrderTest do
       assert %{prefix: _, cycle: _} = result.violation
     end
   end
+
+  # #167. Four defects in the step that turns a completed search into a reported verdict.
+  # Two rules settle them: a found violation is never discarded, and a check that did not
+  # run is named.
+  describe "the verdict says what was checked (#167)" do
+    defmodule Deadlocks do
+      use TLA.Spec
+
+      variable :n, type: 0..2
+
+      init do
+        n = 0
+      end
+
+      action :bump do
+        require n < 2
+        n = n + 1
+      end
+
+      # No `terminal`, so n == 2 deadlocks. Unreachable property, so it is refutable.
+      temporal :reaches_three do
+        eventually(n == 3)
+      end
+    end
+
+    defmodule Constrainable do
+      use TLA.Spec
+
+      variable :n, type: 0..10
+
+      init do
+        n = 0
+      end
+
+      action :bump do
+        require n < 10
+        n = n + 1
+      end
+
+      terminal :done do
+        n == 10
+      end
+
+      temporal :reaches_eleven do
+        eventually(n == 11)
+      end
+    end
+
+    test "a deadlock skips liveness and says so" do
+      result = TLA.ModelChecker.run(Deadlocks, %{check_liveness: true})
+
+      assert result.status == :violation
+      assert result.violation.type == :deadlock
+
+      assert Enum.any?(result.warnings, &(&1 =~ "temporal property was not checked")),
+             "a skipped liveness pass must name itself; got #{inspect(result.warnings)}"
+
+      assert Enum.any?(result.warnings, &(&1 =~ "check_deadlock: false"))
+    end
+
+    test "the same spec without deadlock checking reports the refutation" do
+      result = TLA.ModelChecker.run(Deadlocks, %{check_liveness: true, check_deadlock: false})
+
+      assert result.status == :violation
+      assert %{prefix: _, cycle: _} = result.violation
+    end
+
+    # Previously `ArgumentError: the search did not expand every state`, raised AFTER the
+    # search, discarding a safety result that was valid for what it covered.
+    test "a constraint that holds states back declines liveness instead of crashing" do
+      result =
+        TLA.ModelChecker.run(Constrainable, %{
+          check_liveness: true,
+          state_constraint: fn s -> s.n <= 3 end
+        })
+
+      assert result.status == :constrained
+
+      assert Enum.any?(result.warnings, &(&1 =~ "state_constraint")),
+             "declining must say why; got #{inspect(result.warnings)}"
+    end
+
+    # A constraint that never fires leaves a complete graph, so the question IS answerable —
+    # and the lasso used to be found and then dropped by the `:constrained` status.
+    test "a vacuous constraint still reports a refutation it found" do
+      result =
+        TLA.ModelChecker.run(Constrainable, %{
+          check_liveness: true,
+          state_constraint: fn _ -> true end
+        })
+
+      assert result.status == :violation
+      assert %{prefix: _, cycle: _} = result.violation
+    end
+  end
 end

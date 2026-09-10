@@ -261,6 +261,10 @@ defmodule TLA.ModelChecker do
       :outcome,
       :invariants,
       :liveness,
+      # Why the liveness pass did not run, when it did not. `nil` means it ran (or was not
+      # asked for). Without this a skipped pass was indistinguishable from one that found
+      # nothing, and `warnings` stayed empty either way (#167).
+      :liveness_skipped,
       :profile
     ]
   end
@@ -278,6 +282,7 @@ defmodule TLA.ModelChecker do
       found: 0,
       outcome: :ok,
       liveness: nil,
+      liveness_skipped: nil,
       profile: profile
     }
 
@@ -622,13 +627,26 @@ defmodule TLA.ModelChecker do
   defp check_temporals(%{outcome: outcome} = run) when outcome != :ok, do: run
 
   defp check_temporals(run) do
-    if run.config.check_deadlock and MapSet.size(run.graph.deadlocked) > 0 do
-      run
-    else
-      case Liveness.check(run.spec, run.graph, run.config.temporals) do
-        :ok -> run
-        {:violation, name, lasso} -> %{run | liveness: {name, lasso}}
-      end
+    cond do
+      # A deadlock is a safety failure and a liveness question about a deadlocking spec
+      # answers the wrong one -- but the run used to say NOTHING about having skipped it,
+      # so a refuted property vanished with empty warnings (#167). It is skipped and named.
+      run.config.check_deadlock and MapSet.size(run.graph.deadlocked) > 0 ->
+        %{run | liveness_skipped: :deadlock}
+
+      # A `state_constraint:` holds states back without expanding them, so the graph can
+      # reach the end incomplete -- and asking anyway used to raise from `complete!/1`
+      # AFTER the search, discarding a safety result that was valid for what it covered.
+      # Declining is the honest move: the graph describes part of the state space, and a
+      # liveness verdict over it would be a claim about behaviours nobody explored.
+      not Liveness.answerable?(run.graph) ->
+        %{run | liveness_skipped: :incomplete_graph}
+
+      true ->
+        case Liveness.check(run.spec, run.graph, run.config.temporals) do
+          :ok -> run
+          {:violation, name, lasso} -> %{run | liveness: {name, lasso}}
+        end
     end
   end
 
@@ -668,10 +686,19 @@ defmodule TLA.ModelChecker do
 
     # A refuted temporal property does not cut the search short — the graph was complete
     # before the question was asked — so coverage is bounded by what the SAFETY pass did.
+    # A found violation is never discarded, whatever else the run also was (#167).
+    # `:constrained` used to swallow a lasso the liveness pass had already produced, because
+    # the status is set whenever a constraint is CONFIGURED rather than when it bound the
+    # run. Bounded-ness is carried separately by `coverage.bounded_by`, so nothing is lost by
+    # letting the refutation win -- and a liveness verdict only exists at all when the graph
+    # was complete, which `Liveness.answerable?/1` has already established.
     {status, violation} =
       case {safety_status, run.liveness} do
-        {:ok, {_name, lasso}} -> {:violation, lasso}
-        _ -> {safety_status, safety_violation}
+        {ok_or_constrained, {_name, lasso}} when ok_or_constrained in [:ok, :constrained] ->
+          {:violation, lasso}
+
+        _ ->
+          {safety_status, safety_violation}
       end
 
     # From the SEARCH's outcome, not from the verdict derived above (#136). `safety_status` has
@@ -693,7 +720,7 @@ defmodule TLA.ModelChecker do
       violation: violation,
       coverage: coverage,
       profile: profile,
-      warnings: warnings(run.spec, config, safety_status) ++ Coverage.warnings(coverage),
+      warnings: warnings(run, config, safety_status) ++ Coverage.warnings(coverage),
       fingerprint_bits: config.fingerprint_bits,
       collision_estimate:
         Fingerprint.collision_estimate(graph.state_count, config.fingerprint_bits)
@@ -753,9 +780,10 @@ defmodule TLA.ModelChecker do
     )
   end
 
-  defp warnings(spec, config, status) do
+  defp warnings(run, config, status) do
     []
-    |> temporal_warning(spec, config)
+    |> temporal_warning(run.spec, config)
+    |> liveness_skipped_warning(run)
     |> constrained_warning(status)
     |> symmetry_warning(config)
   end
@@ -789,6 +817,34 @@ defmodule TLA.ModelChecker do
   end
 
   defp temporal_warning(warnings, _spec, _config), do: warnings
+
+  # A liveness pass that was ASKED FOR and did not run says so (#167). Without this the run
+  # was silent about it: a spec that deadlocks and also refutes a temporal property reported
+  # the deadlock with `warnings: []`, and the same spec with `check_deadlock: false` reported
+  # the refutation. The `check_liveness: false` case above already warned; these did not.
+  defp liveness_skipped_warning(warnings, %{liveness_skipped: nil}), do: warnings
+
+  defp liveness_skipped_warning(warnings, %{liveness_skipped: reason, spec: spec}) do
+    count = length(spec.temporals)
+
+    warnings ++
+      [
+        "#{count} temporal #{if count == 1, do: "property was", else: "properties were"} " <>
+          "not checked: #{liveness_skip_reason(reason)}"
+      ]
+  end
+
+  defp liveness_skip_reason(:deadlock),
+    do:
+      "the spec deadlocks, and a liveness question about a spec with a safety failure " <>
+        "answers the wrong question. Fix the deadlock, or re-run with " <>
+        "`check_deadlock: false` to ask anyway."
+
+  defp liveness_skip_reason(:incomplete_graph),
+    do:
+      "a `state_constraint:` held states back, so the graph describes part of the state " <>
+        "space and a liveness verdict over it would be a claim about behaviours nobody " <>
+        "explored. Re-run without the constraint to ask."
 
   defp constrained_warning(warnings, :constrained) do
     warnings ++

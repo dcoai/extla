@@ -240,9 +240,20 @@ defmodule TLA.ModelChecker.Parallel do
         terminal: MapSet.union(graph.terminal, from.terminal)
     }
 
-    # `outcome` is taken from the worker only when it is a violation, and `dispatch/2`
-    # halts on that — so a later worker's `:ok` cannot overwrite it.
-    outcome = if run.outcome == :ok, do: worker.outcome, else: run.outcome
+    # A found violation wins over a budget, whichever arrives first (#167).
+    #
+    # The previous rule kept the first non-`:ok` outcome, reasoning that `dispatch/2` halts
+    # on a violation so a later `:ok` cannot overwrite it. That considers only `:ok`. Both
+    # `:max_states_reached` and `{:violation, _}` occur in the SAME level, because the budget
+    # test reads the shared count -- so once the budget passes, every worker in that level
+    # trips it while one of them is also finding the violation. If the budget worker folded
+    # in first, the counterexample was dropped and the run reported
+    # `status: :max_states_reached, violation: nil`. Measured at roughly 1 in 80 runs on a
+    # 216-state fixture; `workers: 1` never did it, so the verdict was order-dependent.
+    #
+    # Bounded-ness is carried separately by `coverage.bounded_by`, so nothing is lost by
+    # letting the refutation win.
+    outcome = merge_outcome(run.outcome, worker.outcome)
 
     %{
       run
@@ -256,6 +267,11 @@ defmodule TLA.ModelChecker.Parallel do
 
   # `nil` is the unprofiled run, which is the common one. Both sides are nil or neither is:
   # the coordinator decides once, in `search_and_finish/2`.
+  defp merge_outcome({:violation, _} = found, _other), do: found
+  defp merge_outcome(_other, {:violation, _} = found), do: found
+  defp merge_outcome(:ok, other), do: other
+  defp merge_outcome(existing, _other), do: existing
+
   defp merge_profile(nil, nil), do: nil
   defp merge_profile(into, from), do: Profile.merge(into, from)
 end

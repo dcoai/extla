@@ -16,6 +16,31 @@ release it merely follows.
 
 ### Fixed
 
+- **A found violation could be discarded, and a skipped liveness pass said nothing** (#167).
+  Four defects in the step that turns a completed search into a reported verdict.
+
+  A **deadlock** silently suppressed liveness checking. The same spec reported a refuted
+  temporal property with `check_deadlock: false` and never mentioned it with the default,
+  `warnings: []` both times. Skipping is right — a liveness question about a spec with a
+  safety failure answers the wrong question — but the run now says so and names the flag that
+  asks anyway.
+
+  **`check_liveness:` with `state_constraint:`** crashed with `ArgumentError` *after* the
+  search, discarding a safety result that was valid for what it covered. The pairing is only
+  conditionally bad: a constraint that never holds a state back leaves a complete graph. So
+  the run consults `TLA.ModelChecker.Liveness.answerable?/1` and declines with a reason,
+  rather than being refused up front like symmetry and workers, which are unconditionally
+  incompatible.
+
+  A **configured** state constraint discarded a lasso the liveness pass had already found,
+  because `:constrained` is set whenever a constraint exists rather than when it bound the
+  run. Bounded-ness is carried by `coverage.bounded_by`, so the refutation now wins.
+
+  The **parallel merge** kept the first non-`:ok` outcome, so a worker reporting
+  `:max_states_reached` before the worker carrying the violation dropped the counterexample —
+  roughly 1 run in 80, and never at `workers: 1`, so the verdict was order-dependent. Both
+  outcomes occur in the same level because the budget test reads the shared count.
+
 - **Five mix tasks had flags the specification did not mention, `mix tla.simulate` all eight
   of them** (#163). Its section carried usage examples and no option list, so
   `--inject-failures` and `--unrestricted` — two substantial Layer 3 capabilities, crash
