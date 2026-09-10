@@ -60,6 +60,15 @@ release it merely follows.
   gate on a verification artifact D-10 forbids. All eight now parse strictly, asserted by a
   test that **enumerates** the tasks rather than listing them, so one added later is covered
   on the day it is added.
+- **`TLA.Conformance.against_graph/3` passed on a behaviour it never examined** (#168). A
+  one-state behaviour has no pairs, so the fold returned its `:ok` seed and `explain/1`
+  reported that every observed state is in the graph — about a state that was not in it.
+  Reachable in practice: a simulation trace whose first message times out yields one state.
+
+  A single state is now checked on its own, and an empty behaviour is `:nothing_observed`
+  rather than a success. This is the module that already refuses a *bounded* graph outright
+  rather than report absence from it; the same discipline was missing at the other end of
+  the input.
 
 - **Five mix tasks had flags the specification did not mention, `mix tla.simulate` all eight
   of them** (#163). Its section carried usage examples and no option list, so
