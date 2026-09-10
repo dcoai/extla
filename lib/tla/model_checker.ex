@@ -167,10 +167,38 @@ defmodule TLA.ModelChecker do
     {reduced, graph} = search_and_finish(spec, config)
     {full, _graph} = search_and_finish(spec, %{config | symmetry: nil})
 
-    Symmetry.verify!(reduced, full, config.symmetry)
+    reduced =
+      case Symmetry.verify!(reduced, full, config.symmetry) do
+        :ok ->
+          reduced
+
+        # A bounded comparison cannot answer. The first version of this appended the message
+        # to `warnings` and left `status: :ok` -- so `mix tla.check` printed `— verified` and
+        # exited 0 with "could not be verified" as a trailing line. A run that ASKED for the
+        # check came back looking verified to anything reading the exit code, which is the
+        # defect this milestone exists to close, introduced by the fix for it (#170).
+        #
+        # The status becomes the bounded run's. That is true -- the verification ran out of
+        # budget -- and it routes through the existing exit-2 handling for a bounded run, so
+        # nothing downstream has to learn a new status.
+        {:inconclusive, message} ->
+          %{
+            reduced
+            | status: bounded_status(reduced, full),
+              warnings: reduced.warnings ++ [message]
+          }
+      end
 
     {reduced, graph}
   end
+
+  # Whichever run hit its bound; the reduced one is checked first because if BOTH did, its
+  # own status is the more honest one to report about itself.
+  defp bounded_status(%{status: status}, _full)
+       when status in [:max_states_reached, :constrained],
+       do: status
+
+  defp bounded_status(_reduced, %{status: status}), do: status
 
   defp search_and_finish(spec, config) do
     # `type_ok` joins the invariants for the run, so it is checked, selectable

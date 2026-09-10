@@ -190,7 +190,18 @@ defmodule Mix.Tasks.Tla.Check do
     |> Keyword.get(:symmetry, [])
   end
 
-  defp maybe_symmetry(config, [], _verify), do: config
+  # `--verify-symmetry` with nothing to verify used to be dropped here, so it never reached
+  # `ModelChecker.reject_unimplemented!/1` -- the guard that exists to refuse exactly this --
+  # and the run came back `— verified`, exit 0 (#170). The one flag whose stated purpose is
+  # catching an unsound declaration failed green when the declaration was missing or
+  # misspelled.
+  #
+  # The task was routing around its own checker's refusal, which is the same shape as the
+  # selection defect: the check exists and the caller does not reach it. So the flag is passed
+  # through even with no names, and the checker decides.
+  defp maybe_symmetry(config, [], false), do: config
+
+  defp maybe_symmetry(config, [], true), do: Map.put(config, :verify_symmetry, true)
 
   defp maybe_symmetry(config, names, verify),
     do: Map.merge(config, %{symmetry: names, verify_symmetry: verify})
