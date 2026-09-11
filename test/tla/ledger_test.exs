@@ -11,6 +11,10 @@ defmodule TLA.LedgerTest do
 
   use ExUnit.Case, async: false
 
+  # One ledger run model-checks every temporal separately (~35s measured); the stability test
+  # runs it twice on top of the setup_all run.
+  @moduletag timeout: 300_000
+
   alias TLA.Ledger
 
   setup_all do
@@ -138,6 +142,53 @@ defmodule TLA.LedgerTest do
       assert by_status[:fresh] > 0, "the corpus stamps at least one mapping (#67)"
       assert by_status[:unstamped] > 0, "and deliberately leaves others unstamped"
       assert Enum.all?(Map.keys(by_status), &(&1 in [:fresh, :stale, :unstamped, :unverifiable]))
+    end
+
+    # #191. The ledger used to run once, without `check_liveness: true`, and write
+    # `model_checked … checked` beside every temporal not marked vacuous — eleven rows from a
+    # run that never asked. `IdlingUnfair.eventually_two` is REFUTED under liveness and read
+    # as checked; `raft_election`'s `eventually_elect_leader` is recorded as *violated* in the
+    # TLC corpus and read as checked. The drift gate protected a golden that was stable while
+    # wrong: it ensures the golden matches the generator and says nothing about the generator.
+    test "a refuted temporal property is not called checked", %{sections: sections} do
+      row = fn module, name ->
+        sections
+        |> Enum.find(&(&1.module == module))
+        |> Map.fetch!(:rows)
+        |> Enum.find(&(&1.kind == :temporal and &1.name == name))
+      end
+
+      # Refuted under liveness; the corpus's TLC oracle agrees.
+      raft = row.(TLA.Differential.RaftElection, :eventually_elect_leader)
+      assert raft.evidence == :refuted, "TLC records this as violated; the ledger said checked"
+      assert raft.exercised == "REFUTED"
+
+      # Refuted under liveness, holding only under fairness the spec does not declare.
+      unfair = row.(TLA.TestSpecs.IdlingUnfair, :eventually_two)
+      assert unfair.evidence == :refuted
+
+      # The same property name on the FAIR spec genuinely holds, so the verdict is per spec
+      # and per property — not a name lookup.
+      fair = row.(TLA.TestSpecs.Idling, :eventually_two)
+      assert fair.evidence == :model_checked
+      assert fair.exercised == "checked"
+    end
+
+    # A single liveness run halts at the first refutation and cannot say which of several
+    # properties it evaluated, so the ledger runs one per temporal. This pins that: two refuted
+    # properties in one spec must BOTH read as refuted, which one run could not produce.
+    # `Idling` declares one temporal that holds under weak fairness and one that is refuted. A
+    # single checker run halts at the first refutation, so it can only ever report one verdict
+    # for the whole spec; a mixed pair inside one spec is proof the ledger ran each on its own.
+    test "every temporal gets its own verdict, not the first one's", %{sections: sections} do
+      section = Enum.find(sections, &(&1.module == TLA.TestSpecs.Idling))
+
+      verdicts =
+        section.rows
+        |> Enum.filter(&(&1.kind == :temporal))
+        |> Map.new(&{&1.name, &1.evidence})
+
+      assert verdicts == %{eventually_two: :model_checked, never_two: :refuted}
     end
 
     # A stamp names a spec, so only the items of THAT spec become fresh. If freshness leaked
