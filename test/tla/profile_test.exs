@@ -404,6 +404,46 @@ defmodule TLA.ProfileTest do
       assert Profile.format(profile) =~
                ~r/All declarations: [\d,]+ reductions, \d+\.\d% of the run/
     end
+
+    # #199. Declaration costs were collected per worker and summed, while `run_reductions` was
+    # the coordinator's own `Process.info(:reductions)` — which under `workers: n` does almost
+    # none of the work. The numerator counted the workers and the denominator excluded them:
+    # the same spec read 12% at one worker and 91% at eight, and the advice inverted. The
+    # guarding test ran at one worker, where the two brackets coincide.
+    test "the share of the run does not depend on the worker count" do
+      # Bounded buffer rather than this file's chain spec, deliberately. The chain has ONE
+      # state per BFS level, so a parallel run of it is a task per level per state and the
+      # scheduling is three times the search — 6% at one worker, 2% at four, both honest. A
+      # share that says "the machinery is most of this run" is the right answer about
+      # parallelising a chain; the defect was a share that changed by a factor of seven on a
+      # spec where the work did not.
+      {:ok, constants} =
+        TLA.Differential.BoundedBuffer
+        |> TLA.Spec.Compiled.from_module()
+        |> TLA.Spec.Compiled.resolve_constants()
+
+      share_at = fn workers ->
+        TLA.Differential.BoundedBuffer
+        |> ModelChecker.run(%{constants: constants, profile: true, workers: workers})
+        |> Map.fetch!(:profile)
+        |> share()
+      end
+
+      one = share_at.(1)
+      four = share_at.(4)
+
+      # Parallel scheduling costs reductions of its own — about a sixth more on this spec — so
+      # the denominators are not identical. The defect was 12% against 91%.
+      assert_in_delta one, four, 3.0, "share at workers: 1 is #{one}%, at workers: 4 is #{four}%"
+
+      assert one < 25.0 == four < 25.0,
+             "the advice threshold gives different verdicts at one worker and four"
+    end
+  end
+
+  defp share(profile) do
+    total = profile.declarations |> Map.values() |> Enum.map(& &1.reductions) |> Enum.sum()
+    total * 100 / profile.run_reductions
   end
 
   describe "stability — the property the unit was chosen for" do

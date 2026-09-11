@@ -1076,6 +1076,17 @@ the process ends; `TLA.ModelChecker.Parallel.merge/2` sums them beside `TLA.Cove
 The coordinator's own contribution — seeding the initial states and checking their invariants —
 is merged in at the end, so a single-worker run and an eight-worker run travel one code path.
 
+The **denominator** is summed the same way. Each worker brackets its own batch with two
+reduction reads and reports the span as its `run_reductions`; the coordinator adds its own
+bracket to the merged sum at `finalize/2`. The first version took the coordinator's bracket
+alone, which under `--workers` is the scheduling and the seed: the numerator counted the
+workers and the denominator excluded them, and the same spec read 12% at one worker and 91%
+at eight (the bounded-buffer corpus entry read 8% against 170%). The census-of-work argument
+above holds for the numerator only if it holds for the denominator too. Parallel scheduling
+is itself work the run performed, so the two shares are close rather than identical — about a
+sixth apart on a spec with wide BFS levels, and far apart on a chain with one state per level,
+where parallelising is honestly most of the run.
+
 Per-declaration evaluation counts under `--workers n` are **identical** to the single-worker
 counts: they are a function of the search, and a count that moved would mean the parallel run
 explored something different. Costs agree to the same two reductions per evaluation as any two
