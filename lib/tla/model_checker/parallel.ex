@@ -160,6 +160,13 @@ defmodule TLA.ModelChecker.Parallel do
   # back is this worker's *contribution* and `merge/2` can add them. The ETS tables in the
   # graph are the same tables; only the struct around them is private to the worker.
   defp expand_batch(run, batch) do
+    # This worker's own reduction bracket opens here, for the DENOMINATOR of the profile's
+    # share (#199). The coordinator's bracket sees only the coordinator, which under `--workers`
+    # does almost none of the work; the declaration costs in the numerator came from here. A
+    # share whose numerator counted the workers and whose denominator excluded them read 12%
+    # at one worker and 91% at eight on the same spec, and the advice inverted.
+    reductions_before = run.profile && Profile.reductions()
+
     run = %{
       run
       | graph: zeroed(run.graph),
@@ -197,7 +204,17 @@ defmodule TLA.ModelChecker.Parallel do
     # Read out of the dictionary before the process ends and takes it with it. This is the
     # whole of what makes the profile survive `--workers`: the counts live per-process, which
     # is exactly the boundary a contribution is defined at.
-    |> then(fn run -> %{run | profile: run.profile && Profile.collect(run.profile)} end)
+    |> then(fn run ->
+      %{
+        run
+        | profile:
+            run.profile &&
+              %{
+                Profile.collect(run.profile)
+                | run_reductions: Profile.reductions() - reductions_before
+              }
+      }
+    end)
   end
 
   defp zeroed(graph) do

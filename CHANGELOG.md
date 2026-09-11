@@ -95,6 +95,16 @@ release it merely follows.
   nothing was always a rule about what a bare name means; it now applies to every binder,
   and the quantifier gets the same diagnostic, naming both the local and the declaration.
 
+- **The profile's share under `--workers` counted the workers in the numerator and left them
+  out of the denominator** (#239, closes #199). Declaration costs were collected per worker and
+  summed; `run_reductions` was the coordinator's own `Process.info(:reductions)`, and under
+  `workers: n` the coordinator does almost none of the work. The same spec read 12% at one
+  worker and 91% at eight — the bounded-buffer corpus entry 8% against 170%, a share over the
+  whole — and `advice/1`'s verdict inverted. The guarding test ran at one worker, where the
+  two brackets coincide. Each worker now brackets its own batch and the coordinator's bracket
+  is added to the sum rather than replacing it; the new test runs the same spec at one worker
+  and four and asks for the same answer.
+
 - **Two tests that could not fail, and the guard for the class** (#175). The test named "one
   restricted to a callback is not checked in the others" did not discriminate on `callbacks:`
   at all — making the restriction a no-op left it green. Its apparent discrimination came from

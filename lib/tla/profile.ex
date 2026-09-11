@@ -269,6 +269,12 @@ defmodule TLA.Profile do
   Subtract the instrumentation, turn the per-evaluation floor into a cost, and record what the
   whole run spent.
 
+  `run_reductions` is the CALLER's bracket — the coordinator's — and is ADDED to whatever the
+  merged contributions already carry, which is every worker's own bracket (#199). Overwriting
+  it, as this once did, made the denominator the coordinator alone: on a single worker that is
+  the whole run, on eight it is the scheduling and the seed, and the same spec read 12% at one
+  worker and 91% at eight.
+
   **Called once, after any merging.** It is not idempotent — a second call would subtract the
   calibration a second time — and that is why `collect/1` and `merge/2` leave the raw floor
   alone. A worker collects, the coordinator merges, and this runs at the end.
@@ -284,7 +290,11 @@ defmodule TLA.Profile do
         {key, %{entry | per_eval: per_eval, reductions: per_eval * entry.evaluations}}
       end)
 
-    %{profile | declarations: declarations, run_reductions: run_reductions}
+    %{
+      profile
+      | declarations: declarations,
+        run_reductions: profile.run_reductions + run_reductions
+    }
   end
 
   @doc """
