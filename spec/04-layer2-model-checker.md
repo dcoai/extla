@@ -231,7 +231,19 @@ defmodule TLA.Spec.Helpers do
   def head(seq), do: hd(seq)
   def tail(seq), do: tl(seq)
   def len(seq), do: length(seq)
-  def subseq(seq, m, n), do: Enum.slice(seq, m - 1, n - m + 1)
+
+  @doc """
+  SubSeq(s, m, n): elements m through n inclusive, 1-indexed, with TLC's
+  domain rule. `n < m` is `[]` whatever the bounds are (`SubSeq(<<>>, 2, 0)`
+  is `<<>>`). Otherwise both m and n must lie in 1..Len(s); one outside
+  raises `TLA.Spec.DomainError` naming the index and the length, exactly
+  as `f[x]` does for the same off-by-one (D-20). No index wraps: an earlier
+  draft wrote this as `Enum.slice(seq, m - 1, n - m + 1)`, which has
+  Elixir's index semantics — a zero start wrapped to the end, a negative
+  one counted from it — and an off-by-one in a spec yielded a valid
+  sequence that was not the one its author wrote, silently.
+  """
+  def subseq(seq, m, n)
 
   # ── Function (Map) Operations ──
   def for_each(domain, f), do: Map.new(domain, fn k -> {k, f.(k)} end)

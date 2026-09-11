@@ -124,8 +124,35 @@ defmodule TLA.Spec.Helpers do
 
       iex> TLA.Spec.Helpers.subseq([:a, :b, :c, :d], 2, 3)
       [:b, :c]
+
+  `n < m` is the empty sequence, whatever `m` and `n` are — TLC's `SubSeq(s, 2, 0)` is `<<>>`
+  even for an empty `s`. Otherwise both bounds must lie in `1..Len(s)`, and one outside raises
+  `TLA.Spec.DomainError` the way `at/2` does for the same off-by-one (#197).
+
+  This was `Enum.slice(seq, m - 1, n - m + 1)`, which has Elixir's index semantics rather than
+  TLA+'s: `subseq([1, 2, 3], 0, 1)` returned `[3]`, a zero index wrapping to the end, and a
+  negative `m` counted from the end. An off-by-one in a spec then produced a valid sequence
+  that was not the one the author wrote, silently — the exact shape `at/2` refuses.
+
+      iex> TLA.Spec.Helpers.subseq([:a, :b, :c], 3, 2)
+      []
   """
-  def subseq(seq, m, n), do: Enum.slice(seq, m - 1, n - m + 1)
+  def subseq(seq, m, n) when is_list(seq) and is_integer(m) and is_integer(n) and n < m, do: []
+
+  def subseq(seq, m, n) when is_list(seq) and is_integer(m) and is_integer(n) do
+    len = length(seq)
+
+    cond do
+      m < 1 -> raise TLA.Spec.DomainError, collection: seq, key: m, where: subseq_where(m, n)
+      n > len -> raise TLA.Spec.DomainError, collection: seq, key: n, where: subseq_where(m, n)
+      true -> Enum.slice(seq, m - 1, n - m + 1)
+    end
+  end
+
+  def subseq(other, m, n),
+    do: raise(TLA.Spec.DomainError, collection: other, key: m, where: subseq_where(m, n))
+
+  defp subseq_where(m, n), do: "SubSeq(s, #{inspect(m)}, #{inspect(n)}) — s"
 
   # ── Function (map) operations ──
 

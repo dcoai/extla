@@ -1,5 +1,6 @@
 defmodule TLA.Spec.HelpersTest do
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest TLA.Spec.Helpers
 
@@ -100,6 +101,53 @@ defmodule TLA.Spec.HelpersTest do
       assert H.subseq(s, 1, 1) == [:a]
       assert H.subseq(s, 2, 4) == [:b, :c, :d]
       assert H.subseq(s, 1, 5) == s
+    end
+
+    # #197. `subseq/3` was `Enum.slice(seq, m - 1, n - m + 1)`, which has Elixir's index
+    # semantics: a zero index wrapped to the end, a negative one counted from the end, and an
+    # off-by-one produced a valid sequence that was not the one the author wrote — silently,
+    # where `at/2` raises for the identical slip.
+    test "subseq/3 refuses an index outside 1..len, as at/2 does" do
+      s = [1, 2, 3]
+
+      for {m, n} <- [{0, 1}, {-1, -1}, {2, 4}, {4, 4}] do
+        error = assert_raise TLA.Spec.DomainError, fn -> H.subseq(s, m, n) end
+        assert Exception.message(error) =~ "SubSeq(s, #{m}, #{n})", inspect({m, n})
+        assert Exception.message(error) =~ "outside 1..3", inspect({m, n})
+      end
+    end
+
+    # TLC's `SubSeq(s, m, n)` with `n < m` is `<<>>` before any bound is examined, so
+    # `SubSeq(<<>>, 2, 0)` is `<<>>` and not an error. This used to be a `FunctionClauseError`.
+    test "subseq/3 with n < m is the empty sequence, whatever the bounds" do
+      assert H.subseq([], 2, 0) == []
+      assert H.subseq([1, 2, 3], 3, 2) == []
+      assert H.subseq([1, 2, 3], 7, 5) == []
+    end
+
+    test "subseq/3 refuses a non-sequence where len/1 and at/2 already do" do
+      assert_raise TLA.Spec.DomainError, fn -> H.subseq(MapSet.new([1, 2]), 1, 1) end
+    end
+
+    property "subseq/3 and at/2 agree on every out-of-domain index" do
+      check all(
+              s <- list_of(integer(), max_length: 6),
+              m <- integer(-8..12),
+              m not in 1..length(s)//1
+            ) do
+        assert_raise TLA.Spec.DomainError, fn -> H.at(s, m) end
+        assert_raise TLA.Spec.DomainError, fn -> H.subseq(s, m, m) end
+      end
+    end
+
+    property "subseq/3 in domain is the 1-indexed inclusive slice" do
+      check all(
+              s <- list_of(integer(), min_length: 1, max_length: 6),
+              m <- integer(1..length(s)//1),
+              n <- integer(m..length(s)//1)
+            ) do
+        assert H.subseq(s, m, n) == Enum.map(m..n, &H.at(s, &1))
+      end
     end
 
     # Called through apply/3 deliberately: the @spec says `nonempty_list()`, which
