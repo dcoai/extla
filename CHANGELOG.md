@@ -27,6 +27,15 @@ release it merely follows.
   truthy return passed before and fails loudly now; that is the intended change, and the
   fix is the comparison that was missing.
 
+- **CI restores compiled dependencies from the shared depdep store** (#246, for #245). Every
+  job ran `mix deps.get` and compiled the dependency tree from source, with a `mix.lock`-keyed
+  cache as the only reuse — per-project, per-runner, and a cold compile of the whole tree on
+  any lock change. `scripts/depdep.exs --pull --mix-get --compile-deps` (depdep v0.4.0) now
+  stands in for `mix deps.get`: restore what the store has, fetch only what it lacked, decide
+  again over the git dependency once its source is on disk, compile exactly the misses; and
+  `compile` pushes what it built. Inert until the store credentials exist (#247): with no
+  `DEPDEP_*` variables depdep says so, still runs `deps.get`, and exits 0.
+
 ### Fixed
 
 - **Nested temporal quantifiers collapsed their vacuity probes onto the last outer
