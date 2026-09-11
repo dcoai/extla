@@ -160,22 +160,9 @@ defmodule TLA.ModelChecker.Liveness do
 
   # `\A x \in C : F(x)` is a conjunction of instances, each of which is itself in the
   # fragment — so quantifiers are expanded away here and nothing downstream knows about
-  # them. The bound values ride along so a violation can say which instance failed.
-  defp instances(temporal, constants) do
-    temporal.formula.(constants)
-    |> unquantify(constants)
-    |> Enum.map(fn {bound, formula} ->
-      %{name: temporal.name, bound: bound, formula: formula}
-    end)
-  end
-
-  defp unquantify({:for_all, set, instance}, constants) do
-    for value <- Enum.to_list(set.(constants)),
-        {bound, formula} <- unquantify(instance.(value), constants),
-        do: {[value | bound], formula}
-  end
-
-  defp unquantify(formula, _constants), do: [{[], formula}]
+  # them. The expansion is `Spec.Compiled.temporal_instances/2`, shared with coverage's
+  # vacuity probes so the two cannot disagree about what an instance is (#200).
+  defp instances(temporal, constants), do: Spec.Compiled.temporal_instances(temporal, constants)
 
   # One shape per instance, and one index per distinct predicate position. Predicates are
   # evaluated once per state for all properties at once, which is what keeps the
@@ -593,7 +580,7 @@ defmodule TLA.ModelChecker.Liveness do
     do: "temporal property #{inspect(instance.name)} #{what}"
 
   defp describe(instance, what) do
-    values = instance.bound |> Enum.reverse() |> Enum.map_join(", ", &inspect/1)
+    values = Enum.map_join(instance.bound, ", ", &inspect/1)
     "temporal property #{inspect(instance.name)}, at #{values}, #{what}"
   end
 

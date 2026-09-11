@@ -48,7 +48,8 @@ defmodule TLA.Coverage do
 
   @type vacuity :: %{
           property: atom(),
-          binding: term() | nil,
+          # The quantifier bindings of the instance, outermost first; `[]` when unquantified.
+          binding: [term()],
           reason: :antecedent_never_held | :consequent_always_held
         }
 
@@ -349,48 +350,41 @@ defmodule TLA.Coverage do
   # checked — which is the more important half, since an unchecked property that
   # would have been vacuous is doubly worth knowing about.
 
+  # One probe pair per INSTANCE, and the instances come from the same expansion the liveness
+  # checker uses (#200). This module used to walk the formula itself and key a probe by the
+  # innermost binding alone, so under a nested quantifier every outer instance landed on one
+  # key and only the last survived: an outer instance whose antecedent never held anywhere
+  # reported `vacuous == []`, while the checker — expanding correctly — checked it as its own
+  # property. The binding is now the full bound list, outermost first, and the checker's
+  # instance for `[x, y]` and the probe for `[x, y]` are the same thing by construction.
   defp probes(spec, constants) do
     spec.temporals
     |> Enum.flat_map(fn temporal ->
-      temporal.formula.(constants)
-      |> walk(temporal.name, nil, constants)
+      temporal
+      |> TLA.Spec.Compiled.temporal_instances(constants)
+      |> Enum.flat_map(&walk(&1.formula, &1.name, &1.bound))
     end)
-    |> Map.new(fn probe -> {{probe.property, probe.binding, probe.role, probe.index}, probe} end)
+    |> Map.new(fn probe -> {{probe.property, probe.binding, probe.role}, probe} end)
   end
 
-  defp walk(formula, property, binding, constants, index \\ 0)
+  defp walk({:always, inner}, property, binding), do: walk(inner, property, binding)
+  defp walk({:eventually, inner}, property, binding), do: walk(inner, property, binding)
 
-  defp walk({:always, inner}, property, binding, constants, index),
-    do: walk(inner, property, binding, constants, index)
-
-  defp walk({:eventually, inner}, property, binding, constants, index),
-    do: walk(inner, property, binding, constants, index)
-
-  defp walk({:leads_to, antecedent, consequent}, property, binding, _constants, index) do
+  defp walk({:leads_to, antecedent, consequent}, property, binding) do
     [
-      probe(property, binding, :antecedent, index, antecedent),
-      probe(property, binding, :consequent, index, consequent)
+      probe(property, binding, :antecedent, antecedent),
+      probe(property, binding, :consequent, consequent)
     ]
   end
 
-  defp walk({:predicate, predicate}, property, binding, _constants, index),
-    do: [probe(property, binding, :consequent, index, predicate)]
+  defp walk({:predicate, predicate}, property, binding),
+    do: [probe(property, binding, :consequent, predicate)]
 
-  defp walk({:for_all, set, instantiate}, property, _binding, constants, _index) do
-    set.(constants)
-    |> Enum.sort()
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {element, index} ->
-      instantiate.(element) |> walk(property, element, constants, index)
-    end)
-  end
-
-  defp probe(property, binding, role, index, predicate) do
+  defp probe(property, binding, role, predicate) do
     %{
       property: property,
       binding: binding,
       role: role,
-      index: index,
       predicate: predicate,
       ever: false,
       always: true,
@@ -479,11 +473,12 @@ defmodule TLA.Coverage do
       "bounded by #{inspect(bound)}, so this is not a finding about the spec"
   end
 
-  defp vacuity_line(%{property: property, binding: nil, reason: reason}),
+  defp vacuity_line(%{property: property, binding: [], reason: reason}),
     do: "property #{inspect(property)} is VACUOUS: #{reason(reason)}"
 
   defp vacuity_line(%{property: property, binding: binding, reason: reason}),
-    do: "property #{inspect(property)} is VACUOUS for #{inspect(binding)}: #{reason(reason)}"
+    do:
+      "property #{inspect(property)} is VACUOUS for #{Enum.map_join(binding, ", ", &inspect/1)}: #{reason(reason)}"
 
   defp reason(:antecedent_never_held), do: "its antecedent never held in any reachable state"
   defp reason(:consequent_always_held), do: "it held in every reachable state"
