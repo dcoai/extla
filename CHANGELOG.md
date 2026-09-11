@@ -46,6 +46,29 @@ release it merely follows.
   constrained action is disabled leaves a fair cycle. Each is small enough to check by
   reading, and each carries a companion assertion that the model is otherwise sound, so the
   refutation is evidence about the property rather than about a broken spec.
+- **`--verify-symmetry` did nothing without `symmetry:`, and blamed the declaration when it
+  did run** (#170). The one flag whose stated purpose is catching an unsound reduction failed
+  in both directions.
+
+  `mix tla.check` dropped both keys when no `symmetry:` was configured, so the flag never
+  reached the checker's own guard — the one that exists to refuse exactly this — and a
+  misspelled or missing declaration produced `— verified`, exit 0. The task was routing
+  around its own refusal.
+
+  And the comparison read a truncation as a verdict difference. The compared fields exclude
+  counts but include `status` and `never_enabled`, both bound-sensitive, while both runs get
+  the same `max_states` and the reduction's whole purpose is that the unreduced run is
+  bigger. So on any model large enough to need symmetry, the unreduced run hit the bound
+  first and a **sound** declaration drew a maximally confident accusation. A bounded
+  comparison is now refused with a reason rather than answered, which is how
+  `TLA.Conformance` already treats a bounded graph.
+
+  The first version of that refusal appended the reason to `warnings` and left the status
+  `:ok` — so `mix tla.check` printed `— verified` and exited 0 with "could not be verified"
+  as a trailing line. A run that asked for the check came back looking verified to anything
+  reading the exit code, which is the defect this fix exists to close. An inconclusive
+  verification now carries the bounded run's status and exits 2, and a test reads the exit
+  code rather than the warning text.
 
 - **A found violation could be discarded, and a skipped liveness pass said nothing** (#167).
   Four defects in the step that turns a completed search into a reported verdict.

@@ -116,6 +116,69 @@ defmodule TLA.SymmetryTest do
     end
   end
 
+  # #170. Both directions of the one flag whose stated purpose is catching an unsound
+  # declaration.
+  describe "verify_symmetry cannot answer a bounded comparison" do
+    # The compared verdict excludes counts but includes `status` and `never_enabled`, and both
+    # are bound-sensitive — while both runs get the same `max_states` and the reduction's whole
+    # purpose is that the unreduced run is bigger. So on any model large enough to need
+    # symmetry, the unreduced run truncates first and the difference reads as unsoundness.
+    #
+    # With two processes `PerBinding` is 8 states reduced to 5, so a limit of 6 truncates only
+    # the unreduced run — which is the asymmetry that produced the false accusation.
+    test "a SOUND declaration is not accused when the unreduced run hits the bound" do
+      result =
+        ModelChecker.run(PerBinding, %{
+          constants: @processes,
+          symmetry: [:processes],
+          verify_symmetry: true,
+          max_states: 6
+        })
+
+      assert Enum.any?(result.warnings, &(&1 =~ "could not be verified")),
+             "a bounded comparison must say it could not answer; got #{inspect(result.warnings)}"
+
+      assert Enum.any?(result.warnings, &(&1 =~ "max_states_reached"))
+    end
+
+    # Without this the test above could pass because the bound made the comparison equal
+    # rather than because it was refused.
+    test "and the same bound really does truncate only one of the two runs" do
+      config = %{constants: @processes, max_states: 6}
+
+      reduced = ModelChecker.run(PerBinding, Map.put(config, :symmetry, [:processes]))
+      full = ModelChecker.run(PerBinding, config)
+
+      assert reduced.status == :ok
+      assert full.status == :max_states_reached
+    end
+
+    # The fix must not weaken the check it exists for: an unsound declaration on an
+    # UNBOUNDED run still raises. The existing test below covers the message; this asserts
+    # the bounded refusal did not swallow it.
+    test "an unsound declaration still raises when neither run is bounded" do
+      assert_raise TLA.Symmetry.UnsoundError, fn ->
+        ModelChecker.run(Asymmetric, %{
+          constants: @processes,
+          symmetry: [:processes],
+          verify_symmetry: true
+        })
+      end
+    end
+
+    # The CLI used to drop both keys when no `symmetry:` was configured, so the flag never
+    # reached this guard and the run reported `— verified`, exit 0. The task was routing
+    # around its own checker's refusal.
+    test "asking to verify with nothing to verify is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          ModelChecker.run(PerBinding, %{constants: @processes, verify_symmetry: true})
+        end
+
+      assert error.message =~ "no `symmetry:` to verify"
+    end
+  end
+
   describe "verify_symmetry" do
     test "a sound declaration passes and returns the reduced run" do
       result =

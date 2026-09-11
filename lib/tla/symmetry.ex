@@ -168,11 +168,45 @@ defmodule TLA.Symmetry do
     with_reduction = verdict(reduced)
     without = verdict(full)
 
-    if with_reduction == without do
-      :ok
-    else
-      raise UnsoundError, message: unsound_message(names, with_reduction, without)
+    cond do
+      # A truncation is not a verdict difference (#170). The compared fields exclude counts
+      # but include `status` and `never_enabled`, and BOTH are bound-sensitive -- while both
+      # runs get the same `max_states` and the reduction's whole purpose is that the
+      # unreduced run is bigger. So on any model large enough to need symmetry, the
+      # unreduced run hits the bound first and the difference reads as unsoundness.
+      #
+      # Measured on a 7-state-reduced, 20-state-full model at `max_states: 13`: a SOUND
+      # declaration produced "status: :ok with the reduction, :max_states_reached without"
+      # and a maximally confident accusation about the spec.
+      #
+      # Refusing to answer is the honest move and matches how `TLA.Conformance` treats a
+      # bounded graph. Raising the unreduced run's budget was considered and rejected: it
+      # makes the check's cost unpredictable and can still truncate.
+      bounded?(reduced) or bounded?(full) ->
+        {:inconclusive, bounded_message(names, reduced, full)}
+
+      with_reduction == without ->
+        :ok
+
+      true ->
+        raise UnsoundError, message: unsound_message(names, with_reduction, without)
     end
+  end
+
+  @bounded [:max_states_reached, :constrained]
+
+  defp bounded?(result), do: result.status in @bounded
+
+  defp bounded_message(names, reduced, full) do
+    which =
+      [{"with the reduction", reduced}, {"without it", full}]
+      |> Enum.filter(fn {_label, result} -> bounded?(result) end)
+      |> Enum.map_join(", ", fn {label, result} -> "#{label} (#{result.status})" end)
+
+    "symmetry: #{inspect(names)} could not be verified: the run was bounded #{which}, so " <>
+      "the two runs did not explore the same thing and a difference between them would be " <>
+      "a fact about the bound rather than about the declaration. Re-run without the bound, " <>
+      "or with a larger one."
   end
 
   defp unsound_message(names, with_reduction, without) do

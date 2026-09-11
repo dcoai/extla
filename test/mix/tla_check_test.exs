@@ -76,6 +76,28 @@ defmodule Mix.Tasks.Tla.CheckTest do
       assert output =~ "declared and not checked"
     end
 
+    # #170. The first fix for the bounded comparison appended "could not be verified" to
+    # `warnings` and left `status: :ok` — so this printed `— verified` and exited 0, with the
+    # refusal as a trailing line. A CI consumer reading the exit code saw a verified run. The
+    # test that pinned the API behaviour asserted only the warning text, so nothing here saw
+    # the exit code; this does.
+    test "--verify-symmetry that could not verify does not exit 0 or say verified" do
+      Application.put_env(:extla, TLA.TestSpecs.PerBinding,
+        constants: %{processes: MapSet.new([:p1, :p2])},
+        symmetry: [:processes]
+      )
+
+      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.PerBinding) end)
+
+      # `PerBinding` reduces 8 states to 5, so 6 truncates only the unreduced run.
+      {output, code} =
+        check(["TLA.TestSpecs.PerBinding", "--verify-symmetry", "--max-states", "6"])
+
+      assert code == 2, "an inconclusive verification is a bounded run, exit 2; got #{code}"
+      refute output =~ "— verified"
+      assert output =~ "could not be verified"
+    end
+
     test "--verify-symmetry catches a declaration the spec does not deserve" do
       Application.put_env(:extla, TLA.TestSpecs.Asymmetric,
         constants: %{processes: MapSet.new([:p1, :p2])},
