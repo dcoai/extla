@@ -104,7 +104,10 @@ defmodule TLA.StateTest do
           {"a pid", quote(do: self())},
           {"a reference", quote(do: make_ref())},
           {"a fun", quote(do: fn -> :x end)},
-          {"a float", quote(do: 1.5)}
+          {"a float", quote(do: 1.5)},
+          # #198: `TLA.State.Json` has no encoding for a bitstring that is not whole bytes, so
+          # admitting it here meant a violation found by the search was lost to the report.
+          {"a bitstring", quote(do: <<1::3>>)}
         ] do
       test "rejects #{kind} held directly by a variable" do
         assert_raise TLA.State.InvalidTermError,

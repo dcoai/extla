@@ -234,6 +234,22 @@ defmodule Mix.Tasks.Tla.CheckTest do
       assert is_number(entry["collision_estimate"])
     end
 
+    # #198. `<<255, 0>>` is a term §6 permits and a JSON string cannot carry. The search found
+    # the violation, then `Jason.encode!/1` raised `invalid byte 0xFF` from the report writer
+    # and the task exited with a stack trace and no document. A found counterexample must
+    # never be lost to its own serialisation.
+    test "--format json carries a counterexample whose state is not valid UTF-8" do
+      {output, 1} = check(["TLA.TestSpecs.RawBytes", "--format", "json"])
+
+      entry = output |> Jason.decode!() |> Map.fetch!("specs") |> hd()
+
+      assert entry["status"] == "violation"
+      assert entry["violation"]["property"] == "payload_is_text"
+
+      last = entry["violation"]["states"] |> List.last() |> TLA.State.Json.decode!()
+      assert last == %{payload: <<255, 0>>}
+    end
+
     test "an unknown format is refused" do
       assert_raise Mix.Error, ~r/unknown --format/, fn ->
         capture_io(fn -> Check.run(["TLA.TestSpecs.WithDefaults", "--format", "yaml"]) end)

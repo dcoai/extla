@@ -17,6 +17,12 @@ defmodule TLA.State.JsonTest do
         false,
         nil,
         "a binary",
+        # #198. Not valid UTF-8, which §6 permits and JSON strings cannot carry. This went
+        # to `Jason.encode!/1` as a string and raised from inside the report writer, after
+        # the search had found a real violation.
+        <<255, 0>>,
+        <<0, 159, 146, 150>>,
+        "",
         [],
         [1, :two, "three"],
         {},
@@ -39,7 +45,8 @@ defmodule TLA.State.JsonTest do
         StreamData.one_of([
           StreamData.integer(),
           StreamData.member_of([:ready, :incrementing, true, false, nil]),
-          StreamData.string(:alphanumeric)
+          StreamData.string(:alphanumeric),
+          StreamData.binary()
         ])
 
       term =
@@ -55,6 +62,16 @@ defmodule TLA.State.JsonTest do
       check all(value <- term) do
         assert round_trip(value) == value
       end
+    end
+
+    # The whole of #198: what `encode/1` produces must be something `Jason.encode!/1`
+    # accepts, or the report writer raises after the search has finished. `round_trip/1`
+    # goes through Jason, so the property above covers it; this pins the shape so a reader
+    # can see the tag rather than infer it.
+    test "a binary that is not valid UTF-8 travels as base64 and valid UTF-8 stays a string" do
+      assert Json.encode(<<255, 0>>) == %{"b64" => Base.encode64(<<255, 0>>)}
+      assert Json.encode("plain") == %{"b" => "plain"}
+      assert Jason.encode!(Json.encode(<<255, 0>>)) =~ "b64"
     end
 
     test "a struct keeps its module" do

@@ -60,6 +60,16 @@ release it merely follows.
   outside `1..Len(s)` is a `DomainError` naming the index and the length, and a property test
   holds `subseq/3` and `at/2` to the same answer on every out-of-domain index.
 
+- **A non-UTF-8 binary in state crashed `--format json` and discarded the counterexample**
+  (#244, closes #198). §6 permits binaries; `TLA.State.Json` handed every one to
+  `Jason.encode!/1` as a string, which raises `invalid byte 0xFF` on anything that is not
+  valid UTF-8. A spec holding `<<255, 0>>` found a real violation, then `mix tla.check
+  --format json` exited with a stack trace from the report writer and no document. Such a
+  binary now travels as base64 under its own `"b64"` tag; valid UTF-8 keeps `"b"`, so every
+  existing trace still decodes. And `TLA.State.validate!/1` now refuses a bitstring that is
+  not whole bytes (`<<1::3>>`), which the wire format has no form for — what `validate!`
+  admits and what `Json.encode` encodes are the same set.
+
 - **The verification ledger now model-checks temporal properties** (#234, closes #191). The
   ledger ran the checker with `check_liveness: false`, then wrote `checked` in the `:temporal`
   rows anyway — every temporal property in `TLA_COVERAGE.md` was labelled verified on the

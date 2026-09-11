@@ -466,10 +466,14 @@ A spec variable's value MUST be deterministically serializable, because state id
 is a hash of that value (`01-foundation.md` §`TLA.Fingerprint`). Permitted: atoms,
 integers, binaries, tuples, lists, maps, `MapSet`s, and structs built from those.
 
-**Forbidden in spec state:** pids, references, ports, funs, and floats. The first four
-have no stable identity across runs; floats introduce `-0.0`/`NaN` comparison hazards
-that make two "equal" states hash differently. Assigning one is a runtime error from
-the checker naming the variable, not a silent mis-fingerprint.
+**Forbidden in spec state:** pids, references, ports, funs, floats, and bitstrings that
+are not a whole number of bytes. The first four have no stable identity across runs;
+floats introduce `-0.0`/`NaN` comparison hazards that make two "equal" states hash
+differently; a bitstring such as `<<1::3>>` has no JSON form (`TLA.State.Json` carries
+bytes), so admitting it would let a violation the search found be lost when the report
+is written. A binary need not be valid UTF-8 — `<<255, 0>>` is a permitted term, and the
+wire format carries it as base64 under its own tag. Assigning a forbidden term is a
+runtime error from the checker naming the variable, not a silent mis-fingerprint.
 
 **When the check runs:** once per distinct state, as the state enters the state graph,
 and before anything else in the checker looks at it. Not once per transition into it —
