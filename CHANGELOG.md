@@ -56,6 +56,15 @@ release it merely follows.
   §1.2 forbids outside `init`/`action` at any depth. The walk is now the whole expression,
   from the one function both paths share.
 
+- **A constants config key naming no constant is refused, not dropped** (#236, closes
+  #193). `config :extla, Spec, constants: %{maxx: 100}` against `constant :max, default: 3`
+  resolved to `%{max: 3, maxx: 100}`: the override the author wrote was read by nothing,
+  the run used the default, and nothing said so. It is the selection defect of #166 through
+  the one door that fix did not cover. `Spec.Compiled.resolve_constants/1` now raises,
+  naming the key and the declared constants — in the resolver rather than at a call site,
+  because `mix tla.check`, `mix tla.simulate`, Layer 3 conformance, the guides and the
+  ledger all resolve there and each would otherwise need the rule separately.
+
 - **Two tests that could not fail, and the guard for the class** (#175). The test named "one
   restricted to a callback is not checked in the others" did not discriminate on `callbacks:`
   at all — making the restriction a no-op left it green. Its apparent discrimination came from

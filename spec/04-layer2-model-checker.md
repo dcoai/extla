@@ -1354,6 +1354,12 @@ defmodule Mix.Tasks.Tla.Check do
   2. `constant :accounts, default: MapSet.new([...])` beside the declaration
 
   A constant with neither is an error naming both places it could be supplied.
+  A configured key the spec does not declare is also an error, naming the key
+  and the declared constants: `constants: %{maxx: 100}` against `constant :max`
+  would otherwise be merged in, read by nothing, and the run would proceed on
+  the default while the config said something else. The rule lives in the
+  resolver every path shares -- the task, `mix tla.simulate`, Layer 3
+  conformance, the ledger -- so none of them can drop a name the others refuse.
   The `default:` form is the one that needs no second file, and
   `TLA.ModelChecker.run/2` ignores it entirely -- a test that passes its own
   constants is unaffected by what the task would have used.
