@@ -177,6 +177,15 @@ defmodule TLA.Spec.Compiled do
   checking resolve constants HERE rather than each their own way: a specification model
   checked with one assignment and an implementation checked against another are two
   different specifications, and a verdict from each is not a verdict about the same thing.
+
+  A configured key the spec does not declare **raises** rather than being merged and
+  ignored. `constants: %{maxx: 100}` against `constant :max, default: 3` used to resolve
+  to `%{max: 3, maxx: 100}`: the override the author wrote was dropped, the run used the
+  default, and nothing said so (#193) — the same defect as a selection naming a
+  declaration that does not exist, through the one door that fix did not cover. It is a
+  raise and not a second `{:error, _}` shape because a missing assignment is a legitimate
+  state of a spec (one meant to be configured per run), while a key naming nothing is a
+  defect in the configuration, and every caller should refuse it the same way.
   """
   def resolve_constants(%__MODULE__{} = spec) do
     configured =
@@ -185,12 +194,31 @@ defmodule TLA.Spec.Compiled do
       |> Keyword.get(:constants, %{})
       |> Map.new()
 
+    declared = constant_names(spec)
+    reject_undeclared!(spec, Map.keys(configured) -- declared, declared)
+
     constants = Map.merge(default_constants(spec), configured)
 
-    case constant_names(spec) -- Map.keys(constants) do
+    case declared -- Map.keys(constants) do
       [] -> {:ok, constants}
       missing -> {:error, missing}
     end
+  end
+
+  defp reject_undeclared!(_spec, [], _declared), do: :ok
+
+  defp reject_undeclared!(spec, undeclared, declared) do
+    raise ArgumentError, """
+    config for #{inspect(spec.module)} assigns #{Enum.map_join(undeclared, ", ", &inspect/1)}, \
+    which the spec does not declare as a constant.
+
+    Declared: #{declared |> Enum.sort() |> Enum.map_join(", ", &inspect/1)}.
+
+    An assignment to a name the spec does not have is read by nothing: the run would
+    proceed on the declared default, or refuse for want of an assignment, while the config
+    says otherwise. Check the spelling in
+    `config :extla, #{inspect(spec.module)}, constants: %{…}`.
+    """
   end
 
   @doc """
