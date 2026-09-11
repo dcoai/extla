@@ -65,6 +65,27 @@ release it merely follows.
   because `mix tla.check`, `mix tla.simulate`, Layer 3 conformance, the guides and the
   ledger all resolve there and each would otherwise need the rule separately.
 
+- **The module version now moves on every declaration, not only the items** (#237, closes
+  #194). Changing an `init` value, a variable's `type:`, a constant's `default:`, or weak to
+  strong fairness produced the *identical* `spec_version`; only an action-body edit moved
+  it. So a stamp — whose error message asks the author to "confirm that each variable and
+  action it names still means what it did" — stayed fresh across a new variable the mapping's
+  `abstract/1` could not produce, and the ledger's `Fresh` column with it. The reasoning in
+  the code ("not independently verified, so there is nothing for a verdict to go stale
+  against") mistook what the number is for: a stamp names the *specification*, not a verdict.
+
+  `fairness` is included, and it was the one to argue: it changes liveness verdicts and
+  nothing a mapping reads. But one number names one specification, and a spec under strong
+  fairness admits different behaviours from the same spec under weak; a second
+  "liveness-relevant" version would be a second stamp nobody maintains.
+
+  Found on the way: `mix tla.stamp` derived the module version by its own copy of the
+  formula, so widening it in `TLA.Spec.Hash` alone would have made every stamp stale in the
+  task while the compile-time check called it fresh. Both now call
+  `Hash.module_version/2`. The one live stamp in the corpus is regenerated; a test enumerates
+  the DSL's macros against `kinds/0 ++ declarations/0`, so a declaration added to the DSL and
+  to neither is a failing test, not a blind spot.
+
 - **Two tests that could not fail, and the guard for the class** (#175). The test named "one
   restricted to a callback is not checked in the others" did not discriminate on `callbacks:`
   at all — making the restriction a no-op left it green. Its apparent discrimination came from

@@ -1236,6 +1236,20 @@ compile error's message — "an error message offering a one-key fix trains peop
 fix, and a stamp applied without reading is worse than no stamp, because it manufactures
 assurance."
 
+**What the version covers.** The module version is one number naming one specification, so
+it is computed over **every** declaration the DSL has — `variable`, `constant`, `init` and
+`fairness` as well as the item kinds (`action`, `invariant`, `temporal`, `action_property`,
+`terminal`). An earlier version hashed the items alone, so changing an `init` value, a
+constant's `default:`, a variable's `type:` or the fairness kind left the version unmoved
+and a stamp fresh across a change to the reachable set it was a claim about. `fairness` is
+in deliberately: it moves liveness verdicts and nothing a mapping reads, but a spec under
+strong fairness admits a different set of behaviours from the same spec under weak, and a
+"mapping-relevant" version distinct from a "liveness-relevant" one would be two stamps
+where the second is maintained by nobody. The compile-time check and `mix tla.stamp`
+compute the version from **one** function, `TLA.Spec.Hash.module_version/2`; a version the
+two derive separately is not a version. Not covered: `@moduledoc`, `use TLA.Spec`, and
+ordinary `def`s in the module, so a documentation edit does not restamp every mapping.
+
 > The stamp mechanism itself — the `spec_version:` option, `TLA.Spec.Hash`, and the
 > compile-time check — is otherwise unspecified. This section covers the task's surface so it
 > is gated against drift; the feature's semantics need their own section, which is tracked
