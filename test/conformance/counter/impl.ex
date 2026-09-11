@@ -24,7 +24,7 @@ defmodule TLA.Conformance.Counter.Impl do
     use TLA.GenServer,
       spec: TLA.Conformance.Counter.Spec,
       refinement: TLA.Conformance.Counter.Refinement,
-      spec_version: "a5b5d168"
+      spec_version: "0ad20b7a"
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 

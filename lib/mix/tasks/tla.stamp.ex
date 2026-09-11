@@ -164,17 +164,14 @@ defmodule Mix.Tasks.Tla.Stamp do
     Map.merge(mapping, %{current: current, status: status})
   end
 
+  # The one formula, from `TLA.Spec.Hash` — this used to re-derive it from `Hash.scan/2`, so
+  # widening what the version covers (#194) in one place would have made every stamp stale in
+  # the other. A version the compile-time check and this task compute differently is not a
+  # version.
   defp current_version(spec, index) do
-    with path when is_binary(path) <- Map.get(index, spec),
-         versions when versions != %{} <- Hash.scan(File.read!(path), spec) do
-      versions
-      |> Enum.sort()
-      |> Enum.map_join("\n", fn {{kind, name}, version} -> "#{kind} #{name} #{version}" end)
-      |> then(&:crypto.hash(:sha256, &1))
-      |> Base.encode16(case: :lower)
-      |> binary_part(0, 8)
-    else
-      _ -> nil
+    case Map.get(index, spec) do
+      path when is_binary(path) -> Hash.module_version(File.read!(path), spec)
+      nil -> nil
     end
   end
 

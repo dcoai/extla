@@ -34,9 +34,12 @@ defmodule TLA.Spec.Version do
   them would couple two questions that need opposite sensitivities.
   """
 
-  # The DSL macros that declare a versionable item. `variable`, `constant`, `init` and
-  # `fairness` are deliberately absent: they are not independently verified, so there is
-  # nothing for a verdict to go stale against.
+  # The DSL macros that declare an ITEM: something with a verdict of its own, and so a ledger
+  # row. `variable`, `constant`, `init` and `fairness` are not items — but they are part of
+  # the MODULE version `TLA.Spec.Hash.module_version/1` computes, because each changes what
+  # the spec means (#194). An earlier comment here said there was "nothing for a verdict to
+  # go stale against"; that was wrong for `init` and `constant … default:`, which change
+  # the reachable set every invariant verdict is about.
   @kinds ~w(action invariant temporal action_property terminal)a
 
   @typedoc "A spec item's identity within its module."

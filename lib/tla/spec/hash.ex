@@ -35,7 +35,17 @@ defmodule TLA.Spec.Hash do
   the mechanism.
   """
 
+  # The item kinds: declarations that carry a verdict of their own, so each is a ledger row
+  # and each has a stated route to TLC in the differential corpus.
   @kinds ~w(action invariant temporal action_property terminal)a
+
+  # The other declarations. None has a verdict, so none is a row — but every one of them
+  # changes what the spec MEANS, and so every one is part of the module version (#194).
+  # `init` and `constant … default:` change the reachable set every invariant verdict is
+  # about; a `variable`'s `type:` changes what the type check admits; `fairness` changes
+  # which behaviours count, and with them every liveness verdict.
+  @named_declarations ~w(variable constant)a
+  @anonymous_declarations ~w(init fairness)a
   @block_keywords [:do, :else, :end, :catch, :rescue, :after]
 
   @typedoc "A spec item's identity within its module."
@@ -97,34 +107,107 @@ defmodule TLA.Spec.Hash do
   end
 
   @doc """
-  The version of `module` as a whole: 8 hex over its items' versions, in name order.
+  The version of `module` as a whole: 8 hex over every declaration it makes.
 
   This is what a refinement mapping stamps. A mapping is written against the spec's variables
   and actions *together*, so the question it must answer is "has anything I depended on
   moved", not "has this one action moved" — and a per-item stamp on a mapping would be a list
   nobody maintains.
 
-  Derived from the item versions rather than the file's bytes, so it inherits their
+  ## Every declaration, not only the items
+
+  The first version hashed the item kinds alone, on the reasoning that `variable`, `constant`,
+  `init` and `fairness` are "not independently verified, so there is nothing for a verdict to
+  go stale against". That was wrong about what the number is for (#194). A stamp does not
+  name a verdict; it names *the specification* somebody re-read a mapping against, and
+  changing an `init` value, a `constant`'s default or a variable's `type:` produced the
+  identical version — so a mapping stayed fresh across a new variable its `abstract/1` could
+  not produce, which is the exact staleness the stamp exists to catch.
+
+  `fairness` is in for the same reason, and it was the one worth arguing: it changes liveness
+  verdicts and nothing a mapping reads. But the version is one number naming one
+  specification, and a spec under strong fairness admits a different set of behaviours from
+  the same spec under weak. Keeping fairness out would mean a "mapping-relevant" version
+  distinct from a "liveness-relevant" one — two stamps, where the second would be maintained
+  by nobody — and the ledger's `Fresh` column, which sits beside temporal rows, rests on this
+  same number.
+
+  What is *not* in: `@moduledoc`, `@doc`, `use TLA.Spec`, and any ordinary `def` in the
+  module. A helper function called from an action body would change meaning without moving
+  the version; no spec in the project has one, and hashing the whole module body instead
+  would restamp every mapping on a documentation edit, which teaches authors to restamp
+  without reading.
+
+  Derived from declaration hashes rather than the file's bytes, so it inherits their
   position-insensitivity: reformatting a spec does not invalidate every mapping written against
   it. Returns `nil` when the spec's source is not on disk.
   """
   def module_version(module) do
-    case item_versions(module) do
-      empty when empty == %{} ->
+    case source(module) do
+      nil -> nil
+      path -> path |> File.read!() |> module_version(module)
+    end
+  end
+
+  @doc """
+  The version of `module` as declared in `source`, or `nil` when `source` does not define it.
+
+  `Mix.Tasks.Tla.Stamp` reads specs from disk by path rather than through the loaded module,
+  and used to derive the version by its own copy of the formula. One formula, here, is what
+  keeps the compile-time check and the stamp task from disagreeing about a spec's version.
+  """
+  def module_version(source, module) when is_binary(source) do
+    case source |> Code.string_to_quoted!() |> module_body(Module.split(module), []) do
+      nil ->
         nil
 
-      versions ->
-        versions
+      body ->
+        body
+        |> declaration_lines()
         |> Enum.sort()
-        |> Enum.map_join("\n", fn {{kind, name}, version} -> "#{kind} #{name} #{version}" end)
+        |> Enum.join("\n")
         |> then(&:crypto.hash(:sha256, &1))
         |> Base.encode16(case: :lower)
         |> binary_part(0, 8)
     end
   end
 
-  @doc "The kinds of item that carry a version."
+  # One line per declaration, sorted by the caller. Items and named declarations carry their
+  # name; `init` and `fairness` have none, and a spec may declare `fairness(:weak, …)` more
+  # than once, which is why this is a list of lines and not a map keyed by identity.
+  defp declaration_lines(body) do
+    {_, lines} =
+      Macro.prewalk(body, [], fn
+        {kind, _meta, [name | _]} = node, acc
+        when kind in @kinds and is_atom(name) and name not in @block_keywords ->
+          {node, ["#{kind} #{name} #{definition_hash(node)}" | acc]}
+
+        {kind, _meta, [name | _]} = node, acc
+        when kind in @named_declarations and is_atom(name) and name not in @block_keywords ->
+          {node, ["#{kind} #{name} #{definition_hash(node)}" | acc]}
+
+        {kind, _meta, args} = node, acc
+        when kind in @anonymous_declarations and is_list(args) ->
+          {node, ["#{kind} #{definition_hash(node)}" | acc]}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    lines
+  end
+
+  @doc "The kinds of item that carry a version of their own — the ledger's rows."
   def kinds, do: @kinds
+
+  @doc """
+  The declarations that carry no verdict but are part of the module version.
+
+  Together with `kinds/0`, every declaration form the DSL has. A macro added to the DSL and
+  to neither list would leave the module version blind to it, which is the defect #194
+  closed; `TLA.Spec.HashTest` compares the union against the DSL's own macros.
+  """
+  def declarations, do: @named_declarations ++ @anonymous_declarations
 
   defp scan_ast(ast) do
     {_, items} =
