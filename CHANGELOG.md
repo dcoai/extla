@@ -16,6 +16,22 @@ release it merely follows.
 
 ### Fixed
 
+- **Two tests that could not fail, and the guard for the class** (#175). The test named "one
+  restricted to a callback is not checked in the others" did not discriminate on `callbacks:`
+  at all — making the restriction a no-op left it green. Its apparent discrimination came from
+  declaration *order*: the unrestricted invariant was declared first and raised first, so the
+  restricted one never got a chance either way. The new test declares the restricted one
+  first, so honouring the option and ignoring it report different violations.
+
+  And **nothing in the repository read `.gitlab-ci.yml`**. No test asserted that the set of
+  jobs covers the test tree, so a directory reached by no job was undetectable by
+  construction. There is now one that fails when a directory is unreachable.
+
+  Worth stating precisely, because the obvious claim would be wrong: this does *not* catch the
+  guide slug cross-check that has never run. That test **is** run by the `test` job; its
+  problem is that it needs a built `doc/` and only another job builds one. A coverage check
+  cannot see "needs an artifact another job produces". #156 fixes that one by moving it.
+
 - **A found violation could be discarded, and a skipped liveness pass said nothing** (#167).
   Four defects in the step that turns a completed search into a reported verdict.
 
