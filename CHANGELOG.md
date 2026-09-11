@@ -86,6 +86,15 @@ release it merely follows.
   the DSL's macros against `kinds/0 ++ declarations/0`, so a declaration added to the DSL and
   to neither is a failing test, not a blind spot.
 
+- **A temporal quantifier named after a state variable is a compile error, not a silent
+  misread** (#238, closes #195). With `variable :p` declared, `Enum.all?(^procs, fn p ->
+  eventually(pc[p] == :b) end)` compiled — and the body's `p` resolved to the *state
+  variable* in every instance, because the rewriter consults declared variables before bound
+  names. The instance for `p = 2` came out true on a state where `pc[2]` was wrong, and the
+  only mark was a compiler "unused variable" warning. §1.3's rule that a `let` may shadow
+  nothing was always a rule about what a bare name means; it now applies to every binder,
+  and the quantifier gets the same diagnostic, naming both the local and the declaration.
+
 - **Two tests that could not fail, and the guard for the class** (#175). The test named "one
   restricted to a callback is not checked in the others" did not discriminate on `callbacks:`
   at all — making the restriction a no-op left it green. Its apparent discrimination came from

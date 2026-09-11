@@ -79,7 +79,10 @@ end
 ```
 
 `let` accepts any Elixir pattern. Locals may shadow nothing: `let` binding a name that
-is a declared variable or constant is a compile error.
+is a declared variable or constant is a compile error. The rule is about what a bare name
+*means*, not about `let`, so it applies to every binder a spec block has — the `fn x ->`
+of a temporal quantifier (§5.1) included. Without it the quantifier body's `x` resolved to
+the state variable of that name in every instance, and the bound value was never read.
 
 ### 1.4 Reserved names
 
@@ -490,7 +493,7 @@ not compile.
 | `variable assigned twice` | Two assignments to one variable in one action (§2) |
 | `assignment in invariant/temporal` | `=` on a declared variable anywhere outside `init`/`action` — nested under `always`, `and`, a call, or at the top level; the walk is the whole expression, since §1.2 leaves no legitimate nested case |
 | `bare variable in action_property` | §4 |
-| `let shadows a declared name` | §1.3 |
+| `let shadows a declared name` | §1.3 — and the same diagnostic for a temporal quantifier (`Enum.all?(^c, fn x -> …)`) whose `x` is a declared variable or constant |
 | `unknown action in fairness` | `fairness :weak, [:typo]` |
 | `fairness over a state-drawn param` | `fairness :weak, complete_transfer: [:t]` where `t` draws from a state function (§5.2) |
 | `fairness params not a prefix` | The per-binding params are not a leading prefix of the action's params (§5.2) |

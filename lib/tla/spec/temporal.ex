@@ -90,6 +90,10 @@ defmodule TLA.Spec.Temporal do
       )
     end
 
+    # The rewriter resolves a declared variable before a bound name, so a quantifier named
+    # after one would read the state variable in every instance and never the bound value.
+    Block.check_no_shadow!({var, meta, var_ctx}, meta, ctx, "the quantifier")
+
     inner_ctx = %{ctx | bound: MapSet.put(ctx.bound, var)}
     set_expr = Rewriter.rewrite(set, %{inner_ctx | read: :init})
     quantified = Macro.var(var, nil)
