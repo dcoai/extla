@@ -339,6 +339,65 @@ defmodule TLA.Spec.DiagnosticsTest do
       assert temporal =~ hint
     end
 
+    # #192. The check above stopped at the statement level, so it caught `temporal :t do
+    # x = 1 end` — the one shape nobody writes — and not `always(x = 1)`, which compiled
+    # and reported that the property holds. `=` on a declared variable is forbidden
+    # everywhere outside `init`/`action`, nested or not, so the walk goes all the way down.
+    test "an assignment nested under a temporal operator is refused" do
+      for formula <- ["always(x = 1)", "eventually(x = 1)", "(x == 0) ~> (x = 1)"] do
+        error =
+          refuse("""
+          variable :x
+          init do
+            x = 0
+          end
+          action :bump do
+            x = x + 1
+          end
+          temporal :t do
+            #{formula}
+          end
+          """)
+
+        assert error =~ "assignment to variable :x outside `init`/`action`", formula
+        assert error =~ "temporal :t", formula
+      end
+    end
+
+    test "an assignment nested inside an invariant's expression is refused" do
+      error =
+        refuse("""
+        variable :n
+        variable :status
+        init do
+          n = 0
+          status = :idle
+        end
+        invariant :i do
+          n >= 0 and (status = :done)
+        end
+        """)
+
+      assert error =~ "assignment to variable :status outside `init`/`action`"
+      assert error =~ "invariant :i"
+    end
+
+    test "a let that shadows a declared variable is still reported as shadowing" do
+      error =
+        refuse("""
+        variable :n
+        init do
+          n = 0
+        end
+        invariant :i do
+          let n = 1
+          n > 0
+        end
+        """)
+
+      refute error =~ "assignment to variable"
+    end
+
     test "a bare variable in an action_property names old. and new." do
       error =
         refuse("""

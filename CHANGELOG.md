@@ -14,6 +14,19 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Changed
+
+- **A predicate that returns a non-boolean is refused, not counted as holding** (#235,
+  closes #192). Every consumer of an `invariant`, `terminal`, `action_property` or temporal
+  state predicate tested its result for truthiness. Elixir's `and`/`or` return their last
+  operand, so `invariant :i do n >= 0 and status end` evaluated to `status` and *held* in
+  every state where `status` was anything but `nil` or `false` — a run in which it never
+  took the value the author meant reported `:ok`. The compiled predicate now raises
+  `TLA.Spec.PredicateError`, naming the declaration and the value, wherever it is
+  evaluated: the checker, trace replay, coverage, and the ledger. A spec that relied on a
+  truthy return passed before and fails loudly now; that is the intended change, and the
+  fix is the comparison that was missing.
+
 ### Fixed
 
 - **The verification ledger now model-checks temporal properties** (#234, closes #191). The
@@ -32,6 +45,16 @@ release it merely follows.
   `IdlingUnfair.eventually_two` and `Stalls.eventually_done`, each a property the fixture
   *intends* to fail. The cost is a ledger run of ~35s instead of ~15s, measured; that is what
   actually checking costs, and the alternative was a column that meant nothing.
+
+- **`always(x = 1)` is now the compile error `x = 1` already was** (#235, closes #192). The
+  #150 fix rejected an assignment to a declared variable only when it was a whole statement
+  of the block. In a temporal the top level is nearly always `always`, `eventually` or `~>`,
+  so the check fired for the one shape nobody writes and `always(status = :done)` compiled
+  into a formula the checker reported as holding. `invariant :i do n >= 0 and (status =
+  :done) end` compiled too. The rationale for stopping — that a nested `=` is legal Elixir an
+  author might mean — was wrong: the check fires only for `=` on a *declared* variable, which
+  §1.2 forbids outside `init`/`action` at any depth. The walk is now the whole expression,
+  from the one function both paths share.
 
 - **Two tests that could not fail, and the guard for the class** (#175). The test named "one
   restricted to a callback is not checked in the others" did not discriminate on `callbacks:`

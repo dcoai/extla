@@ -274,7 +274,12 @@ defmodule TLA.Spec.DSL do
         extra_bound: MapSet.new([:old, :new])
       })
 
-    body = block |> Block.desugar_predicate!(ctx) |> Rewriter.rewrite(ctx)
+    body =
+      block
+      |> Block.desugar_predicate!(ctx)
+      |> Rewriter.rewrite(ctx)
+      |> Block.boolean!(caller.module, "action_property #{inspect(name)}")
+
     fun = :"__tla_action_property_#{name}__"
 
     put(caller, :tla_action_properties, %{
@@ -418,7 +423,12 @@ defmodule TLA.Spec.DSL do
       })
 
     desugared = Block.desugar_predicate!(block, ctx)
-    body = Rewriter.rewrite(desugared, ctx)
+
+    body =
+      desugared
+      |> Rewriter.rewrite(ctx)
+      |> Block.boolean!(caller.module, "#{kind} #{inspect(name)}")
+
     fun = :"__tla_#{kind}_#{name}__"
 
     near_miss = if kind == "invariant", do: Block.near_miss(desugared)

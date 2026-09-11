@@ -336,13 +336,19 @@ defmodule TLA.Spec.Block do
   "the post-state". In a predicate there is no post-state for it to mean.
   """
   def desugar_predicate!(block, ctx) do
-    block
-    |> statements()
-    |> Enum.map(&desugar_statement!(&1, ctx))
-    |> case do
-      [single] -> single
-      many -> {:__block__, [], many}
-    end
+    desugared =
+      block
+      |> statements()
+      |> Enum.map(&desugar_statement!(&1, ctx))
+      |> case do
+        [single] -> single
+        many -> {:__block__, [], many}
+      end
+
+    # After desugaring, so a `let` that shadows a declared variable is reported as
+    # shadowing by `check_no_shadow!/3` rather than as an assignment by this.
+    reject_assignment!(desugared, ctx)
+    desugared
   end
 
   defp desugar_statement!({:let, meta, [{:=, _, [pattern, rhs]}]}, ctx) do
@@ -356,12 +362,28 @@ defmodule TLA.Spec.Block do
     )
   end
 
-  defp desugar_statement!({:=, _meta, _args} = statement, ctx) do
-    reject_assignment!(statement, ctx)
-    statement
-  end
-
   defp desugar_statement!(statement, _ctx), do: statement
+
+  @doc """
+  Wrap a compiled predicate body so a non-boolean result is refused at run time.
+
+  Elixir's `and`/`or` return their last operand, so `n >= 0 and status`
+  evaluates to `status`. Every consumer of a predicate used to test the result
+  for truthiness, so that predicate counted as holding whenever `status` was
+  anything but `nil` or `false` — a run in which it never took the value the
+  author had in mind reported `:ok` (#192). Wrapping the body once, here, gives
+  the checker, trace replay, coverage and the ledger the same refusal without
+  each of them re-deriving it; see `TLA.Spec.PredicateError`.
+  """
+  def boolean!(body, module, declaration) do
+    quote generated: true do
+      TLA.Spec.PredicateError.boolean!(
+        unquote(body),
+        unquote(module),
+        unquote(declaration)
+      )
+    end
+  end
 
   @doc """
   Reject `=` on a declared variable, where there is no post-state for it to mean.
@@ -386,31 +408,37 @@ defmodule TLA.Spec.Block do
   Returns `:ok`, or raises `TLA.Spec.CompileError`. Anything that is not an
   assignment to a declared variable passes through.
 
-  ## Scope, and what is deliberately not checked
+  ## Scope
 
-  This walks the statements a block is made of, not the expressions inside
-  them — so `always(status = :done)` is not caught, in a `temporal` or in an
-  `invariant`. That limit is shared by both paths rather than differing between
-  them, which is the property that matters here: the two forms now agree about
-  what the rule is. Widening it to a full prewalk is a separate decision, since
-  `=` nested inside a call is legal Elixir that a spec author could conceivably
-  mean.
+  The whole expression is walked, not just its top-level statements. The first
+  version stopped at the statement level, which caught `temporal :t do x = 1 end`
+  and nothing else — in a temporal the top level is nearly always `always`,
+  `eventually` or `~>`, so `always(x = 1)` compiled and reported that the
+  property holds (#192). The reason given for stopping there was that a nested
+  `=` is legal Elixir an author could mean; but the check fires only for `=` on a
+  *declared variable*, which §1.2 forbids everywhere outside `init`/`action`,
+  nested or not. There is no legitimate case the walk could reject.
   """
-  def reject_assignment!({:=, meta, [{name, _, var_ctx}, _rhs]}, ctx)
-      when is_atom(name) and is_atom(var_ctx) do
-    if MapSet.member?(ctx.variables, name) do
-      bad!(ctx, meta, "assignment to variable #{inspect(name)} outside `init`/`action`",
-        hint:
-          "`=` on a declared variable means \"the post-state\", and there is no post-state " <>
-            "here (02-dsl-semantics.md §1.2). For an intermediate value write " <>
-            "`let #{name} = …`."
-      )
-    end
+  def reject_assignment!(ast, ctx) do
+    Macro.prewalk(ast, fn
+      {:=, meta, [{name, _, var_ctx}, _rhs]} = node when is_atom(name) and is_atom(var_ctx) ->
+        if MapSet.member?(ctx.variables, name) do
+          bad!(ctx, meta, "assignment to variable #{inspect(name)} outside `init`/`action`",
+            hint:
+              "`=` on a declared variable means \"the post-state\", and there is no post-state " <>
+                "here (02-dsl-semantics.md §1.2). For a comparison write `#{name} == …`; " <>
+                "for an intermediate value write `let #{name} = …`."
+          )
+        end
+
+        node
+
+      node ->
+        node
+    end)
 
     :ok
   end
-
-  def reject_assignment!(_statement, _ctx), do: :ok
 
   @doc """
   The near-miss expression of an invariant, or `nil` when there is none.

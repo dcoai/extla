@@ -365,6 +365,17 @@ end
 Inside `temporal`, the operators `always/1`, `eventually/1` and `~>/2` (leads-to) are
 available and compose. Everything else in the block is an ordinary state predicate.
 
+**A predicate is `true` or `false`, and nothing else is accepted.** Elixir's `and`/`or`
+return their last operand, so `n >= 0 and status` evaluates to `status`; a checker that
+tested the result for truthiness would count that as holding whenever `status` was
+anything but `nil` or `false`. Every predicate — `invariant`, `terminal`,
+`action_property`, and each state predicate inside a `temporal` — is compiled with a
+result check, and a non-boolean raises `TLA.Spec.PredicateError` naming the declaration
+and the value. It raises rather than reporting a violation because a predicate that
+returned `:idle` was not violated; it was broken, and a "violation" would send the
+author looking for the wrong bug. The check is on the compiled function, so every
+consumer — the checker, trace replay, coverage, the ledger — gets the same refusal.
+
 ### 5.1 The supported temporal fragment is bounded — say so
 
 ExTLA does **not** implement full LTL. The supported fragment is:
@@ -477,7 +488,7 @@ not compile.
 | `undeclared variable` | `=` assigns, or an expression reads, a name that is not a `variable` |
 | `undeclared constant` | `^name` where no `constant :name` exists |
 | `variable assigned twice` | Two assignments to one variable in one action (§2) |
-| `assignment in invariant/temporal` | `=` on a variable outside `init`/`action` |
+| `assignment in invariant/temporal` | `=` on a declared variable anywhere outside `init`/`action` — nested under `always`, `and`, a call, or at the top level; the walk is the whole expression, since §1.2 leaves no legitimate nested case |
 | `bare variable in action_property` | §4 |
 | `let shadows a declared name` | §1.3 |
 | `unknown action in fairness` | `fairness :weak, [:typo]` |

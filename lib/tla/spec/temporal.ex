@@ -130,7 +130,11 @@ defmodule TLA.Spec.Temporal do
     end
 
     state = Macro.var(:tla_state, __MODULE__)
-    body = Rewriter.rewrite(ast, %{ctx | read: {:state, state}})
+
+    body =
+      ast
+      |> Rewriter.rewrite(%{ctx | read: {:state, state}})
+      |> Block.boolean!(ctx.module, ctx.declaration)
 
     quote do: fn unquote(state) -> unquote(body) end
   end
