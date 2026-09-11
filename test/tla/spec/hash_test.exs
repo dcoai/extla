@@ -2,15 +2,16 @@ defmodule TLA.Spec.HashTest do
   @moduledoc """
   The shipped content hash (#67), and its agreement with surfex.
 
-  ExTLA now has two implementations of one algorithm by design: this one ships from `lib/` so
-  a consumer's compile can check a `spec_version:` stamp, while `TLA.Spec.Version` delegates to
-  `Surfex.SourceScan.definition_hash/1` from dev/test-only `ledger/`. Dev/test dependencies are
-  not transitive, which is what makes that split necessary and what makes it dangerous.
+  The algorithm is `Surfex.SourceScan.definition_hash/1`'s, re-implemented here because this
+  module ships from `lib/` to a consumer's compile and surfex is a dev/test dependency, which
+  is not transitive. Two implementations of one algorithm, by design — and the conformance
+  test below is what makes that safe. If it is ever deleted or excluded from the default run,
+  the decision recorded on #67 is void: two implementations that agree only because both were
+  written from the same paragraph will drift, and the symptom would be a stamp that is wrong
+  for no visible reason.
 
-  **The conformance test below is what makes the duplication safe.** If it is ever deleted or
-  excluded from the default run, the decision recorded on #67 is void: two implementations that
-  agree only because both were written from the same paragraph will drift, and the symptom
-  would be a stamp that is wrong for no visible reason.
+  This is also the ledger's `Version` column (#201): there is no second, ledger-side
+  implementation any more, so the tests that once lived beside one are here.
   """
 
   use ExUnit.Case, async: true
@@ -89,6 +90,106 @@ defmodule TLA.Spec.HashTest do
 
     test "a module with no source on disk has no version" do
       assert Hash.module_version(:erlang) == nil
+    end
+  end
+
+  describe "an item's version" do
+    @sample """
+    defmodule Sample do
+      use TLA.Spec
+
+      variable :n, type: 0..3
+
+      init do
+        n = 0
+      end
+
+      action :tick do
+        require n < 3
+        n = n + 1
+      end
+
+      invariant :in_range do
+        n <= 3
+      end
+    end
+    """
+
+    # The reason position-insensitivity is required rather than merely nice: without it, an
+    # edit at the top of a file restamps every item below it and the ledger reports drift
+    # where there is none.
+    test "editing one item leaves the others alone" do
+      edited = String.replace(@sample, "require n < 3", "require n < 5")
+
+      assert Hash.scan(edited)[{:invariant, :in_range}] ==
+               Hash.scan(@sample)[{:invariant, :in_range}]
+
+      refute Hash.scan(edited)[{:action, :tick}] == Hash.scan(@sample)[{:action, :tick}]
+    end
+
+    test "renaming an item gives the new name a different version" do
+      renamed = String.replace(@sample, "action :tick do", "action :tock do")
+
+      refute Hash.scan(renamed)[{:action, :tock}] == Hash.scan(@sample)[{:action, :tick}]
+    end
+
+    test "two items with identical bodies but different names differ" do
+      source = """
+      defmodule Twins do
+        use TLA.Spec
+        action :left do
+          n = n + 1
+        end
+        action :right do
+          n = n + 1
+        end
+      end
+      """
+
+      versions = Hash.scan(source)
+
+      refute versions[{:action, :left}] == versions[{:action, :right}]
+    end
+
+    # #201. The ledger's versions came from a scan of the whole FILE keyed by `{kind, name}`,
+    # so two modules in one file that both declare `tick` — `test/support/specs.ex` has seven
+    # — collapsed onto the last one's hash. Editing `Broken.tick` moved nothing; editing the
+    # last `tick` in the file moved seven rows. The golden was stable while wrong.
+    test "same-named items in different modules of one file have their own versions" do
+      source = """
+      defmodule Neighbours.First do
+        use TLA.Spec
+        action :tick do
+          n = n + 1
+        end
+      end
+
+      defmodule Neighbours.Second do
+        use TLA.Spec
+        action :tick do
+          n = n + 2
+        end
+      end
+      """
+
+      first = Hash.scan(source, Neighbours.First)[{:action, :tick}]
+      second = Hash.scan(source, Neighbours.Second)[{:action, :tick}]
+
+      refute first == second
+      assert first == Hash.definition_hash("action :tick do\n  n = n + 1\nend")
+    end
+
+    test "item_versions/1 reads the module's own source, scoped to the module" do
+      versions = Hash.item_versions(TLA.TestSpecs.Broken)
+
+      assert versions[{:action, :tick}] =~ ~r/^[0-9a-f]{8}$/
+
+      refute versions[{:action, :tick}] ==
+               Hash.item_versions(TLA.TestSpecs.Unbounded)[{:action, :tick}]
+    end
+
+    test "a module with no source on disk yields no versions rather than raising" do
+      assert Hash.item_versions(:erlang) == %{}
     end
   end
 

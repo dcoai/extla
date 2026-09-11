@@ -94,7 +94,7 @@ defmodule TLA.Ledger do
   defp section(module, freshness) do
     fresh = Map.get(freshness, module, :unstamped)
     spec = Spec.Compiled.from_module(module)
-    versions = TLA.Spec.Version.versions(module)
+    versions = TLA.Spec.Hash.item_versions(module)
 
     case Spec.Compiled.resolve_constants(spec) do
       {:ok, constants} ->
