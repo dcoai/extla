@@ -99,8 +99,11 @@ defmodule TLA.Ledger do
     case Spec.Compiled.resolve_constants(spec) do
       {:ok, constants} ->
         case check(spec, constants) do
-          {:ok, coverage} -> checked(module, spec, versions, coverage, fresh)
-          {:exit, reason} -> errored(module, spec, versions, reason, fresh)
+          {:ok, coverage, temporals} ->
+            checked(module, spec, versions, coverage, temporals, fresh)
+
+          {:exit, reason} ->
+            errored(module, spec, versions, reason, fresh)
         end
 
       {:error, missing} ->
@@ -128,20 +131,65 @@ defmodule TLA.Ledger do
 
     {pid, ref} =
       spawn_monitor(fn ->
-        send(
-          parent,
-          {:ledger_coverage, self(), ModelChecker.run(spec, %{constants: constants}).coverage}
-        )
+        coverage = ModelChecker.run(spec, %{constants: constants}).coverage
+        send(parent, {:ledger_coverage, self(), coverage, temporal_verdicts(spec, constants)})
       end)
 
     receive do
-      {:ledger_coverage, ^pid, coverage} ->
+      {:ledger_coverage, ^pid, coverage, temporals} ->
         Process.demonitor(ref, [:flush])
-        {:ok, coverage}
+        {:ok, coverage, temporals}
 
       {:DOWN, ^ref, :process, ^pid, reason} ->
         {:exit, reason}
     end
+  end
+
+  # One liveness run PER temporal property, because the checker halts at the first refutation
+  # and a single run therefore cannot say which of several properties it evaluated (#191).
+  #
+  # This ledger used to run once, without `check_liveness: true`, and then write
+  # `model_checked … checked` beside every temporal not marked vacuous. Eleven rows carried that
+  # claim from a run that never asked the question, and one of them -- `IdlingUnfair`'s
+  # `eventually_two` -- is REFUTED under liveness. The document's own prose names this as the
+  # precise lie it exists to prevent, and its drift gate protected a golden that was stable
+  # while wrong: the gate ensures the golden matches the generator, and says nothing about
+  # whether the generator is right.
+  #
+  # Selecting one temporal per run uses the `temporals:` selection, which since #185 refuses a
+  # name that matches nothing -- so a renamed property cannot silently drop out of the ledger.
+  # Safety is not re-run: `invariants: []` and `action_properties: []` leave only the graph
+  # build and the one liveness question. The cost is one graph per temporal per spec, measured
+  # against the corpus before this landed and recorded on #234.
+  defp temporal_verdicts(spec, constants) do
+    Map.new(spec.temporals, fn %{name: name} ->
+      result =
+        ModelChecker.run(spec, %{
+          constants: constants,
+          check_liveness: true,
+          invariants: [],
+          action_properties: [],
+          temporals: [name]
+        })
+
+      {name, temporal_verdict(result, name)}
+    end)
+  end
+
+  defp temporal_verdict(%{status: :ok}, _name), do: :checked
+
+  defp temporal_verdict(%{status: :violation, violation: %{prefix: %{property: name}}}, name),
+    do: :refuted
+
+  # A safety violation or a deadlock halts before liveness runs; the run says so in its warnings
+  # (#186), and this ledger carries that forward rather than reading it as a pass.
+  defp temporal_verdict(%{warnings: warnings, status: status}, _name) do
+    reason =
+      Enum.find_value(warnings, "#{status} before liveness ran", fn w ->
+        if w =~ "not checked", do: w
+      end)
+
+    {:not_evaluated, reason}
   end
 
   # A spec whose check raised. Every item is listed with NOTHING: nothing was verified, and
@@ -175,7 +223,7 @@ defmodule TLA.Ledger do
   defp describe({reason, _stacktrace}) when is_atom(reason), do: inspect(reason)
   defp describe(_), do: "unknown"
 
-  defp checked(module, spec, versions, coverage, fresh) do
+  defp checked(module, spec, versions, coverage, temporals, fresh) do
     bounded? = coverage.bounded_by != :none
     vacuous = MapSet.new(coverage.vacuous, & &1.property)
 
@@ -188,7 +236,7 @@ defmodule TLA.Ledger do
       bounded_by: coverage.bounded_by,
       rows:
         Enum.map(items(spec), fn {kind, name} ->
-          {evidence, exercised} = verdict(kind, name, coverage, vacuous)
+          {evidence, exercised} = verdict(kind, name, coverage, vacuous, temporals)
 
           %{
             kind: kind,
@@ -237,7 +285,7 @@ defmodule TLA.Ledger do
   # An action never enabled, or a property that held vacuously, was not verified — it was
   # merely present while a check ran. Calling that `model_checked` is the precise lie this
   # ledger exists to prevent.
-  defp verdict(:action, name, coverage, _vacuous) do
+  defp verdict(:action, name, coverage, _vacuous, _temporals) do
     if name in coverage.never_enabled do
       {:nothing, "never enabled"}
     else
@@ -248,7 +296,7 @@ defmodule TLA.Ledger do
     end
   end
 
-  defp verdict(:invariant, name, coverage, _vacuous) do
+  defp verdict(:invariant, name, coverage, _vacuous, _temporals) do
     case Map.get(coverage.invariants, name) do
       # `nil` near-misses is "not measured", which is a different fact from zero: zero is a
       # finding, and not having looked is not.
@@ -258,8 +306,28 @@ defmodule TLA.Ledger do
     end
   end
 
-  defp verdict(:temporal, name, _coverage, vacuous) do
-    if name in vacuous, do: {:nothing, "VACUOUS"}, else: {:model_checked, "checked"}
+  # A refuted property was checked MORE thoroughly than a holding one -- the checker produced a
+  # witness -- so it is `model_checked` strength with the word that matters. It gets its own
+  # evidence rung rather than a detail string because a reader scanning the column for what
+  # was verified must not read a refutation as a pass, and `checked` beside a refuted property
+  # is what this ledger used to write.
+  defp verdict(:temporal, name, _coverage, vacuous, temporals) do
+    cond do
+      name in vacuous ->
+        {:nothing, "VACUOUS"}
+
+      Map.get(temporals, name) == :refuted ->
+        {:refuted, "REFUTED"}
+
+      Map.get(temporals, name) == :checked ->
+        {:model_checked, "checked"}
+
+      match?({:not_evaluated, _}, Map.get(temporals, name)) ->
+        {:nothing, elem(Map.get(temporals, name), 1)}
+
+      true ->
+        {:nothing, "not evaluated"}
+    end
   end
 
   defp source(module) do
@@ -271,7 +339,14 @@ defmodule TLA.Ledger do
     end
   end
 
-  @evidence_order [:model_checked, :refinement_checked, :simulated, :property, :unit_test]
+  @evidence_order [
+    :model_checked,
+    :refuted,
+    :refinement_checked,
+    :simulated,
+    :property,
+    :unit_test
+  ]
 
   @doc """
   The `Surfex.Golden` spec for `TLA_COVERAGE.md` — data only.
@@ -364,13 +439,20 @@ defmodule TLA.Ledger do
 
   defp prose do
     """
-    Evidence, strongest→weakest: `model_checked` ▸ `refinement_checked` ▸ `simulated` ▸
-    `property` ▸ `unit_test` ▸ **NOTHING**. ExTLA reports only evidence ExTLA produces; the
-    weaker classes exist so a consuming project can merge this into its own ladder.
+    Evidence, strongest→weakest: `model_checked` ▸ `refuted` ▸ `refinement_checked` ▸
+    `simulated` ▸ `property` ▸ `unit_test` ▸ **NOTHING**. ExTLA reports only evidence ExTLA
+    produces; the weaker classes exist so a consuming project can merge this into its own ladder.
 
-    `NOTHING` is the backlog. An action that was never enabled and a property that held
-    vacuously were not verified — they were merely present while a check ran, and calling that
-    `model_checked` is the precise lie this document exists to prevent.
+    `refuted` is `model_checked` strength with the word that matters: the checker produced a
+    counterexample, which is a stronger fact about the property than a pass. It is its own
+    class so a reader scanning for what was verified cannot read a refutation as one. Every
+    temporal property gets its own liveness run — the checker halts at the first refutation, so
+    one run cannot say which of several properties it evaluated.
+
+    `NOTHING` is the backlog. An action that was never enabled, a property that held
+    vacuously, and a temporal property the run never reached were not verified — they were
+    merely present while a check ran, and calling that `model_checked` is the precise lie this
+    document exists to prevent.
 
     A section marked **LOWER BOUNDS** was truncated by `max_states`, a `state_constraint`, or a
     counterexample, and its counts are floors rather than totals. A section marked

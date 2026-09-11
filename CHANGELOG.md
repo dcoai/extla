@@ -16,6 +16,23 @@ release it merely follows.
 
 ### Fixed
 
+- **The verification ledger now model-checks temporal properties** (#234, closes #191). The
+  ledger ran the checker with `check_liveness: false`, then wrote `checked` in the `:temporal`
+  rows anyway — every temporal property in `TLA_COVERAGE.md` was labelled verified on the
+  strength of a safety run that never evaluated it. Raft's `eventually_elect_leader`, which
+  the differential corpus records TLC *violating*, sat in the golden as `checked`. That is the
+  precise over-claim Principle 6 forbids, in the document whose one job is to not make it.
+
+  The ledger now runs one liveness check per temporal (`temporals: [name]`), because the
+  checker halts at the first refutation and a single run can only ever produce one verdict
+  for a whole spec. Each row carries its own result: `checked` when the property held,
+  **REFUTED** when the checker found a counterexample, and the checker's own reason when it
+  could not evaluate it (deadlock, incomplete graph). Four rows in the golden flipped to
+  REFUTED — Raft's `eventually_elect_leader` (now agreeing with TLC), `Idling.never_two`,
+  `IdlingUnfair.eventually_two` and `Stalls.eventually_done`, each a property the fixture
+  *intends* to fail. The cost is a ledger run of ~35s instead of ~15s, measured; that is what
+  actually checking costs, and the alternative was a column that meant nothing.
+
 - **Two tests that could not fail, and the guard for the class** (#175). The test named "one
   restricted to a callback is not checked in the others" did not discriminate on `callbacks:`
   at all — making the restriction a no-op left it green. Its apparent discrimination came from
