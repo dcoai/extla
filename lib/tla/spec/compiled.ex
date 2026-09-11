@@ -222,6 +222,37 @@ defmodule TLA.Spec.Compiled do
   end
 
   @doc """
+  The instances of a temporal property: `\\A x \\in C : F(x)` expanded into one unquantified
+  formula per element, with the bound values riding along so a finding can say which.
+
+  `bound` is outermost-first — `[x, y]` for `Enum.all?(^xs, fn x -> Enum.all?(^ys, fn y -> …`
+  — and `[]` for a property with no quantifier.
+
+  **The one expansion, for both consumers.** The liveness checker and `TLA.Coverage`'s vacuity
+  probes each need the instance set, and coverage used to rebuild it with a walk of its own
+  that kept only the innermost binding (#200): a nested quantifier's outer instances all
+  landed on one key, so an outer instance whose antecedent never held was reported by nothing
+  while the checker, expanding correctly, checked it. Two derivations of "what is an
+  instance" cannot be kept in agreement by inspection; one derivation can.
+  """
+  @spec temporal_instances(map(), constants()) :: [
+          %{name: atom(), bound: [term()], formula: temporal_formula()}
+        ]
+  def temporal_instances(temporal, constants) do
+    temporal.formula.(constants)
+    |> unquantify(constants)
+    |> Enum.map(fn {bound, formula} -> %{name: temporal.name, bound: bound, formula: formula} end)
+  end
+
+  defp unquantify({:for_all, set, instance}, constants) do
+    for value <- Enum.sort(set.(constants)),
+        {bound, formula} <- unquantify(instance.(value), constants),
+        do: {[value | bound], formula}
+  end
+
+  defp unquantify(formula, _constants), do: [{[], formula}]
+
+  @doc """
   The declared variable names, in declaration order.
   """
   def variable_names(%__MODULE__{variables: variables}), do: Enum.map(variables, & &1.name)

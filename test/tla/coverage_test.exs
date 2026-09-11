@@ -367,6 +367,78 @@ defmodule TLA.CoverageTest do
       # one. Nothing should be flagged here.
       assert coverage.vacuous == []
     end
+
+    # #200. Probes were keyed by the innermost binding alone, so under a nested quantifier
+    # every outer instance landed on one key and only the last survived. Here `sender == :b`
+    # never holds, so both `[:b, _]` instances are vacuous — and were reported by nothing,
+    # while the liveness checker, expanding correctly, checked each as its own property.
+    defmodule Nested do
+      use TLA.Spec
+      constant :procs
+
+      variable :sent, type: [^procs ~> [^procs ~> [false, true]]]
+      variable :got, type: [^procs ~> [^procs ~> [false, true]]]
+
+      init do
+        sent = for_each(^procs, fn _ -> for_each(^procs, fn _ -> false end) end)
+        got = for_each(^procs, fn _ -> for_each(^procs, fn _ -> false end) end)
+      end
+
+      action :send, params: [from: ^procs, to: ^procs] do
+        require from == :a
+        require not sent[from][to]
+        sent = update(sent, from, fn row -> update(row, to, fn _ -> true end) end)
+      end
+
+      action :deliver, params: [from: ^procs, to: ^procs] do
+        require sent[from][to] and not got[from][to]
+        got = update(got, from, fn row -> update(row, to, fn _ -> true end) end)
+      end
+
+      temporal :every_send_delivered do
+        Enum.all?(^procs, fn from ->
+          Enum.all?(^procs, fn to ->
+            sent[from][to] ~> got[from][to]
+          end)
+        end)
+      end
+    end
+
+    test "under a nested quantifier every outer instance is its own probe" do
+      coverage =
+        coverage(Nested, %{constants: %{procs: MapSet.new([:a, :b])}, check_deadlock: false})
+
+      assert Enum.map(coverage.vacuous, &{&1.binding, &1.reason}) == [
+               {[:b, :a], :antecedent_never_held},
+               {[:b, :b], :antecedent_never_held}
+             ]
+
+      assert Enum.any?(Coverage.warnings(coverage), &(&1 =~ "VACUOUS for :b, :a"))
+    end
+
+    # The probes come from `Spec.Compiled.temporal_instances/2`, the expansion the liveness
+    # checker uses. Asserted rather than assumed: the defect was two derivations of "what is
+    # an instance" that disagreed, and the fix is that there is one.
+    test "coverage's instances are the checker's instances" do
+      constants = %{procs: MapSet.new([:a, :b])}
+      spec = TLA.Spec.Compiled.from_module(Nested)
+      [temporal] = spec.temporals
+
+      checker =
+        temporal
+        |> TLA.Spec.Compiled.temporal_instances(constants)
+        |> Enum.map(& &1.bound)
+        |> Enum.sort()
+
+      probes =
+        coverage(Nested, %{constants: constants, check_deadlock: false})
+        |> Map.fetch!(:vacuous)
+        |> Enum.map(& &1.binding)
+
+      # Every vacuous instance is a checker instance, and the checker has four.
+      assert checker == [[:a, :a], [:a, :b], [:b, :a], [:b, :b]]
+      assert Enum.all?(probes, &(&1 in checker))
+    end
   end
 
   describe "terminal_but_live" do

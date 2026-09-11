@@ -29,6 +29,16 @@ release it merely follows.
 
 ### Fixed
 
+- **Nested temporal quantifiers collapsed their vacuity probes onto the last outer
+  instance** (#240, closes #200). Coverage rebuilt the instance set with a walk of its own and
+  keyed each probe by the innermost binding alone, so for `Enum.all?(^xs, fn x ->
+  Enum.all?(^ys, fn y -> P ~> Q end) end)` every `x` landed on the same key and only the last
+  survived. An outer instance whose antecedent never held anywhere reported `vacuous == []`
+  — while the liveness checker, expanding correctly, checked it as its own property. The two
+  now share one expansion, `TLA.Spec.Compiled.temporal_instances/2`, and a probe is keyed by
+  the full binding path. `vacuity.binding` is that path (`[:b, :a]`), `[]` for an unquantified
+  property, where it was a bare value or `nil`.
+
 - **The verification ledger now model-checks temporal properties** (#234, closes #191). The
   ledger ran the checker with `check_liveness: false`, then wrote `checked` in the `:temporal`
   rows anyway — every temporal property in `TLA_COVERAGE.md` was labelled verified on the

@@ -897,7 +897,14 @@ report success while having verified almost nothing:
   turns an action off entirely. The spec still model-checks — it is simply a
   *weaker* spec now, and a weaker spec passes more easily.
 - **A property satisfied vacuously.** `always(P ~> Q)` where `P` never holds in
-  any reachable state is trivially true and says nothing about `Q`.
+  any reachable state is trivially true and says nothing about `Q`. Under a
+  quantifier this is asked per **instance** — `Enum.all?(^xs, fn x -> … end)` is
+  one probe pair per `x`, nested quantifiers one per `[x, y]` — and the instances
+  are the liveness checker's own (`TLA.Spec.Compiled.temporal_instances/2`), so
+  the two cannot disagree about what an instance is. Coverage once rebuilt them
+  with a walk of its own that kept only the innermost binding, and a nested
+  quantifier's outer instances collapsed onto the last one: an outer instance
+  whose antecedent never held anywhere was reported by nothing.
 - **An invariant that was never at risk.** An invariant no reachable state ever
   came close to falsifying is indistinguishable from `true`.
 
@@ -941,9 +948,11 @@ defmodule TLA.Coverage do
     invariants: %{atom() => %{evaluated_in: non_neg_integer(),
                               near_misses: non_neg_integer() | nil}},
 
-    # Temporal properties whose antecedent never held anywhere.
-    vacuous: [%{property: atom(), reason: :antecedent_never_held
-                                        | :consequent_always_held}],
+    # Temporal properties whose antecedent never held anywhere, per instance.
+    # `binding` is the instance's quantifier values, outermost first; `[]`
+    # when the property has no quantifier.
+    vacuous: [%{property: atom(), binding: [term()],
+                reason: :antecedent_never_held | :consequent_always_held}],
 
     # Params combinations that no reachable state ever admitted.
     unreached_params: %{atom() => [map()]},
