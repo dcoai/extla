@@ -547,6 +547,43 @@ defmodule TLA.Spec.DiagnosticsTest do
              """) =~ "must range over a constant or a literal list"
     end
 
+    # #195. The rewriter resolves a declared variable before a bound name, so a quantifier
+    # named after one compiled — and every instance of the body read `state.p`, never the
+    # bound value. The instance for `p = 2` came out true on a state where `pc[2]` was wrong.
+    # Only a compiler "unused variable" warning marked it.
+    test "a quantifier named after a declared variable is rejected, naming both" do
+      error =
+        refuse("""
+        constant :procs
+        variable :p
+        variable :pc
+        init do
+          p = 1
+          pc = %{}
+        end
+        temporal :t do
+          Enum.all?(^procs, fn p -> eventually(pc[p] == :b) end)
+        end
+        """)
+
+      assert error =~ "the quantifier binds :p, which is a declared variable"
+      assert error =~ "may shadow nothing"
+      assert error =~ "temporal :t"
+    end
+
+    test "a quantifier named after a declared constant is rejected" do
+      assert refuse("""
+             constant :procs
+             variable :pc
+             init do
+               pc = %{}
+             end
+             temporal :t do
+               Enum.all?(^procs, fn procs -> eventually(pc[procs] == :b) end)
+             end
+             """) =~ "the quantifier binds :procs, which is a declared constant"
+    end
+
     test "a multi-statement temporal block is rejected" do
       assert refuse("""
              variable :x

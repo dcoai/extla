@@ -489,22 +489,36 @@ defmodule TLA.Spec.Block do
   # would make every later bare use of that name ambiguous — and the ambiguity
   # would resolve silently, one way in this block and the other way everywhere
   # else in the spec.
-  defp check_no_shadow!(pattern, meta, ctx) do
+  @doc """
+  Reject a binder that shadows a declared variable or constant.
+
+  §1.3 says a `let` may shadow nothing, and the rule is about what a bare name *means*, not
+  about `let`: any binder inside a spec block that captured a declared name would make the
+  same bare name mean two things in one spec. `binder` names the construct for the message —
+  "`let`" or "the quantifier".
+
+  Public because the temporal quantifier needed it and did not have it (#195). `Enum.all?(
+  ^procs, fn p -> … end)` with `variable :p` declared compiled, and the body's `p` resolved
+  to the *state variable*: the rewriter consults `ctx.variables` before `ctx.bound`, so every
+  instance read `state.p` and the bound value was never used. Only an "unused variable"
+  compiler warning marked it, and the formula reported a verdict about the wrong thing.
+  """
+  def check_no_shadow!(pattern, meta, ctx, binder \\ "`let`") do
     pattern
     |> Rewriter.pattern_names()
     |> Enum.each(fn name ->
       cond do
         MapSet.member?(ctx.variables, name) ->
-          bad!(ctx, meta, "`let` binds #{inspect(name)}, which is a declared variable",
+          bad!(ctx, meta, "#{binder} binds #{inspect(name)}, which is a declared variable",
             hint:
-              "A `let` may shadow nothing (02-dsl-semantics.md §1.3): a bare `#{name}` after " <>
-                "this line would mean the local, while everywhere else in the spec it means " <>
+              "A binder may shadow nothing (02-dsl-semantics.md §1.3): a bare `#{name}` in " <>
+                "its scope would mean the local, while everywhere else in the spec it means " <>
                 "the variable. Rename the local."
           )
 
         MapSet.member?(ctx.constants, name) ->
-          bad!(ctx, meta, "`let` binds #{inspect(name)}, which is a declared constant",
-            hint: "A `let` may shadow nothing (02-dsl-semantics.md §1.3). Rename the local."
+          bad!(ctx, meta, "#{binder} binds #{inspect(name)}, which is a declared constant",
+            hint: "A binder may shadow nothing (02-dsl-semantics.md §1.3). Rename the local."
           )
 
         true ->
