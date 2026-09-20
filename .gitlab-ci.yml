@@ -78,16 +78,15 @@
 # that and exits 0. If `--pull` starts reporting "no DEPDEP_* variables" on a run that used to
 # restore, the variables were removed, not the store.
 #
-# THE `mix.lock` CACHE BELOW STAYS, for now, and the reason is specific. The first run with
-# credentials (main, pipeline 2447) restored the hex tree -- `pulled 6, missing 6, already
-# present 0, skipped 1` -- but the skipped one is `surfex`, which depdep v0.4.0 passes over in
-# BOTH passes as "git dependency, the lock carries no dependency list", and the six misses are
-# the dev-only `ex_doc` tree it then fails to compile under MIX_ENV=test (dco-tek/depdep#80).
-# So today the store supplies the hex dependencies and the cache supplies `surfex`; dropping
-# the cache would make `surfex` a cold compile in every job until depdep keys it. When the
-# summary line shows `surfex` restored rather than skipped, remove the cache -- extc did, for
-# the reason its own file gives: a wholesale restore beside a content-addressed one is a
-# second source of truth.
+# THE STORE IS THE ONLY SOURCE of compiled dependencies; there is no `mix.lock` cache (#251).
+# There was one for a week. The first run with credentials (main, pipeline 2447, depdep v0.4.0)
+# restored the hex tree and skipped `surfex` in both passes -- a leaf git dependency was never
+# keyed (dco-tek/depdep#80, fixed by depdep#70 in v0.5.0) -- so the cache stayed to supply it.
+# The v0.5.0 run (pipeline 2461) is the record that ended that: `compile` read `already present
+# 7, skipped 0, not for this env 6`, and `test`, with nothing on disk, read `pulled 7, skipped
+# 0` -- `surfex` from the store, the dev-only `ex_doc` tree correctly left alone. If a job
+# ever compiles a dependency it should not have, the summary line says which and why; read it
+# before reaching for a cache.
 
 stages:
   - check
@@ -167,13 +166,12 @@ default:
     # does not compile ends the run with Mix's status -- this project's own compile,
     # surfaced one line earlier (see scripts/depdep.exs).
     - elixir scripts/depdep.exs --pull --mix-get --compile-deps || mix deps.get
-  cache:
-    key:
-      files:
-        - mix.lock
-    paths:
-      - deps
-      - _build
+  # No `cache:` here, deliberately (#251). Compiled dependencies come from the depdep store
+  # and from nowhere else: a content-addressed store restores only a build these inputs would
+  # produce, where the `mix.lock`-keyed `deps`/`_build` cache this once had was a second source
+  # of truth beside it -- wholesale, per-runner, and silently wrong across a version bump. The
+  # header records the run that showed the store carrying everything. What stays cached is
+  # `tlc-corpus`'s tla2tools jar: a checksum-verified download, not a compiled dependency.
 
 format:
   extends: .elixir

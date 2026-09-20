@@ -14,7 +14,17 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
-### Changed
+### C### Changed
+
+- **CI's compiled dependencies come from the depdep store alone** (#251, closes #250). depdep
+  v0.4.0 never keyed `surfex`, a leaf git dependency, so #247 kept the `mix.lock`-keyed
+  `deps`/`_build` cache beside the store to supply it — two sources of truth for one thing.
+  v0.5.0 keys it (depdep#70) and hands `--compile-deps` only misses this env is known to build
+  (depdep#83); the bump's own pipeline read `pulled 7, skipped 0, not for this env 6` in a job
+  with nothing on disk, `surfex` included. The cache is gone; what stays cached is
+  `tlc-corpus`'s tla2tools jar, a checksum-verified download.
+
+hanged
 
 - **A predicate that returns a non-boolean is refused, not counted as holding** (#235,
   closes #192). Every consumer of an `invariant`, `terminal`, `action_property` or temporal
