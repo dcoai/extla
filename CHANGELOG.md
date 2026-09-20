@@ -50,6 +50,16 @@ release it merely follows.
   test proving two agree. Nine rows in `TLA_COVERAGE.md` change hash — six `tick`s, a
   `taint`, a `reset`, an `eventually_done` — each to the hash of its own definition.
 
+- **`subseq/3` wrapped on a zero index where `at/2` raises, and crashed on an empty result**
+  (#242, closes #197). It was `Enum.slice(seq, m - 1, n - m + 1)`, which has Elixir's index
+  semantics: `subseq([1, 2, 3], 0, 1)` returned `[3]`, a negative start counted from the end,
+  `subseq([], 2, 0)` was a `FunctionClauseError` where TLC returns `<<>>`, and a `MapSet` was
+  accepted where `len/1`, `head/1` and `at/2` all refuse one. An off-by-one in a spec produced
+  a valid sequence that was not the one the author wrote, silently — the exact shape `at/2`
+  refuses for the same slip. It now follows TLC's `SubSeq`: `n < m` is `[]`, any other bound
+  outside `1..Len(s)` is a `DomainError` naming the index and the length, and a property test
+  holds `subseq/3` and `at/2` to the same answer on every out-of-domain index.
+
 - **The verification ledger now model-checks temporal properties** (#234, closes #191). The
   ledger ran the checker with `check_liveness: false`, then wrote `checked` in the `:temporal`
   rows anyway — every temporal property in `TLA_COVERAGE.md` was labelled verified on the
