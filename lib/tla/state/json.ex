@@ -4,7 +4,8 @@ defmodule TLA.State.Json do
 
   `02-dsl-semantics.md` §6 permits atoms, integers, binaries, tuples, lists, maps,
   `MapSet`s and structs built from those. JSON has objects, arrays, strings and numbers,
-  so five of those eight have no JSON of their own and every one of them needs a tag.
+  so five of those eight have no JSON of their own and every one of them needs a tag — and
+  a binary that is not valid UTF-8 is not a JSON string either, so it gets one too (`"b64"`).
 
   ## Why this exists rather than `inspect/1`
 
@@ -45,7 +46,18 @@ defmodule TLA.State.Json do
 
   def encode(integer) when is_integer(integer), do: integer
   def encode(atom) when is_atom(atom), do: %{"a" => Atom.to_string(atom)}
-  def encode(binary) when is_binary(binary), do: %{"b" => binary}
+  # JSON strings are Unicode, so a binary is only its own JSON when it is valid UTF-8.
+  # Anything else — `<<255, 0>>`, which §6 permits — went to `Jason.encode!/1` as a string
+  # and raised `invalid byte`, from inside the report writer, after the search had found a
+  # real violation: `mix tla.check --format json` exited with a stack trace and no document
+  # (#198). A found counterexample must never be lost to its own serialisation, so a
+  # non-UTF-8 binary carries its own tag and travels as base64.
+  def encode(binary) when is_binary(binary) do
+    if String.valid?(binary),
+      do: %{"b" => binary},
+      else: %{"b64" => Base.encode64(binary)}
+  end
+
   def encode(list) when is_list(list), do: Enum.map(list, &encode/1)
   def encode(tuple) when is_tuple(tuple), do: %{"t" => tuple |> Tuple.to_list() |> encode()}
   def encode(%MapSet{} = set), do: %{"set" => set |> MapSet.to_list() |> encode()}
@@ -76,6 +88,7 @@ defmodule TLA.State.Json do
   def decode!(list) when is_list(list), do: Enum.map(list, &decode!/1)
   def decode!(%{"a" => name}) when is_binary(name), do: atom!(name)
   def decode!(%{"b" => binary}) when is_binary(binary), do: binary
+  def decode!(%{"b64" => encoded}) when is_binary(encoded), do: Base.decode64!(encoded)
 
   def decode!(%{"t" => elements}) when is_list(elements),
     do: elements |> decode!() |> List.to_tuple()
@@ -91,8 +104,8 @@ defmodule TLA.State.Json do
   def decode!(other) do
     raise Error,
           "#{inspect(other)} is not the JSON form of a state term. Expected a number, an " <>
-            "array, or an object tagged \"a\" (atom), \"b\" (binary), \"t\" (tuple), " <>
-            "\"set\", \"m\" (map) or \"struct\"."
+            "array, or an object tagged \"a\" (atom), \"b\" (binary), \"b64\" (a binary " <>
+            "that is not valid UTF-8), \"t\" (tuple), \"set\", \"m\" (map) or \"struct\"."
   end
 
   defp pairs(map), do: for({key, value} <- map, do: [encode(key), encode(value)])

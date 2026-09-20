@@ -1453,7 +1453,10 @@ data rather than parsing the human rendering.
 **The counterexample in it round-trips.** States and bindings are written by
 `TLA.State.Json`, whose encoding names every term §6 permits — atoms, binaries,
 tuples, maps with non-string keys, `MapSet`s and structs all have JSON of their
-own. An earlier version wrote them with `inspect/1`, which a person can read and
+own, and a binary that is not valid UTF-8 travels as base64 under a `"b64"` tag,
+since a JSON string cannot carry it. What `TLA.State.validate!/1` admits and what
+this encodes are the same set, by construction: a violation the search found must
+never be lost to its own serialisation. An earlier version wrote them with `inspect/1`, which a person can read and
 a machine cannot parse back, and `05-layer3-conformance.md`'s pipeline runs this
 output straight into `mix tla.replay --trace`. The human rendering is
 `TLA.Trace.format/1` and is unchanged.

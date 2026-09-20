@@ -142,6 +142,12 @@ defmodule TLA.State do
   defp validate_term!(term, var, path) when is_float(term),
     do: reject!(term, var, path, "a float")
 
+  # A bitstring that is not a whole number of bytes. `TLA.State.Json` has no encoding for one
+  # — base64 is bytes — and admitting here what the wire format refuses means a violation the
+  # search found is lost when the report is written (#198). The two agree on what a term is.
+  defp validate_term!(term, var, path) when is_bitstring(term) and not is_binary(term),
+    do: reject!(term, var, path, "a bitstring")
+
   defp validate_term!(%MapSet{} = term, var, path) do
     Enum.each(term, &validate_term!(&1, var, path ++ ["a MapSet element"]))
   end

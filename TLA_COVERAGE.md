@@ -30,9 +30,9 @@ No durations, dates, seeds or machine names appear here. A golden is a stable fu
 source; anything varying independently makes it drift against itself on a quiet day.
 
 
-**32 specs · 122 items** · model_checked 81 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 37
+**33 specs · 124 items** · model_checked 83 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 37
 
-**freshness** · fresh 5 · stale 0 · unstamped 117
+**freshness** · fresh 5 · stale 0 · unstamped 119
 
 ## TLA.Conformance.Counter.BuggySpec — 3 items · gap 0 · LOWER BOUNDS (violation)
 
@@ -207,6 +207,12 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `one_holder` | `:invariant` | `c570f2d7` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `release` | `:action` | `10646bac` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `request` | `:action` | `ad980e15` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+## TLA.TestSpecs.RawBytes — 2 items · gap 0 · LOWER BOUNDS (violation)
+
+| Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
+|---|---|---|---|---|---|---|
+| `payload_is_text` | `:invariant` | `1d1b24bd` | `:model_checked` | `:unstamped` | ≥ 1 near-miss | `test/support/specs.ex` |
+| `receive_raw` | `:action` | `40f35b61` | `:model_checked` | `:unstamped` | ≥ enabled in 1 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Stalls — 2 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
