@@ -67,16 +67,27 @@
 # --compile-deps` runs in `before_script` in place of `mix deps.get`: it restores compiled
 # dependencies from the shared depdep store (the same objects bizex, extc, metresis and
 # visualize restore), fetches only what the store lacked, and compiles exactly the misses;
-# `compile` pushes what it built. The `mix.lock`-keyed cache below is still here until the
-# store is shown restoring on this project (#247), then goes. Two more settings outside this
-# file make it work, recorded for the reason the merge-gate settings are:
+# `compile` pushes what it built. Two settings outside this file make it work, recorded for the
+# reason the merge-gate settings are (#247):
 #
 #   dco-tek/extla is on dco-tek/depdep's inbound job-token allowlist   (Mix.install fetches it)
-#   DEPDEP_ENDPOINT / DEPDEP_BUCKET / DEPDEP_ACCESS_KEY / DEPDEP_SECRET_KEY   masked CI variables
+#   DEPDEP_ENDPOINT / DEPDEP_BUCKET / DEPDEP_ACCESS_KEY / DEPDEP_SECRET_KEY   project CI variables
 #
-# Without either, depdep announces that and exits 0: the pipeline is a cold compile, not a red
-# one. If `--pull` starts reporting "no DEPDEP_* variables" on a run that used to restore, the
-# variables were removed, not the store.
+# Without the allowlist, `Mix.install` gets a 403 and the `|| mix deps.get` runs: a cold
+# compile, not a red one (pipeline 2444 is the record). Without the variables, depdep announces
+# that and exits 0. If `--pull` starts reporting "no DEPDEP_* variables" on a run that used to
+# restore, the variables were removed, not the store.
+#
+# THE `mix.lock` CACHE BELOW STAYS, for now, and the reason is specific. The first run with
+# credentials (main, pipeline 2447) restored the hex tree -- `pulled 6, missing 6, already
+# present 0, skipped 1` -- but the skipped one is `surfex`, which depdep v0.4.0 passes over in
+# BOTH passes as "git dependency, the lock carries no dependency list", and the six misses are
+# the dev-only `ex_doc` tree it then fails to compile under MIX_ENV=test (dco-tek/depdep#80).
+# So today the store supplies the hex dependencies and the cache supplies `surfex`; dropping
+# the cache would make `surfex` a cold compile in every job until depdep keys it. When the
+# summary line shows `surfex` restored rather than skipped, remove the cache -- extc did, for
+# the reason its own file gives: a wholesale restore beside a content-addressed one is a
+# second source of truth.
 
 stages:
   - check
