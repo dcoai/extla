@@ -468,11 +468,17 @@ defmodule TLA.ProfileTest do
       Map.new(profile.declarations, fn {key, entry} -> {key, entry.per_eval} end)
     end
 
+    # Settled floors only (#248). `reset` is applied in exactly one state of this fixture, so
+    # its "floor" is one sample and an excursion inside that one bracket is the reported cost:
+    # 2 on a quiet machine, 29 under load, on three CI runs. That is not the floor moving; it
+    # is a floor that does not exist yet, and `Profile` now says so on the row. The exclusion
+    # is not silent — the test below asserts the marking — and the message carries each
+    # item's evaluation count so a future drift names its sample size.
     defp drift(a, b) do
-      for {key, left} <- floors(a),
+      for {key, %{settled: true, per_eval: left, evaluations: n}} <- a.declarations,
           right = Map.fetch!(floors(b), key),
           abs(left - right) > @margin,
-          do: {key, left, right}
+          do: {key, left, right, {:evaluations, n}}
     end
 
     test "two runs of the same spec agree on every count exactly and every cost to within two" do
@@ -482,6 +488,19 @@ defmodule TLA.ProfileTest do
       # Evaluation counts are a function of the search, so these are exact under any conditions.
       assert counts(one) == counts(other)
       assert drift(one, other) == []
+    end
+
+    # The one-sample item is reported and marked, never dropped: dropping it would be the
+    # exclusion above happening in the report instead of the test.
+    test "a floor over too few evaluations is marked not settled, and the rest are settled" do
+      profile = run().profile
+
+      assert %{evaluations: 1, settled: false} = profile.declarations[{:transition, :reset}]
+      assert %{settled: true} = profile.declarations[{:transition, :tick}]
+
+      assert Profile.format(profile) =~ "reset"
+      assert Profile.format(profile) =~ "floor over 1 evaluation, not settled"
+      refute Profile.format(profile) =~ ~r/tick.*not settled/
     end
 
     test "the cost is the floor times the evaluations, so it is not an average" do

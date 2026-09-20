@@ -131,6 +131,16 @@ defmodule TLA.Profile do
   # precisely what the report exists to tell apart.
   @arity %{invariant: 2, terminal: 2, action_property: 3, guard: 3, transition: 3}
 
+  # A floor is a MINIMUM over evaluations, and a minimum is only a floor when there are enough
+  # of them for an excursion not to have hit every one. Below this many, the "floor" is the
+  # samples themselves: a declaration evaluated once reports whatever that one bracket
+  # measured, excursion included (#248 — `reset`, applied in exactly one state, read 2
+  # reductions on a quiet machine and 29 under load, on three pipelines). Such an entry is still
+  # reported, since the count is exact, but marked as not settled rather than presented as a
+  # reproducible cost. Four is small on purpose: the claim being protected is reproducibility,
+  # and an excursion landing in every one of four brackets is already rare.
+  @settled_at 4
+
   @type kind :: :invariant | :terminal | :action_property | :guard | :transition
   @type key :: {kind(), atom()}
   @type entry :: %{
@@ -144,7 +154,12 @@ defmodule TLA.Profile do
           # What the counter actually accumulated, floor and scheduler excursions together.
           # Carried so nothing is thrown away and so the gap is inspectable: a predicate whose
           # cost genuinely varies with the state shows up as a large `observed - reductions`.
-          observed: non_neg_integer()
+          observed: non_neg_integer(),
+
+          # Whether the floor rests on enough evaluations to be one (`@settled_at`). A cost over
+          # fewer is reported, because the count is exact, but it is NOT reproducible and the
+          # report says so on the row.
+          settled: boolean()
         }
 
   @type t :: %__MODULE__{
@@ -259,11 +274,18 @@ defmodule TLA.Profile do
   defp merge_floor(a, %{evaluations: 0}), do: a.per_eval
   defp merge_floor(a, b), do: min(a.per_eval, b.per_eval)
 
-  defp zero, do: %{evaluations: 0, reductions: 0, per_eval: 0, observed: 0}
+  defp zero, do: %{evaluations: 0, reductions: 0, per_eval: 0, observed: 0, settled: false}
 
-  # Straight off the counter, before the calibration comes out.
+  # Straight off the counter, before the calibration comes out. `settled` is decided by
+  # `finalize/2`, after merging, since the count it depends on is the merged one.
   defp raw(evaluations, observed, floor),
-    do: %{evaluations: evaluations, reductions: 0, per_eval: floor, observed: observed}
+    do: %{
+      evaluations: evaluations,
+      reductions: 0,
+      per_eval: floor,
+      observed: observed,
+      settled: false
+    }
 
   @doc """
   Subtract the instrumentation, turn the per-evaluation floor into a cost, and record what the
@@ -287,7 +309,11 @@ defmodule TLA.Profile do
     declarations =
       Map.new(profile.declarations, fn {{kind, _name} = key, entry} ->
         per_eval = max(entry.per_eval - Map.fetch!(profile.calibration, @arity[kind]), 0)
-        {key, %{entry | per_eval: per_eval, reductions: per_eval * entry.evaluations}}
+
+        {key,
+         entry
+         |> Map.merge(%{per_eval: per_eval, reductions: per_eval * entry.evaluations})
+         |> Map.put(:settled, entry.evaluations >= @settled_at)}
       end)
 
     %{
@@ -480,7 +506,8 @@ defmodule TLA.Profile do
           "  " <>
             String.pad_trailing(Atom.to_string(name), 24) <>
             number(entry.evaluations) <>
-            number(entry.reductions) <> number(entry.per_eval) <> varies(entry)
+            number(entry.reductions) <>
+            number(entry.per_eval) <> varies(entry) <> unsettled(entry)
         end)
 
       heading <>
@@ -503,6 +530,13 @@ defmodule TLA.Profile do
 
   defp varies(_entry), do: ""
 
+  # The count is exact; the cost is not a floor yet. Said on the row, so a reader comparing two
+  # runs does not chase a one-sample difference as a regression.
+  defp unsettled(%{settled: false, evaluations: n}),
+    do: "   <-- floor over #{n} evaluation#{if n == 1, do: "", else: "s"}, not settled"
+
+  defp unsettled(_entry), do: ""
+
   # Sorted by cost, so the answer is the first row. The share is what says whether to read the
   # table at all — on a large model the checker's own machinery is most of the run, and the honest
   # response to that is a guide reference rather than an optimiser.
@@ -517,8 +551,9 @@ defmodule TLA.Profile do
     "\nAll declarations: #{delimit(total)} reductions, #{share}% of the run's " <>
       "#{delimit(profile.run_reductions)}.\n" <>
       advice(share) <>
-      "\nCost is the per-evaluation floor times the evaluations, which is exactly reproducible;\n" <>
-      "anything above the floor in a given evaluation is the scheduler, not your predicate.\n" <>
+      "\nCost is the per-evaluation floor times the evaluations, which is exactly reproducible\n" <>
+      "once the floor rests on #{@settled_at} or more of them; a row marked not settled is not.\n" <>
+      "Anything above the floor in a given evaluation is the scheduler, not your predicate.\n" <>
       "Instrumentation calibrated at #{profile.calibration[2]}/#{profile.calibration[3]} " <>
       "reductions per evaluation (arity 2/3) and subtracted. OTP #{profile.otp_version}.\n"
   end

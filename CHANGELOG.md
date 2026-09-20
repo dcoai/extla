@@ -38,6 +38,17 @@ release it merely follows.
 
 ### Fixed
 
+- **A profile floor over too few evaluations is marked, not presented as reproducible** (#249,
+  closes #248). The report's footer said the cost "is exactly reproducible"; for a declaration
+  evaluated once it is the one sample, excursion included. `TLA.ProfileTest`'s fixture has
+  such an item — `reset` fires in exactly one state — and its "floor" read 2 reductions on a
+  quiet machine and 29 under load on three CI pipelines, each costing a retry. An entry now
+  carries `settled: false` below four evaluations, its row says `floor over N evaluations,
+  not settled`, the footer qualifies its claim, and the stability tests compare settled floors
+  and assert the marking rather than silently skipping the item.
+
+
+
 - **Nested temporal quantifiers collapsed their vacuity probes onto the last outer
   instance** (#240, closes #200). Coverage rebuilt the instance set with a walk of its own and
   keyed each probe by the innermost binding alone, so for `Enum.all?(^xs, fn x ->

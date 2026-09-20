@@ -1151,8 +1151,9 @@ All declarations: 16,336 reductions, 20.7% of the run's 79,001.
 The rest is the checker's own machinery. Your declarations are not the problem —
 see guides/tutorial/09-when-it-explodes.md before optimising one.
 
-Cost is the per-evaluation floor times the evaluations, which is exactly reproducible;
-anything above the floor in a given evaluation is the scheduler, not your predicate.
+Cost is the per-evaluation floor times the evaluations, which is exactly reproducible
+once the floor rests on 4 or more of them; a row marked not settled is not.
+Anything above the floor in a given evaluation is the scheduler, not your predicate.
 Instrumentation calibrated at 1/1 reductions per evaluation (arity 2/3) and subtracted. OTP 29.
 --------------------------------------------------------------------
 ```
