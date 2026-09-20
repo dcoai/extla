@@ -62,6 +62,21 @@
 # outside the repository with no merge involved -- and the verdict tool reported the red, named
 # the jobs, and listed the gates that did not run. Then the variable was removed and the schedule
 # run again green, so `main`'s last recorded verdict is not the demonstration.
+#
+# COMPILED DEPENDENCIES (#245, depdep v0.4.0). `scripts/depdep.exs --pull --mix-get
+# --compile-deps` runs in `before_script` in place of `mix deps.get`: it restores compiled
+# dependencies from the shared depdep store (the same objects bizex, extc, metresis and
+# visualize restore), fetches only what the store lacked, and compiles exactly the misses;
+# `compile` pushes what it built. The `mix.lock`-keyed cache below is still here until the
+# store is shown restoring on this project (#247), then goes. Two more settings outside this
+# file make it work, recorded for the reason the merge-gate settings are:
+#
+#   dco-tek/extla is on dco-tek/depdep's inbound job-token allowlist   (Mix.install fetches it)
+#   DEPDEP_ENDPOINT / DEPDEP_BUCKET / DEPDEP_ACCESS_KEY / DEPDEP_SECRET_KEY   masked CI variables
+#
+# Without either, depdep announces that and exits 0: the pipeline is a cold compile, not a red
+# one. If `--pull` starts reporting "no DEPDEP_* variables" on a run that used to restore, the
+# variables were removed, not the store.
 
 stages:
   - check
@@ -125,7 +140,22 @@ default:
     - git config --global --add url."https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/".insteadOf "git@${CI_SERVER_HOST}:"
     - mix local.hex --force
     - mix local.rebar --force
-    - mix deps.get
+    # One line does three things, in an order that matters (#245, depdep v0.4.0): restore
+    # compiled dependencies from the shared depdep store, run `mix deps.get` to fetch only
+    # what the store did not have, then decide again over the units the first pass could
+    # not key -- `surfex` is a git dependency, and a git lock entry records no dependency
+    # list, so nothing above it can be keyed until the source is on disk. Restoring BEFORE
+    # fetching is load-bearing: source fetched first carries fresh mtimes and Mix rebuilds
+    # everything the store just restored. `--compile-deps` compiles exactly the misses, so
+    # the `mix compile` in each job finds every dependency up to date.
+    #
+    # `|| mix deps.get` is for the day depdep itself cannot start (its repository unreachable
+    # for `Mix.install`): the job goes cold, not red. With no DEPDEP_* variables depdep says
+    # so, still runs `deps.get`, and exits 0. A `deps.get` that fails inside depdep fails
+    # again outside with the same error, as the bare line always did; a dependency that
+    # does not compile ends the run with Mix's status -- this project's own compile,
+    # surfaced one line earlier (see scripts/depdep.exs).
+    - elixir scripts/depdep.exs --pull --mix-get --compile-deps || mix deps.get
   cache:
     key:
       files:
@@ -169,6 +199,11 @@ compile:
     # Warnings are errors here for the same reason they are locally: an unused
     # alias or an unreachable clause is usually a half-finished edit.
     - mix compile --force --warnings-as-errors
+    # Store what this build compiled that the depdep store lacked (#245). After the build,
+    # so a failed compile never populates the store; only the misses are uploaded, so a
+    # converged store sends nothing. This job compiles under MIX_ENV=test, which is what
+    # every other job restores.
+    - elixir scripts/depdep.exs --push || echo "depdep push unavailable - nothing pushed"
     # A lock entry outliving the dependency that pulled it in is the same kind of
     # half-finished edit, one file over. #69 removed dialyxir and left its
     # transitive `erlex` behind, where it sat until #117 -- inert, but nothing
