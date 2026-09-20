@@ -9,13 +9,13 @@ defmodule TLA.Spec.Hash do
   path that may not be exercised for months (#1, failure mode 2). A content version turns that
   into a compile error.
 
-  ## Why this ships, when `TLA.Spec.Version` already exists
+  ## Why the algorithm is implemented here rather than taken from surfex
 
-  `TLA.Spec.Version` lives in dev/test-only `ledger/` and delegates to
-  `Surfex.SourceScan.definition_hash/1`. That is right for ExTLA's own tooling and **wrong for
-  this**: `use TLA.GenServer, spec_version: …` is written by a CONSUMER, so the check runs at
-  their compile — and surfex is `only: [:dev, :test]`, which is not transitive. A check that
-  called it would fail for exactly the people it protects.
+  The algorithm is `Surfex.SourceScan.definition_hash/1`'s — agentronic, extc and ExTLA all
+  stamp rows with a "content version", and the value of that word depends on the three meaning
+  the same thing by it. But `use TLA.GenServer, spec_version: …` is written by a CONSUMER, so
+  the check runs at their compile — and surfex is `only: [:dev, :test]`, which is not
+  transitive. A check that called it would fail for exactly the people it protects.
 
   So the algorithm is implemented here and ships. It is written down rather than shared:
   **strip all AST metadata, `Macro.to_string`, sha256, first 8 hex.**
@@ -25,6 +25,11 @@ defmodule TLA.Spec.Hash do
   If that test is deleted or excluded from the default run, the decision recorded on #67 is
   void — two implementations that agree only because both were written from the same paragraph
   will drift, and the symptom is a stamp that is wrong for no visible reason.
+
+  This is also the ledger's `Version` column. There used to be a second module for that,
+  `TLA.Spec.Version` in `ledger/`, delegating to surfex and scanning the whole *file* — so
+  every `tick` in `test/support/specs.ex` showed the last one's hash, seven rows sharing one
+  cell (#201). One implementation, module-scoped, rather than a test proving two agree.
 
   ## Metadata stripping is the point
 

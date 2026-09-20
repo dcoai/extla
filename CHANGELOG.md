@@ -39,6 +39,17 @@ release it merely follows.
   the full binding path. `vacuity.binding` is that path (`[:b, :a]`), `[]` for an unquantified
   property, where it was a bare value or `nil`.
 
+- **The ledger's `Version` column was file-scoped, so same-named items shared one hash**
+  (#241, closes #201). `TLA.Spec.Version` scanned the whole file and keyed by `{kind, name}`,
+  so the seven `tick` actions in `test/support/specs.ex` all showed the last one's hash —
+  editing `Broken.tick` moved nothing, editing the last `tick` moved seven rows. The golden
+  was stable while wrong, which is the exact failure a drift-gated golden is meant to make
+  impossible; nothing cross-checked the two hash modules because `HashTest` compared
+  `definition_hash/1`, not the scan. `TLA.Spec.Version` is removed and the ledger reads
+  `TLA.Spec.Hash.item_versions/1`, which is module-scoped: one implementation rather than a
+  test proving two agree. Nine rows in `TLA_COVERAGE.md` change hash — six `tick`s, a
+  `taint`, a `reset`, an `eventually_done` — each to the hash of its own definition.
+
 - **The verification ledger now model-checks temporal properties** (#234, closes #191). The
   ledger ran the checker with `check_liveness: false`, then wrote `checked` in the `:temporal`
   rows anyway — every temporal property in `TLA_COVERAGE.md` was labelled verified on the

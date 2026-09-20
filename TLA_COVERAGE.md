@@ -145,7 +145,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `below_three` | `:invariant` | `9f82f32b` | `:model_checked` | `:unstamped` | ≥ not measured | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | ≥ enabled in 3 | `test/support/specs.ex` |
+| `tick` | `:action` | `f069ba87` | `:model_checked` | `:unstamped` | ≥ enabled in 3 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Counter — CANNOT RUN: no assignment for :max
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -192,7 +192,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `non_negative` | `:invariant` | `d3220c4a` | `:model_checked` | `:unstamped` | not measured | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | enabled in 6 | `test/support/specs.ex` |
+| `tick` | `:action` | `758bb280` | `:model_checked` | `:unstamped` | enabled in 6 | `test/support/specs.ex` |
 ## TLA.TestSpecs.OutsideDomain — RAISED TLA.Spec.DomainError: nothing verified
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -211,7 +211,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `eventually_done` | `:temporal` | `76094f89` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
+| `eventually_done` | `:temporal` | `77331947` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
 | `give_up` | `:action` | `9166a6cb` | `:model_checked` | `:unstamped` | enabled in 1 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Swap — 1 items · gap 0
 
@@ -229,8 +229,8 @@ source; anything varying independently makes it drift against itself on a quiet 
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
-| `taint` | `:action` | `e3d1610a` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
+| `taint` | `:action` | `4722a521` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
+| `tick` | `:action` | `19b0a153` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
 ## TLA.TestSpecs.Terminating — CANNOT RUN: no assignment for :max
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -245,7 +245,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `conservation_of_money` | `:invariant` | `043357c3` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `fail_transfer` | `:action` | `459450bc` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `no_stuck_pending` | `:temporal` | `b9a16c09` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-| `reset` | `:action` | `c0adcaa8` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+| `reset` | `:action` | `cd41e83b` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 ## TLA.TestSpecs.TwoStarts — 1 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -262,14 +262,14 @@ source; anything varying independently makes it drift against itself on a quiet 
 |---|---|---|---|---|---|---|
 | `small_or_even` | `:invariant` | `b7253a72` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `switch` | `:action` | `00b1c598` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+| `tick` | `:action` | `6d492fe1` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 ## TLA.TestSpecs.Violating — CANNOT RUN: no assignment for :modes
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `small_or_even` | `:invariant` | `b7253a72` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `switch` | `:action` | `00b1c598` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+| `tick` | `:action` | `d1824eef` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 ## TLA.TestSpecs.WeaklyFair — CANNOT RUN: no assignment for :processes
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
@@ -283,4 +283,4 @@ source; anything varying independently makes it drift against itself on a quiet 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `impossible` | `:action` | `2dcaf6d3` | `:nothing` | `:unstamped` | never enabled | `test/support/specs.ex` |
-| `tick` | `:action` | `4621455c` | `:model_checked` | `:unstamped` | enabled in 3 | `test/support/specs.ex` |
+| `tick` | `:action` | `bbe98200` | `:model_checked` | `:unstamped` | enabled in 3 | `test/support/specs.ex` |
