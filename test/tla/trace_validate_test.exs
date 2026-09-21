@@ -154,6 +154,61 @@ defmodule TLA.TraceValidateTest do
     end
   end
 
+  # #203. `validate/3` is the oracle `generated_models_test.exs` rests on, and it accepted a
+  # stutter anywhere: a one-state, no-action cycle validated at a state with enabled steps
+  # and `format/1` rendered it "has no successors". §5.3 puts a stutter in exactly one place.
+  describe "a stutter where a step is enabled" do
+    test "a lasso stuttering at a live state is rejected, naming the enabled step" do
+      spec = Spec.Compiled.from_module(TestSpecs.Broken)
+
+      stuck_early = %{
+        prefix: %Trace{
+          type: :liveness,
+          states: [%{n: 0}, %{n: 1}],
+          actions: [:tick],
+          bindings: [%{}],
+          length: 2
+        },
+        cycle: %Trace{type: :liveness, states: [%{n: 1}], actions: [], bindings: [], length: 1}
+      }
+
+      assert {:error, message} = Trace.validate(stuck_early, spec, %{})
+      assert message =~ "claimed to stutter forever"
+      assert message =~ ":tick"
+      assert message =~ "§5.3"
+    end
+
+    test "a lasso stuttering at a successor-less state still validates" do
+      {violation, spec, constants} = lasso()
+
+      assert violation.cycle.actions == []
+      assert Trace.validate(violation, spec, constants) == :ok
+    end
+
+    test "a deadlock trace ending at a live state is rejected" do
+      spec = Spec.Compiled.from_module(TestSpecs.Broken)
+
+      not_stuck = %Trace{
+        type: :deadlock,
+        states: [%{n: 0}, %{n: 1}],
+        actions: [:tick],
+        bindings: [%{}],
+        length: 1
+      }
+
+      assert {:error, message} = Trace.validate(not_stuck, spec, %{})
+      assert message =~ "the deadlock's last state"
+      assert message =~ ":tick"
+    end
+
+    test "a deadlock trace the checker produced still validates" do
+      result = ModelChecker.run(TestSpecs.Deadlocking, %{constants: %{max: 2}})
+
+      assert result.violation.type == :deadlock
+      assert Trace.validate(result.violation, TestSpecs.Deadlocking, %{max: 2}) == :ok
+    end
+  end
+
   describe "a lasso with nothing to repeat" do
     test "an empty cycle is named rather than crashing the validator" do
       {%{prefix: prefix, cycle: cycle}, spec, constants} = lasso()
