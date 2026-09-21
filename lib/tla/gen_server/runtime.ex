@@ -399,15 +399,22 @@ defmodule TLA.GenServer.Runtime do
 
   # ── Per-process context and trace ───────────────────────────────────────────
 
+  # Keyed on the module AND its `module_info(:md5)` (#213): a server that outlives a
+  # recompile of its spec — the shape a dev session has — used to keep checking against the
+  # spec it first loaded, since the cache matched on the module name alone. The md5 read is
+  # a lookup on the loaded module, cheap enough for every callback; a recompiled spec is
+  # picked up on the next one.
   @doc false
   def context(spec_module) do
+    md5 = spec_module.module_info(:md5)
+
     case Process.get(@context_key) do
-      %{spec: %Spec.Compiled{module: ^spec_module}} = context ->
+      %{spec: %Spec.Compiled{module: ^spec_module}, md5: ^md5} = context ->
         context
 
       _other ->
         spec = Spec.Compiled.from_module(spec_module)
-        context = %{spec: spec, constants: constants(spec)}
+        context = %{spec: spec, constants: constants(spec), md5: md5}
         Process.put(@context_key, context)
         context
     end
