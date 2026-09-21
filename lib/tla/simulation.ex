@@ -46,7 +46,6 @@ defmodule TLA.Simulation do
   @type config :: %{
           optional(:traces) => pos_integer(),
           optional(:max_steps) => pos_integer(),
-          optional(:constants) => map(),
           optional(:message_generator) => (TLA.State.t() ->
                                              term() | {atom(), map(), term()} | nil),
           optional(:inject_failures) => boolean(),
@@ -96,6 +95,10 @@ defmodule TLA.Simulation do
     config = configure(module, config)
     started = System.monotonic_time(:millisecond)
 
+    # Stops at the first finding, as documented (#213): the stream is consumed with a halt,
+    # which `Task.async_stream/3` honours by shutting down the tasks still in flight. It
+    # used to run every trace and report the first failure among them, so `traces_run`
+    # counts the traces that ran, not the traces asked for.
     outcomes =
       1..config.traces
       |> Task.async_stream(&one_trace(module, config, &1),
@@ -103,7 +106,10 @@ defmodule TLA.Simulation do
         timeout: :infinity,
         ordered: true
       )
-      |> Enum.map(fn {:ok, outcome} -> outcome end)
+      |> Enum.reduce_while([], fn {:ok, outcome}, acc ->
+        if outcome.status == :ok, do: {:cont, [outcome | acc]}, else: {:halt, [outcome | acc]}
+      end)
+      |> Enum.reverse()
 
     summarize(outcomes, config, System.monotonic_time(:millisecond) - started)
   end
@@ -184,7 +190,7 @@ defmodule TLA.Simulation do
       {:ok, server} ->
         state = %{empty_state() | server: server, states: [abstract(config, server)]}
         state = steps(state, module, config, messages)
-        stop(state.server)
+        stop(state.server, config.timeout)
         temporal(state, config)
 
       # `init/1` is allowed to decline. That is not a `MatchError` on `{:ok, pid} =`; it is
@@ -279,6 +285,7 @@ defmodule TLA.Simulation do
   # crashing.
   defp maybe_restart(state, module, config) do
     if config.inject_failures and :rand.uniform() < 0.1 do
+      # A crash, and a crash runs no `terminate/2`: `:kill` is the point here (#213).
       Process.exit(state.server, :kill)
       restart(state, module, config)
     else
@@ -355,7 +362,18 @@ defmodule TLA.Simulation do
   defp configure(module, config) do
     spec = module.__tla_spec_module__()
     refinement = module.__tla_refinement__()
-    constants = Map.get_lazy(config, :constants, fn -> constants!(spec) end)
+    # The server under test resolves its constants from application config, in
+    # `TLA.GenServer.Runtime.context/1`; a generator built on any other assignment would
+    # drive it against a different specification. So there is no `constants:` option here
+    # (#213) — the one place both sides read is the one place they can agree.
+    if Map.has_key?(config, :constants) do
+      raise ArgumentError,
+            "TLA.Simulation takes no `constants:` — the server under test resolves its " <>
+              "constants from `config :extla, #{inspect(spec)}, constants: %{…}`, and the " <>
+              "generator has to use the same ones. Configure them there."
+    end
+
+    constants = constants!(spec)
 
     @defaults
     |> Map.merge(config)
@@ -400,11 +418,27 @@ defmodule TLA.Simulation do
     end
   end
 
-  defp stop(nil), do: :ok
+  # Stopped the way a supervisor stops a child (#213): `exit(:shutdown)`, so a server that
+  # traps exits runs its `terminate/2`, and a bounded wait for the `:DOWN` — a `terminate/2`
+  # that hangs must not hang the simulation — after which it is killed. A server that does
+  # not trap exits dies at the `:shutdown` at once, as it would under its supervisor. This
+  # used to be a bare `:kill`, which skipped `terminate/2` for every server.
+  defp stop(nil, _timeout), do: :ok
 
-  defp stop(server) do
-    if Process.alive?(server), do: Process.exit(server, :kill)
-    :ok
+  defp stop(server, timeout) do
+    ref = Process.monitor(server)
+    Process.exit(server, :shutdown)
+
+    receive do
+      {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+    after
+      timeout ->
+        Process.exit(server, :kill)
+
+        receive do
+          {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+        end
+    end
   end
 
   defp abstract(config, server) do

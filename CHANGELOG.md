@@ -51,6 +51,17 @@ release it merely follows.
 
 ### Fixed
 
+- **Layer 3 process hygiene** (#269, closes #213). The runtime's per-process spec cache matched
+  on the module name alone, so a server that outlived a recompile of its spec kept the
+  structure it first loaded — an invariant added to the spec was never checked by a running
+  server; the cache is keyed on the module's md5. `TLA.Simulation` stopped every server with a
+  bare `:kill`, skipping `terminate/2`; it stops as a supervisor would (`:shutdown`, a bounded
+  wait, then `:kill`), while failure injection stays a `:kill` because a crash runs no
+  `terminate/2`. `run/2` said it stopped at the first finding and ran every trace; it stops.
+  And the `constants:` option is gone: the server under test resolves constants from
+  application config, and a generator on any other assignment drove it against a different
+  specification.
+
 - **Trace rendering and counting edges** (#268, closes #212). `Trace.length` meant three things
   — states, states minus one, action count — and is the number of states everywhere now, the
   lasso splice sharing the cycle head once. A lasso's closing duplicate was labelled

@@ -500,8 +500,10 @@ defmodule TLA.Simulation do
     # Maximum steps per trace
     max_steps: pos_integer(),
 
-    # Constant assignments for the spec
-    constants: map(),
+    # There is deliberately no `constants:`. The server under test resolves its
+    # constants from application config (§The compiled spec and the constants
+    # are memoized per process), and a generator built on any other assignment
+    # would drive it against a different specification. Passing one is refused.
 
     # How to generate random messages
     message_generator: (TLA.State.t() -> term()),
@@ -982,7 +984,14 @@ end
 Both are needed on every transition: `__tla_spec__/0` builds its struct on each call, and
 the constants come from application config. They are resolved once per process and kept in
 the process dictionary beside the trace, which is where a GenServer's per-process state
-belongs — and the wrapper always runs inside the server.
+belongs — and the wrapper always runs inside the server. The entry is keyed on the spec
+module's `module_info(:md5)`, so a server that outlives a recompile of its spec picks the
+new one up on its next callback rather than keeping the structure it first loaded.
+
+When a simulation stops a server it does so as a supervisor would: `exit(:shutdown)`, so a
+server that traps exits runs its `terminate/2`, with a bounded wait before a `:kill`. Failure
+injection is a crash, and a crash runs no `terminate/2`; that one is a `:kill` on purpose.
+`TLA.Simulation.run/2` stops at the first finding; `traces_run` counts the traces that ran.
 
 **The constants are resolved by `TLA.Spec.Compiled.resolve_constants/1`, the same function
 `mix tla.check` uses.** A specification model checked under one assignment and an
