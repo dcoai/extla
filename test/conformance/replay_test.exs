@@ -33,6 +33,65 @@ defmodule TLA.ConformanceReplayTest do
       assert List.last(trace.states).count == 3
       assert :increment in trace.actions
     end
+
+    # #207. `Driver.call/3` matched the `:DOWN` on `^server`; a monitor on a registered name
+    # delivers `{name, node}` there, so neither clause matched and the call waited out its
+    # timeout. The same violation reported in 23 ms for a pid came back `:not_followed`
+    # after 5 seconds for a name — a real finding discarded, with delivery blamed.
+    test "reports the same violation for a registered name as for a pid", %{trace: trace} do
+      name = :"replay_named_#{System.unique_integer([:positive])}"
+      {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [], name: name)
+      Process.unlink(pid)
+
+      # Well inside the timeout, so a fall-through to it is what fails this, not a slow run.
+      named = Replay.counterexample(Impl.FaithfulToABuggySpec, trace, server: name, timeout: 500)
+
+      assert named.status == :violation
+      assert named.violation.kind == :invariant
+      assert named.violation.step == length(trace.actions)
+    end
+  end
+
+  describe "TLA.GenServer.Driver.call/3" do
+    alias TLA.GenServer.Driver
+
+    test "a pid and a registered name give the same outcome for a violation" do
+      name = :"driver_named_#{System.unique_integer([:positive])}"
+      {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [], name: name)
+      Process.unlink(pid)
+
+      # The checker's own counterexample: increments must alternate with `done`, and the
+      # third increment reaches count == 3, which `at_most_two` refuses.
+      steps = [:increment, :done, :increment, :done]
+      for step <- steps, do: assert({:ok, :ok} = Driver.call(name, step, 500))
+
+      assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
+               Driver.call(name, :increment, 500)
+
+      {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [])
+      Process.unlink(pid)
+      for step <- steps, do: assert({:ok, :ok} = Driver.call(pid, step, 500))
+
+      assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
+               Driver.call(pid, :increment, 500)
+    end
+
+    test "a server that stops for another reason reports :stopped under a name too" do
+      name = :"driver_stops_#{System.unique_integer([:positive])}"
+      {:ok, pid} = GenServer.start_link(Impl.Conforming, [], name: name)
+      Process.unlink(pid)
+
+      # Suspended, so the call is never served; then stopped from outside. The `:DOWN` for a
+      # name carries `{name, node}`, the shape the old match could not see.
+      :sys.suspend(pid)
+
+      spawn(fn ->
+        Process.sleep(20)
+        Process.exit(pid, :shutdown)
+      end)
+
+      assert {:stopped, :shutdown} = Driver.call(name, :get, 500)
+    end
   end
 
   describe "a counterexample the implementation cannot follow" do

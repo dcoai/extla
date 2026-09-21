@@ -55,7 +55,7 @@ defmodule TLA.Replay do
 
   Options:
 
-  - `:server` — a pid to drive. Without it the module is started with
+  - `:server` — a pid or registered name to drive. Without it the module is started with
     `GenServer.start_link(module, init_arg)`.
   - `:init_arg` — the argument for that start (default `[]`).
   - `:timeout` — per message (default 5000).
