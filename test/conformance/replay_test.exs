@@ -76,21 +76,71 @@ defmodule TLA.ConformanceReplayTest do
                Driver.call(pid, :increment, 500)
     end
 
+    # #254. The first version of this test raced: it killed the server from a spawned process
+    # after a sleep, and on a 2-core runner the kill landed before the send every time —
+    # `send/2` to a name whose process is gone raises `invalid destination`, where a dead pid
+    # is a no-op answered by `:noproc`. Two orderings, made deterministic: the kill waits until
+    # the `$gen_call` is in the suspended server's mailbox, so it always follows the send.
     test "a server that stops for another reason reports :stopped under a name too" do
       name = :"driver_stops_#{System.unique_integer([:positive])}"
       {:ok, pid} = GenServer.start_link(Impl.Conforming, [], name: name)
       Process.unlink(pid)
-
-      # Suspended, so the call is never served; then stopped from outside. The `:DOWN` for a
-      # name carries `{name, node}`, the shape the old match could not see.
       :sys.suspend(pid)
 
-      spawn(fn ->
-        Process.sleep(20)
-        Process.exit(pid, :shutdown)
-      end)
+      killer =
+        spawn(fn ->
+          receive do
+            :go -> :ok
+          end
 
-      assert {:stopped, :shutdown} = Driver.call(name, :get, 500)
+          until_queued(pid)
+          Process.exit(pid, :shutdown)
+        end)
+
+      send(killer, :go)
+      assert {:stopped, :shutdown} = Driver.call(name, :get, 5_000)
+    end
+
+    # A server that is already gone is the same outcome under every shape — nothing is sent,
+    # nothing raises. Before #254 a dead name raised from `send/2`.
+    test "a dead server reports :noproc for a pid and for a name alike" do
+      name = :"driver_dead_#{System.unique_integer([:positive])}"
+      {:ok, pid} = GenServer.start_link(Impl.Conforming, [], name: name)
+      Process.unlink(pid)
+      ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
+
+      assert {:stopped, :noproc} = Driver.call(pid, :get, 500)
+      assert {:stopped, :noproc} = Driver.call(name, :get, 500)
+      assert {:stopped, :noproc} = Driver.call({name, node()}, :get, 500)
+    end
+
+    # Every `GenServer.server()` shape is the pid path by construction, and this is what holds
+    # it there: a shape-dependent branch cannot come back on one shape only.
+    test "every server shape gives the identical outcome" do
+      for shape <- [:pid, :name, :name_and_node] do
+        name = :"driver_shape_#{System.unique_integer([:positive])}"
+        {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [], name: name)
+        Process.unlink(pid)
+
+        server =
+          case shape do
+            :pid -> pid
+            :name -> name
+            :name_and_node -> {name, node()}
+          end
+
+        for step <- [:increment, :done, :increment, :done] do
+          assert {:ok, :ok} = Driver.call(server, step, 500), "#{shape}: #{step}"
+        end
+
+        assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
+                 Driver.call(server, :increment, 500),
+               "#{shape}: the third increment"
+
+        assert {:stopped, :noproc} = Driver.call(server, :get, 500), "#{shape}: after the crash"
+      end
     end
   end
 
@@ -217,6 +267,14 @@ defmodule TLA.ConformanceReplayTest do
       }
 
       assert %{status: :ok, steps_checked: 2} = Replay.counterexample(Impl.Conforming, lasso)
+    end
+  end
+
+  defp until_queued(pid) do
+    case Process.info(pid, :message_queue_len) do
+      {:message_queue_len, n} when n > 0 -> :ok
+      {:message_queue_len, 0} -> until_queued(pid)
+      nil -> :ok
     end
   end
 
