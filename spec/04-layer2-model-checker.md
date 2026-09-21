@@ -981,7 +981,11 @@ defmodule TLA.Coverage do
     vacuous: [%{property: atom(), binding: [term()],
                 reason: :antecedent_never_held | :consequent_always_held}],
 
-    # Params combinations that no reachable state ever admitted.
+    # Params combinations that no reachable state ever admitted, for actions
+    # whose params all draw from constants or literals. An enabled action with
+    # one is a warning ("was enabled, but N of its bindings were never drawn"),
+    # not a strict-coverage failure. Empty under symmetry, where the bindings
+    # visited are a subset by construction and there is no universe to compare.
     unreached_params: %{atom() => [map()]},
 
     # `terminal` predicates that admitted a state which still had an enabled
@@ -1207,7 +1211,8 @@ defmodule TLA.Trace do
     message: String.t(),
     states: [TLA.State.t()],
     actions: [atom()],               # action taken at each step
-    length: non_neg_integer()
+    length: non_neg_integer()        # the number of STATES; a lasso's
+                                     # splice shares the cycle head once
   }
 
   @type lasso :: %{

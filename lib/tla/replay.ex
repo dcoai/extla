@@ -222,7 +222,8 @@ defmodule TLA.Replay do
       | states: prefix.states ++ cycle.states,
         actions: prefix.actions ++ cycle.actions,
         bindings: prefix.bindings ++ cycle.bindings,
-        length: prefix.length + cycle.length
+        # The cycle's first state is the prefix's last (#212).
+        length: prefix.length + cycle.length - 1
     }
   end
 

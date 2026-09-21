@@ -152,6 +152,24 @@ defmodule TLA.ProfileTest do
       |> assert_window_is_the_search("refuted")
     end
 
+    # #212. The bracket closed after the liveness pass, so the denominator charged the states
+    # liveness materialized again — against the module's own "the window is the search". The
+    # pass is outside it now: the two denominators agree to within the liveness graph's edge
+    # bookkeeping, which the search itself does.
+    test "the run's denominator excludes the liveness pass" do
+      config = %{constants: %{max: 5}, profile: true}
+      without = ModelChecker.run(TLA.ProfileTest.LiveSpec, config).profile.run_reductions
+
+      with_liveness =
+        TLA.ProfileTest.LiveSpec
+        |> ModelChecker.run(Map.put(config, :check_liveness, true))
+        |> Map.fetch!(:profile)
+        |> Map.fetch!(:run_reductions)
+
+      assert with_liveness < without * 1.5,
+             "liveness added #{with_liveness - without} reductions to a #{without}-reduction search"
+    end
+
     test "a liveness run, which rebuilds every state to evaluate predicates over it" do
       # The larger half of #133: 11 against 6 before the fix. `check_liveness` must be passed —
       # it defaults to false, and a probe that omits it never reaches the code at all.

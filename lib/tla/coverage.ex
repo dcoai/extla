@@ -58,6 +58,9 @@ defmodule TLA.Coverage do
           never_enabled: [atom()],
           invariants: %{atom() => invariant_coverage()},
           vacuous: [vacuity()],
+          # Bindings of an action that no reachable state ever drew, for actions whose params
+          # all draw from constants or literals. Empty under symmetry, where the visited
+          # bindings are a subset by construction and the universe is left `:unknown`.
           unreached_params: %{atom() => [map()]},
           terminal_but_live: [atom()],
 
@@ -491,8 +494,25 @@ defmodule TLA.Coverage do
     Enum.map(coverage.never_enabled, &never_enabled_line(&1, coverage.bounded_by)) ++
       Enum.map(coverage.vacuous, &vacuity_line/1) ++
       Enum.map(coverage.terminal_but_live, &"terminal #{inspect(&1)} admitted a live state") ++
+      unreached_lines(coverage) ++
       for {name, %{near_misses: 0}} <- coverage.invariants,
           do: "invariant #{inspect(name)} was never at risk"
+  end
+
+  # A binding no reachable state ever drew is a finding of the never-enabled kind, one
+  # binding at a time: the action ran, and these values of it never could (#212). Computed
+  # since the report existed and surfaced nowhere until now. A never-enabled action's whole
+  # universe is unreached and already has its own line, so those are not repeated.
+  defp unreached_lines(coverage) do
+    for {action, bindings} <- Enum.sort(coverage.unreached_params),
+        action not in coverage.never_enabled do
+      shown = bindings |> Enum.take(3) |> Enum.map_join(", ", &inspect/1)
+      more = if length(bindings) > 3, do: ", …", else: ""
+      verb = if length(bindings) == 1, do: "binding was", else: "bindings were"
+
+      "action #{inspect(action)} was enabled, but #{length(bindings)} of its #{verb} never " <>
+        "drawn: #{shown}#{more}"
+    end
   end
 
   defp never_enabled_line(name, :none), do: "action #{inspect(name)} was never enabled"

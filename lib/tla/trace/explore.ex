@@ -65,6 +65,7 @@ defmodule TLA.Trace.Explore do
 
   def explore(trace_or_lasso, expressions, opts) when is_list(expressions) do
     opts = Keyword.validate!(opts, changed_only: false, width: 68)
+    check_expressions!(expressions)
     {trace, loop} = Trace.join(trace_or_lasso)
 
     if trace.states == [] do
@@ -128,7 +129,29 @@ defmodule TLA.Trace.Explore do
     error -> {:error, Exception.message(error)}
   end
 
-  defp changing?({_name, cells}), do: length(Enum.uniq(cells)) > 1
+  # An expression that is not a one-argument function fails at every state, and used to be
+  # reported as N runtime errors under a row of `⚠` — or, under `changed_only`, as N warnings
+  # under no row at all. It is one mistake, refused once, before anything is evaluated (#212).
+  defp check_expressions!(expressions) do
+    Enum.each(expressions, fn
+      {name, fun} when is_atom(name) and is_function(fun, 1) ->
+        :ok
+
+      {name, other} when is_atom(name) ->
+        raise ArgumentError,
+              "expression #{inspect(name)} is #{inspect(other)}, not a function of one " <>
+                "argument. Write `#{name}: fn state -> ... end`."
+
+      other ->
+        raise ArgumentError,
+              "#{inspect(other)} is not a `name: fn state -> ... end` expression."
+    end)
+  end
+
+  # A row that never changes is hidden under `changed_only`; a row with an error in it is
+  # shown, since the error is the change worth seeing — hiding the row while printing its
+  # warnings below was the one shape a reader could not act on (#212).
+  defp changing?({_name, cells}), do: length(Enum.uniq(cells)) > 1 or "⚠" in cells
 
   # ── The table ───────────────────────────────────────────────────────────────
 

@@ -95,6 +95,54 @@ defmodule TLA.CoverageTest do
                coverage.actions[:tick].distinct_generated
     end
 
+    # #212. `unreached_params` was computed and surfaced nowhere. A binding an enabled action
+    # never drew is a finding of the never-enabled kind, one value at a time; a never-enabled
+    # action's whole universe is not repeated under it.
+    test "an enabled action's never-drawn bindings are warned about, once each", %{
+      coverage: coverage
+    } do
+      # `switch` is never enabled and has its own line; `tick` draws both of its steps.
+      refute Enum.any?(Coverage.warnings(coverage), &(&1 =~ "never drawn"))
+      assert Enum.any?(Coverage.warnings(coverage), &(&1 =~ "switch"))
+
+      defmodule PartlyDrawn do
+        use TLA.Spec
+        variable :n, type: 0..4
+
+        init do
+          n = 0
+        end
+
+        # `step: 5` can never satisfy the guard from any reachable `n`.
+        action :tick, params: [step: [1, 2, 5]] do
+          require n + step <= 4
+          n = n + step
+        end
+      end
+
+      partly = ModelChecker.run(PartlyDrawn, %{}).coverage
+      assert partly.unreached_params == %{tick: [%{step: 5}]}
+
+      assert Enum.any?(
+               Coverage.warnings(partly),
+               &(&1 =~
+                   "action :tick was enabled, but 1 of its binding was never drawn: %{step: 5}")
+             )
+
+      # Surfaced as a warning, not a strict-coverage failure: the action ran.
+      assert Coverage.clean?(partly)
+    end
+
+    test "under symmetry the universe is unknown, so nothing is called unreached" do
+      coverage =
+        coverage(TLA.TestSpecs.PerBinding, %{
+          constants: %{processes: MapSet.new([:p1, :p2])},
+          symmetry: [:processes]
+        })
+
+      assert coverage.unreached_params == %{}
+    end
+
     test "a never-enabled action's unexercised bindings are enumerated", %{coverage: coverage} do
       assert coverage.unreached_params[:switch] == [%{m: :a}, %{m: :b}]
     end

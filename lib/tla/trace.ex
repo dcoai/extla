@@ -28,6 +28,10 @@ defmodule TLA.Trace do
           # the binding a reader cannot tell which of |accounts|^2 transitions the
           # trace took, which is most of what a counterexample is for.
           bindings: [map()],
+
+          # The number of STATES — `length(states)`, so a trace of one state has length 1 and
+          # a lasso's splice drops the shared state. It once meant three things: this, one
+          # less in `from_json!/1`'s fallback, and the action count in `TLA.Simulation` (#212).
           length: non_neg_integer()
         }
 
@@ -114,7 +118,7 @@ defmodule TLA.Trace do
       type: type,
       property: data["property"] && TLA.State.Json.decode!(%{"a" => data["property"]}),
       message: data["message"] || "",
-      length: data["length"] || max(length(states) - 1, 0),
+      length: data["length"] || length(states),
       actions: Enum.map(list!(data, "actions"), &TLA.State.Json.decode!(%{"a" => &1})),
       bindings: Enum.map(list!(data, "bindings"), &TLA.State.Json.decode!/1),
       states: Enum.map(states, &TLA.State.Json.decode!/1)
@@ -515,13 +519,19 @@ defmodule TLA.Trace do
   """
   def format(%{prefix: prefix, cycle: nil}), do: format(prefix)
 
+  # A lasso's last printed state is its cycle head again, and the closing duplicate used to
+  # be labelled `[VIOLATION]` like a safety trace's final state — pointing the reader at the
+  # wrong thing (#212). A stuttering cycle has no duplicate: its one state IS the last.
   def format(%{prefix: _, cycle: %__MODULE__{}} = lasso) do
     {joined, {back_to, cycle}} = join(lasso)
+    last_label = if cycle.actions == [], do: :violation, else: {:cycle_head, back_to}
 
-    format(joined) <> loop_note(cycle, back_to)
+    render(joined, last_label) <> loop_note(cycle, back_to)
   end
 
-  def format(%__MODULE__{} = trace) do
+  def format(%__MODULE__{} = trace), do: render(trace, :violation)
+
+  defp render(%__MODULE__{} = trace, last_label) do
     header = header(trace)
     diffs = to_diffs(trace)
     last = length(diffs)
@@ -530,7 +540,7 @@ defmodule TLA.Trace do
       diffs
       |> Enum.with_index(1)
       |> Enum.map_join("\n", fn {diff, index} ->
-        step(diff, index, index == last, trace)
+        step(diff, index, index == last && last_label, trace)
       end)
 
     header <> "\n\n" <> body <> "\n" <> String.duplicate("═", 68) <> "\n"
@@ -623,13 +633,14 @@ defmodule TLA.Trace do
     "═══ " <> title <> " " <> line
   end
 
-  defp step(diff, index, last?, trace) do
+  defp step(diff, index, last, trace) do
     label =
-      cond do
-        index == 1 and last? -> "State 1 (Init) [VIOLATION]:"
-        index == 1 -> "State 1 (Init):"
-        last? -> "State #{index} [VIOLATION]:"
-        true -> "State #{index}:"
+      case {index, last} do
+        {1, :violation} -> "State 1 (Init) [VIOLATION]:"
+        {1, _} -> "State 1 (Init):"
+        {_, :violation} -> "State #{index} [VIOLATION]:"
+        {_, {:cycle_head, back_to}} -> "State #{index} (= state #{back_to}, the cycle head):"
+        _ -> "State #{index}:"
       end
 
     transition =
