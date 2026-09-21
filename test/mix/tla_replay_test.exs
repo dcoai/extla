@@ -193,6 +193,23 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       end
     end
 
+    # #211. An entry with no `violation` key was a `CaseClauseError` from inside the reader.
+    test "a results entry with no violation key is refused by name", %{tmp: tmp} do
+      path = Path.join(tmp, "keyless.json")
+
+      File.write!(
+        path,
+        Jason.encode!(%{
+          "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+          "specs" => [%{"spec" => "TLA.Conformance.Counter.BuggySpec", "status" => "ok"}]
+        })
+      )
+
+      assert_raise Mix.Error, ~r/has no "violation" key/, fn ->
+        Replay.run([@server, "--trace", path])
+      end
+    end
+
     test "a results file written by a schema version this ExTLA does not read", %{tmp: tmp} do
       path = Path.join(tmp, "future.json")
 

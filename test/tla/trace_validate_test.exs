@@ -248,14 +248,33 @@ defmodule TLA.TraceValidateTest do
       assert Trace.format(trace) =~ "State 4 [VIOLATION]"
     end
 
-    test "a JSON trace with no bindings is refused, not rendered as one state" do
+    # Refused at the read now (#211), one step earlier than `format/1` — the document is data
+    # from outside the program, and its shape is checked before anything is built from it.
+    test "a JSON trace with no bindings is refused on read, naming the counts" do
       {trace, _spec, _constants} = safety_trace()
-      no_bindings = trace |> Trace.to_json() |> Map.delete("bindings") |> Trace.from_json!()
-
-      assert no_bindings.bindings == []
+      no_bindings = trace |> Trace.to_json() |> Map.delete("bindings")
 
       assert_raise ArgumentError, ~r/4 states, 3 actions and 0 bindings/, fn ->
-        Trace.format(no_bindings)
+        Trace.from_json!(no_bindings)
+      end
+    end
+
+    test "a JSON trace with an unknown or non-string type is refused by name" do
+      {trace, _spec, _constants} = safety_trace()
+      json = Trace.to_json(trace)
+
+      # `"ok"` is an existing atom, so `String.to_existing_atom/1` used to accept it and
+      # `format/1` failed later on a type it does not know.
+      assert_raise ArgumentError, ~r/"ok" is not a trace type/, fn ->
+        Trace.from_json!(%{json | "type" => "ok"})
+      end
+
+      assert_raise ArgumentError, ~r/7 is not a trace type/, fn ->
+        Trace.from_json!(%{json | "type" => 7})
+      end
+
+      assert_raise ArgumentError, ~r/"actions" is not a list/, fn ->
+        Trace.from_json!(%{json | "actions" => "tick"})
       end
     end
   end

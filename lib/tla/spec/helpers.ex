@@ -162,7 +162,23 @@ defmodule TLA.Spec.Helpers do
       iex> TLA.Spec.Helpers.for_each(MapSet.new([:a, :b]), fn _ -> 0 end)
       %{a: 0, b: 0}
   """
-  def for_each(domain, f), do: Map.new(domain, fn k -> {k, f.(k)} end)
+  def for_each(domain, f) when is_struct(domain, MapSet) or is_struct(domain, Range),
+    do: Map.new(domain, fn k -> {k, f.(k)} end)
+
+  # TLA+'s `[x \in S |-> …]` ranges over a SET. A list is a sequence here, and building a
+  # function over one deduplicated it silently (#211); a map is already a function. Both
+  # are refused by name, the way `at/2` refuses a term that is neither.
+  def for_each(other, _f) do
+    raise ArgumentError,
+          "for_each/2 builds a function over a set, and #{inspect(other)} is " <>
+            "#{describe_not_a_set(other)}. Pass a MapSet or a range (02-dsl-semantics.md §1.6)."
+  end
+
+  defp describe_not_a_set(list) when is_list(list),
+    do: "a sequence — a function on 1..Len already, whose elements Enum.map/2 can transform"
+
+  defp describe_not_a_set(map) when is_map(map), do: "a function already"
+  defp describe_not_a_set(_other), do: "neither a set nor a range"
 
   @doc """
   TLA+: `[f EXCEPT ![k] = g(@)]`.
@@ -178,8 +194,26 @@ defmodule TLA.Spec.Helpers do
   @doc "The keys of a function, as a list."
   def keys(map), do: Map.keys(map)
 
-  @doc "TLA+: `DOMAIN f`, as a set."
-  def domain(map), do: MapSet.new(Map.keys(map))
+  @doc """
+  TLA+: `DOMAIN f`, as a set.
+
+  A sequence is a function on `1..Len(s)` — that is what `at/2` applies it as — so its
+  domain is that range (#211); this used to raise `BadMapError` on a list `at/2` accepted.
+
+      iex> TLA.Spec.Helpers.domain(%{a: 1, b: 2})
+      MapSet.new([:a, :b])
+
+      iex> TLA.Spec.Helpers.domain([:x, :y, :z])
+      MapSet.new([1, 2, 3])
+  """
+  def domain(map) when is_map(map) and not is_struct(map), do: MapSet.new(Map.keys(map))
+  def domain(seq) when is_list(seq), do: MapSet.new(1..length(seq)//1)
+
+  def domain(other) do
+    raise ArgumentError,
+          "domain/1 takes a function (a map) or a sequence (a list); #{inspect(other)} is " <>
+            "neither (02-dsl-semantics.md §1.6)."
+  end
 
   # ── Arithmetic ──
 

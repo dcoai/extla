@@ -73,6 +73,15 @@ defmodule TLA.Mix.TraceFile do
 
       %{"violation" => violation} ->
         Trace.from_json!(violation)
+
+      # An entry with no `violation` key at all is not a result `mix tla.check` wrote; it used
+      # to be a `CaseClauseError` here (#211).
+      entry ->
+        Mix.raise(
+          "#{path}'s entry for #{spec} has no \"violation\" key (it carries: " <>
+            "#{entry |> Map.keys() |> Enum.join(", ")}), so it is not a result " <>
+            "`mix tla.check --format json` wrote."
+        )
     end
   end
 
