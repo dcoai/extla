@@ -126,15 +126,35 @@ defmodule TLA.ConformanceSimulationTest do
   # server alive: eight `Impl.Conforming` processes after one failed run. The server is now
   # owned by the trace's process, linked for its whole life.
   describe "the server's lifetime is the trace's" do
-    defp conforming_servers do
+    # A module of this test's own (#266): counting `Impl.Conforming` processes counted the
+    # servers other async tests had running at the same moment, and reported them as leaks.
+    # `Leaky` is the conforming implementation under a name nothing else starts.
+    defmodule Leaky do
+      use GenServer
+      use TLA.GenServer, spec: Spec, refinement: Refinement
+
+      def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+      @impl true
+      def init(_opts), do: {:ok, %{value: 0, status: :ready}}
+
+      @impl true
+      def handle_call(:increment, _from, state),
+        do: {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+
+      def handle_call(:done, _from, state), do: {:reply, :ok, %{state | status: :ready}}
+      def handle_call(:reset, _from, state), do: {:reply, :ok, %{state | value: 0}}
+    end
+
+    defp leaky_servers do
       for pid <- Process.list(),
           {:dictionary, dict} <- [Process.info(pid, :dictionary)],
-          dict[:"$initial_call"] == {Impl.Conforming, :init, 1},
+          dict[:"$initial_call"] == {Leaky, :init, 1},
           do: pid
     end
 
     test "a generator that raises leaves no server alive" do
-      before = conforming_servers()
+      assert leaky_servers() == []
 
       explode = fn _state -> raise "the generator is broken" end
 
@@ -143,14 +163,14 @@ defmodule TLA.ConformanceSimulationTest do
       Process.flag(:trap_exit, true)
 
       spawn_link(fn ->
-        Simulation.run(Impl.Conforming, %{traces: 8, seed: 1, message_generator: explode})
+        Simulation.run(Leaky, %{traces: 8, seed: 1, message_generator: explode})
       end)
 
       assert_receive {:EXIT, _, {%RuntimeError{message: "the generator is broken"}, _}}, 5_000
 
       # The links deliver the kill asynchronously, so wait for the count to settle rather
       # than for a fixed time -- and fail with the survivors named if it never does.
-      assert settle(fn -> conforming_servers() -- before end, 2_000) == []
+      assert settle(fn -> leaky_servers() end, 2_000) == []
     end
 
     defp settle(count, deadline_ms) do

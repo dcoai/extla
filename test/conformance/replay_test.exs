@@ -43,8 +43,10 @@ defmodule TLA.ConformanceReplayTest do
       {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [], name: name)
       Process.unlink(pid)
 
-      # Well inside the timeout, so a fall-through to it is what fails this, not a slow run.
-      named = Replay.counterexample(Impl.FaithfulToABuggySpec, trace, server: name, timeout: 500)
+      # The default timeout (#266): the defect was a fall-through to it, and the fix is on the
+      # match, not the clock. A 500 ms timeout here read `{:timeout, 500}` on the 2-core
+      # runner under full-suite load, where a violation's raise and `:DOWN` can take longer.
+      named = Replay.counterexample(Impl.FaithfulToABuggySpec, trace, server: name)
 
       assert named.status == :violation
       assert named.violation.kind == :invariant
@@ -52,6 +54,9 @@ defmodule TLA.ConformanceReplayTest do
     end
   end
 
+  # Every timeout below is the default 5 s (#266). These tests are about the SHAPE of the
+  # outcome for each server form; a 500 ms timeout encoded a latency assumption the 2-core
+  # runner does not share under full-suite load, and turned a violation into `{:timeout, 500}`.
   describe "TLA.GenServer.Driver.call/3" do
     alias TLA.GenServer.Driver
 
@@ -63,17 +68,17 @@ defmodule TLA.ConformanceReplayTest do
       # The checker's own counterexample: increments must alternate with `done`, and the
       # third increment reaches count == 3, which `at_most_two` refuses.
       steps = [:increment, :done, :increment, :done]
-      for step <- steps, do: assert({:ok, :ok} = Driver.call(name, step, 500))
+      for step <- steps, do: assert({:ok, :ok} = Driver.call(name, step, 5_000))
 
       assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
-               Driver.call(name, :increment, 500)
+               Driver.call(name, :increment, 5_000)
 
       {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [])
       Process.unlink(pid)
-      for step <- steps, do: assert({:ok, :ok} = Driver.call(pid, step, 500))
+      for step <- steps, do: assert({:ok, :ok} = Driver.call(pid, step, 5_000))
 
       assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
-               Driver.call(pid, :increment, 500)
+               Driver.call(pid, :increment, 5_000)
     end
 
     # #254. The first version of this test raced: it killed the server from a spawned process
@@ -111,9 +116,9 @@ defmodule TLA.ConformanceReplayTest do
       Process.exit(pid, :kill)
       assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
 
-      assert {:stopped, :noproc} = Driver.call(pid, :get, 500)
-      assert {:stopped, :noproc} = Driver.call(name, :get, 500)
-      assert {:stopped, :noproc} = Driver.call({name, node()}, :get, 500)
+      assert {:stopped, :noproc} = Driver.call(pid, :get, 5_000)
+      assert {:stopped, :noproc} = Driver.call(name, :get, 5_000)
+      assert {:stopped, :noproc} = Driver.call({name, node()}, :get, 5_000)
     end
 
     # Every `GenServer.server()` shape is the pid path by construction, and this is what holds
@@ -132,14 +137,14 @@ defmodule TLA.ConformanceReplayTest do
           end
 
         for step <- [:increment, :done, :increment, :done] do
-          assert {:ok, :ok} = Driver.call(server, step, 500), "#{shape}: #{step}"
+          assert {:ok, :ok} = Driver.call(server, step, 5_000), "#{shape}: #{step}"
         end
 
         assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
-                 Driver.call(server, :increment, 500),
+                 Driver.call(server, :increment, 5_000),
                "#{shape}: the third increment"
 
-        assert {:stopped, :noproc} = Driver.call(server, :get, 500), "#{shape}: after the crash"
+        assert {:stopped, :noproc} = Driver.call(server, :get, 5_000), "#{shape}: after the crash"
       end
     end
   end
