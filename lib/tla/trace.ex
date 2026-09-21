@@ -340,11 +340,8 @@ defmodule TLA.Trace do
   end
 
   defp legal_steps(spec, constants, %__MODULE__{} = trace, what) do
-    if length(trace.actions) != length(trace.states) - 1 or
-         length(trace.bindings) != length(trace.actions) do
-      {:error,
-       "#{what} has #{length(trace.states)} states, #{length(trace.actions)} actions and " <>
-         "#{length(trace.bindings)} bindings, which cannot describe one behaviour."}
+    if misaligned?(trace) do
+      {:error, "#{what} has #{shape(trace)}, which cannot describe one behaviour."}
     else
       trace.states
       |> Enum.zip(tl(trace.states))
@@ -427,10 +424,42 @@ defmodule TLA.Trace do
     end
   end
 
+  # One behaviour: n states, n - 1 actions, one binding per action. Stated in the moduledoc
+  # and checked in two places — `validate/3` reports it, and `to_diffs/1` refuses it.
+  defp misaligned?(%__MODULE__{} = trace) do
+    length(trace.actions) != length(trace.states) - 1 or
+      length(trace.bindings) != length(trace.actions)
+  end
+
+  defp shape(%__MODULE__{} = trace) do
+    "#{length(trace.states)} states, #{length(trace.actions)} actions and " <>
+      "#{length(trace.bindings)} bindings"
+  end
+
   @doc """
   Export a trace as a sequence of state diffs, for programmatic consumption.
+
+  A misaligned trace — one whose actions, bindings and states cannot describe one behaviour —
+  is refused rather than zipped (#204). `Enum.zip/1` stops at the shortest list, so a trace
+  one action short rendered three states of four and marked the wrong one `[VIOLATION]`; the
+  state that actually violated was never shown. The shape the simulation's restart branch
+  produced was exactly that, and `Trace.Explore`, which renders every column, disagreed with
+  `format/1` about the same trace.
   """
-  def to_diffs(%__MODULE__{states: [first | rest]} = trace) do
+  def to_diffs(%__MODULE__{states: [_ | _]} = trace) do
+    if misaligned?(trace) do
+      raise ArgumentError,
+            "a trace with #{shape(trace)} cannot describe one behaviour: n states need " <>
+              "n - 1 actions and one binding each. Rendering it would drop the surplus and " <>
+              "mark the wrong state."
+    end
+
+    diffs(trace)
+  end
+
+  def to_diffs(%__MODULE__{states: []}), do: []
+
+  defp diffs(%__MODULE__{states: [first | rest]} = trace) do
     steps = Enum.zip([trace.actions, trace.bindings, rest])
 
     [%{action: nil, params: %{}, changed: first, state: first}] ++
@@ -443,8 +472,6 @@ defmodule TLA.Trace do
         %{action: action, params: params, changed: changed, state: state}
       end)
   end
-
-  def to_diffs(%__MODULE__{states: []}), do: []
 
   @doc """
   Pretty-print a trace or a lasso, marking the variables each step changed.
