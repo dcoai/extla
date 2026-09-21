@@ -437,7 +437,7 @@ defmodule TLA.Simulation do
       states: Enum.reverse(outcome.states),
       actions: Enum.reverse(outcome.actions),
       bindings: Enum.reverse(outcome.bindings),
-      length: length(outcome.actions)
+      length: length(outcome.states)
     }
   end
 

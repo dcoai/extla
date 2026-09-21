@@ -231,20 +231,31 @@ defmodule TLA.ModelChecker do
         symmetry: symmetry_mappings(config)
       )
 
-    run = searched |> search(config, graph, profile) |> check_temporals()
+    run = search(searched, config, graph, profile)
 
+    # The bracket closes HERE, before the liveness pass: `TLA.Profile`'s window is the search
+    # and only the search, and the liveness pass materializes every state again to evaluate
+    # predicates over it. Closing after `check_temporals/1` charged that pass to the
+    # denominator, against the module's own doc (#212).
+    #
     # The workers' contributions are already summed into `run.profile` by
     # `TLA.ModelChecker.Parallel.merge/2`; this adds the COORDINATOR's own, which is the
     # seeding of the initial states and their invariant checks. One code path for both
     # cases: on a single-worker run `run.profile` is still the zeroed accumulator and every
-    # count is in this process's dictionary.
+    # count is in this process's dictionary — read out, then cleared, so a later run in the
+    # same process (a test suite) starts from nothing.
     profile =
       if profile do
+        run_reductions = Profile.reductions() - reductions_before
+        collected = Profile.collect(profile)
+        Profile.clear(profile)
+
         run.profile
-        |> Profile.merge(Profile.collect(profile))
-        |> Profile.finalize(Profile.reductions() - reductions_before)
+        |> Profile.merge(collected)
+        |> Profile.finalize(run_reductions)
       end
 
+    run = check_temporals(run)
     result = finish(run, System.monotonic_time(:millisecond) - started, profile)
 
     {result, run.graph}
@@ -354,6 +365,14 @@ defmodule TLA.ModelChecker do
   # The universe of parameter combinations is a property of the constants, not of
   # any one state, so it is enumerated once — on the first initial state, which
   # is a real state rather than a stand-in.
+  #
+  # Not under symmetry (#212): the reduction visits one representative per orbit, so the
+  # bindings the run saw are a subset of the bindings the spec admits by construction, and
+  # every unseen one would be reported as unreached. The universe stays `:unknown` there,
+  # which `unreached/1` renders as nothing and the coverage doc explains.
+  defp note_universes(%{config: %{symmetry: names}} = run, _state) when names not in [nil, []],
+    do: run
+
   defp note_universes(run, state) do
     if Enum.any?(Map.values(run.coverage.param_universe), &(&1 == :unknown)) do
       coverage =

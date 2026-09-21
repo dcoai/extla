@@ -145,6 +145,19 @@ defmodule TLA.ModelChecker.LivenessTest do
 
       assert output =~ "↺ back to state 1"
       assert output =~ "repeat forever"
+
+      # #212. The closing duplicate is the cycle head again, and was labelled `[VIOLATION]`
+      # like a safety trace's final state — the wrong thing to point a reader at.
+      refute output =~ "[VIOLATION]"
+      assert output =~ ~r/State \d+ \(= state 1, the cycle head\):/
+    end
+
+    test "a lasso's length counts states, sharing the cycle head once" do
+      violation = check(IdlingUnfair, %{}, [:eventually_two]).violation
+      {joined, _} = Trace.join(violation)
+
+      assert joined.length == length(joined.states)
+      assert joined.length == violation.prefix.length + violation.cycle.length - 1
     end
   end
 

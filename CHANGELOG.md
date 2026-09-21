@@ -51,6 +51,18 @@ release it merely follows.
 
 ### Fixed
 
+- **Trace rendering and counting edges** (#268, closes #212). `Trace.length` meant three things
+  — states, states minus one, action count — and is the number of states everywhere now, the
+  lasso splice sharing the cycle head once. A lasso's closing duplicate was labelled
+  `[VIOLATION]` like a safety trace's last state; it is labelled as the return to the cycle
+  head. The explorer hid an all-error row under `changed_only` while printing its warnings,
+  and reported a non-function expression as one runtime error per state; the row is shown and
+  the expression refused once. `unreached_params` was computed and surfaced nowhere; an
+  enabled action's never-drawn bindings are a warning, and under symmetry the universe is left
+  unknown rather than compared against a reduced visit. And the profile's run bracket closed
+  after the liveness pass, charging the states it materialized to a denominator whose doc says
+  "the window is the search"; it closes before, and the coordinator clears its counters.
+
 - **Four DSL front-end edges are diagnostics, not crashes or silences** (#264, closes #210).
   A `let` could shadow a `params:` name (or `old`/`new`): §1.3 said locals shadow nothing and
   two of three cases were enforced. A variable inside a temporal quantifier's literal list

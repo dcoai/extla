@@ -229,6 +229,16 @@ defmodule TLA.Profile do
   end
 
   @doc """
+  Remove this process's counters from its dictionary. `zero/1` does this on a worker's way
+  in; the coordinator calls it on its way out (#212), so the keys do not outlive the run in
+  a long-lived process.
+  """
+  def clear(%__MODULE__{} = profile) do
+    Enum.each(Map.keys(profile.declarations), &Process.delete(dict_key(&1)))
+    :ok
+  end
+
+  @doc """
   This process's contribution, read out of its dictionary.
 
   Raw: the calibration is subtracted by `finalize/2`, after any merging, so the constant is

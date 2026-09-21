@@ -258,6 +258,21 @@ defmodule TLA.TraceExploreTest do
       end
     end
 
+    # #212. A non-function expression failed at every state and was reported as N runtime
+    # errors — under `changed_only`, N warnings beneath no row at all.
+    test "an expression that is not a function is refused once, up front" do
+      error = assert_raise(ArgumentError, fn -> Trace.explore(trace(), n: 42) end)
+      assert error.message =~ "expression :n is 42, not a function of one argument"
+    end
+
+    test "a row that errors is shown under changed_only, since the error is the change" do
+      output = Trace.explore(trace(), [boom: fn _ -> raise "no" end], changed_only: true)
+
+      # The ROW, not only the warnings beneath: a name followed by an error cell in the table.
+      assert output =~ ~r/^\s+boom\s+⚠/m
+      refute output =~ "hid them all"
+    end
+
     test "expressions as a map, because the order is information" do
       assert_raise ArgumentError, ~r/must be a keyword list/, fn ->
         Trace.explore(trace(), %{n: & &1.n})
