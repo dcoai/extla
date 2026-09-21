@@ -121,6 +121,64 @@ defmodule TLA.ConformanceSimulationTest do
     end
   end
 
+  # #206. Each server was started linked, unlinked at once, and stopped only on the normal
+  # return — so a generator that raised once took the run down and left every started
+  # server alive: eight `Impl.Conforming` processes after one failed run. The server is now
+  # owned by the trace's process, linked for its whole life.
+  describe "the server's lifetime is the trace's" do
+    defp conforming_servers do
+      for pid <- Process.list(),
+          {:dictionary, dict} <- [Process.info(pid, :dictionary)],
+          dict[:"$initial_call"] == {Impl.Conforming, :init, 1},
+          do: pid
+    end
+
+    test "a generator that raises leaves no server alive" do
+      before = conforming_servers()
+
+      explode = fn _state -> raise "the generator is broken" end
+
+      # The raise reaches the caller as the linked task's exit, as a crash always did; what
+      # is different is what it leaves behind.
+      Process.flag(:trap_exit, true)
+
+      spawn_link(fn ->
+        Simulation.run(Impl.Conforming, %{traces: 8, seed: 1, message_generator: explode})
+      end)
+
+      assert_receive {:EXIT, _, {%RuntimeError{message: "the generator is broken"}, _}}, 5_000
+
+      # The links deliver the kill asynchronously, so wait for the count to settle rather
+      # than for a fixed time -- and fail with the survivors named if it never does.
+      assert settle(fn -> conforming_servers() -- before end, 2_000) == []
+    end
+
+    defp settle(count, deadline_ms) do
+      deadline = System.monotonic_time(:millisecond) + deadline_ms
+
+      Stream.repeatedly(count)
+      |> Enum.find(fn left -> left == [] or System.monotonic_time(:millisecond) > deadline end)
+    end
+
+    test "init/1 returning :ignore is an outcome, not a MatchError" do
+      defmodule Declines do
+        use GenServer
+        use TLA.GenServer, spec: Spec, refinement: Refinement
+
+        def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+        @impl true
+        def init(_opts), do: :ignore
+      end
+
+      result = Simulation.run(Declines, %{traces: 2, seed: 1})
+
+      assert result.status == :error
+      assert result.detail =~ "init/1 returned :ignore"
+      assert result.detail =~ "nothing was checked"
+    end
+  end
+
   describe "the generator" do
     test "produces a message for an action the spec declares" do
       generate = Generator.from_spec(Spec, Refinement, @constants)
