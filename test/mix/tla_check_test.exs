@@ -155,6 +155,18 @@ defmodule Mix.Tasks.Tla.CheckTest do
       assert code == 0
     end
 
+    # #208. The budget skip was the one unnamed liveness skip, and this flag is where it bit:
+    # exit 0, and a temporal property nobody checked went unmentioned. `Idling` declares two
+    # and is stopped at two states here.
+    test "--allow-incomplete still says which temporal properties were not checked" do
+      {output, code} =
+        check(["TLA.TestSpecs.Idling", "--max-states", "2", "--allow-incomplete"])
+
+      assert code == 0
+      assert output =~ "2 temporal properties were not checked"
+      assert output =~ "max_states"
+    end
+
     test "--strict-coverage exits 3 on a never-enabled action" do
       {output, code} = check(["TLA.TestSpecs.WithDefaults", "--strict-coverage"])
 

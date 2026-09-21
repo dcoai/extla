@@ -654,6 +654,18 @@ defmodule TLA.ModelChecker do
   # asked when the spec deadlocks — a deadlock is a safety failure, and answering a
   # liveness question about a spec that has one answers the wrong question.
   defp check_temporals(%{config: %{check_liveness: false}} = run), do: run
+
+  # A search the budget stopped, or a safety counterexample halted, is not asked the liveness
+  # question either -- and used to say nothing about that (#208). #167 named the deadlock skip
+  # and the constraint skip and left these two silent, which mattered most for the bound:
+  # `mix tla.check --allow-incomplete` turns a bounded run into exit 0, and a temporal property
+  # nobody checked went unmentioned in a green result.
+  defp check_temporals(%{outcome: :max_states_reached} = run),
+    do: %{run | liveness_skipped: :bounded}
+
+  defp check_temporals(%{outcome: {:violation, _}} = run),
+    do: %{run | liveness_skipped: :violation}
+
   defp check_temporals(%{outcome: outcome} = run) when outcome != :ok, do: run
 
   defp check_temporals(run) do
@@ -854,6 +866,10 @@ defmodule TLA.ModelChecker do
   # the refutation. The `check_liveness: false` case above already warned; these did not.
   defp liveness_skipped_warning(warnings, %{liveness_skipped: nil}), do: warnings
 
+  # Nothing to name when nothing was declared: a spec with no temporal property was not
+  # deprived of a check it never asked for.
+  defp liveness_skipped_warning(warnings, %{spec: %{temporals: []}}), do: warnings
+
   defp liveness_skipped_warning(warnings, %{liveness_skipped: reason, spec: spec}) do
     count = length(spec.temporals)
 
@@ -875,6 +891,17 @@ defmodule TLA.ModelChecker do
       "a `state_constraint:` held states back, so the graph describes part of the state " <>
         "space and a liveness verdict over it would be a claim about behaviours nobody " <>
         "explored. Re-run without the constraint to ask."
+
+  defp liveness_skip_reason(:bounded),
+    do:
+      "the state budget stopped the search, so the graph describes part of the state space " <>
+        "and a liveness verdict over it would be a claim about behaviours nobody explored. " <>
+        "Raise `max_states` to ask."
+
+  defp liveness_skip_reason(:violation),
+    do:
+      "a safety counterexample halted the search before the graph was complete. Fix the " <>
+        "violation to ask."
 
   defp constrained_warning(warnings, :constrained) do
     warnings ++

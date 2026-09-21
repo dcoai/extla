@@ -495,6 +495,17 @@ It is worth stating because the transition between the two is where a verdict go
 `mix tla.check` checks is **not** checked by the same spec under `assert_spec` unless the
 config says so. A suite can be green over a temporal property nothing evaluated.
 
+**A liveness pass that was asked for and did not run is named.** Liveness runs over a
+finished graph and only over one, so four things skip it: a deadlock (a safety failure;
+the liveness question would answer the wrong one), a `state_constraint:` that held states
+back, the state budget stopping the search, and a safety counterexample halting it. Each
+puts one warning in `warnings` — "N temporal properties were not checked: <why, and what
+to do>" — and the run's status is whatever the search produced. The last two were silent
+until #208, and the budget one is the case that mattered: `mix tla.check
+--allow-incomplete` turns a bounded run into exit 0, so a temporal property nobody checked
+went unmentioned in a green result. A spec with no temporal property gets no such warning;
+it was not deprived of a check it never asked for.
+
 ```elixir
 
   @type result :: %{
