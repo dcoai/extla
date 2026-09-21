@@ -51,6 +51,14 @@ release it merely follows.
 
 ### Fixed
 
+- **A liveness pass skipped by the state budget or a safety counterexample is named** (#257,
+  closes #208). #167 named the deadlock skip and the constraint skip and left these two
+  silent: `check_liveness: true, max_states: 3` on a spec with a temporal reported the bound
+  and nothing about the property, and `mix tla.check --allow-incomplete` turned that into
+  exit 0 with the property unmentioned. Both now put the same "N temporal properties were not
+  checked" warning in the result, with the reason and what to do; a spec with no temporal
+  gets no such warning.
+
 - **The ledger enumerated three of five declaration kinds** (#256, closes #202). Under a header
   promising "every item each TLA.Spec declares", `action_property` and `terminal` had no rows
   at all — the kind list was written by hand. It is now `TLA.Spec.Hash.kinds/0`, so a kind

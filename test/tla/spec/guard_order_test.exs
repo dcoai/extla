@@ -159,6 +159,29 @@ defmodule TLA.Spec.GuardOrderTest do
       end
     end
 
+    defmodule Violates do
+      use TLA.Spec
+
+      variable :n, type: 0..3
+
+      init do
+        n = 0
+      end
+
+      action :bump do
+        require n < 3
+        n = n + 1
+      end
+
+      invariant :below_two do
+        n < 2
+      end
+
+      temporal :reaches_three do
+        eventually(n == 3)
+      end
+    end
+
     defmodule Constrainable do
       use TLA.Spec
 
@@ -227,6 +250,38 @@ defmodule TLA.Spec.GuardOrderTest do
 
       assert result.status == :violation
       assert %{prefix: _, cycle: _} = result.violation
+    end
+
+    # #208. The deadlock skip and the constraint skip were named; the budget skip was not, and
+    # that is the one `mix tla.check --allow-incomplete` turns into exit 0 — a temporal
+    # property nobody checked, unmentioned in a green result.
+    test "a run the state budget stopped skips liveness and says so" do
+      result = TLA.ModelChecker.run(Constrainable, %{check_liveness: true, max_states: 2})
+
+      assert result.status == :max_states_reached
+      assert result.status == :max_states_reached
+
+      assert Enum.any?(result.warnings, &(&1 =~ "temporal property was not checked")),
+             "a budget-skipped liveness pass must name itself; got #{inspect(result.warnings)}"
+
+      assert Enum.any?(result.warnings, &(&1 =~ "max_states"))
+    end
+
+    test "a safety counterexample that halted the search names the liveness skip too" do
+      result = TLA.ModelChecker.run(Violates, %{check_liveness: true})
+
+      assert result.status == :violation
+      assert result.violation.property == :below_two
+      assert Enum.any?(result.warnings, &(&1 =~ "safety counterexample halted the search"))
+    end
+
+    # Nothing to name when nothing was declared.
+    test "a bounded run of a spec with no temporal property has no skip to report" do
+      result =
+        TLA.ModelChecker.run(TLA.TestSpecs.Unbounded, %{check_liveness: true, max_states: 5})
+
+      assert result.status == :max_states_reached
+      refute Enum.any?(result.warnings, &(&1 =~ "not checked"))
     end
   end
 
