@@ -17,7 +17,18 @@ defmodule TLA.GenServer.Driver do
   @type outcome ::
           {:ok, term()} | {:violation, Violation.t()} | {:stopped, term()} | {:timeout, timeout()}
 
-  @doc "Call `server` with `message`, reporting the outcome instead of raising it."
+  @doc """
+  Call `server` — a pid or a registered name — with `message`, reporting the outcome instead
+  of raising it.
+
+  The `:DOWN` is matched on the monitor reference alone. It used to be matched on `^server`
+  as well, which is right for a pid and wrong for a name: a monitor on a registered name
+  delivers its `:DOWN` with `{name, node}` in that position, never the bare atom, so neither
+  clause matched, the message sat in the mailbox, and the call fell through to the timeout.
+  `Replay.counterexample(…, server: :named)` then reported `:not_followed` after the full
+  wait — a violation the server had raised, discarded, with delivery blamed (#207). The
+  reference is unique to this call, so it is the whole of what needs matching.
+  """
   def call(server, message, timeout \\ 5_000) do
     ref = Process.monitor(server)
     send(server, {:"$gen_call", {self(), ref}, message})
@@ -27,10 +38,10 @@ defmodule TLA.GenServer.Driver do
         Process.demonitor(ref, [:flush])
         {:ok, reply}
 
-      {:DOWN, ^ref, :process, ^server, {%Violation{} = violation, _stack}} ->
+      {:DOWN, ^ref, :process, _server, {%Violation{} = violation, _stack}} ->
         {:violation, violation}
 
-      {:DOWN, ^ref, :process, ^server, reason} ->
+      {:DOWN, ^ref, :process, _server, reason} ->
         {:stopped, reason}
     after
       timeout ->

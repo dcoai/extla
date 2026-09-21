@@ -48,6 +48,16 @@ hanged
 
 ### Fixed
 
+### Fixed
+
+- **`Replay.counterexample/3` with `server: <registered name>` reported `:not_followed` instead
+  of the violation the server raised** (#252, closes #207). `TLA.GenServer.Driver.call/3`
+  matched the `:DOWN` on the server the caller passed; a monitor on a registered name delivers
+  `{name, node}` there, never the bare atom, so neither clause matched and the call waited out
+  its timeout — 5 seconds, then delivery blamed for a finding that had been made and thrown
+  away. The `:DOWN` is now matched on the monitor reference alone, which is unique to the call,
+  and a pid and a name give the same outcome.
+
 - **A profile floor over too few evaluations is marked, not presented as reproducible** (#249,
   closes #248). The report's footer said the cost "is exactly reproducible"; for a declaration
   evaluated once it is the one sample, excursion included. `TLA.ProfileTest`'s fixture has
