@@ -57,6 +57,15 @@ release it merely follows.
   document read as a proof. It now says what the status says — bounded at N states by the
   limit, held back by the constraint, or the status by name — and only `ok` is verified.
 
+- **A raise in one simulation trace orphaned every in-flight server** (#262, closes #206).
+  `TLA.Simulation` started each server linked, unlinked it at once, and stopped it only on
+  the normal return, so a message generator that raised once took the run down and left
+  every started server alive — eight `Impl.Conforming` processes after one failed run. Each
+  trace now runs in a process that owns its server: linked for the trace's whole life and
+  trapping exits, so a raise anywhere in the trace takes the server with it and a server's
+  own crash still arrives as an outcome. `init/1` returning `:ignore` or `{:error, _}` is an
+  `:error` outcome naming it, not a `MatchError`.
+
 - **`Trace.validate/3` accepted a stutter at a live state** (#259, closes #203). A one-state
   cycle with no actions validated `:ok` at a state with enabled steps — and `format/1` then
   rendered it "has no successors: the behaviour stutters there forever" — and a `:deadlock`

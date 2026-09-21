@@ -144,17 +144,61 @@ defmodule TLA.Simulation do
   # ── One trace ───────────────────────────────────────────────────────────────
 
   defp one_trace(module, config, index) do
-    seed_for(config.seed, index)
-    drive(module, config, :generated)
+    drive(module, config, :generated, fn -> seed_for(config.seed, index) end)
   end
 
-  defp drive(module, config, messages) do
-    server = start(module, config)
-    initial = abstract(config, server)
+  # One trace, in a process that OWNS its server (#206). The server is started linked and
+  # stays linked, and the process traps exits. Two things follow, and together they are the
+  # whole of the lifetime guarantee:
+  #
+  #   * If anything in the trace raises — a message generator, a refinement mapping, a
+  #     `:sys.get_state` on a server that stopped — this process ends abnormally and the
+  #     link takes the server with it. The first version unlinked the server right after
+  #     starting it and stopped it only on the normal return, so a generator that raised
+  #     once left every started server alive: eight `Impl.Conforming` processes after one
+  #     failed run.
+  #   * If the server crashes — a conformance violation raises inside it — the exit arrives
+  #     here as an `{:EXIT, _, _}` message rather than as a kill, and the trace goes on to
+  #     report it. `TLA.GenServer.Driver.call/3`'s monitor is still what turns the crash into
+  #     an outcome; the EXIT message is left in the mailbox of a process about to end.
+  #
+  # A `Task` rather than trapping exits in the caller: `run_trace/2` and `replay/3` are called
+  # from user code, and flipping a caller's `trap_exit` would be a side effect no function
+  # named "run a trace" should have. The caller is linked to the task the way `run/2`'s
+  # `Task.async_stream` already links its workers, so a crash reaches the caller as it did.
+  #
+  # `prepare` runs inside the owning process before the trace: the per-trace seed goes there,
+  # because `:rand` state is per process and the generator draws from it in this one.
+  defp drive(module, config, messages, prepare \\ fn -> :ok end) do
+    fn ->
+      Process.flag(:trap_exit, true)
+      prepare.()
+      owned_drive(module, config, messages)
+    end
+    |> Task.async()
+    |> Task.await(:infinity)
+  end
 
-    state = %{
-      server: server,
-      states: [initial],
+  defp owned_drive(module, config, messages) do
+    case start(module, config) do
+      {:ok, server} ->
+        state = %{empty_state() | server: server, states: [abstract(config, server)]}
+        state = steps(state, module, config, messages)
+        stop(state.server)
+        temporal(state, config)
+
+      # `init/1` is allowed to decline. That is not a `MatchError` on `{:ok, pid} =`; it is
+      # an outcome, and one worth reporting by name, since a server that will not start
+      # under the simulation's `init_arg` has not been checked against anything.
+      {:declined, detail} ->
+        %{empty_state() | status: :error, detail: detail}
+    end
+  end
+
+  defp empty_state do
+    %{
+      server: nil,
+      states: [],
       actions: [],
       bindings: [],
       steps: 0,
@@ -163,10 +207,6 @@ defmodule TLA.Simulation do
       violation: nil,
       detail: nil
     }
-
-    state = steps(state, module, config, messages)
-    stop(state.server)
-    temporal(state, config)
   end
 
   defp steps(state, module, config, :generated) do
@@ -240,32 +280,44 @@ defmodule TLA.Simulation do
   defp maybe_restart(state, module, config) do
     if config.inject_failures and :rand.uniform() < 0.1 do
       Process.exit(state.server, :kill)
-      server = start(module, config)
-      recovered = abstract(config, server)
-
-      case Runtime.check_spec_invariants(config.spec, recovered) do
-        :ok ->
-          %{
-            state
-            | server: server,
-              restarts: state.restarts + 1,
-              states: [recovered | state.states]
-          }
-
-        {:violation, violation} ->
-          %{
-            state
-            | server: server,
-              restarts: state.restarts + 1,
-              status: :violation,
-              violation: violation,
-              states: [recovered | state.states],
-              actions: [:restart | state.actions],
-              bindings: [%{} | state.bindings]
-          }
-      end
+      restart(state, module, config)
     else
       state
+    end
+  end
+
+  defp restart(state, module, config) do
+    case start(module, config) do
+      {:declined, detail} ->
+        %{state | server: nil, status: :error, detail: "on restart, " <> detail}
+
+      {:ok, server} ->
+        recovered = abstract(config, server)
+        recovery(state, server, recovered, Runtime.check_spec_invariants(config.spec, recovered))
+    end
+  end
+
+  defp recovery(state, server, recovered, verdict) do
+    case verdict do
+      :ok ->
+        %{
+          state
+          | server: server,
+            restarts: state.restarts + 1,
+            states: [recovered | state.states]
+        }
+
+      {:violation, violation} ->
+        %{
+          state
+          | server: server,
+            restarts: state.restarts + 1,
+            status: :violation,
+            violation: violation,
+            states: [recovered | state.states],
+            actions: [:restart | state.actions],
+            bindings: [%{} | state.bindings]
+        }
     end
   end
 
@@ -330,11 +382,25 @@ defmodule TLA.Simulation do
   # 37 of a 1000-trace run can be re-run on its own.
   defp seed_for(seed, index), do: :rand.seed(:exsss, {seed, index, seed + index})
 
+  # Linked, and it stays linked: see `drive/3`.
   defp start(module, config) do
-    {:ok, pid} = GenServer.start_link(module, config.init_arg)
-    Process.unlink(pid)
-    pid
+    case GenServer.start_link(module, config.init_arg) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      :ignore ->
+        {:declined,
+         "#{inspect(module)}.init/1 returned :ignore for init_arg #{inspect(config.init_arg)}, " <>
+           "so no server started and nothing was checked."}
+
+      {:error, reason} ->
+        {:declined,
+         "#{inspect(module)}.init/1 failed for init_arg #{inspect(config.init_arg)}: " <>
+           "#{inspect(reason)}. No server started and nothing was checked."}
+    end
   end
+
+  defp stop(nil), do: :ok
 
   defp stop(server) do
     if Process.alive?(server), do: Process.exit(server, :kill)
