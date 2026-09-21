@@ -163,6 +163,32 @@ defmodule TLA.Spec.DiagnosticsTest do
              end
              """) =~ "`let` binds :c, which is a declared constant"
     end
+
+    # #210. §1.3's rule covers three cases and the check enforced two: `let k = 100` under
+    # `params: [k: [1, 2]]` compiled, and both bindings produced the same successor.
+    test "a let may not shadow a params: name or old/new either" do
+      assert refuse("""
+             variable :x
+             init do
+               x = 0
+             end
+             action :a, params: [k: [1, 2]] do
+               let k = 100
+               x = k
+             end
+             """) =~ "`let` binds :k, which this declaration already binds"
+
+      assert refuse("""
+             variable :x
+             init do
+               x = 0
+             end
+             action_property :p do
+               let old = 1
+               new.x >= old
+             end
+             """) =~ "`let` binds :old, which this declaration already binds"
+    end
   end
 
   describe "init" do
@@ -582,6 +608,24 @@ defmodule TLA.Spec.DiagnosticsTest do
                Enum.all?(xs, fn x -> eventually(x == 1) end)
              end
              """) =~ "must range over a constant or a literal list"
+    end
+
+    # #210. A literal list containing a variable passed the shape check and then hit a rewrite
+    # mode no clause handles: `FunctionClauseError` from inside the compiler, not a diagnostic.
+    test "a variable inside a quantifier's literal list is a diagnostic, not a crash" do
+      error =
+        refuse("""
+        variable :x
+        init do
+          x = 0
+        end
+        temporal :t do
+          Enum.all?([x, 1], fn v -> eventually(v == 1) end)
+        end
+        """)
+
+      assert error =~ "variable :x in a temporal quantifier's set"
+      assert error =~ "§5.1"
     end
 
     # #195. The rewriter resolves a declared variable before a bound name, so a quantifier

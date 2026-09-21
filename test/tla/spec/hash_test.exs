@@ -54,6 +54,25 @@ defmodule TLA.Spec.HashTest do
   end
 
   describe "module_version/1" do
+    # #210. `defmodule __MODULE__.Spec` puts a `{:__MODULE__, _, _}` node among the alias
+    # segments, and `Atom.to_string/1` on it crashed the scanner from inside a consumer's
+    # compile. A computed name cannot be located from source: no version, no crash.
+    test "a module whose defmodule is not a literal name has no version rather than a crash" do
+      source = """
+      defmodule Outer do
+        defmodule __MODULE__.Spec do
+          use TLA.Spec
+          action :a do
+            n = 1
+          end
+        end
+      end
+      """
+
+      assert Hash.module_version(source, Outer.Spec) == nil
+      assert Hash.scan(source, Outer.Spec) == %{}
+    end
+
     test "is 8 hex over a spec's items" do
       assert Hash.module_version(TLA.Conformance.Counter.Spec) =~ ~r/^[0-9a-f]{8}$/
     end

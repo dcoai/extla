@@ -43,6 +43,11 @@ defmodule TLA.Spec.Rewriter do
     :read,
     :line,
     bound: MapSet.new(),
+    # The names the declaration binds BEFORE its block: an action's `params:`, an action
+    # property's `old`/`new`. They are in `bound` too, alongside every name the block binds,
+    # which is why `bound` cannot serve the shadow check: a `let`'s own name is in it. These
+    # are the ones a `let` may not take (#210).
+    params: MapSet.new(),
     constants_ast: nil
   ]
 

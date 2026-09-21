@@ -51,6 +51,15 @@ release it merely follows.
 
 ### Fixed
 
+- **Four DSL front-end edges are diagnostics, not crashes or silences** (#264, closes #210).
+  A `let` could shadow a `params:` name (or `old`/`new`): §1.3 said locals shadow nothing and
+  two of three cases were enforced. A variable inside a temporal quantifier's literal list
+  killed the compiler with a `FunctionClauseError` from a rewrite mode nothing handled; it is
+  the §5.1 diagnostic now. `defmodule __MODULE__.Spec` crashed the hash scanner from inside a
+  consumer's compile; a computed name now has no version and `check_stamp!` says why. And
+  `params: [k: [1, 1, 2]]` drew three bindings per state and inflated the action's coverage;
+  each distinct value is drawn once and a visible repeat warns.
+
 - **The trace reader said "the spec was verified" about a bounded run** (#261, closes #205).
   `mix tla.replay --trace` and `mix tla.explore` matched `"violation" => nil` and said
   verified without reading the `status` beside it, so a `max_states_reached` or `constrained`

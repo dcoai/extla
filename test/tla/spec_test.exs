@@ -130,6 +130,39 @@ defmodule TLA.SpecTest do
   end
 
   describe "params" do
+    # #210. `params: [k: [1, 1, 2]]` yielded three bindings per state, two of them the same
+    # successor, and inflated the action's coverage. Each distinct value is drawn once, and
+    # the visible repeat is a compile warning naming it.
+    test "a list draws each distinct value once, and a literal repeat warns" do
+      warning =
+        ExUnit.CaptureIO.capture_io(:stderr, fn ->
+          Code.compile_string("""
+          defmodule TLA.SpecTest.Repeats do
+            use TLA.Spec
+            variable :n, type: 0..2
+            init do
+              n = 0
+            end
+            action :set, params: [k: [1, 1, 2]] do
+              n = k
+            end
+          end
+          """)
+        end)
+
+      assert warning =~ "lists 1 2 times"
+
+      spec = Compiled.from_module(TLA.SpecTest.Repeats)
+
+      assert TLA.ModelChecker.bindings(Compiled.action(spec, :set), %{}, %{n: 0}) == [
+               %{k: 1},
+               %{k: 2}
+             ]
+
+      result = TLA.ModelChecker.run(TLA.SpecTest.Repeats, %{})
+      assert result.coverage.actions[:set].states_generated == 2 * result.distinct_states
+    end
+
     setup do
       spec = Compiled.from_module(Transfer)
       constants = %{accounts: MapSet.new([:alice, :bob]), max_balance: 3}

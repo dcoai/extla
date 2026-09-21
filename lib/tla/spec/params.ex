@@ -74,8 +74,13 @@ defmodule TLA.Spec.Params do
     {Rewriter.rewrite(literal, ctx), :literal}
   end
 
-  defp generator!(_name, literal, ctx, _c, _s, _b) when is_list(literal) do
-    {Rewriter.rewrite(literal, ctx), :literal}
+  # A list draws each DISTINCT value once. `params: [k: [1, 1, 2]]` used to yield three
+  # bindings per state — two of them the same successor — and inflate the action's coverage
+  # (#210). Visible literal duplicates warn at compile time, naming them; the `Enum.uniq/1`
+  # covers the ones only known once constants are assigned, `[^a, ^b]` with `a == b`.
+  defp generator!(name, literal, ctx, _c, _s, _b) when is_list(literal) do
+    warn_duplicates!(name, literal, ctx)
+    {quote(do: Enum.uniq(unquote(Rewriter.rewrite(literal, ctx)))), :literal}
   end
 
   # A function of the pre-state, optionally also of the params bound so far.
@@ -138,6 +143,25 @@ defmodule TLA.Spec.Params do
 
   defp meta_of({_, meta, _}) when is_list(meta), do: meta
   defp meta_of(_), do: nil
+
+  # Warn, not refuse: a duplicated literal is almost certainly a slip, and the run is still
+  # right once the values are distinct. A `^constant` or an expression is not a literal and
+  # is not compared here; `Enum.uniq/1` at draw time is what covers those.
+  defp warn_duplicates!(name, literal, ctx) do
+    literals = Enum.filter(literal, &(is_atom(&1) or is_integer(&1) or is_binary(&1)))
+    duplicates = literals |> Enum.frequencies() |> Enum.filter(fn {_, n} -> n > 1 end)
+
+    if duplicates != [] do
+      IO.warn(
+        "#{inspect(ctx.module)}, in #{ctx.declaration}: `params:` entry #{inspect(name)} " <>
+          "lists #{Enum.map_join(duplicates, ", ", fn {v, n} -> "#{inspect(v)} #{n} times" end)}. " <>
+          "Each distinct value is drawn once; the repeats add nothing.",
+        [{ctx.module, :__params__, 0, line: ctx.line}]
+      )
+    end
+
+    :ok
+  end
 
   defp bad!(ctx, meta, problem, extra) do
     CompileError.raise!(
