@@ -246,11 +246,15 @@ defmodule TLA.Spec.Helpers do
   def subseq(seq, m, n)
 
   # ── Function (Map) Operations ──
-  def for_each(domain, f), do: Map.new(domain, fn k -> {k, f.(k)} end)
+  # [x \in S |-> f(x)]: S is a set (a MapSet) or a range. A list is a sequence
+  # -- a function on 1..Len already -- and is refused by name rather than
+  # deduplicated; a map is a function already.
+  def for_each(domain, f)
   def update(map, key, f), do: Map.update!(map, key, f)
   def values(map), do: Map.values(map)
   def keys(map), do: Map.keys(map)
-  def domain(map), do: MapSet.new(Map.keys(map))
+  # DOMAIN f. A sequence's domain is 1..Len, which is how `f[x]` applies one.
+  def domain(map_or_seq)
 
   # ── Arithmetic ──
   def sum(enum), do: Enum.sum(enum)

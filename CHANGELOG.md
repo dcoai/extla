@@ -60,6 +60,16 @@ release it merely follows.
   `params: [k: [1, 1, 2]]` drew three bindings per state and inflated the action's coverage;
   each distinct value is drawn once and a visible repeat warns.
 
+- **Three boundaries that accepted what they should have refused** (#265, closes #211).
+  `Trace.from_json!/1` read no structure: `"type": "ok"` became `:ok` through
+  `String.to_existing_atom/1` and `format/1` failed later, a non-string type was a raw
+  `ArgumentError`, and two states with no actions built a trace nothing could render honestly;
+  it now checks the type against the three it knows and the alignment before building
+  anything, and `mix tla.replay` refuses an entry with no `violation` key by name instead of a
+  `CaseClauseError`. `domain/1` raised `BadMapError` on a list `at/2` applies as a function;
+  it answers `1..Len`. `for_each/2` built a function over a list, deduplicating silently; it
+  ranges over a set or a range and refuses a sequence or a map by name.
+
 - **The trace reader said "the spec was verified" about a bounded run** (#261, closes #205).
   `mix tla.replay --trace` and `mix tla.explore` matched `"violation" => nil` and said
   verified without reading the `status` beside it, so a `max_states_reached` or `constrained`

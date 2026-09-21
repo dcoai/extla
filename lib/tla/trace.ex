@@ -91,22 +91,59 @@ defmodule TLA.Trace do
     %{prefix: from_json!(prefix), cycle: data["cycle"] && from_json!(data["cycle"])}
   end
 
-  def from_json!(%{"states" => states} = data) do
-    %__MODULE__{
-      type: String.to_existing_atom(data["type"] || "safety"),
+  # A trace file is data from outside the program, and this reads its STRUCTURE before it
+  # builds anything (#211). The first version read none: `"type"` went through
+  # `String.to_existing_atom/1`, so `"ok"` became `:ok` and `format/1` failed later on a
+  # type it does not know; a non-string type was a raw `ArgumentError`; two states and no
+  # actions built a trace that could not describe one behaviour and was rendered anyway.
+  @types %{"safety" => :safety, "liveness" => :liveness, "deadlock" => :deadlock}
+
+  def from_json!(%{"states" => states} = data) when is_list(states) do
+    type =
+      case Map.get(data, "type", "safety") do
+        given when is_map_key(@types, given) ->
+          Map.fetch!(@types, given)
+
+        other ->
+          raise ArgumentError,
+                "#{inspect(other)} is not a trace type: expected one of " <>
+                  "#{@types |> Map.keys() |> Enum.map_join(", ", &inspect/1)}."
+      end
+
+    trace = %__MODULE__{
+      type: type,
       property: data["property"] && TLA.State.Json.decode!(%{"a" => data["property"]}),
       message: data["message"] || "",
       length: data["length"] || max(length(states) - 1, 0),
-      actions: Enum.map(data["actions"] || [], &TLA.State.Json.decode!(%{"a" => &1})),
-      bindings: Enum.map(data["bindings"] || [], &TLA.State.Json.decode!/1),
+      actions: Enum.map(list!(data, "actions"), &TLA.State.Json.decode!(%{"a" => &1})),
+      bindings: Enum.map(list!(data, "bindings"), &TLA.State.Json.decode!/1),
       states: Enum.map(states, &TLA.State.Json.decode!/1)
     }
+
+    if misaligned?(trace) do
+      raise ArgumentError,
+            "the encoded trace has #{shape(trace)}, which cannot describe one behaviour: " <>
+              "n states need n - 1 actions and one binding each."
+    end
+
+    trace
   end
 
   def from_json!(other) do
     raise ArgumentError,
           "#{inspect(other)} is not an encoded trace: expected an object with \"states\" " <>
             "(a trace) or \"prefix\" (a lasso)."
+  end
+
+  defp list!(data, key) do
+    case Map.get(data, key, []) do
+      list when is_list(list) ->
+        list
+
+      other ->
+        raise ArgumentError,
+              "the encoded trace's #{inspect(key)} is not a list: #{inspect(other)}"
+    end
   end
 
   @doc """

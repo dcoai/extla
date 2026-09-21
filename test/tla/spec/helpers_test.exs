@@ -178,6 +178,28 @@ defmodule TLA.Spec.HelpersTest do
       assert Enum.sort(H.keys(f)) == [:a, :b]
       assert H.domain(f) == MapSet.new([:a, :b])
     end
+
+    # #211. `at/2` applies a list as a function on 1..Len; `domain/1` raised `BadMapError` on
+    # the same list, and `for_each/2` built a function over a list, deduplicating silently.
+    # The three now agree about what a function is.
+    test "domain/1 answers 1..Len for a sequence, as at/2 applies one" do
+      assert H.domain([:x, :y, :z]) == MapSet.new([1, 2, 3])
+      assert H.domain([]) == MapSet.new()
+
+      for i <- H.domain([:x, :y, :z]), do: assert(H.at([:x, :y, :z], i) in [:x, :y, :z])
+
+      assert_raise ArgumentError, ~r/neither/, fn -> H.domain(MapSet.new([1])) end
+    end
+
+    test "for_each/2 ranges over a set or a range, and refuses a sequence by name" do
+      assert H.for_each(1..3, &(&1 * 2)) == %{1 => 2, 2 => 4, 3 => 6}
+
+      error = assert_raise ArgumentError, fn -> H.for_each([:a, :a, :b], fn _ -> 0 end) end
+      assert error.message =~ "is a sequence"
+
+      error = assert_raise ArgumentError, fn -> H.for_each(%{a: 1}, fn _ -> 0 end) end
+      assert error.message =~ "is a function already"
+    end
   end
 
   describe "arithmetic" do
