@@ -50,6 +50,15 @@ hanged
 
 ### Fixed
 
+- **`Driver.call/3` raised for a dead registered name where a dead pid reported `:stopped`**
+  (#255, closes #254). #252 made the `:DOWN` match shape-independent and left the send
+  shape-dependent: `send/2` to an atom no longer registered raises `invalid destination`,
+  where the same send to a dead pid is a no-op answered by the monitor's `:noproc`. Found by
+  the #252 test itself racing on the 2-core runner, which killed the server before the send
+  every time and turned `main`'s `test` job red. The server is now resolved once with
+  `GenServer.whereis/1` and every `GenServer.server()` shape — pid, name, `{name, node}` — is
+  the pid path by construction; a test enumerates the shapes and holds each outcome identical.
+
 - **`Replay.counterexample/3` with `server: <registered name>` reported `:not_followed` instead
   of the violation the server raised** (#252, closes #207). `TLA.GenServer.Driver.call/3`
   matched the `:DOWN` on the server the caller passed; a monitor on a registered name delivers

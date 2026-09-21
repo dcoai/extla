@@ -18,20 +18,32 @@ defmodule TLA.GenServer.Driver do
           {:ok, term()} | {:violation, Violation.t()} | {:stopped, term()} | {:timeout, timeout()}
 
   @doc """
-  Call `server` — a pid or a registered name — with `message`, reporting the outcome instead
-  of raising it.
+  Call `server` — any `GenServer.server()`: a pid, a registered name, `{name, node}`,
+  `{:global, _}` or `{:via, _, _}` — with `message`, reporting the outcome instead of
+  raising it.
 
-  The `:DOWN` is matched on the monitor reference alone. It used to be matched on `^server`
-  as well, which is right for a pid and wrong for a name: a monitor on a registered name
-  delivers its `:DOWN` with `{name, node}` in that position, never the bare atom, so neither
-  clause matched, the message sat in the mailbox, and the call fell through to the timeout.
-  `Replay.counterexample(…, server: :named)` then reported `:not_followed` after the full
-  wait — a violation the server had raised, discarded, with delivery blamed (#207). The
-  reference is unique to this call, so it is the whole of what needs matching.
+  **Every shape is the pid path.** The server is resolved once with `GenServer.whereis/1`
+  and the monitor and the send both take the pid; a name that resolves to nothing is
+  `{:stopped, :noproc}` with nothing sent. Two defects lived in treating the shapes
+  separately. The `:DOWN` was matched on `^server`, and a monitor on a registered name
+  delivers `{name, node}` there, so a violation raised under a name sat unread until the
+  timeout and `Replay` reported `:not_followed` (#207). Then `send/2` to a name whose process
+  had just died raised `invalid destination`, where the same send to a dead pid is a no-op
+  answered by the monitor's `:noproc` — one shape raising and the other reporting, for one
+  situation (#254). Resolving first removes the second by construction; the reference-only
+  `:DOWN` match below removes the first. A process that dies between the lookup and the send
+  is the dead-pid case: a no-op send and a `:noproc` `:DOWN`.
   """
   def call(server, message, timeout \\ 5_000) do
-    ref = Process.monitor(server)
-    send(server, {:"$gen_call", {self(), ref}, message})
+    case GenServer.whereis(server) do
+      nil -> {:stopped, :noproc}
+      pid -> call_pid(pid, message, timeout)
+    end
+  end
+
+  defp call_pid(pid, message, timeout) do
+    ref = Process.monitor(pid)
+    send(pid, {:"$gen_call", {self(), ref}, message})
 
     receive do
       {^ref, reply} ->
