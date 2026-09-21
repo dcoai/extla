@@ -229,6 +229,35 @@ defmodule TLA.TraceValidateTest do
       assert {:error, message} = Trace.validate(corrupt, spec, constants)
       assert message =~ "cannot describe one behaviour"
     end
+
+    # #204. `format/1` zipped the three lists and stopped at the shortest: one action short —
+    # the shape the simulation's restart branch produced — it printed three states of four
+    # and marked the wrong one `[VIOLATION]`. The state that actually violated was never
+    # shown, and `Trace.Explore`, which renders every column, disagreed with it.
+    test "format/1 refuses a misaligned trace rather than marking the wrong state" do
+      {trace, _spec, _constants} = safety_trace()
+      assert length(trace.states) == 4
+
+      one_short = %{trace | actions: tl(trace.actions), bindings: tl(trace.bindings)}
+
+      error = assert_raise ArgumentError, fn -> Trace.format(one_short) end
+      assert error.message =~ "4 states, 2 actions and 2 bindings"
+      assert error.message =~ "mark the wrong state"
+
+      # The well-formed trace renders as before, its last state marked.
+      assert Trace.format(trace) =~ "State 4 [VIOLATION]"
+    end
+
+    test "a JSON trace with no bindings is refused, not rendered as one state" do
+      {trace, _spec, _constants} = safety_trace()
+      no_bindings = trace |> Trace.to_json() |> Map.delete("bindings") |> Trace.from_json!()
+
+      assert no_bindings.bindings == []
+
+      assert_raise ArgumentError, ~r/4 states, 3 actions and 0 bindings/, fn ->
+        Trace.format(no_bindings)
+      end
+    end
   end
 
   describe "validate!/3" do

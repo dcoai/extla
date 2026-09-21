@@ -59,6 +59,14 @@ release it merely follows.
   passed it. Both now require no enabled step at that state, per §5.3, and name the enabled
   action otherwise.
 
+- **`Trace.format/1` truncated a misaligned trace and marked the wrong state** (#260, closes
+  #204). `to_diffs/1` zipped states, actions and bindings and stopped at the shortest list:
+  one action short — the shape the simulation's restart branch produced — it printed three
+  states of four and put `[VIOLATION]` on the wrong one, and a JSON file lacking `bindings`
+  rendered as a single-state trace. The alignment invariant `validate/3` already reports is
+  now checked in `to_diffs/1`, so `format/1` and every programmatic consumer refuse a trace
+  that cannot describe one behaviour, naming the three counts.
+
 - **A liveness pass skipped by the state budget or a safety counterexample is named** (#257,
   closes #208). #167 named the deadlock skip and the constraint skip and left these two
   silent: `check_liveness: true, max_states: 3` on a spec with a temporal reported the bound
