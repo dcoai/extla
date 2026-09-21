@@ -191,6 +191,11 @@ defmodule TLA.Trace do
        actions, and a pairing between them that is a lie.
     4. For a lasso, additionally: the cycle starts where the prefix ends, its steps are
        legal, and it **closes** — applying them returns to its own first state.
+    5. A **stutter is final** (§5.3). A one-state cycle with no actions claims the behaviour
+       stays there forever, which is only so where nothing is enabled; a deadlock trace
+       likewise has to end at a successor-less state. Both used to pass at a live state
+       (#203), and `format/1` rendered the stutter "has no successors" — an oracle that
+       agreed with a liveness pass putting a stutter in the wrong place.
 
   ## A safety trace must also refute the property it names
 
@@ -238,6 +243,7 @@ defmodule TLA.Trace do
     with :ok <- validate(prefix, spec, constants),
          :ok <- cycle_continues(prefix, cycle),
          :ok <- legal_steps(spec, constants, cycle, "the cycle"),
+         :ok <- stutter_is_final(spec, constants, cycle),
          do: cycle_closes(cycle)
   end
 
@@ -279,6 +285,11 @@ defmodule TLA.Trace do
   # is caught here as a shape error rather than silently checking the shorter of the two.
   # A trace naming no property claims nothing to refute — a captured behaviour, or a
   # deadlock, whose finding is the absence of successors rather than a false predicate.
+  # A deadlock's finding is the absence of successors, so the trace has to end where there
+  # are none: a last state with an enabled step is not a deadlock, whatever the trace says.
+  defp refutes_its_property(spec, constants, %__MODULE__{type: :deadlock} = trace),
+    do: no_enabled_step(spec, constants, List.last(trace.states), "the deadlock's last state")
+
   defp refutes_its_property(_spec, _constants, %__MODULE__{property: nil}), do: :ok
 
   defp refutes_its_property(_spec, _constants, %__MODULE__{type: :liveness}), do: :ok
@@ -378,6 +389,30 @@ defmodule TLA.Trace do
        "the cycle starts at\n\n  #{inspect(hd(cycle.states))}\n\nbut the prefix ends " <>
          "at\n\n  #{inspect(List.last(prefix.states))}\n\nso the lasso is two " <>
          "behaviours rather than one."}
+    end
+  end
+
+  # A one-state cycle with no actions is a stutter, and §5.3 puts a stutter in one place: a
+  # successor-less state. `validate/3` used to pass one at a live state — and `format/1` then
+  # rendered it "has no successors: stutters there forever" — so a liveness pass that produced
+  # a stutter in the wrong place had an oracle that agreed with it (#203).
+  defp stutter_is_final(spec, constants, %__MODULE__{actions: [], states: [state | _]}),
+    do: no_enabled_step(spec, constants, state, "the cycle's state")
+
+  defp stutter_is_final(_spec, _constants, _cycle), do: :ok
+
+  defp no_enabled_step(spec, constants, state, what) do
+    case ModelChecker.enabled_steps(spec, constants, state) do
+      [] ->
+        :ok
+
+      [{action, binding} | rest] ->
+        others = if rest == [], do: "", else: " and #{length(rest)} more"
+
+        {:error,
+         "#{what} is claimed to stutter forever, but #{inspect(action)} with " <>
+           "#{inspect(binding)}#{others} is enabled there. A behaviour stutters forever only " <>
+           "at a state with no successors (02-dsl-semantics.md §5.3)."}
     end
   end
 

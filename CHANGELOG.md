@@ -51,6 +51,14 @@ release it merely follows.
 
 ### Fixed
 
+- **`Trace.validate/3` accepted a stutter at a live state** (#259, closes #203). A one-state
+  cycle with no actions validated `:ok` at a state with enabled steps — and `format/1` then
+  rendered it "has no successors: the behaviour stutters there forever" — and a `:deadlock`
+  trace whose last state had successors validated too. `validate/3` is the oracle the
+  generated-model tests rest on, so a liveness bug producing a stutter in the wrong place
+  passed it. Both now require no enabled step at that state, per §5.3, and name the enabled
+  action otherwise.
+
 - **A liveness pass skipped by the state budget or a safety counterexample is named** (#257,
   closes #208). #167 named the deadlock skip and the constraint skip and left these two
   silent: `check_liveness: true, max_states: 3` on a spec with a temporal reported the bound
