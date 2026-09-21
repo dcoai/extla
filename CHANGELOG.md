@@ -51,6 +51,12 @@ release it merely follows.
 
 ### Fixed
 
+- **The trace reader said "the spec was verified" about a bounded run** (#261, closes #205).
+  `mix tla.replay --trace` and `mix tla.explore` matched `"violation" => nil` and said
+  verified without reading the `status` beside it, so a `max_states_reached` or `constrained`
+  document read as a proof. It now says what the status says — bounded at N states by the
+  limit, held back by the constraint, or the status by name — and only `ok` is verified.
+
 - **`Trace.validate/3` accepted a stutter at a live state** (#259, closes #203). A one-state
   cycle with no actions validated `:ok` at a state with enabled steps — and `format/1` then
   rendered it "has no successors: the behaviour stutters there forever" — and a `:deadlock`
