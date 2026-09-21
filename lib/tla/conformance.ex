@@ -50,6 +50,7 @@ defmodule TLA.Conformance do
   """
   @type finding ::
           :ok
+          | :nothing_observed
           | {:checker, map()}
           | {:absent_state, map()}
           | {:not_a_step_of_the_spec, map()}

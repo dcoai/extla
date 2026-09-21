@@ -66,6 +66,16 @@ release it merely follows.
   own crash still arrives as an outcome. `init/1` returning `:ignore` or `{:error, _}` is an
   `:error` outcome naming it, not a `MatchError`.
 
+- **Five small regressions left by recent fixes** (#263, closes #209). `init` was the one
+  options-taking macro with no option check, so `init desc: "x", do: …` compiled with the
+  keyword dropped (and the `do … end` spelling was an "undefined function init/2" from the
+  compiler rather than a diagnostic) — it now takes no options and says so. The liveness-skip
+  warning counted declared temporals rather than the selection, so `temporals: [:one]` with
+  three declared said three were not checked. The accepted-options comment still said
+  `temporal` reads no options. `TLA.Conformance`'s `@type finding` lacked `:nothing_observed`.
+  And the liveness-shape fixture tests asserted only `status == :violation`, so a fairness
+  regression reporting the unfair cycle would have passed; the cycles are pinned.
+
 - **`Trace.validate/3` accepted a stutter at a live state** (#259, closes #203). A one-state
   cycle with no actions validated `:ok` at a state with enabled steps — and `format/1` then
   rendered it "has no successors: the behaviour stutters there forever" — and a `:deadlock`
