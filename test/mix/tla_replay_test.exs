@@ -144,16 +144,52 @@ defmodule Mix.Tasks.Tla.ReplayTest do
     test "a results file whose spec was verified", %{tmp: tmp} do
       path = Path.join(tmp, "clean.json")
 
+      # `"status" => "ok"` is what makes this verified; the fixture used to omit the status,
+      # and the reader used to say verified without it (#205).
       File.write!(
         path,
         Jason.encode!(%{
           "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
-          "specs" => [%{"spec" => "TLA.Conformance.Counter.BuggySpec", "violation" => nil}]
+          "specs" => [
+            %{"spec" => "TLA.Conformance.Counter.BuggySpec", "status" => "ok", "violation" => nil}
+          ]
         })
       )
 
-      assert_raise Mix.Error, ~r/records no counterexample/, fn ->
+      assert_raise Mix.Error, ~r/records no counterexample.*the spec was verified/, fn ->
         Replay.run([@server, "--trace", path])
+      end
+    end
+
+    # #205. The reader matched `"violation" => nil` and said "verified" without reading the
+    # `status` beside it, so a run the state limit stopped read as a proof.
+    test "a results file whose run was bounded is not called verified", %{tmp: tmp} do
+      for {status, expect} <- [
+            {"max_states_reached", ~r/bounded at 20 states by the state limit/},
+            {"constrained", ~r/state_constraint.*held states back after 20 states/},
+            {"unsound_symmetry", ~r/status is "unsound_symmetry", which is not verified/}
+          ] do
+        path = Path.join(tmp, "#{status}.json")
+
+        File.write!(
+          path,
+          Jason.encode!(%{
+            "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+            "specs" => [
+              %{
+                "spec" => "TLA.Conformance.Counter.BuggySpec",
+                "status" => status,
+                "distinct_states" => 20,
+                "violation" => nil
+              }
+            ]
+          })
+        )
+
+        error = assert_raise(Mix.Error, fn -> Replay.run([@server, "--trace", path]) end)
+
+        assert error.message =~ expect, status
+        refute error.message =~ "was verified", status
       end
     end
 

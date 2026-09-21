@@ -65,13 +65,33 @@ defmodule TLA.Mix.TraceFile do
             "#{specs |> Enum.map_join(", ", & &1["spec"])}."
         )
 
-      %{"violation" => nil} ->
-        Mix.raise("#{path} records no counterexample for #{spec}: the spec was verified.")
+      # No counterexample is not the same as verified, and the document says which: a bounded
+      # or constrained run stopped before it could find one. This used to say "the spec was
+      # verified" for both (#205), on a status the reader had in hand and did not read.
+      %{"violation" => nil} = entry ->
+        Mix.raise("#{path} records no counterexample for #{spec}: #{no_counterexample(entry)}")
 
       %{"violation" => violation} ->
         Trace.from_json!(violation)
     end
   end
+
+  defp no_counterexample(%{"status" => "ok"}), do: "the spec was verified."
+
+  defp no_counterexample(%{"status" => "max_states_reached"} = entry) do
+    "the search was bounded at #{entry["distinct_states"]} states by the state limit, so " <>
+      "nothing is verified. Re-run `mix tla.check --format json` with a higher --max-states."
+  end
+
+  defp no_counterexample(%{"status" => "constrained"} = entry) do
+    "a `state_constraint:` held states back after #{entry["distinct_states"]} states, so " <>
+      "nothing is verified. Re-run `mix tla.check --format json` without the constraint."
+  end
+
+  defp no_counterexample(%{"status" => status}),
+    do: "the run's status is #{inspect(status)}, which is not verified."
+
+  defp no_counterexample(_entry), do: "the entry carries no status, so nothing is known."
 
   defp decode!(path) do
     unless File.exists?(path), do: Mix.raise("#{path} does not exist.")
