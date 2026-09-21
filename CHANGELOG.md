@@ -14,7 +14,7 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
-### C### Changed
+### Changed
 
 - **CI's compiled dependencies come from the depdep store alone** (#251, closes #250). depdep
   v0.4.0 never keyed `surfex`, a leaf git dependency, so #247 kept the `mix.lock`-keyed
@@ -23,8 +23,6 @@ release it merely follows.
   (depdep#83); the bump's own pipeline read `pulled 7, skipped 0, not for this env 6` in a job
   with nothing on disk, `surfex` included. The cache is gone; what stays cached is
   `tlc-corpus`'s tla2tools jar, a checksum-verified download.
-
-hanged
 
 - **A predicate that returns a non-boolean is refused, not counted as holding** (#235,
   closes #192). Every consumer of an `invariant`, `terminal`, `action_property` or temporal
@@ -46,9 +44,22 @@ hanged
   `compile` pushes what it built. Inert until the store credentials exist (#247): with no
   `DEPDEP_*` variables depdep says so, still runs `deps.get`, and exits 0.
 
-### Fixed
+- **`mix tla.check --format json` schema 3: `coverage.terminals`** (#256, closes #202). How many
+  successor-less states each `terminal` admitted. Additive, and bumped anyway — the policy
+  recorded beside the version is that additive changes bump so a reader can refuse a shape it
+  does not know; `mix tla.replay --trace` refuses a v2 document naming both versions.
 
 ### Fixed
+
+- **The ledger enumerated three of five declaration kinds** (#256, closes #202). Under a header
+  promising "every item each TLA.Spec declares", `action_property` and `terminal` had no rows
+  at all — the kind list was written by hand. It is now `TLA.Spec.Hash.kinds/0`, so a kind
+  added to the DSL is a row on the day it is added or a loud failure, never an absence. Fifteen
+  rows join `TLA_COVERAGE.md`. Their evidence rests on what the run recorded: an action
+  property on the transitions it was checked against (`lock_not_stolen` on 76), a terminal on
+  the end states it admitted (`term_bound_exhausted` admitted 655) — and a terminal that
+  admitted none reads `NOTHING`, because the run would have reported the same deadlocks without
+  it.
 
 - **`Driver.call/3` raised for a dead registered name where a dead pid reported `:stopped`**
   (#255, closes #254). #252 made the `:DOWN` match shape-independent and left the send

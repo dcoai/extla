@@ -120,6 +120,40 @@ defmodule TLA.LedgerTest do
   end
 
   describe "what counts as verified" do
+    # #202. The kind list was written by hand — three of five — under a header promising every
+    # item each spec declares, so `action_property` and `terminal` had no rows at all. The
+    # list is now `TLA.Spec.Hash.kinds/0`, and this holds it there: a kind added to the DSL
+    # with no rows in the corpus fails here, not silently.
+    test "every kind the DSL declares has rows, from the DSL's own enumeration", %{
+      sections: sections
+    } do
+      kinds_with_rows = sections |> Enum.flat_map(& &1.rows) |> MapSet.new(& &1.kind)
+
+      for kind <- TLA.Spec.Hash.kinds() do
+        assert kind in kinds_with_rows, "no ledger row of kind #{inspect(kind)} in the corpus"
+      end
+    end
+
+    # A terminal's evidence is the end states it admitted; one that admitted none is unused,
+    # not verified. `WithDefaults.done` is `n == ^max`, the one state its `tick` chain ends in.
+    test "a terminal is verified by the end states it admitted", %{sections: sections} do
+      section = Enum.find(sections, &(&1.module == TLA.TestSpecs.WithDefaults))
+      row = Enum.find(section.rows, &(&1.kind == :terminal and &1.name == :done))
+
+      assert row.evidence == :model_checked
+      assert row.exercised =~ "admitted 1 end state"
+    end
+
+    test "an action property is verified by the transitions it was checked on", %{
+      sections: sections
+    } do
+      section = Enum.find(sections, &(&1.module == TLA.Differential.DistributedLock))
+      row = Enum.find(section.rows, &(&1.kind == :action_property))
+
+      assert row.evidence == :model_checked
+      assert row.exercised =~ ~r/on \d+ transitions/
+    end
+
     test "NOTHING is the backlog and it is non-empty here", %{sections: sections} do
       gaps = Ledger.gaps(sections)
 

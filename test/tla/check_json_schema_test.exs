@@ -15,7 +15,7 @@ defmodule TLA.CheckJsonSchemaTest do
     spec status message distinct_states states_found transitions diameter deadlock
     duration_ms fingerprint_bits collision_estimate warnings coverage profile violation
   )
-  @coverage_keys ~w(actions never_enabled invariants vacuous terminal_but_live bounded_by)
+  @coverage_keys ~w(actions never_enabled invariants vacuous terminal_but_live terminals bounded_by)
 
   # The exit status is deliberately NOT asserted to be 0: `mix tla.check` exits non-zero when
   # it finds a violation, and a violating run is half of what this schema has to cover. Pinning

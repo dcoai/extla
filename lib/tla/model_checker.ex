@@ -637,13 +637,15 @@ defmodule TLA.ModelChecker do
   end
 
   defp mark_stuck(run, id, state) do
+    admitting = Safety.admitting_terminals(run.spec, run.config.constants, state)
+
     graph =
-      case Safety.classify_stuck(run.spec, run.config.constants, state) do
-        :terminal -> StateGraph.mark_terminal(run.graph, id)
-        :deadlocked -> StateGraph.mark_deadlocked(run.graph, id)
+      case admitting do
+        [] -> StateGraph.mark_deadlocked(run.graph, id)
+        _ -> StateGraph.mark_terminal(run.graph, id)
       end
 
-    %{run | graph: graph}
+    %{run | graph: graph, coverage: Coverage.observe_stuck(run.coverage, admitting)}
   end
 
   # Liveness runs over the finished graph, and only over a finished graph: a search cut

@@ -974,6 +974,12 @@ defmodule TLA.Coverage do
     # broader than the end state it was written for.
     terminal_but_live: [atom()],
 
+    # How many successor-less states each `terminal` admitted. A terminal that
+    # admitted none was never the reason a behaviour ended — the run would
+    # have reported the same deadlocks without it — which is what lets the
+    # ledger tell a verified terminal from an unused one.
+    terminals: %{atom() => %{admitted: non_neg_integer()}},
+
     # Set when `state_constraint` or `max_states` bounded the run, or when it
     # stopped at a counterexample mid-expansion — the coverage numbers are then a
     # lower bound, not a census.
@@ -1469,7 +1475,7 @@ does not know rather than misread it:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "specs": [
     {
       "spec": "Specs.TransferProtocol",
@@ -1491,6 +1497,7 @@ does not know rather than misread it:
         "invariants": {"type_ok": {"evaluated_in": 3612, "near_misses": null}},
         "vacuous": [],
         "terminal_but_live": [],
+        "terminals": {"all_done": {"admitted": 6}},
         "bounded_by": "none"
       },
       "profile": null,
