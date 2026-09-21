@@ -507,6 +507,7 @@ defmodule TLA.Spec.DSL do
       constants: MapSet.new(declared_names(caller, :tla_constants)),
       read: Map.fetch!(opts, :read),
       constants_ast: Map.get(opts, :constants_ast),
+      params: extra,
       bound: MapSet.union(extra, Rewriter.bound_names(block))
     }
   end

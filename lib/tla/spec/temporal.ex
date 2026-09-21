@@ -53,6 +53,16 @@ defmodule TLA.Spec.Temporal do
     formula(single, ctx)
   end
 
+  defp reject_in_set do
+    fn name ->
+      {"variable #{inspect(name)} in a temporal quantifier's set",
+       "A quantifier ranges over a constant or a literal list, so its instances are fixed " <>
+         "before any state exists; a set that reads the state would have a different shape " <>
+         "in every state (02-dsl-semantics.md §5.1). Quantify over a `^constant`, or move " <>
+         "the condition into the predicate."}
+    end
+  end
+
   defp unwrap({:__block__, _, [single]}), do: single
   defp unwrap(other), do: other
 
@@ -95,7 +105,11 @@ defmodule TLA.Spec.Temporal do
     Block.check_no_shadow!({var, meta, var_ctx}, meta, ctx, "the quantifier")
 
     inner_ctx = %{ctx | bound: MapSet.put(ctx.bound, var)}
-    set_expr = Rewriter.rewrite(set, %{inner_ctx | read: :init})
+
+    # A bare variable in the set is the §5.1 error, said as such. This used to rewrite with
+    # `read: :init`, a mode no clause of the rewriter handles, so `Enum.all?([x, 1], …)` died
+    # with a `FunctionClauseError` from inside the compiler instead of a diagnostic (#210).
+    set_expr = Rewriter.rewrite(set, %{inner_ctx | read: {:reject, reject_in_set()}})
     quantified = Macro.var(var, nil)
 
     quote do

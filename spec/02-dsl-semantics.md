@@ -79,7 +79,8 @@ end
 ```
 
 `let` accepts any Elixir pattern. Locals may shadow nothing: `let` binding a name that
-is a declared variable or constant is a compile error. The rule is about what a bare name
+is a declared variable, a declared constant, one of the action's `params:`, or an action
+property's `old`/`new` is a compile error. The rule is about what a bare name
 *means*, not about `let`, so it applies to every binder a spec block has — the `fn x ->`
 of a temporal quantifier (§5.1) included. Without it the quantifier body's `x` resolved to
 the state variable of that name in every instance, and the bound value was never read.
@@ -276,7 +277,7 @@ There is now **one** mechanism. A `params:` entry may draw from:
 | Form | Meaning | Example |
 |---|---|---|
 | A constant | Each element of the constant set | `from: ^accounts` |
-| A literal range or list | Each element | `amount: 1..10`, `mode: [:a, :b]` |
+| A literal range or list | Each **distinct** element — a repeated literal warns at compile time, and coinciding `^constants` are drawn once | `amount: 1..10`, `mode: [:a, :b]` |
 | A **state function** | Each element of the set the function returns for the pre-state | `t: fn s -> s.pending end` |
 
 **Params bind left to right**, and a state function may take a second argument

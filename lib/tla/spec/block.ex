@@ -521,6 +521,20 @@ defmodule TLA.Spec.Block do
             hint: "A binder may shadow nothing (02-dsl-semantics.md §1.3). Rename the local."
           )
 
+        # The third case §1.3's rule covers and the check did not (#210): a `params:` name, or
+        # an action property's `old`/`new`. `let k = 100` under `params: [k: [1, 2]]` compiled,
+        # and both bindings produced the same successor.
+        MapSet.member?(ctx.params, name) ->
+          bad!(
+            ctx,
+            meta,
+            "#{binder} binds #{inspect(name)}, which this declaration already binds",
+            hint:
+              "A binder may shadow nothing (02-dsl-semantics.md §1.3): #{inspect(name)} is a " <>
+                "`params:` name here, or one of `old`/`new`, and a `let` of the same name " <>
+                "would make every use after it mean the local. Rename the local."
+          )
+
         true ->
           :ok
       end

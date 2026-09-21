@@ -133,8 +133,9 @@ defmodule TLA.GenServer do
       # as a verified one, which is worse than having no stamp at all.
       nil ->
         IO.warn(
-          "cannot verify spec_version for #{inspect(spec)}: its source is not on disk, " <>
-            "so the stamp is unchecked here.",
+          "cannot verify spec_version for #{inspect(spec)}: its source is not on disk, or " <>
+            "its `defmodule` is not spelled with a literal name (`defmodule __MODULE__.Spec` " <>
+            "cannot be located from source), so the stamp is unchecked here.",
           Macro.Env.stacktrace(env)
         )
 

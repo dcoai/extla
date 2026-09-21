@@ -232,10 +232,19 @@ defmodule TLA.Spec.Hash do
   # The body of the `defmodule` naming `segments`, at any nesting depth. Elixir permits both
   # `defmodule A.B do` and `defmodule A do defmodule B do`, and both must resolve, so the walk
   # carries the enclosing prefix rather than matching an alias literally.
+  #
+  # Only a LITERAL name can be matched from source. `defmodule __MODULE__.Spec` puts an
+  # `{:__MODULE__, _, _}` node among the segments; that used to reach `Atom.to_string/1` and
+  # crash the scanner from inside a consumer's compile (#210). A computed name is not a scan
+  # failure, it is a module this scanner cannot version — `nil`, which `check_stamp!`
+  # reports as unverifiable and says why.
   defp module_body({:defmodule, _, [{:__aliases__, _, alias_segs}, [do: body]]}, segments, prefix) do
-    here = prefix ++ Enum.map(alias_segs, &Atom.to_string/1)
-
-    if here == segments, do: body, else: module_body(body, segments, here)
+    if Enum.all?(alias_segs, &is_atom/1) do
+      here = prefix ++ Enum.map(alias_segs, &Atom.to_string/1)
+      if here == segments, do: body, else: module_body(body, segments, here)
+    else
+      nil
+    end
   end
 
   defp module_body({:__block__, _, nodes}, segments, prefix),
