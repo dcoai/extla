@@ -199,6 +199,60 @@ defmodule TLA.ConformanceSimulationTest do
     end
   end
 
+  # #213. Three things the module said or did that did not match each other.
+  describe "what the doc says, the code does" do
+    test "run/2 stops at the first finding, and traces_run counts what ran" do
+      result = Simulation.run(Impl.CollapsesTwoSteps, %{traces: 50, max_steps: 5, seed: 11})
+
+      assert result.status == :violation
+      assert result.traces_run < 50
+    end
+
+    # `terminate/2` is the implementation's chance to clean up, and a bare `:kill` skipped it
+    # for every server. A supervisor's `:shutdown` runs it for a server that traps exits.
+    test "a stopped server that traps exits gets its terminate/2" do
+      defmodule Tidy do
+        use GenServer
+        use TLA.GenServer, spec: Spec, refinement: Refinement
+
+        def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+        @impl true
+        def init(opts) do
+          Process.flag(:trap_exit, true)
+          {:ok, %{value: 0, status: :ready, notify: Keyword.fetch!(opts, :notify)}}
+        end
+
+        @impl true
+        def handle_call(:increment, _from, state),
+          do: {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+
+        def handle_call(:done, _from, state), do: {:reply, :ok, %{state | status: :ready}}
+        def handle_call(:reset, _from, state), do: {:reply, :ok, %{state | value: 0}}
+
+        @impl true
+        def terminate(reason, state), do: send(state.notify, {:terminated, reason})
+      end
+
+      assert %{status: :ok} =
+               Simulation.replay(Tidy, [:increment, :done], %{init_arg: [notify: self()]})
+
+      assert_receive {:terminated, :shutdown}, 5_000
+    end
+
+    # The server resolves its constants from application config; a generator on any other
+    # assignment would drive it against a different specification.
+    test "constants: is refused, naming where the constants come from" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Simulation.run(Impl.Conforming, %{traces: 1, constants: %{max_val: 99}})
+        end
+
+      assert error.message =~ "takes no `constants:`"
+      assert error.message =~ "config :extla, TLA.Conformance.Counter.Spec"
+    end
+  end
+
   describe "the generator" do
     test "produces a message for an action the spec declares" do
       generate = Generator.from_spec(Spec, Refinement, @constants)

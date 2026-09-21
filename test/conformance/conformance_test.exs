@@ -97,5 +97,49 @@ defmodule TLA.ConformanceTest do
     end
   end
 
+  # #213. The runtime's per-process spec cache matched on the module name alone, so a server
+  # that outlived a recompile of its spec kept the STRUCTURE it first loaded: the compiled
+  # closures are remote captures and follow a recompile on their own, but the list of
+  # invariants does not, so an invariant added to the spec was never checked by a running
+  # server. The cache is keyed on the module's md5 now. A throwaway module, so the recompile
+  # touches nothing else.
+  describe "the runtime's spec cache" do
+    test "a recompiled spec is picked up by a process that had cached the old one" do
+      name = "TLA.ConformanceTest.Recompiled#{System.unique_integer([:positive])}"
+
+      source = fn invariants ->
+        """
+        defmodule #{name} do
+          use TLA.Spec
+          variable :n, type: 0..5
+          init do
+            n = 0
+          end
+          action :tick do
+            require n < 5
+            n = n + 1
+          end
+          #{invariants}
+        end
+        """
+      end
+
+      ExUnit.CaptureIO.capture_io(:stderr, fn -> Code.compile_string(source.("")) end)
+      module = String.to_existing_atom("Elixir." <> name)
+
+      first = TLA.GenServer.Runtime.context(module)
+      assert Enum.map(first.spec.invariants, & &1.name) == []
+
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        Code.compile_string(source.("invariant :small do\n  n < 3\nend"))
+      end)
+
+      second = TLA.GenServer.Runtime.context(module)
+
+      assert Enum.map(second.spec.invariants, & &1.name) == [:small],
+             "the invariant added by the recompile is missing: the cache served the old spec"
+    end
+  end
+
   defp compiled, do: TLA.Spec.Compiled.from_module(Spec)
 end
