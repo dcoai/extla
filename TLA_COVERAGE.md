@@ -13,9 +13,11 @@ temporal property gets its own liveness run — the checker halts at the first r
 one run cannot say which of several properties it evaluated.
 
 `NOTHING` is the backlog. An action that was never enabled, a property that held
-vacuously, and a temporal property the run never reached were not verified — they were
+vacuously, a temporal property the run never reached, an action property checked against
+no transition, and a terminal that admitted no end state were not verified — they were
 merely present while a check ran, and calling that `model_checked` is the precise lie this
-document exists to prevent.
+document exists to prevent. Every kind the DSL declares has rows here; the kind list is
+`TLA.Spec.Hash.kinds/0`, not a list written by hand.
 
 A section marked **LOWER BOUNDS** was truncated by `max_states`, a `state_constraint`, or a
 counterexample, and its counts are floors rather than totals. A section marked
@@ -30,9 +32,9 @@ No durations, dates, seeds or machine names appear here. A golden is a stable fu
 source; anything varying independently makes it drift against itself on a quiet day.
 
 
-**33 specs · 124 items** · model_checked 83 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 37
+**33 specs · 139 items** · model_checked 92 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 43
 
-**freshness** · fresh 5 · stale 0 · unstamped 119
+**freshness** · fresh 5 · stale 0 · unstamped 134
 
 ## TLA.Conformance.Counter.BuggySpec — 3 items · gap 0 · LOWER BOUNDS (violation)
 
@@ -50,17 +52,19 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `in_bounds` | `:invariant` | `200ddd0f` | `:model_checked` | `:fresh` | not measured | `test/conformance/counter/spec.ex` |
 | `increment` | `:action` | `7db7349d` | `:model_checked` | `:fresh` | enabled in 5 | `test/conformance/counter/spec.ex` |
 | `reset` | `:action` | `164e9589` | `:model_checked` | `:fresh` | enabled in 6 | `test/conformance/counter/spec.ex` |
-## TLA.Differential.AuditLog — 3 items · gap 0 · LOWER BOUNDS (violation)
+## TLA.Differential.AuditLog — 4 items · gap 0 · LOWER BOUNDS (violation)
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `bounded_log` | `:invariant` | `d2aa2ae8` | `:model_checked` | `:unstamped` | ≥ not measured | `test/differential/audit_log/spec.ex` |
 | `compact` | `:action` | `bac5f93b` | `:model_checked` | `:unstamped` | ≥ enabled in 1 | `test/differential/audit_log/spec.ex` |
+| `log_only_grows` | `:action_property` | `db1d5929` | `:model_checked` | `:unstamped` | ≥ on 2 transitions | `test/differential/audit_log/spec.ex` |
 | `record` | `:action` | `dfc969dd` | `:model_checked` | `:unstamped` | ≥ enabled in 2 | `test/differential/audit_log/spec.ex` |
-## TLA.Differential.BoundedBuffer — 15 items · gap 0
+## TLA.Differential.BoundedBuffer — 16 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
+| `all_items_consumed` | `:terminal` | `ca68d979` | `:model_checked` | `:unstamped` | admitted 1 end state | `test/differential/bounded_buffer/spec.ex` |
 | `buffer_bounded` | `:invariant` | `b60f43b4` | `:model_checked` | `:unstamped` | not measured | `test/differential/bounded_buffer/spec.ex` |
 | `consume` | `:action` | `83c11e04` | `:model_checked` | `:unstamped` | enabled in 2446 | `test/differential/bounded_buffer/spec.ex` |
 | `consumer_done` | `:action` | `19b5176a` | `:model_checked` | `:unstamped` | enabled in 2296 | `test/differential/bounded_buffer/spec.ex` |
@@ -87,13 +91,14 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `fill_small` | `:action` | `6aba9e57` | `:model_checked` | `:unstamped` | ≥ enabled in 12 | `test/differential/die_hard/spec.ex` |
 | `not_solved` | `:invariant` | `a305cd10` | `:model_checked` | `:unstamped` | ≥ not measured | `test/differential/die_hard/spec.ex` |
 | `small_to_big` | `:action` | `726278cb` | `:model_checked` | `:unstamped` | ≥ enabled in 12 | `test/differential/die_hard/spec.ex` |
-## TLA.Differential.DistributedLock — 9 items · gap 0
+## TLA.Differential.DistributedLock — 10 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `acquire_lock` | `:action` | `7e01cb44` | `:model_checked` | `:unstamped` | enabled in 16 | `test/differential/distributed_lock/spec.ex` |
 | `holding_means_owner` | `:invariant` | `09882724` | `:model_checked` | `:unstamped` | not measured | `test/differential/distributed_lock/spec.ex` |
 | `lock_eventually_released` | `:temporal` | `deac4c61` | `:model_checked` | `:unstamped` | checked | `test/differential/distributed_lock/spec.ex` |
+| `lock_not_stolen` | `:action_property` | `c3a2397e` | `:model_checked` | `:unstamped` | on 76 transitions | `test/differential/distributed_lock/spec.ex` |
 | `mutual_exclusion` | `:invariant` | `402d28a4` | `:model_checked` | `:unstamped` | not measured | `test/differential/distributed_lock/spec.ex` |
 | `no_starvation` | `:temporal` | `d15eb021` | `:model_checked` | `:unstamped` | checked | `test/differential/distributed_lock/spec.ex` |
 | `owner_is_valid` | `:invariant` | `34934c14` | `:model_checked` | `:unstamped` | not measured | `test/differential/distributed_lock/spec.ex` |
@@ -110,7 +115,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `phase_1b` | `:action` | `c46a8abd` | `:model_checked` | `:unstamped` | enabled in 1718 | `test/differential/paxos/spec.ex` |
 | `phase_2a` | `:action` | `14495168` | `:model_checked` | `:unstamped` | enabled in 568 | `test/differential/paxos/spec.ex` |
 | `phase_2b` | `:action` | `5d6caaf9` | `:model_checked` | `:unstamped` | enabled in 3776 | `test/differential/paxos/spec.ex` |
-## TLA.Differential.RaftElection — 8 items · gap 0
+## TLA.Differential.RaftElection — 9 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
@@ -120,6 +125,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `handle_vote_response` | `:action` | `ad695631` | `:model_checked` | `:unstamped` | enabled in 15396 | `test/differential/raft_election/spec.ex` |
 | `leader_has_quorum` | `:invariant` | `4655fa45` | `:model_checked` | `:unstamped` | not measured | `test/differential/raft_election/spec.ex` |
 | `step_down` | `:action` | `c20c55bc` | `:model_checked` | `:unstamped` | enabled in 8196 | `test/differential/raft_election/spec.ex` |
+| `term_bound_exhausted` | `:terminal` | `bbdd1986` | `:model_checked` | `:unstamped` | admitted 655 end states | `test/differential/raft_election/spec.ex` |
 | `timeout` | `:action` | `f79da27f` | `:model_checked` | `:unstamped` | enabled in 7613 | `test/differential/raft_election/spec.ex` |
 | `vote_integrity` | `:invariant` | `c128cefa` | `:model_checked` | `:unstamped` | not measured | `test/differential/raft_election/spec.ex` |
 ## TLA.Differential.TwoPhaseCommit — 8 items · gap 0
@@ -140,11 +146,13 @@ source; anything varying independently makes it drift against itself on a quiet 
 |---|---|---|---|---|---|---|
 | `never_p2` | `:invariant` | `1c187a01` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `set` | `:action` | `4c63d21e` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-## TLA.TestSpecs.Broken — 2 items · gap 0 · LOWER BOUNDS (violation)
+| `settled` | `:terminal` | `2a8b2be1` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+## TLA.TestSpecs.Broken — 3 items · gap 0 · LOWER BOUNDS (violation)
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `below_three` | `:invariant` | `9f82f32b` | `:model_checked` | `:unstamped` | ≥ not measured | `test/support/specs.ex` |
+| `never_decreases` | `:action_property` | `08f7bb17` | `:model_checked` | `:unstamped` | ≥ on 2 transitions | `test/support/specs.ex` |
 | `tick` | `:action` | `f069ba87` | `:model_checked` | `:unstamped` | ≥ enabled in 3 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Counter — CANNOT RUN: no assignment for :max
 
@@ -153,6 +161,8 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `eventually_done` | `:temporal` | `76094f89` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `finish` | `:action` | `032e17a2` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `increment` | `:action` | `25a96c81` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+| `never_jumps` | `:action_property` | `d3969994` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+| `nothing_left` | `:terminal` | `a83f71ed` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `reset` | `:action` | `c0adcaa8` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `within_bounds` | `:invariant` | `61f771c5` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 ## TLA.TestSpecs.Cube — 3 items · gap 0
@@ -167,19 +177,21 @@ source; anything varying independently makes it drift against itself on a quiet 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `produce` | `:action` | `a41de17b` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-## TLA.TestSpecs.Idling — 4 items · gap 0
+## TLA.TestSpecs.Idling — 5 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `advance` | `:action` | `e4623413` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
+| `arrived` | `:terminal` | `0621e388` | `:model_checked` | `:unstamped` | admitted 2 end states | `test/support/specs.ex` |
 | `eventually_two` | `:temporal` | `1f6c393b` | `:model_checked` | `:unstamped` | checked | `test/support/specs.ex` |
 | `never_two` | `:temporal` | `00dfeb68` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
 | `spin` | `:action` | `971901a2` | `:model_checked` | `:unstamped` | enabled in 2 | `test/support/specs.ex` |
-## TLA.TestSpecs.IdlingUnfair — 3 items · gap 0
+## TLA.TestSpecs.IdlingUnfair — 4 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `advance` | `:action` | `e4623413` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
+| `arrived` | `:terminal` | `0621e388` | `:model_checked` | `:unstamped` | admitted 2 end states | `test/support/specs.ex` |
 | `eventually_two` | `:temporal` | `1f6c393b` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
 | `spin` | `:action` | `971901a2` | `:model_checked` | `:unstamped` | enabled in 2 | `test/support/specs.ex` |
 ## TLA.TestSpecs.LetScopes — 1 items · gap 0
@@ -213,11 +225,12 @@ source; anything varying independently makes it drift against itself on a quiet 
 |---|---|---|---|---|---|---|
 | `payload_is_text` | `:invariant` | `1d1b24bd` | `:model_checked` | `:unstamped` | ≥ 1 near-miss | `test/support/specs.ex` |
 | `receive_raw` | `:action` | `40f35b61` | `:model_checked` | `:unstamped` | ≥ enabled in 1 | `test/support/specs.ex` |
-## TLA.TestSpecs.Stalls — 2 items · gap 0
+## TLA.TestSpecs.Stalls — 3 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
 | `eventually_done` | `:temporal` | `77331947` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
+| `gave_up` | `:terminal` | `eee83da6` | `:model_checked` | `:unstamped` | admitted 1 end state | `test/support/specs.ex` |
 | `give_up` | `:action` | `9166a6cb` | `:model_checked` | `:unstamped` | enabled in 1 | `test/support/specs.ex` |
 ## TLA.TestSpecs.Swap — 1 items · gap 0
 
@@ -235,12 +248,14 @@ source; anything varying independently makes it drift against itself on a quiet 
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
+| `never_fractional` | `:action_property` | `31f1e737` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
 | `taint` | `:action` | `4722a521` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
 | `tick` | `:action` | `19b0a153` | `:nothing` | `:unstamped` | raised | `test/support/specs.ex` |
 ## TLA.TestSpecs.Terminating — CANNOT RUN: no assignment for :max
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
+| `all_produced` | `:terminal` | `93f0b569` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `produce` | `:action` | `a41de17b` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 ## TLA.TestSpecs.Transfer — CANNOT RUN: no assignment for :accounts, :max_balance
 
@@ -250,6 +265,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `complete_transfer` | `:action` | `d1f32bda` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `conservation_of_money` | `:invariant` | `043357c3` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `fail_transfer` | `:action` | `459450bc` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
+| `no_phantom_credit` | `:action_property` | `9473e259` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `no_stuck_pending` | `:temporal` | `b9a16c09` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `reset` | `:action` | `cd41e83b` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 ## TLA.TestSpecs.TwoStarts — 1 items · gap 0
@@ -284,9 +300,10 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `no_starvation` | `:temporal` | `20c4dbff` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `release` | `:action` | `10646bac` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
 | `request` | `:action` | `ad980e15` | `:nothing` | `:unstamped` | cannot run | `test/support/specs.ex` |
-## TLA.TestSpecs.WithDefaults — 2 items · gap 1
+## TLA.TestSpecs.WithDefaults — 3 items · gap 1
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
 |---|---|---|---|---|---|---|
+| `done` | `:terminal` | `c03c5c9b` | `:model_checked` | `:unstamped` | admitted 1 end state | `test/support/specs.ex` |
 | `impossible` | `:action` | `2dcaf6d3` | `:nothing` | `:unstamped` | never enabled | `test/support/specs.ex` |
 | `tick` | `:action` | `bbe98200` | `:model_checked` | `:unstamped` | enabled in 3 | `test/support/specs.ex` |

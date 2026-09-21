@@ -61,6 +61,11 @@ defmodule TLA.Coverage do
           unreached_params: %{atom() => [map()]},
           terminal_but_live: [atom()],
 
+          # How many successor-less states each `terminal` admitted (#202). A terminal that
+          # admitted none was never the reason a behaviour ended — the run would have reported
+          # the same deadlocks without it — and the ledger cannot call that verified.
+          terminals: %{atom() => %{admitted: non_neg_integer()}},
+
           # `:violation` is not in `04-layer2-model-checker.md`'s list, and it
           # belongs there: a run that stopped at a counterexample stopped
           # mid-expansion, so its counts are a lower bound for exactly the same
@@ -75,6 +80,7 @@ defmodule TLA.Coverage do
             vacuous: [],
             unreached_params: %{},
             terminal_but_live: [],
+            terminals: %{},
             bounded_by: :none,
 
             # Accumulator-only, dropped by finalize/3.
@@ -103,6 +109,7 @@ defmodule TLA.Coverage do
            %{evaluated_in: 0, near_misses: if(invariant[:near_miss], do: 0, else: nil)}}
         end),
       probes: probes(spec, constants),
+      terminals: Map.new(spec.terminals, &{&1.name, %{admitted: 0}}),
       seen_bindings: Map.new(spec.actions, &{&1.name, MapSet.new()}),
       param_universe: Map.new(spec.actions, &{&1.name, :unknown})
     }
@@ -187,6 +194,23 @@ defmodule TLA.Coverage do
       end)
 
     %{coverage | actions: actions}
+  end
+
+  @doc """
+  Record a successor-less state and which `terminal` predicates admitted it.
+
+  `admitting` is the list of terminal names whose predicate held there — the same evaluation
+  `TLA.ModelChecker.Safety.classify_stuck/3` made to call the state terminal rather than
+  deadlocked, handed over so it is counted once and not evaluated twice. An empty list is a
+  deadlock, and counts against nothing.
+  """
+  def observe_stuck(coverage, admitting) do
+    terminals =
+      Enum.reduce(admitting, coverage.terminals, fn name, acc ->
+        Map.update!(acc, name, &%{&1 | admitted: &1.admitted + 1})
+      end)
+
+    %{coverage | terminals: terminals}
   end
 
   @doc """
@@ -283,6 +307,10 @@ defmodule TLA.Coverage do
         invariants: merge_with(into.invariants, from.invariants, &merge_invariant/2),
         probes: merge_with(into.probes, from.probes, &merge_probe/2),
         seen_bindings: merge_with(into.seen_bindings, from.seen_bindings, &merge_bindings/2),
+        terminals:
+          merge_with(into.terminals, from.terminals, fn a, b ->
+            %{admitted: a.admitted + b.admitted}
+          end),
         live_terminals: MapSet.union(into.live_terminals, from.live_terminals)
     }
   end
@@ -338,6 +366,7 @@ defmodule TLA.Coverage do
       vacuous: vacuous(coverage.probes),
       unreached_params: unreached(coverage),
       terminal_but_live: coverage.live_terminals |> MapSet.to_list() |> Enum.sort(),
+      terminals: coverage.terminals,
       bounded_by: bounded_by
     }
   end

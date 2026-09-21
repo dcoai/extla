@@ -274,7 +274,9 @@ defmodule Mix.Tasks.Tla.Check do
   # misread it. The cost is bounded and self-repairing -- `TLA.Mix.TraceFile` refuses a v1
   # document with a message naming both versions and telling the reader to re-run
   # `mix tla.check --format json`, which regenerates it.
-  @schema_version 2
+  #
+  # Bumped to 3 by #256, which added `coverage.terminals` -- again additive, again bumped.
+  @schema_version 3
 
   defp encode(results) do
     specs =
@@ -321,6 +323,7 @@ defmodule Mix.Tasks.Tla.Check do
           invariants: result.coverage.invariants,
           vacuous: result.coverage.vacuous,
           terminal_but_live: result.coverage.terminal_but_live,
+          terminals: result.coverage.terminals,
           bounded_by: result.coverage.bounded_by
         },
         profile: profile_json(result.profile),

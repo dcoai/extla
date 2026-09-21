@@ -276,11 +276,21 @@ defmodule TLA.Ledger do
     }
   end
 
+  # Every kind `TLA.Spec.Hash.kinds/0` names, in that order, so a kind added to the DSL is a
+  # row here on the day it is added — or a `FunctionClauseError` from `verdict/5`, which is
+  # the honest failure. A hand-written list of three (#202) left `action_property` and
+  # `terminal` with no rows under a header promising every item a spec declares.
   defp items(spec) do
-    Enum.map(spec.actions, &{:action, &1.name}) ++
-      Enum.map(spec.invariants, &{:invariant, &1.name}) ++
-      Enum.map(spec.temporals, &{:temporal, &1.name})
+    Enum.flat_map(TLA.Spec.Hash.kinds(), fn kind ->
+      Enum.map(declarations(spec, kind), &{kind, &1.name})
+    end)
   end
+
+  defp declarations(spec, :action), do: spec.actions
+  defp declarations(spec, :invariant), do: spec.invariants
+  defp declarations(spec, :temporal), do: spec.temporals
+  defp declarations(spec, :action_property), do: spec.action_properties
+  defp declarations(spec, :terminal), do: spec.terminals
 
   # An action never enabled, or a property that held vacuously, was not verified — it was
   # merely present while a check ran. Calling that `model_checked` is the precise lie this
@@ -302,6 +312,27 @@ defmodule TLA.Ledger do
       # finding, and not having looked is not.
       %{near_misses: nil} -> {:model_checked, "not measured"}
       %{near_misses: n} -> {:model_checked, "#{n} near-miss"}
+      nil -> {:nothing, "not evaluated"}
+    end
+  end
+
+  # An action property is checked on every transition the search took, so its evidence is
+  # the transition count — and a run that took none checked it against nothing.
+  defp verdict(:action_property, _name, coverage, _vacuous, _temporals) do
+    case coverage.actions |> Map.values() |> Enum.map(& &1.states_generated) |> Enum.sum() do
+      0 -> {:nothing, "no transitions"}
+      n -> {:model_checked, "on #{n} transitions"}
+    end
+  end
+
+  # A terminal is consulted only where a behaviour ends. One that admitted no such state was
+  # never the reason a behaviour was allowed to end there — the run would have reported the
+  # same deadlocks without it — and that is not verified, it is unused.
+  defp verdict(:terminal, name, coverage, _vacuous, _temporals) do
+    case Map.get(coverage.terminals, name) do
+      %{admitted: 0} -> {:nothing, "admitted no end state"}
+      %{admitted: 1} -> {:model_checked, "admitted 1 end state"}
+      %{admitted: n} -> {:model_checked, "admitted #{n} end states"}
       nil -> {:nothing, "not evaluated"}
     end
   end
@@ -450,9 +481,11 @@ defmodule TLA.Ledger do
     one run cannot say which of several properties it evaluated.
 
     `NOTHING` is the backlog. An action that was never enabled, a property that held
-    vacuously, and a temporal property the run never reached were not verified — they were
+    vacuously, a temporal property the run never reached, an action property checked against
+    no transition, and a terminal that admitted no end state were not verified — they were
     merely present while a check ran, and calling that `model_checked` is the precise lie this
-    document exists to prevent.
+    document exists to prevent. Every kind the DSL declares has rows here; the kind list is
+    `TLA.Spec.Hash.kinds/0`, not a list written by hand.
 
     A section marked **LOWER BOUNDS** was truncated by `max_states`, a `state_constraint`, or a
     counterexample, and its counts are floors rather than totals. A section marked

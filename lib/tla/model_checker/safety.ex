@@ -46,9 +46,20 @@ defmodule TLA.ModelChecker.Safety do
   other state in the spec at the same time.
   """
   def classify_stuck(spec, constants, state) do
-    if Enum.any?(spec.terminals, & &1.predicate.(constants, state)),
-      do: :terminal,
-      else: :deadlocked
+    case admitting_terminals(spec, constants, state) do
+      [] -> :deadlocked
+      _ -> :terminal
+    end
+  end
+
+  @doc """
+  The names of every `terminal` whose predicate admits `state`. Empty means a deadlock.
+
+  `classify_stuck/3` is this with the names thrown away; the checker asks for the names so
+  coverage can count which terminal ended which behaviour (#202) from one evaluation.
+  """
+  def admitting_terminals(spec, constants, state) do
+    for terminal <- spec.terminals, terminal.predicate.(constants, state), do: terminal.name
   end
 
   @doc """
