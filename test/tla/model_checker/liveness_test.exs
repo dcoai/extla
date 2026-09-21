@@ -95,10 +95,29 @@ defmodule TLA.ModelChecker.LivenessTest do
       cycle = result.violation.cycle
       assert cycle.actions != []
 
-      # p1 waits for the whole cycle while p2 goes round; `acquire(p1)` is disabled
-      # wherever p2 holds the lock, which is what makes weak fairness powerless here.
-      assert Enum.all?(cycle.states, &(&1.pc.p1 == :waiting))
-      assert Enum.any?(cycle.states, &(&1.owner == :p2))
+      # One process waits for the whole cycle while the other goes round; `acquire` for the
+      # waiter is disabled wherever the other holds the lock, which is what makes weak
+      # fairness powerless here. The property, not a process: `WeaklyFair` is symmetric in
+      # p1/p2, so a lasso starving either is a valid counterexample, and this test once
+      # named p1 — which is more than the checker promises. It has always come back p1 in
+      # every run anyone has looked at (#243); if it ever does not, the message below is
+      # what records it, and a lasso that differs run to run would be its own finding.
+      processes = [:p1, :p2]
+
+      starved =
+        Enum.filter(processes, fn p -> Enum.all?(cycle.states, &(&1.pc[p] == :waiting)) end)
+
+      assert [waiter] = starved,
+             "expected exactly one process waiting through the whole cycle, got " <>
+               "#{inspect(starved)}\nactions: #{inspect(cycle.actions)}\nstates:\n" <>
+               Enum.map_join(cycle.states, "\n", &("  " <> inspect(&1)))
+
+      [other] = processes -- [waiter]
+
+      assert Enum.any?(cycle.states, &(&1.owner == other)),
+             "#{inspect(other)} never held the lock in a cycle that starves #{inspect(waiter)}: " <>
+               inspect(cycle.states)
+
       assert graph.fairness_index != []
     end
   end
