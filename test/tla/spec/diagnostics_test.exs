@@ -484,6 +484,21 @@ defmodule TLA.Spec.DiagnosticsTest do
       assert error =~ "[dom ~> rng]"
     end
 
+    # #196. A stepped range is in the grammar now; a zero step is the one shape that is not,
+    # and refusing it here names the type rather than letting `Range.new/3` refuse it later.
+    test "a range step of zero is rejected at the declaration" do
+      error =
+        refuse("""
+        variable :x, type: 0..10//0
+        init do
+          x = 0
+        end
+        """)
+
+      assert error =~ "a range step of 0 is not a range"
+      assert error =~ "§1.5"
+    end
+
     test "a type naming an undeclared constant is rejected" do
       assert refuse("""
              variable :x, type: 0..^cap

@@ -81,6 +81,58 @@ defmodule TLA.Spec.TypeTest do
       refute Type.member?(type, -2)
       refute Type.member?(type, 3)
     end
+
+    # #196. `resolve!` accepted `a..b//step` and dropped the step to a plain range, so `x = 1`
+    # passed `type: 0..10//2` — while `params: [k: 0..10//2]` evaluates the same literal as
+    # Elixir does and never drew a 1. Two consumers of one syntax disagreed.
+    test "a stepped range honours its step" do
+      type = resolve(quote(do: 0..10//2))
+
+      assert Type.member?(type, 0)
+      assert Type.member?(type, 10)
+      refute Type.member?(type, 1)
+      refute Type.member?(type, 9)
+      refute Type.member?(type, 12)
+      assert Type.describe(type) == "0..10//2"
+    end
+
+    test "a stepped range's step may be a constant, and may run downward" do
+      assert Type.member?(resolve(quote(do: 0..^max//^by), %{max: 9, by: 3}), 6)
+      refute Type.member?(resolve(quote(do: 0..^max//^by), %{max: 9, by: 3}), 7)
+
+      down = resolve(quote(do: 10..0//-5))
+      assert Type.member?(down, 5)
+      refute Type.member?(down, 4)
+    end
+
+    # The same literal, the two consumers: what `params:` draws is exactly the type's members.
+    test "type: and params: agree on a stepped range" do
+      defmodule Stepped do
+        use TLA.Spec
+
+        variable :seen, type: set(0..10//2)
+
+        init do
+          seen = set()
+        end
+
+        action :draw, params: [k: 0..10//2] do
+          seen = put(seen, k)
+        end
+      end
+
+      result = ModelChecker.run(Stepped, %{})
+      assert result.status == :ok
+
+      spec = TLA.Spec.Compiled.from_module(Stepped)
+      [draw] = spec.actions
+      drawn = draw.params |> Keyword.fetch!(:k) |> then(& &1.(%{}, %{}, %{})) |> MapSet.new()
+      type = resolve(quote(do: 0..10//2))
+
+      assert drawn == MapSet.new([0, 2, 4, 6, 8, 10])
+      assert Enum.all?(drawn, &Type.member?(type, &1))
+      refute Enum.any?(-1..11, &(Type.member?(type, &1) and &1 not in drawn))
+    end
   end
 
   describe "element-typed collections" do

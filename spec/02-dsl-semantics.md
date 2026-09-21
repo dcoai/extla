@@ -104,6 +104,7 @@ compiles.
 | `:atom`, `0`, `"s"` | Exactly that literal |
 | `[:a, :b]` | One of the listed literals |
 | `a..b` | An integer in the range; either bound may be `^const` |
+| `a..b//step` | Every `step`th integer from `a` up to `b` — `0..10//2` is 0, 2, …, 10; a step may be `^const` and may not be 0 |
 | `^name` | Any element of the constant (which must be a set) |
 | `t1 \| t2` | Union — a value of either type |
 | `{t1, t2, …}` | A tuple of that arity, element-wise |
@@ -115,7 +116,9 @@ compiles.
 
 A range bound may be an integer, a `^constant`, or arithmetic over them
 (`0..(^max_items - 1)`), and it may be negative: Paxos's `maxBal` is `-1` until the
-acceptor promises something.
+acceptor promises something. A stepped range means what the same literal means in
+`params:` — `params:` always honoured the step, and `type:` once dropped it, so `x = 1`
+passed `type: 0..10//2`; the two consumers of one syntax now agree.
 
 Two operators are overloaded and a reader should know it: inside `type:`, `~>` is the
 function arrow and `|` is union; inside a `temporal` block `~>` is leads-to. The two

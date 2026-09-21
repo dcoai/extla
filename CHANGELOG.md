@@ -59,6 +59,13 @@ release it merely follows.
   checked" warning in the result, with the reason and what to do; a spec with no temporal
   gets no such warning.
 
+- **A stepped range type honours its step** (#258, closes #196). `variable :x, type: 0..10//2`
+  compiled and `resolve!` dropped the step to a plain range, so `x = 1` passed `type_ok` —
+  while `params: [k: 0..10//2]` evaluates the same literal as Elixir does and never drew a 1.
+  Two consumers of one syntax disagreed, and §1.5 had no `//` at all. The step is now honoured
+  (a `^constant` step and a negative step included), a zero step is a compile error naming the
+  grammar, and §1.5 says so.
+
 - **The ledger enumerated three of five declaration kinds** (#256, closes #202). Under a header
   promising "every item each TLA.Spec declares", `action_property` and `terminal` had no rows
   at all — the kind list was written by hand. It is now `TLA.Spec.Hash.kinds/0`, so a kind

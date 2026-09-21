@@ -15,6 +15,7 @@ defmodule TLA.Spec.Type do
   | `:atom`, `0`, `"s"` | Exactly that literal |
   | `[:a, :b]` | One of the listed literals |
   | `a..b` | An integer in the range; either bound may be `^const`, and either may be negative |
+  | `a..b//step` | Every `step`th integer from `a` up to `b` — `0..10//2` is 0, 2, …, 10 |
   | `^name` | Any element of the constant (which must be a set) |
   | `t1 \\| t2` | Union — a value of either type |
   | `{t1, t2, …}` | A tuple of that arity, element-wise |
@@ -72,9 +73,25 @@ defmodule TLA.Spec.Type do
     check_bound!(hi, constants, opts)
   end
 
-  defp check!({:..//, _meta, [lo, hi, _step]}, constants, opts) do
+  # `a..b//step` — the step is honoured (#196). `params:` evaluates the same literal as
+  # Elixir does and always honoured it; `type:` used to drop it to a plain range, so `x = 1`
+  # passed `type: 0..10//2` and two consumers of one syntax disagreed. A step of zero is
+  # refused here, the way an ill-formed bound is: Elixir refuses it too, one layer down and
+  # with a message about `Range.new/3` rather than about the type.
+  defp check!({:..//, meta, [lo, hi, step]}, constants, opts) do
     check_bound!(lo, constants, opts)
     check_bound!(hi, constants, opts)
+    check_bound!(step, constants, opts)
+
+    if step == 0 do
+      bad!(opts, meta, "a range step of 0 is not a range",
+        hint:
+          "Write `a..b` for step 1, or `a..b//n` with a non-zero `n` " <>
+            "(02-dsl-semantics.md §1.5)."
+      )
+    end
+
+    :ok
   end
 
   # `{t1, t2, ...}` — a tuple, element-wise. Two-element tuples are their own AST
@@ -152,6 +169,7 @@ defmodule TLA.Spec.Type do
           :atom | 0 | "s"       a literal
           [:a, :b]              one of the listed literals
           a..b                  an integer range; a bound may be ^const or negative
+          a..b//step            every step-th integer from a up to b
           ^name                 any element of a constant set
           t1 | t2               union
           {t1, t2}              a tuple, element-wise
@@ -223,6 +241,8 @@ defmodule TLA.Spec.Type do
           {:literal, term()}
           | {:one_of, [term()]}
           | {:range, integer(), integer()}
+          # `a..b//step`, step honoured: the members are lo, lo + step, ... within the bounds.
+          | {:range, integer(), integer(), integer()}
           | {:element_of, MapSet.t()}
           | {:union, [resolved()]}
           | {:tuple, [resolved()]}
@@ -280,8 +300,10 @@ defmodule TLA.Spec.Type do
   def resolve!({:.., _, [lo, hi]}, constants, where),
     do: {:range, bound!(lo, constants, where), bound!(hi, constants, where)}
 
-  def resolve!({:..//, _, [lo, hi, _step]}, constants, where),
-    do: {:range, bound!(lo, constants, where), bound!(hi, constants, where)}
+  def resolve!({:..//, _, [lo, hi, step]}, constants, where),
+    do:
+      {:range, bound!(lo, constants, where), bound!(hi, constants, where),
+       bound!(step, constants, where)}
 
   def resolve!({a, b}, constants, where),
     do: {:tuple, [resolve!(a, constants, where), resolve!(b, constants, where)]}
@@ -319,6 +341,7 @@ defmodule TLA.Spec.Type do
   defp domain_values!({:one_of, values}, _where), do: MapSet.new(values)
   defp domain_values!({:literal, value}, _where), do: MapSet.new([value])
   defp domain_values!({:range, lo, hi}, _where), do: MapSet.new(lo..hi//1)
+  defp domain_values!({:range, lo, hi, step}, _where), do: MapSet.new(lo..hi//step)
 
   defp domain_values!(other, where) do
     raise ArgumentError,
@@ -360,6 +383,11 @@ defmodule TLA.Spec.Type do
 
   def member?({:range, lo, hi}, value),
     do: is_integer(value) and value >= lo and value <= hi
+
+  # `Enum.member?/2` on a stepped range is exact -- the value must be lo + k * step for some
+  # k with the result inside the bounds -- and honours a negative step.
+  def member?({:range, lo, hi, step}, value),
+    do: is_integer(value) and Enum.member?(lo..hi//step, value)
 
   def member?({:element_of, set}, value), do: MapSet.member?(set, value)
   def member?({:union, types}, value), do: Enum.any?(types, &member?(&1, value))
@@ -464,6 +492,7 @@ defmodule TLA.Spec.Type do
   def describe({:literal, literal}), do: inspect(literal)
   def describe({:one_of, literals}), do: Enum.map_join(literals, " | ", &inspect/1)
   def describe({:range, lo, hi}), do: "#{lo}..#{hi}"
+  def describe({:range, lo, hi, step}), do: "#{lo}..#{hi}//#{step}"
   def describe({:element_of, set}), do: "an element of #{inspect(set)}"
   def describe({:union, types}), do: Enum.map_join(types, " | ", &describe/1)
   def describe({:tuple, types}), do: "{" <> Enum.map_join(types, ", ", &describe/1) <> "}"
