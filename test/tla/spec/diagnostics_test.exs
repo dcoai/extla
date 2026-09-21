@@ -241,6 +241,28 @@ defmodule TLA.Spec.DiagnosticsTest do
       assert error =~ "`constant` accepts :default"
     end
 
+    # #209. `init` was the eighth options-taking macro and the one without a check, so
+    # `init desc: "x", do: …` compiled with the keyword dropped by `pop_do!/3`.
+    test "init takes no options, and says so" do
+      error =
+        refuse("""
+        variable :x
+        init desc: "the start" do
+          x = 0
+        end
+        """)
+
+      assert error =~ "in init:"
+      assert error =~ "unknown option: :desc"
+      assert error =~ "`init` takes no options"
+
+      # The one-list spelling the review found compiling: `init desc: "x", do: …`.
+      assert refuse("""
+             variable :x
+             init desc: "the start", do: x = 0
+             """) =~ "unknown option: :desc"
+    end
+
     # A block reaches these macros as a `do:` entry in the same keyword list, so a check that
     # ran before `pop_do!/3` would reject every declaration in the project.
     test "the block itself is not mistaken for an unknown option" do

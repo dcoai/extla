@@ -870,8 +870,14 @@ defmodule TLA.ModelChecker do
   # deprived of a check it never asked for.
   defp liveness_skipped_warning(warnings, %{spec: %{temporals: []}}), do: warnings
 
-  defp liveness_skipped_warning(warnings, %{liveness_skipped: reason, spec: spec}) do
-    count = length(spec.temporals)
+  # Counts the SELECTION, not the declaration: `temporals: [:one]` with three declared used
+  # to say three were not checked (#209). `:all` is every declared one.
+  defp liveness_skipped_warning(warnings, %{liveness_skipped: reason, spec: spec, config: config}) do
+    count =
+      case config.temporals do
+        :all -> length(spec.temporals)
+        names -> Enum.count(spec.temporals, &(&1.name in names))
+      end
 
     warnings ++
       [

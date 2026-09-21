@@ -275,6 +275,21 @@ defmodule TLA.Spec.GuardOrderTest do
       assert Enum.any?(result.warnings, &(&1 =~ "safety counterexample halted the search"))
     end
 
+    # #209. The count named the declaration, not the selection: `temporals: [:one]` with three
+    # declared said three were not checked. `Idling` declares two.
+    test "the skip warning counts the selected properties, not the declared ones" do
+      result =
+        TLA.ModelChecker.run(TLA.TestSpecs.Idling, %{
+          check_liveness: true,
+          max_states: 1,
+          temporals: [:never_two]
+        })
+
+      assert result.status == :max_states_reached
+      assert Enum.any?(result.warnings, &(&1 =~ "1 temporal property was not checked"))
+      refute Enum.any?(result.warnings, &(&1 =~ "2 temporal properties"))
+    end
+
     # Nothing to name when nothing was declared.
     test "a bounded run of a spec with no temporal property has no skip to report" do
       result =

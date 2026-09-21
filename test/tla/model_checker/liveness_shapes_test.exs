@@ -151,6 +151,8 @@ defmodule TLA.ModelChecker.LivenessShapesTest do
     result = verdict(InfinitelyOften)
 
     assert result.status == :violation
+    # The refuting cycle spins at n == 2, where P (`n == 0`) never holds again.
+    assert result.violation.cycle.actions == [:spin]
     assert %{prefix: _, cycle: _} = result.violation
   end
 
@@ -158,6 +160,8 @@ defmodule TLA.ModelChecker.LivenessShapesTest do
     result = verdict(EventuallyAlways)
 
     assert result.status == :violation
+    # The refuting cycle flips between n == 0 and n == 1, so not-P recurs forever.
+    assert result.violation.cycle.actions == [:flip, :flip]
     assert %{prefix: _, cycle: _} = result.violation
   end
 
@@ -168,7 +172,13 @@ defmodule TLA.ModelChecker.LivenessShapesTest do
            "the SF-fair self-loop at phase 0 refutes the property, and only the strong " <>
              "split finds it — an unsplit search discards the whole component as unfair"
 
-    assert %{prefix: _, cycle: _} = result.violation
+    # Pinned to the post-split component (#209): the unfair cycle `tick` runs through phase 1,
+    # where `a` is enabled and strong fairness forbids staying; the fair one is `stay` at
+    # phase 0 alone, where `a` is disabled. A regression that ignored fairness would report
+    # the unfair cycle and still be a violation.
+    assert %{prefix: _, cycle: cycle} = result.violation
+    assert cycle.actions == [:stay]
+    assert Enum.all?(cycle.states, &(&1.phase == 0))
   end
 
   # Without this the three above could pass because the specs are broken in some other way —

@@ -73,9 +73,21 @@ defmodule TLA.Spec.DSL do
   Multiple `init` blocks are disjuncted — a nondeterministic choice of starting
   state.
   """
+  # `init desc: "x" do … end` parses as `init/2`, options then block, the way the named
+  # macros do; merged here so the option check sees it. Without this clause that spelling
+  # was an "undefined function init/2" from the compiler rather than a diagnostic (#209).
+  defmacro init(opts, block) do
+    caller = __CALLER__
+
+    quote do
+      init(unquote(merge_opts(opts, block, caller, "init")))
+    end
+  end
+
   defmacro init(opts) do
     caller = __CALLER__
-    {block, _} = pop_do!(opts, caller, "init")
+    {block, rest} = pop_do!(opts, caller, "init")
+    check_options!(rest, caller, "init", nil)
 
     index = length(Module.get_attribute(caller.module, :tla_inits) || [])
     fun = :"__tla_init_#{index}__"
@@ -676,14 +688,17 @@ defmodule TLA.Spec.DSL do
 
   # What each declaration CONSUMES, established by reading the consumers rather than the
   # documentation: `:default` at `TLA.Spec.Compiled.defaults/1`, `:type` and `:params` popped
-  # here, `:desc` popped for the three predicate forms. `temporal` reads none.
+  # here, `:desc` popped for the three predicate forms and, since #160 stored it, for
+  # `temporal`. `init` reads none, and is checked against an empty set (#209): a keyword
+  # nobody reads must not compile there either.
   #
   # An option nobody reads and an option nobody wrote are the same thing to a `Keyword.pop/2`
   # with a default, which is how `variable :n, type: :nat, bogus: 1` came to compile. The list
-  # therefore records consumption, not intent: `desc:` is NOT accepted on `temporal`, `action`,
-  # `variable` or `constant`, because nothing there would ever read it. Accepting it would put
+  # therefore records consumption, not intent: `desc:` is NOT accepted on `action`, `variable`,
+  # `constant` or `init`, because nothing there would ever read it. Accepting it would put
   # back exactly the silence this closes.
   @accepted_options %{
+    "init" => [],
     "constant" => [:default],
     "variable" => [:type],
     "action" => [:params],
@@ -697,7 +712,7 @@ defmodule TLA.Spec.DSL do
   # validating before it is removed would reject every declaration in the project.
   defp check_options!(opts, caller, kind, name) do
     accepted = Map.fetch!(@accepted_options, kind)
-    declaration = "#{kind} #{inspect(name)}"
+    declaration = if name, do: "#{kind} #{inspect(name)}", else: kind
 
     unless keyword_list?(opts) do
       CompileError.raise!(
@@ -723,6 +738,7 @@ defmodule TLA.Spec.DSL do
     end
   end
 
+  defp accepts_hint(kind, []), do: "`#{kind}` takes no options."
   defp accepts_hint(kind, accepted), do: "`#{kind}` accepts #{keys(accepted)}."
 
   defp keys(list), do: Enum.map_join(list, ", ", &inspect/1)
