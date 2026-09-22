@@ -3,8 +3,17 @@ defmodule TLA.Spec.Temporal do
   Parses a `temporal` block into the bounded fragment of
   `02-dsl-semantics.md` §5.1:
 
-      formula ::= always(formula) | eventually(formula) | pred ~> pred | pred
-                | Enum.all?(^constant, fn x -> formula end)
+      formula  ::= temporal | Enum.all?(^constant, fn x -> formula end)
+      temporal ::= pred | always(pred) | eventually(pred)
+                 | always(eventually(pred)) | eventually(always(pred))
+                 | pred ~> pred | always(pred ~> pred)
+
+  **The nesting is bounded, and the grammar says so.** It used to read
+  `always(formula) | eventually(formula) | …`, which is recursive — so
+  `always(always(P))` was inside the grammar, compiled, and then met a checker
+  that evaluates seven shapes and no others. The bound was enforced three
+  frames further on, at run time, by an `ArgumentError` carrying no module,
+  declaration or line (#277).
 
   There is no negation, conjunction or disjunction **of formulas**. A `pred` may
   of course contain `not`/`and`/`or`; the restriction is on combining formulas.
@@ -22,6 +31,38 @@ defmodule TLA.Spec.Temporal do
   alias TLA.Spec.{Block, CompileError, Rewriter}
 
   @formula_ops [:always, :eventually, :~>]
+
+  # Where each formula operator may appear, and what its argument may then contain. This
+  # table IS the fragment's nesting bound, and it is the front end's because §5.1 promises
+  # that a formula outside the fragment is a **compile** error — "every rule here is enforced
+  # at compile time".
+  #
+  # It was enforced nowhere at compile time and three times after it, each in its own words:
+  # `Liveness.shape/4` raises (only under `check_liveness: true`),
+  # `GenServer.Runtime.verdict/3` has no fallback clause and dies with a
+  # `FunctionClauseError` under `mix tla.simulate`, and `Coverage.walk/3` does the same by
+  # default. Four hand-kept copies of one enumeration, which is this project's recurring
+  # defect: a list that stops being true without saying so.
+  #
+  # Widening the fragment means changing this table, §5.1's grammar, and those three
+  # consumers together — `test/tla/spec/temporal_fragment_test.exs` drives every shape here
+  # through all of them, so widening one alone goes red.
+  @nesting %{
+    {:always, :formula} => :always,
+    {:always, :eventually} => :predicate,
+    {:eventually, :formula} => :eventually,
+    {:eventually, :always} => :predicate,
+    {:~>, :formula} => :predicate,
+    {:~>, :always} => :predicate
+  }
+
+  @doc false
+  # Public so the fragment's gate can DERIVE the shapes from the bound rather than keep its
+  # own list beside it. A second hand-kept list of the fragment is the defect this table
+  # exists to end, and a test that enumerates the shapes itself is exactly that list: widen
+  # the table and the gate would still assert the old seven, in the file whose job is to
+  # notice (#277).
+  def nesting, do: @nesting
 
   @doc """
   Parse a temporal block into quoted code that builds a
@@ -51,7 +92,7 @@ defmodule TLA.Spec.Temporal do
     # nothing.
     Block.reject_assignment!(single, ctx)
 
-    formula(single, ctx)
+    formula(single, ctx, :formula)
   end
 
   defp reject_in_set do
@@ -69,27 +110,36 @@ defmodule TLA.Spec.Temporal do
 
   # always(P ~> Q) is P ~> Q. The collapse happens here rather than in the
   # checker so that the stored formula has one shape per meaning.
-  defp formula({:always, _meta, [inner]}, ctx) do
-    case formula(unwrap(inner), ctx) do
+  defp formula({:always, meta, [inner]} = ast, ctx, position) do
+    case formula(unwrap(inner), ctx, nest!(ast, :always, meta, position, ctx)) do
       {:{}, _, [:leads_to, _, _]} = leads_to -> leads_to
       other -> quote do: {:always, unquote(other)}
     end
   end
 
-  defp formula({:eventually, _meta, [inner]}, ctx) do
-    quote do: {:eventually, unquote(formula(unwrap(inner), ctx))}
+  defp formula({:eventually, meta, [inner]} = ast, ctx, position) do
+    inner_position = nest!(ast, :eventually, meta, position, ctx)
+    quote do: {:eventually, unquote(formula(unwrap(inner), ctx, inner_position))}
   end
 
-  defp formula({:~>, _meta, [p, q]}, ctx) do
+  defp formula({:~>, meta, [p, q]} = ast, ctx, position) do
+    nest!(ast, :~>, meta, position, ctx)
     quote do: {:leads_to, unquote(predicate(p, ctx)), unquote(predicate(q, ctx))}
   end
 
   # `\A x \in C : F(x)` — a conjunction of instantiated formulas, each of which
   # is itself in the fragment, so checking one needs nothing new.
+  # Only at the formula position. `always(Enum.all?(^procs, fn p -> done[p] end))` is
+  # `always(pred)` — a quantifier over a constant with a BOOLEAN body is an ordinary state
+  # predicate, and the rewriter has handled one inside an `invariant` all along. Taking it as
+  # a formula-level `\A` there built `{:always, {:for_all, …}}`, which no consumer evaluates:
+  # it died in `Coverage.walk/3` with a `FunctionClauseError`, under the DEFAULT
+  # configuration, on a formula that reads perfectly and means what it looks like (#277).
   defp formula(
          {{:., _, [{:__aliases__, _, [:Enum]}, :all?]}, meta,
           [set, {:fn, _, [{:->, _, [[{var, _, var_ctx}], body]}]}]},
-         ctx
+         ctx,
+         :formula
        )
        when is_atom(var) and is_atom(var_ctx) do
     unless quantifiable_set?(set) do
@@ -119,11 +169,11 @@ defmodule TLA.Spec.Temporal do
 
     quote do
       {:for_all, fn unquote(Rewriter.constants_ast(ctx)) -> unquote(set_expr) end,
-       fn unquote(quantified) -> unquote(formula(unwrap(body), inner_ctx)) end}
+       fn unquote(quantified) -> unquote(formula(unwrap(body), inner_ctx, :formula)) end}
     end
   end
 
-  defp formula(other, ctx) do
+  defp formula(other, ctx, _position) do
     if op = unsupported_op(other) do
       bad!(
         :unsupported_temporal_operator,
@@ -155,8 +205,10 @@ defmodule TLA.Spec.Temporal do
         meta_of(ast),
         "temporal operator #{op} where a state predicate is required",
         hint:
-          "The operands of `~>` are state predicates, not formulas " <>
-            "(02-dsl-semantics.md §5.1)."
+          "A state predicate is evaluated at ONE state; `always`, `eventually` and `~>` " <>
+            "are formulas, evaluated over a whole behaviour. The operands of `~>` are " <>
+            "predicates, and so is the body of a quantifier that sits under a temporal " <>
+            "operator (02-dsl-semantics.md §5.1)."
       )
     end
 
@@ -184,6 +236,51 @@ defmodule TLA.Spec.Temporal do
 
     found
   end
+
+  # The operator is supported; this nesting of it is not — a distinction the message has to
+  # make, because "unsupported temporal operator: always/1" about a formula whose author
+  # wrote nothing but supported operators would send them looking for the wrong thing.
+  defp nest!(ast, op, meta, position, ctx) do
+    case Map.fetch(@nesting, {op, position}) do
+      {:ok, inner_position} ->
+        inner_position
+
+      :error ->
+        bad!(
+          :temporal_nesting_outside_fragment,
+          ctx,
+          meta,
+          # The literal prefix is not decoration: `DIAGNOSTICS.md` renders a message's
+          # interpolations as `…`, so a problem built entirely from them is the row
+          # `… …: …` — a golden listing a diagnostic it cannot describe.
+          "a nesting the fragment does not evaluate: #{rendered(op)} #{where(position)}" <>
+            " — #{Macro.to_string(ast)}",
+          hint: """
+          The fragment (02-dsl-semantics.md §5.1) nests at most two operators deep:
+
+              formula  ::= temporal | Enum.all?(^constant, fn x -> formula end)
+              temporal ::= pred | always(pred) | eventually(pred)
+                         | always(eventually(pred)) | eventually(always(pred))
+                         | pred ~> pred | always(pred ~> pred)
+
+          This is not a parser limitation to work around: the checker evaluates these
+          shapes by SCC analysis, and there is no shape to approximate a deeper one with
+          that would not be a weaker check reported as the real thing.
+
+          `always(always(P))` is `always(P)`, and `eventually(eventually(P))` is
+          `eventually(P)` — write the inner one. For anything else, one `temporal`
+          declaration per property usually says what was meant and is checkable.\
+          """
+        )
+    end
+  end
+
+  defp rendered(:~>), do: "`~>`"
+  defp rendered(op), do: "`#{op}`"
+
+  defp where(:always), do: "directly inside `always(…)`"
+  defp where(:eventually), do: "directly inside `eventually(…)`"
+  defp where(:predicate), do: "where the fragment allows only a state predicate"
 
   defp quantifiable_set?({:^, _, [{name, _, ctx}]}) when is_atom(name) and is_atom(ctx), do: true
   defp quantifiable_set?(list) when is_list(list), do: true

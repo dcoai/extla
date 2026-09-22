@@ -215,6 +215,12 @@ defmodule TLA.ModelChecker.LivenessTest do
       end
     end
 
+    # Since #277 this is an INTERNAL invariant rather than a diagnostic: the front end
+    # refuses the nesting at compile time, so the only way to build the formula below is to
+    # hand-assemble one, as this test does. It is kept — and its message rewritten to address
+    # ExTLA rather than the author of a spec — because a shape reaching the checker unchecked
+    # is a hole in the front end, and carrying on with a weaker shape is the one thing the
+    # checker must not do.
     test "a nesting of operators it does not evaluate" do
       spec = Spec.Compiled.from_module(Counter)
 
@@ -230,9 +236,14 @@ defmodule TLA.ModelChecker.LivenessTest do
       {_result, graph} =
         ModelChecker.explore(Counter, %{constants: %{max: 2}, liveness_graph: true})
 
-      assert_raise ArgumentError, ~r/nests operators more deeply/, fn ->
-        Liveness.check(%{spec | temporals: [nested]}, graph)
-      end
+      error =
+        assert_raise ArgumentError, fn ->
+          Liveness.check(%{spec | temporals: [nested]}, graph)
+        end
+
+      assert Exception.message(error) =~ "a shape it does not evaluate"
+      assert Exception.message(error) =~ "eventually(always(eventually(pred)))"
+      assert Exception.message(error) =~ "bug in ExTLA, not in the specification"
     end
   end
 

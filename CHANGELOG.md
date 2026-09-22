@@ -30,6 +30,34 @@ release it merely follows.
 
 ### Fixed
 
+- **A temporal formula outside §5.1's fragment is refused at compile time** (#277, for #177).
+  `spec/02` promised "a **compile error** naming the unsupported operator" and that "every
+  rule here is enforced at compile time"; the fragment's *nesting* bound was enforced
+  nowhere at compile time and three times after it. `always(always(P))` was inside the
+  grammar — which was recursive — so it compiled, and then met
+  `TLA.ModelChecker.Liveness.shape/4`'s `ArgumentError`, three frames into a run, carrying
+  no module, declaration or line, and only under `check_liveness: true`. Under the default
+  configuration the formula was never looked at and the run reported `:ok`.
+  `TLA.Spec.Temporal` now carries the bound as a table and refuses the nesting at the
+  declaration, and §5.1's grammar states it instead of contradicting it.
+
+  **Two more doors were open.** `TLA.GenServer.Runtime.verdict/3` and `TLA.Coverage.walk/3`
+  each enumerate the same fragment again and neither had a fallback clause, so the same
+  formulas died there as a `FunctionClauseError` printing closures and no property name —
+  under `mix tla.simulate`, and under the **default** configuration respectively. Both now
+  say what reaching them means, which after this change is a bug in ExTLA rather than a
+  mistake in the specification.
+
+  **And one formula that was never wrong.** `always(Enum.all?(^procs, fn p -> done[p] end))`
+  is `always(pred)`: a quantifier over a constant with a boolean body is an ordinary state
+  predicate, as it has always been inside an `invariant`. Taken as the formula-level `\A`
+  it built a shape no consumer evaluates and died in the coverage probes, by default, on a
+  formula that means exactly what it looks like. It now compiles and checks.
+
+  `test/tla/spec/temporal_fragment_test.exs` is the recurrence guard: it **derives** the
+  shapes from the parser's own table and drives every one through all four consumers, so a
+  fragment widened in one place goes red rather than quiet.
+
 - **A temporal property's description reaches the counterexample a user reads** (#276, for
   #176). `temporal :x, desc: "…"` was stored by the DSL and dropped by
   `compiled_temporals/1`, so the option #160 kept — on the reasoning that accepting one

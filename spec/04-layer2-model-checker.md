@@ -951,7 +951,8 @@ end
 
 ### The fragment, shape by shape
 
-§5.1's grammar reduces to six shapes, each a question about components. `\A x \in C`
+§5.1's grammar is seven shapes, each a question about components — six below, plus
+`always(pred ~> pred)`, which collapses to the last row at parse time. `\A x \in C`
 is a conjunction of instances, so quantifiers are expanded away before any of this.
 
 | Formula | Refuted by |
@@ -968,9 +969,18 @@ continuation, because a walk to a BOTTOM component is always available and a bot
 component is always fair — every action enabled inside it has its edge inside it,
 since nothing leaves.
 
-A nesting outside the table raises. The grammar is recursive and admits
-`always(eventually(always(p)))`; evaluating one of those as though it were
-something simpler is a weaker check reported as the real thing.
+**A nesting outside the table cannot reach here.** `02-dsl-semantics.md` §5.1's grammar
+is bounded and the bound is enforced at compile time, so a formula the table has no row
+for is refused at the declaration — naming the module, the declaration and the line —
+rather than arriving with a run already underway.
+
+This paragraph used to acknowledge the opposite: the grammar was recursive, it admitted
+`always(eventually(always(p)))`, and the refusal was an `ArgumentError` raised from
+`TLA.ModelChecker.Liveness` when the search reached the formula. That refusal is *kept*,
+and rewritten as an internal invariant — it now says a shape reaching the checker is a
+bug in ExTLA rather than a mistake in the specification, because after #277 that is what
+it means. Evaluating a deeper nesting as though it were something simpler remains the one
+thing the checker must not do; what changed is who is told, and when.
 
 ### The counterexample
 

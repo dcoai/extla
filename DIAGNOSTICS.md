@@ -9,7 +9,7 @@ because a message's literal skeleton is its identity and the values it splices a
 per-spec. §7's table lists the same kinds; `spec_diagnostics_test.exs` holds the two to
 each other, and to the kinds the tests assert on.
 
-**50 kinds · 53 sites** · files 7
+**51 kinds · 54 sites** · files 7
 
 | Kind | Problem | Locus |
 |---|---|---|
@@ -52,9 +52,10 @@ each other, and to the kinds the tests assert on.
 | `:record_type_key_not_literal` | a record type's keys must be literals, got: … | `lib/tla/spec/type.ex:148` |
 | `:require_in_init` | `require` is not permitted in `init` | `lib/tla/spec/block.ex:281` |
 | `:reserved_name` | … is a reserved name | `lib/tla/spec/dsl.ex:540` |
-| `:temporal_block_not_one_formula` | a `temporal` block is a single formula, got … statements | `lib/tla/spec/temporal.ex:31` |
-| `:temporal_operator_in_state_predicate` | temporal operator … where a state predicate is required | `lib/tla/spec/temporal.ex:152` |
-| `:temporal_quantifier_domain` | a temporal quantifier must range over a constant or a literal list | `lib/tla/spec/temporal.ex:96` |
+| `:temporal_block_not_one_formula` | a `temporal` block is a single formula, got … statements | `lib/tla/spec/temporal.ex:72` |
+| `:temporal_nesting_outside_fragment` | a nesting the fragment does not evaluate: … …… | `lib/tla/spec/temporal.ex:249` |
+| `:temporal_operator_in_state_predicate` | temporal operator … where a state predicate is required | `lib/tla/spec/temporal.ex:202` |
+| `:temporal_quantifier_domain` | a temporal quantifier must range over a constant or a literal list | `lib/tla/spec/temporal.ex:146` |
 | `:type_names_undeclared_constant` | the type refers to ^…, which is not a declared constant | `lib/tla/spec/type.ex:56` |
 | `:type_range_bound` | a range bound must be an integer or ^constant, got:… | `lib/tla/spec/type.ex:221` |
 | `:type_range_step_zero` | a range step of 0 is not a range | `lib/tla/spec/type.ex:91` |
@@ -63,6 +64,6 @@ each other, and to the kinds the tests assert on.
 | `:unexpected_statement` | unexpected statement: … | `lib/tla/spec/block.ex:72` |
 | `:unknown_action_in_fairness` | unknown action in fairness: … | `lib/tla/spec.ex:279` |
 | `:unknown_option` | unknown option…: … | `lib/tla/spec/dsl.ex:747` |
-| `:unsupported_temporal_operator` | unsupported temporal operator: … | `lib/tla/spec/temporal.ex:128` |
+| `:unsupported_temporal_operator` | unsupported temporal operator: … | `lib/tla/spec/temporal.ex:178` |
 | `:variable_assigned_twice` | variable … assigned … times | `lib/tla/spec/block.ex:125` |
 | `:variable_not_readable_here` | … | `lib/tla/spec/rewriter.ex:160` |

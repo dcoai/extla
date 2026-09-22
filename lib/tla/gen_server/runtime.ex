@@ -306,6 +306,18 @@ defmodule TLA.GenServer.Runtime do
 
   defp verdict({:predicate, _p}, [], _constants), do: :inconclusive
 
+  # Without this clause the same off-fragment formulas that raised in the model checker died
+  # HERE with a `FunctionClauseError` printing three closures and no property name, under
+  # `mix tla.simulate` and Layer 3's conformance run (#277). The compile-time refusal means
+  # neither can happen now; this says so rather than leaving the second door unlabelled.
+  defp verdict(formula, _behavior, _constants) do
+    raise ArgumentError,
+          "a temporal formula reached the runtime checker as a shape it does not evaluate: " <>
+            "#{inspect(formula)}. This is a bug in ExTLA, not in the specification: " <>
+            "`TLA.Spec.Temporal` refuses a formula outside 02-dsl-semantics.md §5.1 at " <>
+            "compile time, so nothing should build this. Please report it."
+  end
+
   # A `for_all` holds only if every instance does, and one violated instance refutes the
   # whole — the same rule the model checker applies, one verdict wider.
   defp combine(verdicts) do
