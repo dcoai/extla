@@ -1,7 +1,7 @@
 defmodule TLA.SpecOptionsTest do
   @moduledoc """
   The specification's list of a task's options, and the task's own `@switches`, held to each
-  other (#132, #134).
+  other (#132, #134) — over the set of tasks `CLI_SURFACE.md` derives (#272).
 
   `spec/04-layer2-model-checker.md` reproduces `Mix.Tasks.Tla.Check`'s moduledoc as prose, and
   nothing compared the copy to the original. What that cost: the spec asserted `--workers` was
@@ -10,43 +10,51 @@ defmodule TLA.SpecOptionsTest do
   more switches were undocumented, and the Usage block demonstrated `--graph`/`--output`, which
   the task refuses.
 
-  Scoped to option **lists** and nothing wider, deliberately. Evaluation swept all of `spec/` for
-  the claim class that produced the bug — an assertion that something is not built or waits on a
-  phase — and found exactly one occurrence, the one being fixed. Prose does not drift here often
-  enough to gate; flag lists change whenever a flag does, which is every few work items.
+  ## Why the list of tasks is no longer written here
+
+  Until #272 this file carried `@documented`: six `{task, spec file, anchor}` tuples, correct
+  because #163 had written them eleven days earlier. A seventh task would not have been in it,
+  and nothing would have said so — a task absent from the list reads exactly like a task that
+  passes, which is the vacuity this project keeps finding in its own gates.
+
+  The set now comes from `TLA.CliSurface`, which finds the tasks by walking `mix/tasks/` and
+  finds each one's spec section by searching `spec/*.md` for its `defmodule` line. So this test
+  iterates what the directory holds, a task with no section fails the "every shipped task is
+  specified" assertion below rather than going unchecked, and the golden a reader opens lists
+  the same set this gate walks — by construction, not by two hand lists agreeing.
+
+  Scoped to option **lists** and nothing wider, deliberately. Evaluation swept all of `spec/`
+  for the claim class that produced the bug — an assertion that something is not built or waits
+  on a phase — and found exactly one occurrence, the one being fixed. Prose does not drift here
+  often enough to gate; flag lists change whenever a flag does, which is every few work items.
   """
   use ExUnit.Case, async: true
 
+  alias TLA.CliSurface
+
   @layer2 Path.expand("../../spec/04-layer2-model-checker.md", __DIR__)
-  @layer3 Path.expand("../../spec/05-layer3-conformance.md", __DIR__)
+  @root Path.expand("../..", __DIR__)
 
-  # One entry per task whose options the specification lists: `{task, spec file, anchor}`.
-  #
-  # This covered ONE task until #163 — `mix tla.check`, gated at #134 — and that section was
-  # consequently the only flag list in the whole specification that stayed correct. Six more
-  # drifted in the meantime: `tla.simulate` documented none of its eight switches,
-  # `tla.replay` and `tla.visualize` were each missing one, and `tla.stamp` had no section
-  # anywhere. The blocker was never the parser; it was that `switches/0` existed on one task.
-  @documented [
-    {Mix.Tasks.Tla.Check, @layer2, "defmodule Mix.Tasks.Tla.Check do"},
-    {Mix.Tasks.Tla.Explore, @layer2, "defmodule Mix.Tasks.Tla.Explore do"},
-    {Mix.Tasks.Tla.Simulate, @layer3, "defmodule Mix.Tasks.Tla.Simulate do"},
-    {Mix.Tasks.Tla.Replay, @layer3, "defmodule Mix.Tasks.Tla.Replay do"},
-    {Mix.Tasks.Tla.Visualize, @layer3, "defmodule Mix.Tasks.Tla.Visualize do"},
-    {Mix.Tasks.Tla.Stamp, @layer3, "defmodule Mix.Tasks.Tla.Stamp do"}
-  ]
+  setup_all do
+    %{tasks: CliSurface.run(@root)}
+  end
 
-  describe "every task whose options the spec lists" do
-    for {task, file, anchor} <- @documented do
-      test "#{inspect(task)} declares exactly the switches #{Path.basename(file)} documents" do
-        documented = documented_options(unquote(file), unquote(anchor))
-        declared = declared_switches(unquote(task))
+  describe "every task the specification documents" do
+    test "declares exactly the switches its spec section lists", %{tasks: tasks} do
+      documented = Enum.filter(tasks, &(&1.spec != nil))
 
-        assert MapSet.equal?(documented, declared), """
-        #{inspect(unquote(task))} and #{Path.basename(unquote(file))} disagree about its options.
+      assert documented != [], "no task has a spec section; the anchor search reads nothing"
 
-          in @switches, undocumented:  #{inspect(Enum.sort(MapSet.difference(declared, documented)))}
-          documented, not a switch:    #{inspect(Enum.sort(MapSet.difference(documented, declared)))}
+      for task <- documented do
+        {path, anchor} = task.spec
+        from_spec = documented_options(Path.join(@root, path), anchor)
+        declared = MapSet.new(task.switches, fn {name, _type} -> CliSurface.flag(name) end)
+
+        assert MapSet.equal?(from_spec, declared), """
+        mix #{task.task} and #{path} disagree about its options.
+
+          in @switches, undocumented:  #{inspect(Enum.sort(MapSet.difference(declared, from_spec)))}
+          documented, not a switch:    #{inspect(Enum.sort(MapSet.difference(from_spec, declared)))}
 
         The first list is a flag a user cannot discover from the specification. The second is one
         the specification invites them to pass and `OptionParser` will refuse — which is worse,
@@ -55,6 +63,26 @@ defmodule TLA.SpecOptionsTest do
         Update the option list in the task's section of the spec, or the task.
         """
       end
+    end
+
+    # The half `@documented` could not state: a task nobody listed was a task nobody checked.
+    test "and every shipped task HAS a section", %{tasks: tasks} do
+      unspecified = for t <- tasks, t.shipped?, t.spec == nil, do: t.task
+
+      assert unspecified == [], """
+      #{inspect(unspecified)} ship from lib/ and no spec/*.md file reproduces them.
+
+      A shipped task is part of the published surface: `spec/04` or `spec/05` carries its
+      section, and CLI_SURFACE.md's heading for it says which. Add the section, or — if the
+      task is tooling rather than surface — move it out of `lib/`.
+      """
+    end
+
+    test "and a task outside lib/ is listed without one, rather than unlisted", %{tasks: tasks} do
+      tooling = Enum.reject(tasks, & &1.shipped?)
+
+      assert tooling != [], "the ledger's own tasks are not being scanned"
+      assert Enum.all?(tooling, &(&1.spec == nil))
     end
   end
 
@@ -87,13 +115,7 @@ defmodule TLA.SpecOptionsTest do
     end
   end
 
-  # ── The two sides ───────────────────────────────────────────────────────────
-
-  defp declared_switches(task) do
-    MapSet.new(task.switches(), fn {name, _type} ->
-      "--" <> String.replace(Atom.to_string(name), "_", "-")
-    end)
-  end
+  # ── The spec side ───────────────────────────────────────────────────────────
 
   # An option DEFINITION is a line whose first non-space characters are the flag, followed by the
   # description. A usage example begins with the command, so `^\s+--` separates them without
@@ -108,8 +130,9 @@ defmodule TLA.SpecOptionsTest do
 
     if MapSet.size(options) == 0 do
       raise "no option lines in the section anchored at #{inspect(anchor)}. Either the task " <>
-              "documents none — in which case remove it from @documented — or the layout " <>
-              "changed and this parser now reads nothing, which would make the test vacuous."
+              "documents none — in which case its section is not an option list, and " <>
+              "CLI_SURFACE.md should not pair it with one — or the layout changed and this " <>
+              "parser now reads nothing, which would make the test vacuous."
     end
 
     options
