@@ -16,6 +16,17 @@ release it merely follows.
 
 ### Added
 
+- **Every compile diagnostic carries a `kind`, and `DIAGNOSTICS.md` lists them** (#273, from
+  #270). `02-dsl-semantics.md` §7 tabulates the diagnostics under a preamble promising that a
+  spec violating any rule does not compile, and nothing held the table to the code — nothing
+  *could*, because a row's first column was a name its author chose and `TLA.Spec.CompileError`
+  carried no identifier to match it against. §7 was **twenty-eight kinds short of the fifty the
+  DSL raises**, and one of its rows described §6's term check, which runs at runtime, so the
+  preamble was false for exactly that row. `kind` is the join key: 53 raise sites pass one, the
+  golden renders them, §7's first column is the kind, and `spec_diagnostics_test.exs` holds the
+  four sets — raised, rendered, tabulated, tested — to each other. Renaming one kind reddens
+  five of its eight assertions.
+
 - **`CLI_SURFACE.md`: every `mix tla.*` task's switches and exit codes** (#272, from #270).
   One row per `@switches` entry and per documented exit code, read from source, with the
   specification section that reproduces each task **found by searching `spec/*.md` for its

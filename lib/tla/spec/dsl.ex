@@ -376,6 +376,7 @@ defmodule TLA.Spec.DSL do
 
             other ->
               CompileError.raise!(
+                kind: :malformed_fairness_entry,
                 module: caller.module,
                 declaration: "fairness",
                 line: line,
@@ -389,6 +390,7 @@ defmodule TLA.Spec.DSL do
 
         other ->
           CompileError.raise!(
+            kind: :fairness_not_a_list,
             module: caller.module,
             declaration: "fairness",
             line: line,
@@ -406,6 +408,7 @@ defmodule TLA.Spec.DSL do
 
   defmacro fairness(kind, _entries) do
     CompileError.raise!(
+      kind: :fairness_kind,
       module: __CALLER__.module,
       declaration: "fairness",
       line: __CALLER__.line,
@@ -524,6 +527,7 @@ defmodule TLA.Spec.DSL do
 
   defp check_name!(caller, kind, name) do
     CompileError.raise!(
+      kind: :declaration_name_not_an_atom,
       module: caller.module,
       declaration: kind,
       line: caller.line,
@@ -534,6 +538,7 @@ defmodule TLA.Spec.DSL do
 
   defp check_reserved!(caller, kind, name) when name in @reserved do
     CompileError.raise!(
+      kind: :reserved_name,
       module: caller.module,
       declaration: "#{kind} #{inspect(name)}",
       line: caller.line,
@@ -549,6 +554,7 @@ defmodule TLA.Spec.DSL do
 
   defp check_reserved_invariant!(caller, "invariant", name) when name in @reserved_invariants do
     CompileError.raise!(
+      kind: :implicit_invariant_redeclared,
       module: caller.module,
       declaration: "invariant #{inspect(name)}",
       line: caller.line,
@@ -568,6 +574,7 @@ defmodule TLA.Spec.DSL do
 
     if name in taken do
       CompileError.raise!(
+        kind: :already_declared,
         module: caller.module,
         declaration: "declaration of #{inspect(name)}",
         line: caller.line,
@@ -584,6 +591,7 @@ defmodule TLA.Spec.DSL do
       cond do
         MapSet.member?(ctx.variables, param) ->
           CompileError.raise!(
+            kind: :param_shadows_a_variable,
             module: caller.module,
             declaration: "action #{inspect(action)}",
             line: caller.line,
@@ -595,6 +603,7 @@ defmodule TLA.Spec.DSL do
 
         param in @reserved ->
           CompileError.raise!(
+            kind: :param_is_a_reserved_name,
             module: caller.module,
             declaration: "action #{inspect(action)}",
             line: caller.line,
@@ -613,6 +622,7 @@ defmodule TLA.Spec.DSL do
 
       [dupe | _] ->
         CompileError.raise!(
+          kind: :duplicate_param,
           module: caller.module,
           declaration: "action #{inspect(action)}",
           line: caller.line,
@@ -632,6 +642,7 @@ defmodule TLA.Spec.DSL do
 
   defp merge_opts(opts, block, caller, kind) do
     CompileError.raise!(
+      kind: :options_not_literal,
       module: caller.module,
       declaration: kind,
       line: caller.line,
@@ -645,6 +656,7 @@ defmodule TLA.Spec.DSL do
     case Keyword.pop(opts, :do) do
       {nil, _} ->
         CompileError.raise!(
+          kind: :declaration_without_a_block,
           module: caller.module,
           declaration: kind,
           line: caller.line,
@@ -658,6 +670,7 @@ defmodule TLA.Spec.DSL do
 
   defp pop_do!(other, caller, kind) do
     CompileError.raise!(
+      kind: :options_not_a_keyword_list,
       module: caller.module,
       declaration: kind,
       line: caller.line,
@@ -677,6 +690,7 @@ defmodule TLA.Spec.DSL do
   defp pop_option(opts, key, caller, declaration) do
     unless keyword_list?(opts) do
       CompileError.raise!(
+        kind: :options_not_literal,
         module: caller.module,
         declaration: declaration,
         line: caller.line,
@@ -717,6 +731,7 @@ defmodule TLA.Spec.DSL do
 
     unless keyword_list?(opts) do
       CompileError.raise!(
+        kind: :options_not_literal,
         module: caller.module,
         declaration: declaration,
         line: caller.line,
@@ -730,6 +745,7 @@ defmodule TLA.Spec.DSL do
 
       unknown ->
         CompileError.raise!(
+          kind: :unknown_option,
           module: caller.module,
           declaration: declaration,
           line: caller.line,

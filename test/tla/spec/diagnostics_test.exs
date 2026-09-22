@@ -15,222 +15,273 @@ defmodule TLA.Spec.DiagnosticsTest do
   describe "names" do
     test "an undeclared variable read names the declared ones" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        action :bump do
-          require y > 0
-          x = x + 1
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          action :bump do
+            require y > 0
+            x = x + 1
+          end
+          """,
+          :undeclared_variable
+        )
 
       assert error =~ "undeclared variable: y"
       assert error =~ "Declared: :x."
     end
 
     test "an assignment to an undeclared variable is caught" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-               y = 1
-             end
-             """) =~ "assignment to undeclared variable: y"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+                 y = 1
+               end
+               """,
+               :assignment_to_undeclared_variable
+             ) =~ "assignment to undeclared variable: y"
     end
 
     test "an undeclared constant is caught" do
-      assert refuse("""
-             variable :x
-             init do
-               x = ^limit
-             end
-             """) =~ "undeclared constant: ^limit"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = ^limit
+               end
+               """,
+               :undeclared_constant
+             ) =~ "undeclared constant: ^limit"
     end
 
     # The likeliest typo in the whole DSL, so it gets its own message rather than
     # falling through to "undeclared variable".
     test "a constant referenced without the pin says so" do
       error =
-        refuse("""
-        constant :limit
-        variable :x
-        init do
-          x = limit
-        end
-        """)
+        refuse(
+          """
+          constant :limit
+          variable :x
+          init do
+            x = limit
+          end
+          """,
+          :constant_without_pin
+        )
 
       assert error =~ "constant :limit referenced without `^`"
       assert error =~ "Write `^limit`"
     end
 
     test "assigning to a constant is caught" do
-      assert refuse("""
-             constant :limit
-             variable :x
-             init do
-               x = 0
-               limit = 1
-             end
-             """) =~ "limit is a constant"
+      assert refuse(
+               """
+               constant :limit
+               variable :x
+               init do
+                 x = 0
+                 limit = 1
+               end
+               """,
+               :assignment_to_undeclared_variable
+             ) =~ "limit is a constant"
     end
 
     test "a reserved name is rejected at the declaration" do
       for name <- [:state, :old, :new] do
-        assert refuse("variable :#{name}") =~ "is a reserved name"
+        assert refuse("variable :#{name}", :reserved_name) =~ "is a reserved name"
       end
     end
 
     test "a second declaration of one name is rejected" do
-      assert refuse("""
-             variable :x
-             variable :x
-             """) =~ ":x is already declared"
+      assert refuse(
+               """
+               variable :x
+               variable :x
+               """,
+               :already_declared
+             ) =~ ":x is already declared"
 
-      assert refuse("""
-             constant :c
-             variable :c
-             """) =~ ":c is already declared"
+      assert refuse(
+               """
+               constant :c
+               variable :c
+               """,
+               :already_declared
+             ) =~ ":c is already declared"
     end
   end
 
   describe "action bodies" do
     test "a variable assigned twice is rejected, not resolved last-write-wins" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        action :broken do
-          x = 1
-          x = 2
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          action :broken do
+            x = 1
+            x = 2
+          end
+          """,
+          :variable_assigned_twice
+        )
 
       assert error =~ "variable :x assigned 2 times"
       assert error =~ "conjunction, not a sequence"
     end
 
     test "a destructuring assignment without let points at let" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a do
-               {a, b} = {1, 2}
-               x = a + b
-             end
-             """) =~ "destructuring assignment without `let`"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a do
+                 {a, b} = {1, 2}
+                 x = a + b
+               end
+               """,
+               :destructuring_without_let
+             ) =~ "destructuring assignment without `let`"
     end
 
     test "a statement that is neither guard, let nor assignment is rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a do
-               IO.puts("hello")
-               x = 1
-             end
-             """) =~ "unexpected statement"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a do
+                 IO.puts("hello")
+                 x = 1
+               end
+               """,
+               :unexpected_statement
+             ) =~ "unexpected statement"
     end
 
     test "a let may shadow nothing" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a do
-               let x = 1
-               x = 2
-             end
-             """) =~ "`let` binds :x, which is a declared variable"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a do
+                 let x = 1
+                 x = 2
+               end
+               """,
+               :binder_shadows_variable
+             ) =~ "`let` binds :x, which is a declared variable"
 
-      assert refuse("""
-             constant :c
-             variable :x
-             init do
-               x = 0
-             end
-             invariant :i do
-               let c = 1
-               c > 0
-             end
-             """) =~ "`let` binds :c, which is a declared constant"
+      assert refuse(
+               """
+               constant :c
+               variable :x
+               init do
+                 x = 0
+               end
+               invariant :i do
+                 let c = 1
+                 c > 0
+               end
+               """,
+               :binder_shadows_constant
+             ) =~ "`let` binds :c, which is a declared constant"
     end
 
     # #210. §1.3's rule covers three cases and the check enforced two: `let k = 100` under
     # `params: [k: [1, 2]]` compiled, and both bindings produced the same successor.
     test "a let may not shadow a params: name or old/new either" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a, params: [k: [1, 2]] do
-               let k = 100
-               x = k
-             end
-             """) =~ "`let` binds :k, which this declaration already binds"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a, params: [k: [1, 2]] do
+                 let k = 100
+                 x = k
+               end
+               """,
+               :binder_shadows_binding
+             ) =~ "`let` binds :k, which this declaration already binds"
 
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action_property :p do
-               let old = 1
-               new.x >= old
-             end
-             """) =~ "`let` binds :old, which this declaration already binds"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action_property :p do
+                 let old = 1
+                 new.x >= old
+               end
+               """,
+               :binder_shadows_binding
+             ) =~ "`let` binds :old, which this declaration already binds"
     end
   end
 
   describe "init" do
     test "cannot read a variable" do
-      assert refuse("""
-             variable :x
-             variable :y
-             init do
-               x = 0
-               y = x
-             end
-             """) =~ "`init` cannot read variable :x"
+      assert refuse(
+               """
+               variable :x
+               variable :y
+               init do
+                 x = 0
+                 y = x
+               end
+               """,
+               :variable_not_readable_here
+             ) =~ "`init` cannot read variable :x"
     end
 
     test "must assign every declared variable" do
       error =
-        refuse("""
-        variable :x
-        variable :y
-        init do
-          x = 0
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          variable :y
+          init do
+            x = 0
+          end
+          """,
+          :init_does_not_assign
+        )
 
       assert error =~ "`init` does not assign :y"
       assert error =~ "KeyError"
     end
 
     test "cannot be guarded" do
-      assert refuse("""
-             variable :x
-             init do
-               require true
-               x = 0
-             end
-             """) =~ "`require` is not permitted in `init`"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 require true
+                 x = 0
+               end
+               """,
+               :require_in_init
+             ) =~ "`require` is not permitted in `init`"
     end
 
     # A spec with variables and no init has no reachable states, and a checker
     # would report "no violations" over an empty search.
     test "is required when there are variables" do
-      assert refuse("variable :x") =~ "no `init` block"
+      assert refuse("variable :x", :no_init_block) =~ "no `init` block"
     end
   end
 
@@ -241,12 +292,15 @@ defmodule TLA.Spec.DiagnosticsTest do
   describe "declaration options" do
     test "an unknown option names the key and what the declaration accepts" do
       error =
-        refuse("""
-        variable :x, type: :nat, bogus: 1
-        init do
-          x = 0
-        end
-        """)
+        refuse(
+          """
+          variable :x, type: :nat, bogus: 1
+          init do
+            x = 0
+          end
+          """,
+          :unknown_option
+        )
 
       assert error =~ "variable :x"
       assert error =~ "unknown option: :bogus"
@@ -255,13 +309,16 @@ defmodule TLA.Spec.DiagnosticsTest do
 
     test "several unknown keys are all named" do
       error =
-        refuse("""
-        constant :c, default: 1, one: 2, two: 3
-        variable :x
-        init do
-          x = 0
-        end
-        """)
+        refuse(
+          """
+          constant :c, default: 1, one: 2, two: 3
+          variable :x
+          init do
+            x = 0
+          end
+          """,
+          :unknown_option
+        )
 
       assert error =~ "unknown options: :one, :two"
       assert error =~ "`constant` accepts :default"
@@ -271,22 +328,28 @@ defmodule TLA.Spec.DiagnosticsTest do
     # `init desc: "x", do: …` compiled with the keyword dropped by `pop_do!/3`.
     test "init takes no options, and says so" do
       error =
-        refuse("""
-        variable :x
-        init desc: "the start" do
-          x = 0
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init desc: "the start" do
+            x = 0
+          end
+          """,
+          :unknown_option
+        )
 
       assert error =~ "in init:"
       assert error =~ "unknown option: :desc"
       assert error =~ "`init` takes no options"
 
       # The one-list spelling the review found compiling: `init desc: "x", do: …`.
-      assert refuse("""
-             variable :x
-             init desc: "the start", do: x = 0
-             """) =~ "unknown option: :desc"
+      assert refuse(
+               """
+               variable :x
+               init desc: "the start", do: x = 0
+               """,
+               :unknown_option
+             ) =~ "unknown option: :desc"
     end
 
     # A block reaches these macros as a `do:` entry in the same keyword list, so a check that
@@ -330,16 +393,19 @@ defmodule TLA.Spec.DiagnosticsTest do
 
   describe "invariants, terminals and action properties" do
     test "an invariant may not assign a variable" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             invariant :i do
-               x = 1
-               true
-             end
-             """) =~ "assignment to variable :x outside `init`/`action`"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               invariant :i do
+                 x = 1
+                 true
+               end
+               """,
+               :assignment_outside_init_or_action
+             ) =~ "assignment to variable :x outside `init`/`action`"
     end
 
     # #150. `temporal` reaches `TLA.Spec.Temporal.parse!/2`, which does not desugar, so it
@@ -352,15 +418,18 @@ defmodule TLA.Spec.DiagnosticsTest do
     # this exists rather than a runtime assertion.
     test "a temporal may not assign a variable either, with the same message" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        temporal :t do
-          x = 1
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          temporal :t do
+            x = 1
+          end
+          """,
+          :assignment_outside_init_or_action
+        )
 
       assert error =~ "assignment to variable :x outside `init`/`action`"
       assert error =~ "temporal :t"
@@ -379,8 +448,10 @@ defmodule TLA.Spec.DiagnosticsTest do
         """
       end
 
-      invariant = refuse(body.("invariant :i do\n  x = 1\n  true\nend"))
-      temporal = refuse(body.("temporal :t do\n  x = 1\nend"))
+      invariant =
+        refuse(body.("invariant :i do\n  x = 1\n  true\nend"), :assignment_outside_init_or_action)
+
+      temporal = refuse(body.("temporal :t do\n  x = 1\nend"), :assignment_outside_init_or_action)
 
       hint = "there is no post-state here"
       assert invariant =~ hint
@@ -394,18 +465,21 @@ defmodule TLA.Spec.DiagnosticsTest do
     test "an assignment nested under a temporal operator is refused" do
       for formula <- ["always(x = 1)", "eventually(x = 1)", "(x == 0) ~> (x = 1)"] do
         error =
-          refuse("""
-          variable :x
-          init do
-            x = 0
-          end
-          action :bump do
-            x = x + 1
-          end
-          temporal :t do
-            #{formula}
-          end
-          """)
+          refuse(
+            """
+            variable :x
+            init do
+              x = 0
+            end
+            action :bump do
+              x = x + 1
+            end
+            temporal :t do
+              #{formula}
+            end
+            """,
+            :assignment_outside_init_or_action
+          )
 
         assert error =~ "assignment to variable :x outside `init`/`action`", formula
         assert error =~ "temporal :t", formula
@@ -414,17 +488,20 @@ defmodule TLA.Spec.DiagnosticsTest do
 
     test "an assignment nested inside an invariant's expression is refused" do
       error =
-        refuse("""
-        variable :n
-        variable :status
-        init do
-          n = 0
-          status = :idle
-        end
-        invariant :i do
-          n >= 0 and (status = :done)
-        end
-        """)
+        refuse(
+          """
+          variable :n
+          variable :status
+          init do
+            n = 0
+            status = :idle
+          end
+          invariant :i do
+            n >= 0 and (status = :done)
+          end
+          """,
+          :assignment_outside_init_or_action
+        )
 
       assert error =~ "assignment to variable :status outside `init`/`action`"
       assert error =~ "invariant :i"
@@ -432,31 +509,37 @@ defmodule TLA.Spec.DiagnosticsTest do
 
     test "a let that shadows a declared variable is still reported as shadowing" do
       error =
-        refuse("""
-        variable :n
-        init do
-          n = 0
-        end
-        invariant :i do
-          let n = 1
-          n > 0
-        end
-        """)
+        refuse(
+          """
+          variable :n
+          init do
+            n = 0
+          end
+          invariant :i do
+            let n = 1
+            n > 0
+          end
+          """,
+          :binder_shadows_variable
+        )
 
       refute error =~ "assignment to variable"
     end
 
     test "a bare variable in an action_property names old. and new." do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        action_property :p do
-          x >= 0
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          action_property :p do
+            x >= 0
+          end
+          """,
+          :variable_not_readable_here
+        )
 
       assert error =~ "bare variable :x in an action_property"
       assert error =~ "old.x"
@@ -467,66 +550,81 @@ defmodule TLA.Spec.DiagnosticsTest do
   describe "params" do
     test "a param that draws from neither a set, a literal nor a function is rejected" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        action :a, params: [p: MapSet.new([1, 2])] do
-          x = p
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          action :a, params: [p: MapSet.new([1, 2])] do
+            x = p
+          end
+          """,
+          :param_draws_from_a_non_set
+        )
 
       assert error =~ "param :p draws from a non-set"
       assert error =~ "fn s ->"
     end
 
     test "a generator of the wrong arity is rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a, params: [p: fn s, bound, extra -> [s, bound, extra] end] do
-               x = p
-             end
-             """) =~ "generator takes 3 arguments"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a, params: [p: fn s, bound, extra -> [s, bound, extra] end] do
+                 x = p
+               end
+               """,
+               :param_generator_arity
+             ) =~ "generator takes 3 arguments"
     end
 
     test "a param may not shadow a declared variable" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a, params: [x: [1, 2]] do
-               x = 1
-             end
-             """) =~ "param :x has the same name as a declared variable"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a, params: [x: [1, 2]] do
+                 x = 1
+               end
+               """,
+               :param_shadows_a_variable
+             ) =~ "param :x has the same name as a declared variable"
     end
 
     test "a generator may not read bare variables" do
-      assert refuse("""
-             variable :queue
-             init do
-               queue = []
-             end
-             action :a, params: [item: fn _s -> queue end] do
-               queue = []
-             end
-             """) =~ "bare variable :queue in a `params:` generator"
+      assert refuse(
+               """
+               variable :queue
+               init do
+                 queue = []
+               end
+               action :a, params: [item: fn _s -> queue end] do
+                 queue = []
+               end
+               """,
+               :variable_not_readable_here
+             ) =~ "bare variable :queue in a `params:` generator"
     end
   end
 
   describe "types" do
     test "an ill-formed type is rejected with the grammar" do
       error =
-        refuse("""
-        variable :x, type: (fn -> 1 end)
-        init do
-          x = 0
-        end
-        """)
+        refuse(
+          """
+          variable :x, type: (fn -> 1 end)
+          init do
+            x = 0
+          end
+          """,
+          :ill_formed_type
+        )
 
       assert error =~ "ill-formed type"
       assert error =~ "[dom ~> rng]"
@@ -536,24 +634,30 @@ defmodule TLA.Spec.DiagnosticsTest do
     # and refusing it here names the type rather than letting `Range.new/3` refuse it later.
     test "a range step of zero is rejected at the declaration" do
       error =
-        refuse("""
-        variable :x, type: 0..10//0
-        init do
-          x = 0
-        end
-        """)
+        refuse(
+          """
+          variable :x, type: 0..10//0
+          init do
+            x = 0
+          end
+          """,
+          :type_range_step_zero
+        )
 
       assert error =~ "a range step of 0 is not a range"
       assert error =~ "§1.5"
     end
 
     test "a type naming an undeclared constant is rejected" do
-      assert refuse("""
-             variable :x, type: 0..^cap
-             init do
-               x = 0
-             end
-             """) =~ "^cap, which is not a declared constant"
+      assert refuse(
+               """
+               variable :x, type: 0..^cap
+               init do
+                 x = 0
+               end
+               """,
+               :type_names_undeclared_constant
+             ) =~ "^cap, which is not a declared constant"
     end
 
     # Deferred to @before_compile precisely so this compiles: a type may name a
@@ -572,57 +676,69 @@ defmodule TLA.Spec.DiagnosticsTest do
   describe "temporal formulas" do
     test "a conjunction of formulas is rejected, naming the operator" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        temporal :t do
-          eventually(x == 1) and eventually(x == 2)
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          temporal :t do
+            eventually(x == 1) and eventually(x == 2)
+          end
+          """,
+          :unsupported_temporal_operator
+        )
 
       assert error =~ "unsupported temporal operator: eventually/1"
       assert error =~ "no negation, conjunction or disjunction OF FORMULAS"
     end
 
     test "a formula where a state predicate is required is rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             temporal :t do
-               (x == 0) ~> always(x == 1)
-             end
-             """) =~ "where a state predicate is required"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               temporal :t do
+                 (x == 0) ~> always(x == 1)
+               end
+               """,
+               :temporal_operator_in_state_predicate
+             ) =~ "where a state predicate is required"
     end
 
     test "a quantifier over a state-dependent set is rejected" do
-      assert refuse("""
-             variable :xs
-             init do
-               xs = []
-             end
-             temporal :t do
-               Enum.all?(xs, fn x -> eventually(x == 1) end)
-             end
-             """) =~ "must range over a constant or a literal list"
+      assert refuse(
+               """
+               variable :xs
+               init do
+                 xs = []
+               end
+               temporal :t do
+                 Enum.all?(xs, fn x -> eventually(x == 1) end)
+               end
+               """,
+               :temporal_quantifier_domain
+             ) =~ "must range over a constant or a literal list"
     end
 
     # #210. A literal list containing a variable passed the shape check and then hit a rewrite
     # mode no clause handles: `FunctionClauseError` from inside the compiler, not a diagnostic.
     test "a variable inside a quantifier's literal list is a diagnostic, not a crash" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        temporal :t do
-          Enum.all?([x, 1], fn v -> eventually(v == 1) end)
-        end
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          temporal :t do
+            Enum.all?([x, 1], fn v -> eventually(v == 1) end)
+          end
+          """,
+          :variable_not_readable_here
+        )
 
       assert error =~ "variable :x in a temporal quantifier's set"
       assert error =~ "§5.1"
@@ -634,18 +750,21 @@ defmodule TLA.Spec.DiagnosticsTest do
     # Only a compiler "unused variable" warning marked it.
     test "a quantifier named after a declared variable is rejected, naming both" do
       error =
-        refuse("""
-        constant :procs
-        variable :p
-        variable :pc
-        init do
-          p = 1
-          pc = %{}
-        end
-        temporal :t do
-          Enum.all?(^procs, fn p -> eventually(pc[p] == :b) end)
-        end
-        """)
+        refuse(
+          """
+          constant :procs
+          variable :p
+          variable :pc
+          init do
+            p = 1
+            pc = %{}
+          end
+          temporal :t do
+            Enum.all?(^procs, fn p -> eventually(pc[p] == :b) end)
+          end
+          """,
+          :binder_shadows_variable
+        )
 
       assert error =~ "the quantifier binds :p, which is a declared variable"
       assert error =~ "may shadow nothing"
@@ -653,122 +772,146 @@ defmodule TLA.Spec.DiagnosticsTest do
     end
 
     test "a quantifier named after a declared constant is rejected" do
-      assert refuse("""
-             constant :procs
-             variable :pc
-             init do
-               pc = %{}
-             end
-             temporal :t do
-               Enum.all?(^procs, fn procs -> eventually(pc[procs] == :b) end)
-             end
-             """) =~ "the quantifier binds :procs, which is a declared constant"
+      assert refuse(
+               """
+               constant :procs
+               variable :pc
+               init do
+                 pc = %{}
+               end
+               temporal :t do
+                 Enum.all?(^procs, fn procs -> eventually(pc[procs] == :b) end)
+               end
+               """,
+               :binder_shadows_constant
+             ) =~ "the quantifier binds :procs, which is a declared constant"
     end
 
     test "a multi-statement temporal block is rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             temporal :t do
-               let y = 1
-               eventually(x == y)
-             end
-             """) =~ "single formula"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               temporal :t do
+                 let y = 1
+                 eventually(x == y)
+               end
+               """,
+               :temporal_block_not_one_formula
+             ) =~ "single formula"
     end
   end
 
   describe "fairness" do
     test "an unknown action lists the declared ones" do
       error =
-        refuse("""
-        variable :x
-        init do
-          x = 0
-        end
-        action :bump do
-          x = x + 1
-        end
-        fairness :weak, [:typo]
-        """)
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          action :bump do
+            x = x + 1
+          end
+          fairness :weak, [:typo]
+          """,
+          :unknown_action_in_fairness
+        )
 
       assert error =~ "unknown action in fairness: :typo"
       assert error =~ "Declared actions: :bump."
     end
 
     test "params that are not a leading prefix are rejected" do
-      assert refuse("""
-             constant :ps
-             variable :x
-             init do
-               x = 0
-             end
-             action :a, params: [p: ^ps, q: ^ps] do
-               x = 1
-             end
-             fairness :weak, a: [:q]
-             """) =~ "are not a leading prefix"
+      assert refuse(
+               """
+               constant :ps
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a, params: [p: ^ps, q: ^ps] do
+                 x = 1
+               end
+               fairness :weak, a: [:q]
+               """,
+               :fairness_params_not_a_prefix
+             ) =~ "are not a leading prefix"
     end
 
     # A state function returns a different set in every state, so there is no
     # fixed collection of bindings to attach one constraint each to.
     test "a state-drawn param cannot be quantified over" do
-      assert refuse("""
-             variable :pending
-             init do
-               pending = []
-             end
-             action :take, params: [t: fn s -> s.pending end] do
-               pending = []
-             end
-             fairness :weak, take: [:t]
-             """) =~ "fairness over a state-drawn param"
+      assert refuse(
+               """
+               variable :pending
+               init do
+                 pending = []
+               end
+               action :take, params: [t: fn s -> s.pending end] do
+                 pending = []
+               end
+               fairness :weak, take: [:t]
+               """,
+               :fairness_over_a_state_drawn_param
+             ) =~ "fairness over a state-drawn param"
     end
 
     test "a kind other than :weak or :strong is rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a do
-               x = 1
-             end
-             fairness :eventual, [:a]
-             """) =~ "fairness kind must be :weak or :strong"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a do
+                 x = 1
+               end
+               fairness :eventual, [:a]
+               """,
+               :fairness_kind
+             ) =~ "fairness kind must be :weak or :strong"
     end
   end
 
   describe "duplicate declarations" do
     test "two actions of one name are rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             action :a do
-               x = 1
-             end
-             action :a do
-               x = 2
-             end
-             """) =~ "action :a is declared 2 times"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               action :a do
+                 x = 1
+               end
+               action :a do
+                 x = 2
+               end
+               """,
+               :duplicate_declaration
+             ) =~ "action :a is declared 2 times"
     end
 
     test "two invariants of one name are rejected" do
-      assert refuse("""
-             variable :x
-             init do
-               x = 0
-             end
-             invariant :i do
-               true
-             end
-             invariant :i do
-               false
-             end
-             """) =~ "invariant :i is declared 2 times"
+      assert refuse(
+               """
+               variable :x
+               init do
+                 x = 0
+               end
+               invariant :i do
+                 true
+               end
+               invariant :i do
+                 false
+               end
+               """,
+               :duplicate_declaration
+             ) =~ "invariant :i is declared 2 times"
     end
   end
 
@@ -830,11 +973,19 @@ defmodule TLA.Spec.DiagnosticsTest do
 
   # ── helpers ─────────────────────────────────────────────────────────────────
 
-  defp refuse(body) do
+  # The `kind` is required, not optional (#273). A test that asserts only on a message
+  # substring pins the prose and not the diagnostic: the message can be reworded, or the
+  # spec can start failing a *different* rule that happens to share a phrase, and the test
+  # stays green either way. The kind is the identifier §7's table and `DIAGNOSTICS.md`
+  # share, so pinning it here is what makes those three documents one claim.
+  defp refuse(body, kind) do
     error =
       assert_raise TLA.Spec.CompileError, fn ->
         capture_io(:stderr, fn -> Code.compile_string(source(body)) end)
       end
+
+    assert error.kind == kind,
+           "expected #{inspect(kind)}, got #{inspect(error.kind)}: #{Exception.message(error)}"
 
     Exception.message(error)
   end

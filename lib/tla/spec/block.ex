@@ -47,7 +47,7 @@ defmodule TLA.Spec.Block do
   end
 
   def classify!({:let, meta, [other]}, ctx) do
-    bad!(ctx, meta, "`let` needs a binding: #{Macro.to_string(other)}",
+    bad!(:let_without_binding, ctx, meta, "`let` needs a binding: #{Macro.to_string(other)}",
       hint: "Write `let name = expression` (02-dsl-semantics.md §1.3)."
     )
   end
@@ -57,7 +57,11 @@ defmodule TLA.Spec.Block do
       do: {:assign, name, rhs, meta}
 
   def classify!({:=, meta, [pattern, _rhs]}, ctx) do
-    bad!(ctx, meta, "destructuring assignment without `let`: #{Macro.to_string(pattern)}",
+    bad!(
+      :destructuring_without_let,
+      ctx,
+      meta,
+      "destructuring assignment without `let`: #{Macro.to_string(pattern)}",
       hint:
         "`=` on a declared variable assigns the post-state, so an intermediate value needs " <>
           "its own form: `let #{Macro.to_string(pattern)} = …` (02-dsl-semantics.md §1.3)."
@@ -65,7 +69,11 @@ defmodule TLA.Spec.Block do
   end
 
   def classify!(other, ctx) do
-    bad!(ctx, meta_of(other), "unexpected statement: #{Macro.to_string(other)}",
+    bad!(
+      :unexpected_statement,
+      ctx,
+      meta_of(other),
+      "unexpected statement: #{Macro.to_string(other)}",
       hint:
         "An action body is a conjunction of a guard and next-state equations " <>
           "(02-dsl-semantics.md §2). Every statement is `require expr`, " <>
@@ -94,7 +102,13 @@ defmodule TLA.Spec.Block do
           "Declare it with `variable :#{name}`, or bind a local with `let #{name} = …`."
         end
 
-      bad!(ctx, meta, "assignment to undeclared variable: #{name}", hint: hint)
+      bad!(
+        :assignment_to_undeclared_variable,
+        ctx,
+        meta,
+        "assignment to undeclared variable: #{name}",
+        hint: hint
+      )
     end
   end
 
@@ -108,7 +122,11 @@ defmodule TLA.Spec.Block do
       {name, [_ | _] = dupes} ->
         {_, _, meta} = List.last(dupes)
 
-        bad!(ctx, meta, "variable #{inspect(name)} assigned #{length(dupes)} times",
+        bad!(
+          :variable_assigned_twice,
+          ctx,
+          meta,
+          "variable #{inspect(name)} assigned #{length(dupes)} times",
           hint:
             "An action body is a conjunction, not a sequence, so two assignments to one " <>
               "variable are two contradictory equations rather than a last-write-wins " <>
@@ -260,7 +278,7 @@ defmodule TLA.Spec.Block do
   def init_body(classified, ctx, declared) do
     Enum.each(classified, fn
       {:guard, _expr, meta} ->
-        bad!(ctx, meta, "`require` is not permitted in `init`",
+        bad!(:require_in_init, ctx, meta, "`require` is not permitted in `init`",
           hint:
             "An `init` block defines a starting state unconditionally. For several possible " <>
               "starting states, write several `init` blocks — they are disjuncted."
@@ -278,7 +296,11 @@ defmodule TLA.Spec.Block do
         :ok
 
       missing ->
-        bad!(ctx, nil, "`init` does not assign #{Enum.map_join(missing, ", ", &inspect/1)}",
+        bad!(
+          :init_does_not_assign,
+          ctx,
+          nil,
+          "`init` does not assign #{Enum.map_join(missing, ", ", &inspect/1)}",
           hint:
             "Every declared variable needs an initial value; a partial initial state would " <>
               "surface as a KeyError from whichever action first reads the missing one."
@@ -357,7 +379,7 @@ defmodule TLA.Spec.Block do
   end
 
   defp desugar_statement!({:let, meta, [other]}, ctx) do
-    bad!(ctx, meta, "`let` needs a binding: #{Macro.to_string(other)}",
+    bad!(:let_without_binding, ctx, meta, "`let` needs a binding: #{Macro.to_string(other)}",
       hint: "Write `let name = expression` (02-dsl-semantics.md §1.3)."
     )
   end
@@ -423,7 +445,11 @@ defmodule TLA.Spec.Block do
     Macro.prewalk(ast, fn
       {:=, meta, [{name, _, var_ctx}, _rhs]} = node when is_atom(name) and is_atom(var_ctx) ->
         if MapSet.member?(ctx.variables, name) do
-          bad!(ctx, meta, "assignment to variable #{inspect(name)} outside `init`/`action`",
+          bad!(
+            :assignment_outside_init_or_action,
+            ctx,
+            meta,
+            "assignment to variable #{inspect(name)} outside `init`/`action`",
             hint:
               "`=` on a declared variable means \"the post-state\", and there is no post-state " <>
                 "here (02-dsl-semantics.md §1.2). For a comparison write `#{name} == …`; " <>
@@ -509,7 +535,11 @@ defmodule TLA.Spec.Block do
     |> Enum.each(fn name ->
       cond do
         MapSet.member?(ctx.variables, name) ->
-          bad!(ctx, meta, "#{binder} binds #{inspect(name)}, which is a declared variable",
+          bad!(
+            :binder_shadows_variable,
+            ctx,
+            meta,
+            "#{binder} binds #{inspect(name)}, which is a declared variable",
             hint:
               "A binder may shadow nothing (02-dsl-semantics.md §1.3): a bare `#{name}` in " <>
                 "its scope would mean the local, while everywhere else in the spec it means " <>
@@ -517,7 +547,11 @@ defmodule TLA.Spec.Block do
           )
 
         MapSet.member?(ctx.constants, name) ->
-          bad!(ctx, meta, "#{binder} binds #{inspect(name)}, which is a declared constant",
+          bad!(
+            :binder_shadows_constant,
+            ctx,
+            meta,
+            "#{binder} binds #{inspect(name)}, which is a declared constant",
             hint: "A binder may shadow nothing (02-dsl-semantics.md §1.3). Rename the local."
           )
 
@@ -526,6 +560,7 @@ defmodule TLA.Spec.Block do
         # and both bindings produced the same successor.
         MapSet.member?(ctx.params, name) ->
           bad!(
+            :binder_shadows_binding,
             ctx,
             meta,
             "#{binder} binds #{inspect(name)}, which this declaration already binds",
@@ -546,13 +581,14 @@ defmodule TLA.Spec.Block do
   defp meta_of({_, meta, _}) when is_list(meta), do: meta
   defp meta_of(_), do: nil
 
-  defp bad!(ctx, meta, problem, extra) do
+  defp bad!(kind, ctx, meta, problem, extra) do
     CompileError.raise!(
       module: ctx.module,
       declaration: ctx.declaration,
       line: (is_list(meta) && Keyword.get(meta, :line)) || ctx.line,
       problem: problem,
-      hint: Keyword.get(extra, :hint)
+      hint: Keyword.get(extra, :hint),
+      kind: kind
     )
   end
 end

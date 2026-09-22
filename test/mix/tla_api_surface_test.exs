@@ -10,21 +10,25 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
   """
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   @moduletag :tmp_dir
 
-  setup do
-    Mix.shell(Mix.Shell.Process)
-    on_exit(fn -> Mix.shell(Mix.Shell.IO) end)
-    :ok
-  end
-
   describe "TLA.Surface.check!/4" do
+    # `Mix.shell/1` is VM-global, and `tla_coverage_test.exs` sets it for its own assertions.
+    # Two async tests swapping one global between them is a race whose loser reads an empty
+    # mailbox — which is what this file did to that one when it was first written. Capturing
+    # the default shell's output asserts the same thing and mutates nothing.
     test "passes when the file matches what was rendered", %{tmp_dir: tmp} do
       path = Path.join(tmp, "API_SURFACE.md")
       File.write!(path, "identical")
-      TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical")
-      assert_received {:mix_shell, :info, [msg]}
-      assert msg == "API_SURFACE.md is current"
+
+      output =
+        capture_io(fn ->
+          TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical")
+        end)
+
+      assert output =~ "API_SURFACE.md is current"
     end
 
     test "raises on drift, naming the golden and how to regenerate it", %{tmp_dir: tmp} do

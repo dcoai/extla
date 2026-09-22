@@ -494,34 +494,108 @@ Every rule above is checked when the spec module compiles, because the DSL alrea
 accumulates every declaration it needs. A spec either means something precise or does
 not compile.
 
-| Diagnostic | Trigger |
+**The first column is the diagnostic's `kind`** — the identifier `TLA.Spec.CompileError`
+carries, `DIAGNOSTICS.md` lists and `test/docs/spec_diagnostics_test.exs` holds this table
+to. Before #273 the column was a name chosen per row and the code carried nothing to match
+it against, so the table could not be checked and was not: it was twenty-eight rows short,
+and one row described a check that runs at runtime (§6's forbidden terms, D-26), which the
+preamble above would have made a false claim about. A row here is a kind; a kind may be
+raised from more than one place, and `DIAGNOSTICS.md` lists the sites.
+
+### Names and declarations
+
+| Kind | Trigger |
 |---|---|
-| `undeclared variable` | `=` assigns, or an expression reads, a name that is not a `variable` |
-| `undeclared constant` | `^name` where no `constant :name` exists |
-| `variable assigned twice` | Two assignments to one variable in one action (§2) |
-| `assignment in invariant/temporal` | `=` on a declared variable anywhere outside `init`/`action` — nested under `always`, `and`, a call, or at the top level; the walk is the whole expression, since §1.2 leaves no legitimate nested case |
-| `bare variable in action_property` | §4 |
-| `let shadows a declared name` | §1.3 — and the same diagnostic for a temporal quantifier (`Enum.all?(^c, fn x -> …)`) whose `x` is a declared variable or constant |
-| `unknown action in fairness` | `fairness :weak, [:typo]` |
-| `fairness over a state-drawn param` | `fairness :weak, complete_transfer: [:t]` where `t` draws from a state function (§5.2) |
-| `fairness params not a prefix` | The per-binding params are not a leading prefix of the action's params (§5.2) |
-| `ill-formed type` | A `type:` expression outside the §1.5 grammar |
-| `unsupported temporal operator` | A formula outside the §5.1 fragment |
-| `param draws from a non-set` | A `params:` entry that is not a constant, range, list, or 1- or 2-arity function |
-| `reserved name` | A `variable`/`constant` named `state`, `old` or `new` (§1.4) |
-| `forbidden state term` | A pid, reference, port, fun or float assigned to a variable (§6) |
-| `already declared` | Two `variable`/`constant` declarations of one name, or two `action`/`invariant`/`terminal`/`temporal`/`action_property` declarations of one name — a second cannot shadow the first, and a name that identifies two things is a name a trace cannot report |
-| `init does not assign` | An `init` block that leaves a declared variable out. The partial state would surface much later, as a `KeyError` from whichever action first read it |
-| `no init block` | A spec with variables and no `init`. Its state space is empty, and checking it would report success over a search of nothing |
-| `require in init` | An `init` block is unconditional; several possible starting states are several `init` blocks |
-| `unexpected statement` | A statement in an `init`/`action` body that is not `require`, `let`, or an assignment (§2) |
-| `param shadows a variable` | A `params:` entry named after a declared variable, which would make a bare use of that name inside the block ambiguous |
-| `constant referenced without ^` | A bare name matching a declared constant — the likeliest typo in the DSL, so it gets its own message rather than falling through to `undeclared variable` (§1.1) |
-| `temporal block is not a single formula` | A `temporal` block with more than one statement. Unlike `invariant`, there is no single state in which to compute an intermediate value: the formula is evaluated over a behavior |
+| `undeclared_variable` | `=` assigns, or an expression reads, a name that is not a `variable` |
+| `undeclared_constant` | `^name` where no `constant :name` exists |
+| `constant_without_pin` | A bare name matching a declared constant — the likeliest typo in the DSL, so it gets its own message rather than falling through to `undeclared_variable` (§1.1) |
+| `variable_not_readable_here` | A variable read where there is no state to read it from: `init`, which defines the first state, and the `old`/`new` positions that name one explicitly |
+| `reserved_name` | A `variable`/`constant` named `state`, `old` or `new` (§1.4) |
+| `implicit_invariant_redeclared` | An `invariant :type_ok`, which §1.5 derives from the declared types and checks implicitly |
+| `already_declared` | Two `variable`/`constant` declarations of one name |
+| `duplicate_declaration` | Two `action`/`invariant`/`terminal`/`temporal`/`action_property` declarations of one name — a second cannot shadow the first, and a name that identifies two things is a name a trace cannot report |
+| `declaration_name_not_an_atom` | A declaration whose name is computed rather than a literal atom; the name reaches traces and coverage, so it is fixed at compile time |
+
+### Blocks and statements
+
+| Kind | Trigger |
+|---|---|
+| `unexpected_statement` | A statement in an `init`/`action` body that is not `require`, `let`, or an assignment (§2) |
+| `declaration_without_a_block` | A declaration with options and no `do` block |
+| `variable_assigned_twice` | Two assignments to one variable in one action (§2) |
+| `assignment_outside_init_or_action` | `=` on a declared variable anywhere outside `init`/`action` — nested under `always`, `and`, a call, or at the top level; the walk is the whole expression, since §1.2 leaves no legitimate nested case |
+| `assignment_to_undeclared_variable` | `=` assigns a name no `variable` declares |
+| `destructuring_without_let` | A pattern assignment (`{a, b} = …`) without `let`: in a spec block `=` is a next-state relation on one variable, so a destructuring form means a local and must say so |
+| `let_without_binding` | A `let` whose body is not a binding |
+| `require_in_init` | An `init` block is unconditional; several possible starting states are several `init` blocks |
+| `init_does_not_assign` | An `init` block that leaves a declared variable out. The partial state would surface much later, as a `KeyError` from whichever action first read it |
+| `no_init_block` | A spec with variables and no `init`. Its state space is empty, and checking it would report success over a search of nothing |
+| `binder_shadows_variable` | A `let` or a quantifier binder named after a declared variable (§1.3) |
+| `binder_shadows_constant` | The same, for a declared constant |
+| `binder_shadows_binding` | The same, for a name this declaration already binds — a `params:` name, or `old`/`new` |
+
+### Options
+
+| Kind | Trigger |
+|---|---|
+| `options_not_a_keyword_list` | A declaration's options are not a keyword list |
+| `options_not_literal` | Options built at compile time from something other than a literal keyword list, so the set of keys cannot be read |
+| `unknown_option` | An option no declaration of that kind consumes. An option nobody reads and an option nobody wrote are the same thing to a `Keyword.pop/2` with a default (D-18) |
+
+### Parameters
+
+| Kind | Trigger |
+|---|---|
+| `params_not_a_keyword_list` | `params:` is not a keyword list |
+| `malformed_params_entry` | A `params:` entry that is not `name: source` |
+| `param_draws_from_a_non_set` | A `params:` entry that is not a constant, range, list, or 1- or 2-arity function |
+| `param_generator_arity` | A `params:` generator function of an arity the search cannot call (§3) |
+| `param_generator_clauses` | A `params:` generator with several clauses: which one applies would depend on the state, and the binding set has to be a function of the declaration |
+| `param_shadows_a_variable` | A `params:` entry named after a declared variable, which would make a bare use of that name inside the block ambiguous |
+| `param_is_a_reserved_name` | A `params:` entry named `state`, `old` or `new` (§1.4) |
+| `duplicate_param` | Two `params:` entries of one name |
+
+### Types (§1.5)
+
+| Kind | Trigger |
+|---|---|
+| `ill_formed_type` | A `type:` expression outside the §1.5 grammar |
+| `type_names_undeclared_constant` | `^name` in a type where no `constant :name` exists |
+| `type_range_bound` | A range bound that is neither an integer nor a `^constant` |
+| `type_range_step_zero` | A stepped range whose step is 0, which describes no values |
+| `collection_type_arity` | `set(…)`/`seq(…)` with other than one element type (D-21) |
+| `record_type_key_not_literal` | A record type whose keys are computed rather than literal |
+| `list_type_element_not_literal` | A list type listing something other than literals — `[:a, :b]` means "one of these"; a map type is `[dom ~> rng]` and a union of richer types is `t1 \| t2` |
+
+### Fairness (§5.2)
+
+| Kind | Trigger |
+|---|---|
+| `fairness_kind` | A fairness kind other than `:weak` or `:strong` |
+| `fairness_not_a_list` | `fairness` given something other than a list |
+| `malformed_fairness_entry` | A fairness entry that is neither an action name nor `action: [params]` |
+| `unknown_action_in_fairness` | `fairness :weak, [:typo]` |
+| `fairness_over_a_state_drawn_param` | `fairness :weak, complete_transfer: [:t]` where `t` draws from a state function |
+| `fairness_params_not_a_prefix` | The per-binding params are not a leading prefix of the action's params |
+
+### Temporal formulas (§5.1)
+
+| Kind | Trigger |
+|---|---|
+| `unsupported_temporal_operator` | A formula outside the §5.1 fragment |
+| `temporal_operator_in_state_predicate` | A temporal operator where a state predicate is required — inside `always(…)`'s argument, or under a quantifier |
+| `temporal_quantifier_domain` | A temporal quantifier ranging over something that is not a constant or a literal list |
+| `temporal_block_not_one_formula` | A `temporal` block with more than one statement. Unlike `invariant`, there is no single state in which to compute an intermediate value: the formula is evaluated over a behavior |
 
 Diagnostics carry the spec module, the declaration name, and the offending line. The
 quality of these messages is most of the difference between a DSL people adopt and one
 they bounce off; they are a deliverable, not a nicety.
+
+**Not here, and deliberately: the §6 term check.** A pid, reference, port, fun, float or
+non-byte-aligned bitstring assigned to a variable is a *runtime* error from the checker, as
+§6 and D-26 both say — the value is not known until a state is computed. It was a row in
+this table until #273, under a preamble promising a compile error, which made the preamble
+false for exactly one row.
 
 ---
 

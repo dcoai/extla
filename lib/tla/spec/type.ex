@@ -53,7 +53,11 @@ defmodule TLA.Spec.Type do
   defp check!({:^, meta, [{name, _, ctx}]}, constants, opts)
        when is_atom(name) and is_atom(ctx) do
     unless MapSet.member?(constants, name) do
-      bad!(opts, meta, "the type refers to ^#{name}, which is not a declared constant",
+      bad!(
+        :type_names_undeclared_constant,
+        opts,
+        meta,
+        "the type refers to ^#{name}, which is not a declared constant",
         hint: "Add `constant :#{name}` above this variable declaration."
       )
     end
@@ -84,7 +88,7 @@ defmodule TLA.Spec.Type do
     check_bound!(step, constants, opts)
 
     if step == 0 do
-      bad!(opts, meta, "a range step of 0 is not a range",
+      bad!(:type_range_step_zero, opts, meta, "a range step of 0 is not a range",
         hint:
           "Write `a..b` for step 1, or `a..b//n` with a non-zero `n` " <>
             "(02-dsl-semantics.md §1.5)."
@@ -121,7 +125,11 @@ defmodule TLA.Spec.Type do
 
   defp check!({collection, meta, args}, _constants, opts)
        when collection in [:set, :seq] and is_list(args) do
-    bad!(opts, meta, "#{collection}/#{length(args)} takes exactly one element type",
+    bad!(
+      :collection_type_arity,
+      opts,
+      meta,
+      "#{collection}/#{length(args)} takes exactly one element type",
       hint:
         "Write `#{collection}(t)` for a #{collection} of `t`s, or bare `:#{collection}` " <>
           "for one whose elements are unconstrained."
@@ -137,7 +145,11 @@ defmodule TLA.Spec.Type do
         check!(type, constants, opts)
 
       other ->
-        bad!(opts, meta, "a record type's keys must be literals, got: #{Macro.to_string(other)}",
+        bad!(
+          :record_type_key_not_literal,
+          opts,
+          meta,
+          "a record type's keys must be literals, got: #{Macro.to_string(other)}",
           hint: "Write `%{type: :prepared, rm: ^rms}` — each key literal, each value a type."
         )
     end)
@@ -148,6 +160,7 @@ defmodule TLA.Spec.Type do
     Enum.each(list, fn element ->
       unless literal?(element) do
         bad!(
+          :list_type_element_not_literal,
           opts,
           nil,
           "a list type may only list literals, got: #{Macro.to_string(element)}",
@@ -162,7 +175,7 @@ defmodule TLA.Spec.Type do
   end
 
   defp check!(other, _constants, opts) do
-    bad!(opts, meta_of(other), "ill-formed type: #{Macro.to_string(other)}",
+    bad!(:ill_formed_type, opts, meta_of(other), "ill-formed type: #{Macro.to_string(other)}",
       hint: """
       The type grammar (02-dsl-semantics.md §1.5) is:
 
@@ -206,6 +219,7 @@ defmodule TLA.Spec.Type do
 
   defp check_bound!(other, _constants, opts) do
     bad!(
+      :type_range_bound,
       opts,
       meta_of(other),
       "a range bound must be an integer or ^constant, got: " <>
@@ -219,13 +233,14 @@ defmodule TLA.Spec.Type do
   defp meta_of({_, meta, _}) when is_list(meta), do: meta
   defp meta_of(_), do: nil
 
-  defp bad!(opts, meta, problem, extra \\ []) do
+  defp bad!(kind, opts, meta, problem, extra \\ []) do
     CompileError.raise!(
       module: Keyword.fetch!(opts, :module),
       declaration: Keyword.fetch!(opts, :declaration),
       line: line_of(meta) || Keyword.get(opts, :line),
       problem: problem,
-      hint: Keyword.get(extra, :hint)
+      hint: Keyword.get(extra, :hint),
+      kind: kind
     )
   end
 
