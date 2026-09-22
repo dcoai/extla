@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 379 items** · functions 317 · arities 389 · types 62
+**59 modules · 382 items** · functions 320 · arities 393 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -66,11 +66,7 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `against_graph/3` | `:def` | (graph, behaviour, opts) | `43ea7512` | `lib/tla/conformance.ex` |
 | `explain/1` | `:def` | (_) | `ab441add` | `lib/tla/conformance.ex` |
-| `finding()` | `:type` | :ok
-\| :nothing_observed
-\| {:checker, map()}
-\| {:absent_state, map()}
-\| {:not_a_step_of_the_spec, map()} | `f4477bef` | `lib/tla/conformance.ex` |
+| `finding()` | `:type` | :ok \| :nothing_observed \| {:checker, map()} \| {:absent_state, map()} \| {:not_a_step_of_the_spec, map()} | `f4477bef` | `lib/tla/conformance.ex` |
 ## TLA.Coverage — 17 items
 
 | Item | Kind | Shape | Version | Locus |
@@ -204,7 +200,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `initial_state/1` | `:def` | (result) | `d80258d7` | `lib/tla/invariant/runtime.ex` |
 | `initial_statem_state/1` | `:def` | (result) | `2d59b39a` | `lib/tla/invariant/runtime.ex` |
 | `telemetry?/0` | `:def` | () | `31a12d2e` | `lib/tla/invariant/runtime.ex` |
-## TLA.Invariant.Test — 10 items
+## TLA.Invariant.Test — 11 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
@@ -218,6 +214,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `assert_action_properties/3` | `:defmacro` | (module, old_state, new_state) | `286c7ee2` | `lib/tla/invariant/test.ex` |
 | `assert_invariants/2` | `:defmacro` | (module, state) | `06d22a1b` | `lib/tla/invariant/test.ex` |
 | `refute_invariant/3` | `:defmacro` | (module, name, state) | `ee22ff06` | `lib/tla/invariant/test.ex` |
+| `valid_states/3` | `:def` | (module, type_invariant_name, base_generator) | `f5725f95` | `lib/tla/invariant/test.ex` |
 ## TLA.Invariant.Violation — 3 items
 
 | Item | Kind | Shape | Version | Locus |
@@ -307,10 +304,13 @@ key whose value is a union of atoms; any other type is shown as written.
 | `reductions/0` | `:def` | () | `11ca45a8` | `lib/tla/profile.ex` |
 | `t()` | `:type` | declarations, calibration, run_reductions, otp_version | `5a1499db` | `lib/tla/profile.ex` |
 | `zero/1` | `:def` | (profile) | `bda19dd1` | `lib/tla/profile.ex` |
-## TLA.PropertyTest — 1 items
+## TLA.PropertyTest — 3 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
+| `action_sequences/2` | `:def` | (spec, constants, max_length \\ …) | `a6449182` | `lib/tla/property_test.ex` |
+| `action_sequences/3` | `:def` | (spec, constants, max_length \\ …) | `a6449182` | `lib/tla/property_test.ex` |
+| `init_states/2` | `:def` | (spec, constants) | `2e3eb256` | `lib/tla/property_test.ex` |
 | `initial_states/2` | `:def` | (spec, constants) | `ad67db2e` | `lib/tla/property_test.ex` |
 ## TLA.Refinement — 3 items
 
@@ -413,11 +413,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `state_predicate()` | `:type` | (TLA.State.t() -> boolean()) | `bcfbd5bb` | `lib/tla/spec/compiled.ex` |
 | `t()` | `:type` | module, constants, variables, init, actions, invariants, action_properties, temporals, terminals, fairness | `356a0d6c` | `lib/tla/spec/compiled.ex` |
 | `temporal_def()` | `:type` | name, formula, opts | `f4f709f4` | `lib/tla/spec/compiled.ex` |
-| `temporal_formula()` | `:type` | {:always, temporal_formula()}
-\| {:eventually, temporal_formula()}
-\| {:leads_to, state_predicate(), state_predicate()}
-\| {:predicate, state_predicate()}
-\| {:for_all, (constants() -> Enumerable.t()), (term() -> temporal_formula())} | `2a9c8fa9` | `lib/tla/spec/compiled.ex` |
+| `temporal_formula()` | `:type` | {:always, temporal_formula()} \| {:eventually, temporal_formula()} \| {:leads_to, state_predicate(), state_predicate()} \| {:predicate, state_predicate()} \| {:for_all, (constants() -> Enumerable.t()), (term() -> temporal_formula())} | `2a9c8fa9` | `lib/tla/spec/compiled.ex` |
 | `temporal_instances/2` | `:def` | (temporal, constants) | `b5f68976` | `lib/tla/spec/compiled.ex` |
 | `terminal_def()` | `:type` | name, predicate | `2640532e` | `lib/tla/spec/compiled.ex` |
 | `type_expr()` | `:type` | Macro.t() | `5f670250` | `lib/tla/spec/compiled.ex` |
@@ -551,21 +547,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `invariant/2` | `:def` | (spec, constants) | `b5681925` | `lib/tla/spec/type.ex` |
 | `member?/2` | `:def` | (_, value) | `a02d6dac` | `lib/tla/spec/type.ex` |
 | `resolve!/3` | `:def` | (type, constants, where) | `842686fc` | `lib/tla/spec/type.ex` |
-| `resolved()` | `:type` | {:literal, term()}
-\| {:one_of, [term()]}
-\| {:range, integer(), integer()}
-\| {:range, integer(), integer(), integer()}
-\| {:element_of, MapSet.t()}
-\| {:union, [resolved()]}
-\| {:tuple, [resolved()]}
-\| {:function, MapSet.t(), resolved()}
-\| {:record, %{term() => resolved()}}
-\| {:set_of, resolved()}
-\| {:seq_of, resolved()}
-\| :set
-\| :seq
-\| :int
-\| :nat | `33ba2864` | `lib/tla/spec/type.ex` |
+| `resolved()` | `:type` | {:literal, term()} \| {:one_of, [term()]} \| {:range, integer(), integer()} \| {:range, integer(), integer(), integer()} \| {:element_of, MapSet.t()} \| {:union, [resolved()]} \| {:tuple, [resolved()]} \| {:function, MapSet.t(), resolved()} \| {:record, %{term() => resolved()}} \| {:set_of, resolved()} \| {:seq_of, resolved()} \| :set \| :seq \| :int \| :nat | `33ba2864` | `lib/tla/spec/type.ex` |
 | `resolved_variables/2` | `:def` | (spec, constants) | `ce78afc4` | `lib/tla/spec/type.ex` |
 | `validate!/3` | `:def` | (type, constants, opts) | `1882a9dd` | `lib/tla/spec/type.ex` |
 ## TLA.State — 13 items

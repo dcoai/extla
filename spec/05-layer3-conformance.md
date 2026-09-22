@@ -368,7 +368,6 @@ defmodule TLA.Refinement do
   documented obligation on the author, and a violation of it surfaces as a
   `:diverged` step failure.
   """
-  @spec validate!(module(), module()) :: :ok | no_return()
   def validate!(refinement_module, spec_module)
 end
 ```
@@ -400,7 +399,6 @@ defmodule TLA.Replay do
   means the spec permits a behavior the code does not, so one of the two is
   wrong.
   """
-  @spec counterexample(module(), TLA.Trace.t(), keyword()) :: result()
   def counterexample(genserver_module, trace, opts \\ [])
 
   @doc """
@@ -418,7 +416,6 @@ defmodule TLA.Replay do
   Nothing needs to be running: this is a pure function over recorded data, so it
   can be run in CI against a fixture, or offline against a captured incident.
   """
-  @spec trace(module(), [{message :: term(), concrete_state :: map()}], keyword()) :: result()
   def trace(genserver_module, captured, opts \\ [])
 
   @type result :: %{
@@ -515,7 +512,16 @@ defmodule TLA.Simulation do
     seed: integer() | nil,
 
     # Number of concurrent simulations
-    concurrency: pos_integer()
+    concurrency: pos_integer(),
+
+    # What `init/1` is given when a trace starts its server, and again when
+    # `--inject-failures` restarts one — the argument a supervisor would pass.
+    init_arg: term(),
+
+    # How long a single delivery may take before the trace reports that the
+    # server stopped answering, which is an `:error` outcome rather than a
+    # conformance finding.
+    timeout: timeout()
   }
 
   @type result :: %{
@@ -576,21 +582,18 @@ defmodule TLA.Simulation do
   that comes back in a state its own specification forbids is a finding whatever
   the spec says about crashing.
   """
-  @spec run(module(), config()) :: result()
   def run(genserver_module, config)
 
   @doc """
   Run a single trace and return the full abstract behavior.
   Useful for debugging specific scenarios.
   """
-  @spec run_trace(module(), config()) :: {result(), TLA.State.behavior()}
   def run_trace(genserver_module, config)
 
   @doc """
   Replay a specific trace (from a seed or explicit message sequence).
   Useful for reproducing and debugging failures.
   """
-  @spec replay(module(), [term()], config()) :: result()
   def replay(genserver_module, messages, config)
 end
 ```
@@ -605,27 +608,26 @@ defmodule TLA.Simulation.Generator do
   """
 
   @doc """
-  Create a message generator from a spec module.
-  Returns a function that, given the current abstract state,
-  produces a random valid message.
-  """
-  Amended to take the REFINEMENT as well. A specification has no notion of a
-  message -- that is what `concrete_message/2` exists for -- so a generator
-  returning one needs the mapping. The alternative, returning `{action, params}`
-  and mapping in the caller, puts half the generator outside it.
+  Create a message generator from a spec module and a refinement mapping.
 
-  Returns `{action, params, message}`, so that a counterexample built from a
-  simulation names its actions the way a model-checker counterexample does.
+  Returns a function that, given the current abstract state, produces a random
+  valid `{action, params, message}`.
+
+  It takes the REFINEMENT as well as the spec, which an earlier draft did not. A
+  specification has no notion of a message -- that is what `concrete_message/2`
+  exists for -- so a generator returning one needs the mapping; returning
+  `{action, params}` and mapping in the caller would put half the generator
+  outside it. The action and binding travel beside the message so that a
+  counterexample built from a simulation names its actions the way a
+  model-checker counterexample does.
   """
-  @spec from_spec(module(), module(), map()) ::
-    (TLA.State.t() -> {atom(), map(), term()} | nil)
   def from_spec(spec_module, refinement, constants)
 
   @doc """
-  Create a message generator that only produces messages
-  corresponding to currently ENABLED actions.
-  More efficient — avoids generating messages that will be rejected.
-  """
+  Create a message generator that only produces messages corresponding to
+  currently ENABLED actions. More efficient — it avoids generating messages that
+  will be rejected.
+
   **This is the default** `message_generator`. The unrestricted one asks a
   different question -- does the implementation REFUSE what the spec forbids in
   this state -- and most servers are not written to: a `handle_call` clause with
@@ -633,8 +635,6 @@ defmodule TLA.Simulation.Generator do
   finding about that pair. It is also a finding about nearly every server ever
   written, so hunting it is opt-in (`mix tla.simulate --unrestricted`).
   """
-  @spec enabled_only(module(), module(), map()) ::
-    (TLA.State.t() -> {atom(), map(), term()} | nil)
   def enabled_only(spec_module, refinement, constants)
 end
 ```
@@ -656,7 +656,6 @@ defmodule TLA.PropertyTest do
   Generate a StreamData generator for valid initial states.
   Derived from the spec's `init` block.
   """
-  @spec init_states(module(), map()) :: StreamData.t(map())
   def init_states(spec_module, constants)
 
   @doc """
@@ -664,8 +663,6 @@ defmodule TLA.PropertyTest do
   Each generated sequence is a list of {action_name, params} tuples
   that form a valid behavior from an initial state.
   """
-  @spec action_sequences(module(), map(), max_length :: pos_integer()) ::
-    StreamData.t([{atom(), map()}])
   def action_sequences(spec_module, constants, max_length \\ 20)
 
   # Both are compiled behind `Code.ensure_loaded?(StreamData)`. `stream_data` is a
@@ -698,7 +695,6 @@ defmodule TLA.PropertyTest do
   2. Applies them to the GenServer
   3. Checks refinement at every step
   """
-  @spec generate_test_module(module(), module(), map()) :: String.t()
   def generate_test_module(spec_module, genserver_module, constants)
 end
 
@@ -888,8 +884,6 @@ defmodule TLA.GenServer.Runtime do
   diff against the closest candidate — that message is the layer's primary
   output, and it is worth the effort to make it precise.
   """
-  @spec check_step!(module(), atom(), map(), TLA.State.t(), TLA.State.t()) ::
-    :ok | no_return()
   def check_step!(spec_module, action, params, pre_abstract, post_abstract)
 
   @doc """
@@ -897,15 +891,12 @@ defmodule TLA.GenServer.Runtime do
   Fails with `:unmapped_but_moved`, which means either a missing
   `abstract_action/1` clause or a transition the spec does not model.
   """
-  @spec check_stuttering!(module(), TLA.State.t(), TLA.State.t()) :: :ok | no_return()
   def check_stuttering!(spec_module, pre_abstract, post_abstract)
 
   @doc "Check spec invariants against an abstract state."
-  @spec check_spec_invariants!(module(), TLA.State.t()) :: :ok | no_return()
   def check_spec_invariants!(spec_module, abstract_state)
 
   @doc "Check spec action properties against an abstract transition."
-  @spec check_action_properties!(module(), TLA.State.t(), TLA.State.t()) :: :ok | no_return()
   def check_action_properties!(spec_module, pre_abstract, post_abstract)
 
   @doc """
@@ -921,7 +912,6 @@ defmodule TLA.GenServer.Runtime do
   drops oldest-first. An unbounded per-process trace is a memory leak in any
   long-lived GenServer, which is most of them.
   """
-  @spec record_transition!(module(), term(), TLA.State.t(), TLA.State.t()) :: :ok
   def record_transition!(spec_module, message, pre, post)
 
   @doc """
@@ -930,7 +920,6 @@ defmodule TLA.GenServer.Runtime do
   Sends the process a `:sys`-level request rather than reaching into its
   dictionary, for the same reason: only the owning process can read it.
   """
-  @spec get_trace(pid()) :: TLA.State.behavior()
   def get_trace(pid)
 
   @doc """
@@ -943,8 +932,6 @@ defmodule TLA.GenServer.Runtime do
   the third into the first — the same honesty rule as `max_states_reached`
   in Layer 2.
   """
-  @spec check_temporal_properties(module(), TLA.State.behavior()) ::
-    %{atom() => :holds | :violated | :inconclusive}
   def check_temporal_properties(spec_module, behavior)
 
   @doc """
@@ -953,8 +940,6 @@ defmodule TLA.GenServer.Runtime do
   `check_step!/5` and `check_stuttering!/3` directly — see §Compile-Time
   Transformation for why the `case` cannot be emitted.
   """
-  @spec check_transition!(module(), module(), term(), TLA.State.t(), TLA.State.t()) ::
-    :ok | no_return()
   def check_transition!(spec_module, refinement, message, pre, post)
 
   @doc """
@@ -962,7 +947,6 @@ defmodule TLA.GenServer.Runtime do
   recorded. Takes the raw `init/1` return, because `:ignore` and a bare
   `{:stop, reason}` produce no state at all.
   """
-  @spec record_initial!(module(), module(), term()) :: :ok
   def record_initial!(spec_module, refinement, result)
 
   @doc """
@@ -970,11 +954,9 @@ defmodule TLA.GenServer.Runtime do
   `TLA.Refinement.abstract!/3` needs the compiled struct; the wrapper has only the
   module.
   """
-  @spec abstract!(module(), module(), map()) :: TLA.State.t()
   def abstract!(spec_module, refinement, concrete)
 
   @doc "The behaviour recorded by THIS process, oldest state first."
-  @spec trace() :: TLA.State.behavior()
   def trace()
 end
 ```
@@ -1180,6 +1162,13 @@ end
 ```
 
 ### `mix tla.gen.test`
+
+> **Status: deferred past v1** (`06-architecture.md` §Implementation Phases).
+>
+> §Deferred gives the reason: "`mix tla.gen.test` writes code someone then has to maintain;
+> the property helpers give most of the value without that." `TLA.PropertyTest`'s two
+> generators are those helpers, and they are built. Specified here so the design is not
+> painted into a corner, and not built.
 
 ```elixir
 defmodule Mix.Tasks.Tla.Gen.Test do

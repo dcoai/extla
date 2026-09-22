@@ -306,34 +306,24 @@ defmodule TLA.Invariant.Runtime do
   `:checked`. The three-argument form contains no timing and no success event to
   skip, which is what "unemitted" has to mean (§Telemetry Integration).
   """
-  @spec check_invariants!(module(), [atom()], TLA.State.t()) :: :ok | no_return()
   def check_invariants!(module, names, state)
 
-  @spec check_invariants!(module(), [atom()], TLA.State.t(), :verbose) :: :ok | no_return()
   def check_invariants!(module, names, state, :verbose)
 
   @doc "Check the named action properties against a state transition."
-  @spec check_action_properties!(module(), [atom()], TLA.State.t(), TLA.State.t()) ::
-    :ok | no_return()
   def check_action_properties!(module, names, old_state, new_state)
 
-  @spec check_action_properties!(module(), [atom()], TLA.State.t(), TLA.State.t(), :verbose) ::
-    :ok | no_return()
   def check_action_properties!(module, names, old_state, new_state, :verbose)
 
   @doc """
   Check every precondition whose pattern matches `message`, for the given
   callback. A message no pattern matches has no preconditions and passes.
   """
-  @spec check_preconditions!(module(), callback :: atom(), message :: term(), TLA.State.t()) ::
-    :ok | no_return()
   def check_preconditions!(module, callback, message, state)
 
   @doc """
   Check every postcondition whose pattern matches `message`.
   """
-  @spec check_postconditions!(module(), callback :: atom(), message :: term(), TLA.State.t(), TLA.State.t()) ::
-    :ok | no_return()
   def check_postconditions!(module, callback, message, old_state, new_state)
 
   @doc """
@@ -343,7 +333,6 @@ defmodule TLA.Invariant.Runtime do
   forms. A return that carries no state (`{:stop, reason}` from `handle_info`)
   yields `pre_state` — the wrapper text above explains why the fallback is needed.
   """
-  @spec extract_state(callback_result :: term(), pre_state :: TLA.State.t()) :: TLA.State.t()
   def extract_state(callback_result, pre_state)
 end
 ```
@@ -374,7 +363,6 @@ defmodule TLA.Invariant.Violation do
   - :log_only → Logger.error with structured metadata
   - :disabled → no-op (but this function should never be called in :disabled)
   """
-  @spec report!(t()) :: :ok | no_return()
   def report!(violation)
 end
 ```
@@ -533,7 +521,6 @@ defmodule TLA.Invariant.Test do
   where it is loaded, decided when ExTLA compiles — the same absent-tolerance
   `jason` and `telemetry` get.
   """
-  @spec valid_states(module(), atom(), StreamData.t(map())) :: StreamData.t(map())
   def valid_states(module, type_invariant_name, base_generator)
 end
 ```
