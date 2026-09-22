@@ -24,12 +24,12 @@ each other, and to the kinds the tests assert on.
 | `:declaration_name_not_an_atom` | … name must be a literal atom, got: … | `lib/tla/spec/dsl.ex:529` |
 | `:declaration_without_a_block` | … needs a `do` block | `lib/tla/spec/dsl.ex:658` |
 | `:destructuring_without_let` | destructuring assignment without `let`: … | `lib/tla/spec/block.ex:60` |
-| `:duplicate_declaration` | … … is declared … times | `lib/tla/spec.ex:238` |
+| `:duplicate_declaration` | … … is declared … times | `lib/tla/spec.ex:245` |
 | `:duplicate_param` | param … is declared twice | `lib/tla/spec/dsl.ex:624` |
 | `:fairness_kind` | fairness kind must be :weak or :strong, got: … | `lib/tla/spec/dsl.ex:410` |
 | `:fairness_not_a_list` | fairness takes a list, got: … | `lib/tla/spec/dsl.ex:392` |
-| `:fairness_over_a_state_drawn_param` | fairness over a state-drawn param: ….… | `lib/tla/spec.ex:301` |
-| `:fairness_params_not_a_prefix` | fairness params … are not a leading prefix of… | `lib/tla/spec.ex:285` |
+| `:fairness_over_a_state_drawn_param` | fairness over a state-drawn param: ….… | `lib/tla/spec.ex:308` |
+| `:fairness_params_not_a_prefix` | fairness params … are not a leading prefix of… | `lib/tla/spec.ex:292` |
 | `:ill_formed_type` | ill-formed type: … | `lib/tla/spec/type.ex:178` |
 | `:implicit_invariant_redeclared` | … is checked implicitly and cannot be declared | `lib/tla/spec/dsl.ex:556` |
 | `:init_does_not_assign` | `init` does not assign … | `lib/tla/spec/block.ex:299` |
@@ -38,7 +38,7 @@ each other, and to the kinds the tests assert on.
 | `:list_type_element_not_literal` | a list type may only list literals, got: … | `lib/tla/spec/type.ex:162` |
 | `:malformed_fairness_entry` | malformed fairness entry: … | `lib/tla/spec/dsl.ex:378` |
 | `:malformed_params_entry` | malformed `params:` entry: … | `lib/tla/spec/params.ex:50` |
-| `:no_init_block` | no `init` block | `lib/tla/spec.ex:254` |
+| `:no_init_block` | no `init` block | `lib/tla/spec.ex:261` |
 | `:options_not_a_keyword_list` | … options must be a keyword list, got: … | `lib/tla/spec/dsl.ex:672` |
 | `:options_not_literal` | options must be a literal keyword list, got:… | `lib/tla/spec/dsl.ex:644` |
 | `:options_not_literal` | options must be a literal keyword list, got: … | `lib/tla/spec/dsl.ex:692` |
@@ -61,7 +61,7 @@ each other, and to the kinds the tests assert on.
 | `:undeclared_constant` | undeclared constant: ^… | `lib/tla/spec/rewriter.ex:72` |
 | `:undeclared_variable` | undeclared variable: … | `lib/tla/spec/rewriter.ex:146` |
 | `:unexpected_statement` | unexpected statement: … | `lib/tla/spec/block.ex:72` |
-| `:unknown_action_in_fairness` | unknown action in fairness: … | `lib/tla/spec.ex:272` |
+| `:unknown_action_in_fairness` | unknown action in fairness: … | `lib/tla/spec.ex:279` |
 | `:unknown_option` | unknown option…: … | `lib/tla/spec/dsl.ex:747` |
 | `:unsupported_temporal_operator` | unsupported temporal operator: … | `lib/tla/spec/temporal.ex:128` |
 | `:variable_assigned_twice` | variable … assigned … times | `lib/tla/spec/block.ex:125` |

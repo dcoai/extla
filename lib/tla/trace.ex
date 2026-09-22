@@ -532,7 +532,7 @@ defmodule TLA.Trace do
   def format(%__MODULE__{} = trace), do: render(trace, :violation)
 
   defp render(%__MODULE__{} = trace, last_label) do
-    header = header(trace)
+    header = header(trace) <> message(trace)
     diffs = to_diffs(trace)
     last = length(diffs)
 
@@ -622,6 +622,14 @@ defmodule TLA.Trace do
     "\n↺ back to state #{back_to} — states #{back_to}-#{back_to + length(states) - 2} " <>
       "repeat forever.\n"
   end
+
+  # Every finding writes a `message` saying what was refuted and, for a temporal property,
+  # what its author said it means — and until #176 nothing rendered it, so the whole of what
+  # a reader was told was the banner's property NAME. `to_json/1` carried it out to a file
+  # the whole time; the person reading the terminal was the one who could not see it.
+  defp message(%__MODULE__{message: ""}), do: ""
+  defp message(%__MODULE__{message: message}) when is_binary(message), do: "\n" <> message
+  defp message(%__MODULE__{}), do: ""
 
   defp header(%{type: :deadlock}), do: banner("DEADLOCK")
   defp header(%{type: :safety, property: property}), do: banner("VIOLATION: #{property}")

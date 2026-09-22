@@ -576,13 +576,25 @@ defmodule TLA.ModelChecker.Liveness do
     %{prefix: prefix, cycle: Trace.from(graph, List.last(prefix.states), cycle_steps, [])}
   end
 
-  defp describe(%{bound: []} = instance, what),
-    do: "temporal property #{inspect(instance.name)} #{what}"
-
+  # `desc:` is the sentence the author wrote to say what the property MEANS, and this is the
+  # one place a reader meets the property without its formula in front of them. A name alone
+  # asks them to reconstruct the intent from `:eventually_done` (#176).
   defp describe(instance, what) do
-    values = Enum.map_join(instance.bound, ", ", &inspect/1)
-    "temporal property #{inspect(instance.name)}, at #{values}, #{what}"
+    "temporal property " <>
+      inspect(instance.name) <>
+      bound(instance) <>
+      " " <>
+      what <>
+      meaning(instance)
   end
+
+  defp bound(%{bound: []}), do: ""
+  defp bound(%{bound: values}), do: ", at " <> Enum.map_join(values, ", ", &inspect/1) <> ","
+
+  # A declaration with no `desc:` holds `""` — #160 made the macro store the option, so the
+  # absence is an empty string rather than a missing key, and it renders as it did before.
+  defp meaning(%{description: ""}), do: ""
+  defp meaning(%{description: description}), do: " — " <> description
 
   # A closed walk from the entry state through everything the cycle has to contain: the
   # state or edge that satisfies each fairness constraint, and whatever the property

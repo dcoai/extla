@@ -127,6 +127,7 @@ defmodule TLA.Spec.Compiled do
   # neither of which has a value until a run assigns one.
   @type temporal_def :: %{
           name: atom(),
+          description: String.t(),
           formula: (constants() -> temporal_formula()),
           opts: keyword()
         }
@@ -241,7 +242,14 @@ defmodule TLA.Spec.Compiled do
   def temporal_instances(temporal, constants) do
     temporal.formula.(constants)
     |> unquantify(constants)
-    |> Enum.map(fn {bound, formula} -> %{name: temporal.name, bound: bound, formula: formula} end)
+    |> Enum.map(fn {bound, formula} ->
+      %{
+        name: temporal.name,
+        description: temporal.description,
+        bound: bound,
+        formula: formula
+      }
+    end)
   end
 
   defp unquantify({:for_all, set, instance}, constants) do

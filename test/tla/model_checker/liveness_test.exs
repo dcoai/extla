@@ -140,6 +140,29 @@ defmodule TLA.ModelChecker.LivenessTest do
       assert output =~ "stutters there forever"
     end
 
+    # What a counterexample is FOR is telling someone what went wrong, and `desc:` is the
+    # sentence its author wrote to say what the property means. The chain is four hops long —
+    # the DSL stores the option, `compiled_temporals/1` emits it, `temporal_instances/2`
+    # carries it onto the instance, `describe/2` prints it — and it was severed at the second
+    # for a fortnight (#176). The assertion is on the RENDERING, not on the struct: the
+    # message field it lands in was itself unrendered until this work item, so a test that
+    # read `violation.prefix.message` would have passed over a counterexample that showed the
+    # reader nothing. Every hop is load-bearing; cut any one and this goes red.
+    test "a refuted property's counterexample carries the description its author wrote" do
+      output = Trace.format(check(IdlingUnfair, %{}, [:eventually_two]).violation)
+
+      assert output =~ "the counter reaches two and does not spin forever"
+    end
+
+    # `desc:` is optional and stored as `""` when it is absent (#160), so the line has to read
+    # the same as it did before there was a description to add to it.
+    test "and a property declared without one reads exactly as it did before" do
+      output = Trace.format(check(Stalls, %{}, [:eventually_done]).violation)
+
+      assert output =~ "temporal property :eventually_done is refuted by this behaviour\n"
+      refute output =~ "behaviour —"
+    end
+
     test "a real cycle is formatted as a loop back to where it started" do
       output = Trace.format(check(IdlingUnfair, %{}, [:eventually_two]).violation)
 
@@ -197,6 +220,7 @@ defmodule TLA.ModelChecker.LivenessTest do
 
       nested = %{
         name: :too_deep,
+        description: "",
         opts: [],
         formula: fn _constants ->
           {:eventually, {:always, {:eventually, {:predicate, fn _state -> true end}}}}

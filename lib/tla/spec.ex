@@ -201,11 +201,18 @@ defmodule TLA.Spec do
     end
   end
 
+  # The `description` is what the author wrote in `desc:`, and it travels to the liveness
+  # checker's refutation message the way an invariant's travels to a violation's (#176). It
+  # was STORED and dropped here for a fortnight: #160 made the macro keep it, on the
+  # reasoning that accepting an option nothing reads is the same defect as an unknown key,
+  # and the value then stopped at this function. The test written to protect that fix
+  # asserted only that the module compiles, which the pre-fix code did too.
   defp compiled_temporals(temporals) do
-    for %{name: name, opts: opts, fun: fun} <- temporals do
+    for %{name: name, description: description, opts: opts, fun: fun} <- temporals do
       quote do
         %{
           name: unquote(name),
+          description: unquote(description),
           formula: &(__MODULE__.unquote(fun) / 1),
           opts: unquote(opts || [])
         }

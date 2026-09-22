@@ -448,6 +448,22 @@ defmodule TLA.ModelCheckerTest do
       assert output =~ "── tick"
     end
 
+    # The `message` every finding writes went to `to_json/1` and to nowhere a person looks:
+    # `format/1` printed the banner, which is the property's NAME, and dropped the sentence
+    # saying what about it failed (#176). `:type_ok` is the clearest case — its message names
+    # the variable, its value and the type it was declared with, and the banner says `type_ok`.
+    test "format/1 prints the message the finding wrote, not just the property's name" do
+      trace = %TLA.Trace{
+        type: :safety,
+        property: :type_ok,
+        message: "type_ok: n = 4 is not in 0..3",
+        states: [%{n: 4}],
+        length: 1
+      }
+
+      assert Trace.format(trace) =~ "type_ok: n = 4 is not in 0..3"
+    end
+
     test "format/1 shows a binding as a call" do
       trace =
         ModelChecker.run(Transfer, %{

@@ -30,6 +30,20 @@ release it merely follows.
 
 ### Fixed
 
+- **A temporal property's description reaches the counterexample a user reads** (#276, for
+  #176). `temporal :x, desc: "…"` was stored by the DSL and dropped by
+  `compiled_temporals/1`, so the option #160 kept — on the reasoning that accepting one
+  nothing reads is the same defect as an unknown key — reached no consumer. It now travels
+  all four hops, and a refutation reads `temporal property :eventually_two is refuted by this
+  behaviour — the counter reaches two and does not spin forever`. One hop below it,
+  **`TLA.Trace.format/1` printed the banner and dropped the `message` every finding writes**:
+  an invariant's violation text, an action property's, the deadlock's pointer at
+  `terminal :name do` and every liveness refutation were rendered to nobody, while
+  `to_json/1` carried them out to a file the whole time. The new tests assert on the
+  rendering rather than on the struct, because one reading `violation.prefix.message` would
+  have passed over a counterexample that showed the reader nothing. D-33 records what
+  accepting `desc:` obliges, beside D-18's map of which declarations accept it.
+
 - **The specification's API blocks are held to `API_SURFACE.md`** (#164, closes #153). `spec/01–05`
   published **seventeen signatures and seven type shapes the code does not have** — a reader
   coding to them got `UndefinedFunctionError` on the first call — and nothing had compared the
