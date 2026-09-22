@@ -332,7 +332,11 @@ defmodule TLA.Simulation do
   # neither the other way round, so only `:violated` is a finding here — `:inconclusive` is
   # the honest answer for a property this trace could not settle, not a failure.
   defp temporal(%{status: :ok} = state, config) do
-    behavior = Enum.reverse(state.states)
+    # `dropped: 0` is a claim, and it is true here: a simulation keeps every state it
+    # generated, so this behaviour begins where the run began. The trace buffer of a
+    # long-lived GenServer does not, which is why the count travels with the states at all
+    # (#278).
+    behavior = %{states: Enum.reverse(state.states), dropped: 0}
 
     case Enum.find(
            Runtime.check_temporal_properties(config.spec, behavior),
@@ -348,7 +352,7 @@ defmodule TLA.Simulation do
             violation: %{
               kind: :temporal,
               name: name,
-              post: List.last(behavior),
+              post: List.last(behavior.states),
               detail: "the temporal property #{inspect(name)} is violated by this behaviour"
             }
         }

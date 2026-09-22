@@ -48,12 +48,17 @@ defmodule TLA.ConformanceStepTest do
       {:ok, :ok} = call(server, :increment)
       {:ok, :ok} = call(server, :done)
 
-      assert Runtime.get_trace(server) == [
-               %{count: 0, status: :ready},
-               %{count: 0, status: :ready},
-               %{count: 1, status: :incrementing},
-               %{count: 1, status: :ready}
-             ]
+      # `%{states:, dropped:}` since #278: a bare list cannot say whether it still holds
+      # the behaviour's beginning, and the bare-predicate verdict depends on that.
+      assert Runtime.get_trace(server) == %{
+               states: [
+                 %{count: 0, status: :ready},
+                 %{count: 0, status: :ready},
+                 %{count: 1, status: :incrementing},
+                 %{count: 1, status: :ready}
+               ],
+               dropped: 0
+             }
     end
 
     # A real trace has no lasso, so a property that needs one is `:inconclusive` by
@@ -211,8 +216,15 @@ defmodule TLA.ConformanceStepTest do
       end
 
       trace = Runtime.get_trace(server)
-      assert length(trace) == 3
-      assert List.last(trace) == %{count: 4, status: :ready}
+      assert length(trace.states) == 3
+      assert List.last(trace.states) == %{count: 4, status: :ready}
+
+      # And it says how many it dropped to stay at three, which is what makes a verdict
+      # about the behaviour's first state refusable rather than wrong (#278). Ten states
+      # were recorded — the initial one, then a pre and a post for the first transition and
+      # a post for each of the seven after it — and three are kept.
+      assert trace.dropped == 7
+      assert length(trace.states) + trace.dropped == 10
     end
   end
 

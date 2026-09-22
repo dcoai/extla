@@ -137,15 +137,15 @@ key whose value is a union of atoms; any other type is shown as written.
 | `check_step/5` | `:def` | (spec_module, action_name, params, pre, post) | `02b98199` | `lib/tla/gen_server/runtime.ex` |
 | `check_stuttering!/3` | `:def` | (spec_module, pre, post) | `f8503dea` | `lib/tla/gen_server/runtime.ex` |
 | `check_stuttering/3` | `:def` | (spec_module, pre, post) | `06d3ef7f` | `lib/tla/gen_server/runtime.ex` |
-| `check_temporal_properties/2` | `:def` | (spec_module, behavior) | `dfe53ad4` | `lib/tla/gen_server/runtime.ex` |
+| `check_temporal_properties/2` | `:def` | (spec_module, behavior) | `6110f9e0` | `lib/tla/gen_server/runtime.ex` |
 | `check_transition!/5` | `:def` | (spec_module, refinement, message, pre, post) | `9f14d1ac` | `lib/tla/gen_server/runtime.ex` |
 | `check_transition/5` | `:def` | (spec_module, refinement, message, pre, post) | `65e5281a` | `lib/tla/gen_server/runtime.ex` |
 | `context/1` | `:def` | (spec_module) | `8218d102` | `lib/tla/gen_server/runtime.ex` |
 | `finding()` | `:type` | :ok \| {:violation, Violation.t()} | `4ce2beda` | `lib/tla/gen_server/runtime.ex` |
 | `get_trace/1` | `:def` | (pid) | `8834025a` | `lib/tla/gen_server/runtime.ex` |
 | `record_initial!/3` | `:def` | (spec_module, refinement, result) | `215c7341` | `lib/tla/gen_server/runtime.ex` |
-| `record_transition!/4` | `:def` | (_spec_module, _message, pre, post) | `22188522` | `lib/tla/gen_server/runtime.ex` |
-| `trace/0` | `:def` | () | `3c27a04a` | `lib/tla/gen_server/runtime.ex` |
+| `record_transition!/4` | `:def` | (_spec_module, _message, pre, post) | `ae5e5404` | `lib/tla/gen_server/runtime.ex` |
+| `trace/0` | `:def` | () | `846537ad` | `lib/tla/gen_server/runtime.ex` |
 ## TLA.GenServer.Violation — 2 items
 
 | Item | Kind | Shape | Version | Locus |

@@ -910,15 +910,22 @@ defmodule TLA.GenServer.Runtime do
 
   The buffer is bounded (`config :extla, trace_buffer: n`, default 1000) and
   drops oldest-first. An unbounded per-process trace is a memory leak in any
-  long-lived GenServer, which is most of them.
+  long-lived GenServer, which is most of them — and the count of what it dropped
+  is kept beside it, because a truncated list is indistinguishable from a short
+  one.
   """
   def record_transition!(spec_module, message, pre, post)
 
   @doc """
-  Retrieve a process's accumulated behavior trace.
+  Retrieve a process's accumulated behavior trace: `%{states: [...], dropped: n}`,
+  oldest state first.
 
   Sends the process a `:sys`-level request rather than reaching into its
   dictionary, for the same reason: only the owning process can read it.
+
+  `dropped` is how many states the buffer discarded. It is part of the value
+  rather than a separate query because the states alone cannot carry it, and a
+  caller holding only the states has no way to know the question exists.
   """
   def get_trace(pid)
 
@@ -931,6 +938,26 @@ defmodule TLA.GenServer.Runtime do
   distinguishes `:holds`, `:violated` and `:inconclusive` rather than collapsing
   the third into the first — the same honesty rule as `max_states_reached`
   in Layer 2.
+
+  **A trace that lost its beginning cannot settle a claim about its beginning.**
+  A bare-predicate property — `temporal :t do n == 0 end` — is a claim about the
+  behaviour's FIRST state, and the buffer above drops oldest-first, so for a
+  long-lived server the oldest state still held is not the one the behaviour
+  began at. It is `:inconclusive` when `dropped > 0`, by the rule in the
+  paragraph above.
+
+  No other shape needs this, and giving it to them would be the rule pointed the
+  wrong way. Truncation drops a *prefix*: `always(P)` answers `:violated` from a
+  retained state where P is false — a state that really occurred, so it refutes
+  the whole behaviour too — and `eventually(P)` answers `:holds` from a retained
+  witness for the same reason. Reporting either as `:inconclusive` would discard
+  a sound verdict. `<>[]P`, `[]<>P` and `P ~> Q` need a lasso, which a recorded
+  trace never has, and are `:inconclusive` either way.
+
+  The behaviour is therefore `%{states: [...], dropped: n}` and a bare list is
+  **refused**, not defaulted to `dropped: 0`. Defaulting is what makes a caller
+  who has not thought about the question get a confident wrong answer — the same
+  argument `against_graph/3` makes for requiring `status:`.
   """
   def check_temporal_properties(spec_module, behavior)
 

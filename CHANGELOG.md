@@ -30,6 +30,29 @@ release it merely follows.
 
 ### Fixed
 
+- **A recorded behaviour says what its buffer threw away, and a truncated one cannot
+  settle a claim about its beginning** (#278, for #177). `TLA.GenServer.Runtime`'s trace
+  buffer drops oldest-first — correctly; an unbounded per-process trace is a memory leak in
+  any long-lived GenServer — and recorded nothing about having dropped anything. The
+  bare-predicate verdict read the list's head as "the behaviour's first state", which for a
+  server past the buffer is a different state, and the answer was not merely
+  over-confident: a server 1,200 transitions from `n = 0` reported the property `n == 0`
+  **violated**, as a settled fact, about a behaviour that satisfies it. A false refutation
+  sends someone to fix a specification that is correct.
+
+  `trace/0` and `get_trace/1` now return `%{states: [...], dropped: n}`, and
+  `check_temporal_properties/2` **refuses a bare list** rather than defaulting it to
+  `dropped: 0` — defaulting would have left every existing caller compiling and the
+  truncated one still lying, which is the argument `TLA.Conformance.against_graph/3`
+  already makes for requiring `status:`.
+
+  **Only the bare predicate changes.** Truncation drops a *prefix*, and every other shape
+  survives it: `always(P)` answers `:violated` from a retained state that really occurred,
+  `eventually(P)` answers `:holds` from a retained witness, and `<>[]P`, `[]<>P` and
+  `P ~> Q` need a lasso a recorded trace never has. Making `always` `:inconclusive` on
+  truncation — as the work item asked — would discard a sound refutation, which is the
+  honesty rule pointed the wrong way; `spec/05` now says so.
+
 - **A temporal formula outside §5.1's fragment is refused at compile time** (#277, for #177).
   `spec/02` promised "a **compile error** naming the unsupported operator" and that "every
   rule here is enforced at compile time"; the fragment's *nesting* bound was enforced

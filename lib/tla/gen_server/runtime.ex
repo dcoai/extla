@@ -29,6 +29,12 @@ defmodule TLA.GenServer.Runtime do
 
   @context_key {__MODULE__, :context}
   @trace_key {__MODULE__, :trace}
+
+  # What the buffer has thrown away. Kept beside the trace rather than derived from it,
+  # because a truncated list is indistinguishable from a short one — which is the whole
+  # defect: a behaviour that began 1,200 transitions ago looked exactly like one that began
+  # at the oldest state still held (#278).
+  @dropped_key {__MODULE__, :dropped}
   @default_trace_buffer 1000
 
   @doc """
@@ -230,12 +236,30 @@ defmodule TLA.GenServer.Runtime do
     trace = Process.get(@trace_key, [])
     trace = if trace == [], do: [pre], else: trace
 
-    Process.put(@trace_key, bound([post | trace]))
+    {kept, dropped} = bound([post | trace])
+
+    Process.put(@trace_key, kept)
+    if dropped > 0, do: Process.put(@dropped_key, Process.get(@dropped_key, 0) + dropped)
     :ok
   end
 
-  @doc "The behaviour recorded by THIS process, oldest state first."
-  def trace, do: @trace_key |> Process.get([]) |> Enum.reverse()
+  @doc """
+  The behaviour recorded by THIS process: `%{states: [...], dropped: n}`, oldest state
+  first.
+
+  **`dropped` is part of the value because the states alone cannot carry it.** This
+  returned a bare list until #278, and `check_temporal_properties/2` read its head as "the
+  first state of the behaviour" — true until the buffer dropped it, after which a bare
+  predicate was settled against an arbitrary mid-behaviour state. A server that had taken
+  1,200 transitions reported `n == 0` **violated** when the behaviour did start at zero:
+  not a missing verdict, the opposite one, as a settled fact.
+  """
+  def trace do
+    %{
+      states: @trace_key |> Process.get([]) |> Enum.reverse(),
+      dropped: Process.get(@dropped_key, 0)
+    }
+  end
 
   @doc """
   Retrieve another process's accumulated behaviour trace.
@@ -270,12 +294,28 @@ defmodule TLA.GenServer.Runtime do
   have repeated that cycle forever — so the properties that need one are `:inconclusive`
   by construction rather than by accident.
   """
-  def check_temporal_properties(spec_module, behavior) do
+  def check_temporal_properties(spec_module, %{states: _, dropped: _} = behavior) do
     %{spec: spec, constants: constants} = context(spec_module)
 
     Map.new(spec.temporals, fn temporal ->
       {temporal.name, verdict(temporal.formula.(constants), behavior, constants)}
     end)
+  end
+
+  # A bare list is REFUSED rather than read as a complete behaviour. `TLA.Conformance`
+  # already makes this argument about its own `status:` — "required rather than optional:
+  # only a complete run can be audited this way, and a caller who has not thought about that
+  # is a caller about to get a false finding" — and it is the same question here. Defaulting
+  # to `dropped: 0` would restore exactly the bug: every existing caller would keep compiling
+  # and the truncated one would keep lying.
+  def check_temporal_properties(_spec_module, behavior) when is_list(behavior) do
+    raise ArgumentError,
+          "a behaviour is `%{states: [...], dropped: n}`, not a bare list. `dropped` is " <>
+            "how many states the trace buffer threw away, and without it a bare predicate " <>
+            "cannot tell the behaviour's first state from the oldest one still held. " <>
+            "`TLA.GenServer.Runtime.trace/0` and `get_trace/1` return the right shape; a " <>
+            "behaviour assembled by the caller, from a simulation or a counterexample, " <>
+            "dropped nothing and says so: `%{states: behaviour, dropped: 0}`."
   end
 
   # ── The formula fragment (02-dsl-semantics.md §5.1) ─────────────────────────
@@ -287,24 +327,39 @@ defmodule TLA.GenServer.Runtime do
     |> combine()
   end
 
+  # Every shape below reads the states alone, and a dropped PREFIX cannot falsify any of
+  # them. Without a lasso — which a real trace never has — `always` answers `:violated` or
+  # `:inconclusive` and `eventually` answers `:holds` or `:inconclusive`; each settled
+  # verdict rests on a state that is still in hand and really did occur, so it is as true of
+  # the whole behaviour as of the suffix. `<>[]`, `[]<>` and `~>` need the lasso and are
+  # `:inconclusive` either way. Answering `:inconclusive` for a truncated `always(P)` whose
+  # P is false in a retained state would DISCARD a sound refutation, which is the honesty
+  # rule pointed the wrong way.
   defp verdict({:always, {:eventually, {:predicate, p}}}, behavior, _constants),
-    do: Temporal.always_eventually(behavior, p)
+    do: Temporal.always_eventually(behavior.states, p)
 
   defp verdict({:eventually, {:always, {:predicate, p}}}, behavior, _constants),
-    do: Temporal.eventually_always(behavior, p)
+    do: Temporal.eventually_always(behavior.states, p)
 
   defp verdict({:always, {:predicate, p}}, behavior, _constants),
-    do: Temporal.always(behavior, p)
+    do: Temporal.always(behavior.states, p)
 
   defp verdict({:eventually, {:predicate, p}}, behavior, _constants),
-    do: Temporal.eventually(behavior, p)
+    do: Temporal.eventually(behavior.states, p)
 
-  defp verdict({:leads_to, p, q}, behavior, _constants), do: Temporal.leads_to(behavior, p, q)
+  defp verdict({:leads_to, p, q}, behavior, _constants),
+    do: Temporal.leads_to(behavior.states, p, q)
 
-  defp verdict({:predicate, p}, [first | _], _constants),
+  # The one shape whose SUBJECT is the behaviour's first state, and therefore the one a
+  # dropped prefix takes away. `05-layer3-conformance.md`'s honesty rule applies to what a
+  # trace cannot settle, and a trace missing its own beginning cannot settle this.
+  defp verdict({:predicate, p}, %{states: [first | _], dropped: 0}, _constants),
     do: if(p.(first), do: :holds, else: :violated)
 
-  defp verdict({:predicate, _p}, [], _constants), do: :inconclusive
+  defp verdict({:predicate, _p}, %{dropped: dropped}, _constants) when dropped > 0,
+    do: :inconclusive
+
+  defp verdict({:predicate, _p}, %{states: []}, _constants), do: :inconclusive
 
   # Without this clause the same off-fragment formulas that raised in the model checker died
   # HERE with a `FunctionClauseError` printing three closures and no property name, under
@@ -449,8 +504,11 @@ defmodule TLA.GenServer.Runtime do
     end
   end
 
+  # `{kept, dropped}`, because the caller cannot work out the second from the first.
   defp bound(trace) do
     limit = Application.get_env(:extla, :trace_buffer, @default_trace_buffer)
-    if length(trace) > limit, do: Enum.take(trace, limit), else: trace
+    over = length(trace) - limit
+
+    if over > 0, do: {Enum.take(trace, limit), over}, else: {trace, 0}
   end
 end
