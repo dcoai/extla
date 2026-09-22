@@ -370,7 +370,12 @@ defmodule TLA.Spec.Compiled do
   @type invariant_def :: %{
     name: atom(),
     description: String.t(),
-    predicate: (constants(), TLA.State.t() -> boolean())
+    predicate: (constants(), TLA.State.t() -> boolean()),
+
+    # The near-miss probe, derived from a top-level `or` in the invariant's own
+    # body (§Coverage and Vacuity) — nil where none can be derived, which is
+    # honest rather than absent. The whole near-miss column runs on this.
+    near_miss: (constants(), TLA.State.t() -> boolean()) | nil
   }
 
   @type action_property_def :: %{
@@ -404,7 +409,6 @@ defmodule TLA.Spec.Compiled do
   @doc """
   Extract the compiled spec from a module.
   """
-  @spec from_module(module()) :: t()
   def from_module(module)
 end
 ```
@@ -480,8 +484,25 @@ defmodule TLA.ModelChecker do
     symmetry: [atom()] | nil,          # symmetric CONSTANT names (see §Symmetry)
     verify_symmetry: boolean(),        # also run unreduced and compare (see §Symmetry)
     state_constraint: (TLA.State.t() -> boolean()) | nil, # see §State constraints
-    fingerprint_bits: 64 | 128         # state identity width (default: 64)
+    fingerprint_bits: 64 | 128,        # state identity width (default: 64)
+
+    # Build the liveness graph -- the edge table and the ENABLED bits -- without
+    # checking anything with it. `check_liveness:` implies it; alone it is for
+    # measuring and testing the structure.
+    liveness_graph: boolean(),
+
+    # Per-declaration cost in reductions (§Profiling). Off by default and free
+    # when off: the closures are wrapped only when it is asked for.
+    profile: boolean(),
+
+    # Which of the spec's declarations to check, the way a TLC `.cfg` selects
+    # them. `:all` by default; the differential corpus uses these to reproduce
+    # TLC's per-invariant reports from one spec.
+    invariants: :all | [atom()],
+    action_properties: :all | [atom()],
+    temporals: :all | [atom()]
   }
+end
 ```
 
 #### The CLI infers `check_liveness`; the API does not
@@ -511,18 +532,37 @@ went unmentioned in a green result. A spec with no temporal property gets no suc
 it was not deprived of a check it never asked for.
 
 ```elixir
-
+defmodule TLA.ModelChecker do
   @type result :: %{
-    status: :ok | :violation | :max_states_reached | :constrained | :error,
+    # `:deadlock` rather than `:error`: a reachable state with no successors that
+    # no `terminal` admits is a finding about the SPEC, and the run that found it
+    # completed. There is no status for a run that failed — a spec that cannot be
+    # checked raises, and `mix tla.check` turns that into its own JSON status
+    # (`unsound_symmetry`), which is the task's vocabulary and not this one's.
+    status: :ok | :violation | :max_states_reached | :constrained | :deadlock,
     states_found: non_neg_integer(),
     distinct_states: non_neg_integer(),
     transitions: non_neg_integer(),
+
+    # The longest shortest-path from an initial state: the number TLC reports as
+    # a counterexample's length, and what the differential corpus compares.
+    diameter: non_neg_integer(),
+
+    # Whether any reachable state was stuck and unadmitted. Separate from
+    # `status`, because a run can find a deadlock AND an invariant violation, and
+    # the status reports the violation.
+    deadlock: boolean(),
     duration_ms: non_neg_integer(),
     violation: TLA.Trace.t() | nil,
     warnings: [String.t()],
 
     # What the run actually exercised (see §Coverage and Vacuity).
     coverage: TLA.Coverage.t(),
+
+    # Per-declaration cost in reductions, or nil when `profile:` was not asked
+    # for — the closures are wrapped only then, so an unprofiled run calls
+    # exactly the functions `TLA.Spec.Compiled` holds.
+    profile: TLA.Profile.t() | nil,
 
     # Soundness margin: expected states lost to fingerprint collisions at the
     # configured width, by the birthday bound. Reported, never assumed.
@@ -550,28 +590,24 @@ it was not deprived of a check it never asked for.
   out of the example anyway: this one asks for `check_liveness`, which is the
   one thing `workers:` is refused alongside.
   """
-  @spec run(module(), config()) :: result()
   def run(spec_module, config)
 
   @doc """
   Run only safety checking (invariants + action properties).
   Faster than full check — use for rapid iteration.
   """
-  @spec check_safety(module(), config()) :: result()
   def check_safety(spec_module, config)
-
-  @doc """
-  Run only liveness checking (temporal properties).
-  Requires the full state graph to be built first.
-  """
-  @spec check_liveness(module(), config()) :: result()
-  def check_liveness(spec_module, config)
 
   @doc """
   Run the model checker and return the full state graph.
   Useful for visualization and debugging.
   """
-  @spec explore(module(), config()) :: {result(), TLA.StateGraph.t()}
+  @doc """
+  Run the checker and return `{result(), TLA.StateGraph.t()}`.
+
+  The caller owns the graph, and its ETS tables with it: `run/2` is this with the
+  graph dropped, and it releases them.
+  """
   def explore(spec_module, config)
 end
 ```
@@ -649,14 +685,45 @@ defmodule TLA.StateGraph do
   @type node_record :: %{
     parent: state_id() | nil,          # nil for an initial state
     action: atom() | nil,
-    params: map() | nil
+    params: map() | nil,
+
+    # WHICH `init` block produced this state, and nil for every non-initial one.
+    # Several `init` blocks are disjuncted (02-dsl-semantics.md), so replay has
+    # to know which to run for the root of a path.
+    init_index: non_neg_integer() | nil,
+
+    # The BFS level: 1 for an initial state, one more than its parent otherwise.
+    # `diameter` is the maximum of these, and it is the number TLC reports as a
+    # counterexample's length.
+    depth: pos_integer()
   }
 
   @type edge :: {action :: atom(), params :: map(), successor :: state_id()}
 
   @type t :: %__MODULE__{
+    # Replay needs these: the graph retains no states (D-5), so regenerating one
+    # means running `init` and then each recorded action, which cannot be done
+    # from the identifiers alone.
+    spec: TLA.Spec.Compiled.t(),
+    constants: map(),
+
+    # The width a state is fingerprinted at, and the permutations it is
+    # canonicalized under before that — present when `symmetry:` was declared,
+    # nil otherwise. Two symmetric states are one state exactly when this is set.
+    fingerprint_bits: 64 | 128,
+    symmetry: [TLA.Symmetry.mapping()] | nil,
+
     nodes: %{state_id() => node_record()},        # ETS-backed; see 06-architecture.md
     fingerprints: %{TLA.Fingerprint.t() => state_id()},
+
+    # The longest `depth` any node carries: what `result().diameter` reports and
+    # what the differential corpus compares against TLC.
+    diameter: non_neg_integer(),
+
+    # The id counter, shared across workers: a `:atomics` reference rather than a
+    # struct field, because under `workers:` several processes register states at
+    # once and an id has to be unique across all of them (D-27).
+    ids: :atomics.atomics_ref(),
     initial_states: MapSet.t(state_id()),
     deadlocked: MapSet.t(state_id()),             # successor-less, no `terminal` admits it
     terminal: MapSet.t(state_id()),               # successor-less, admitted by a `terminal`
@@ -673,15 +740,12 @@ defmodule TLA.StateGraph do
   Register a state by fingerprint, returning its ID and whether it is new.
   The state itself is not retained.
   """
-  @spec add_state(t(), TLA.State.t(), parent :: state_id() | nil, atom(), map()) ::
-    {t(), state_id(), :new | :existing}
   def add_state(graph, state, parent, action, params)
 
   @doc """
   Record a state's out-edges and enabled bits. Called once per expanded state
   when the liveness graph is being built; a no-op otherwise.
   """
-  @spec add_edges(t(), state_id(), [edge()], enabled :: bitstring()) :: t()
   def add_edges(graph, state_id, edges, enabled)
 
   @doc """
@@ -689,26 +753,21 @@ defmodule TLA.StateGraph do
   the graph was built without `check_liveness: true` — there is no cheaper
   source, and guessing from parent pointers would be wrong.
   """
-  @spec successors(t(), state_id()) :: [edge()]
   def successors(graph, state_id)
 
   @doc """
   The action path from an initial state to the target, walked through parent
   pointers. `TLA.Trace` replays this to regenerate the states themselves.
   """
-  @spec path_to(t(), state_id()) :: [{atom(), map()}]
   def path_to(graph, target)
 
   @doc "All strongly connected components of the edge table (liveness graph only)."
-  @spec sccs(t()) :: [[state_id()]]
   def sccs(graph)
 
   @doc "Export as DOT for Graphviz. Regenerates states for node labels."
-  @spec to_dot(t(), keyword()) :: String.t()
   def to_dot(graph, opts \\ [])
 
   @doc "Export as JSON for tooling and editor integration."
-  @spec to_json(t()) :: String.t()
   def to_json(graph)
 end
 ```
@@ -802,27 +861,33 @@ defmodule TLA.ModelChecker.Safety do
   """
 
   @doc """
-  Check all invariants against a single state.
-  Returns {:ok, state} or {:violation, invariant_name, state}.
+  Check the selected invariants against a single state. Answers `:ok`, or
+  `{:violation, name}` naming the first that failed.
+
+  `constants` is an argument rather than read from `spec`, because a run assigns
+  them (§Configuration) and the same compiled spec is checked under several
+  assignments. `only` restricts the check to named invariants the way a TLC
+  `.cfg` selects which of a module's invariants a run checks; `:all` is every
+  declared one.
   """
-  @spec check_invariants(TLA.Spec.Compiled.t(), TLA.State.t()) ::
-    :ok | {:violation, atom(), TLA.State.t()}
-  def check_invariants(spec, state)
+  def check_invariants(spec, constants, state, only \\ :all)
 
   @doc """
-  Check all action properties against a transition.
+  Check the selected action properties against a transition. Answers `:ok`, or
+  `{:violation, name}`.
   """
-  @spec check_action_properties(TLA.Spec.Compiled.t(), TLA.State.t(), TLA.State.t()) ::
-    :ok | {:violation, atom(), TLA.State.t(), TLA.State.t()}
-  def check_action_properties(spec, old_state, new_state)
+  def check_action_properties(spec, constants, old_state, new_state, only \\ :all)
 
   @doc """
-  Classify a state with no enabled action: `:terminal` if a `terminal`
-  predicate admits it (02-dsl-semantics.md §5.3), `:deadlocked` otherwise. A
-  state with an enabled action is `:ok`.
+  Classify a state that produced no successors: `:terminal` if a `terminal`
+  predicate admits it (`02-dsl-semantics.md` §5.3), `:deadlocked` otherwise.
+
+  Named for what it does rather than for the flag that asks for it: a state with
+  successors is never passed here, so there is no `:ok` to report. The names of
+  the terminals that admitted it are available from `admitting_terminals/3`,
+  which is what coverage counts (#202) — this is that with the names discarded.
   """
-  @spec check_deadlock(TLA.Spec.Compiled.t(), TLA.State.t()) :: :ok | :terminal | :deadlocked
-  def check_deadlock(spec, state)
+  def classify_stuck(spec, constants, state)
 end
 ```
 
@@ -876,7 +941,6 @@ defmodule TLA.ModelChecker.Liveness do
   invariants — the differential corpus asks one property at a time, because that
   is how TLC reports them.
   """
-  @spec check(TLA.Spec.Compiled.t(), TLA.StateGraph.t(), :all | [atom()]) :: verdict()
   def check(spec, graph, selected \\ :all)
 end
 ```
@@ -1011,11 +1075,9 @@ defmodule TLA.Coverage do
   # exploration, which is what "computed from the completed state graph" was
   # protecting.
   @doc "A fresh accumulator for a run."
-  @spec init(TLA.Spec.Compiled.t(), constants(), [invariant_def()]) :: t()
   def init(spec, constants, invariants)
 
   @doc "Finish the accumulator into the report."
-  @spec finalize(t(), :none | :state_constraint | :max_states | :violation) :: t()
   def finalize(coverage, bounded_by)
 
   @doc """
@@ -1023,7 +1085,6 @@ defmodule TLA.Coverage do
   never-enabled actions and vacuous properties, which are warnings by default
   and errors under `--strict-coverage`.
   """
-  @spec format(t()) :: String.t()
   def format(coverage)
 end
 ```
@@ -1066,12 +1127,6 @@ about the checker, and "`quorum_agrees` costs 2,400 reductions each of 58,359 ti
 about the spec in front of them.
 
 ```elixir
-@spec init(TLA.Spec.Compiled.t()) :: t()
-@spec instrument(TLA.Spec.Compiled.t()) :: TLA.Spec.Compiled.t()
-@spec collect(t()) :: t()
-@spec merge(t(), t()) :: t()
-@spec finalize(t(), non_neg_integer()) :: t()
-@spec format(t(), keyword()) :: String.t()
 ```
 
 Enabled by `profile: true` (`mix tla.check --profile`) and **off by default**: `instrument/1`
@@ -1211,40 +1266,51 @@ defmodule TLA.Trace do
     message: String.t(),
     states: [TLA.State.t()],
     actions: [atom()],               # action taken at each step
+
+    # The parameter binding of each action, one per action. Without it a reader
+    # cannot tell which of |accounts|^2 transitions the trace took, which is most
+    # of what a counterexample is for — and this file's own example output prints
+    # `begin_transfer(from: alice, to: bob, amount: 3)`.
+    bindings: [map()],
     length: non_neg_integer()        # the number of STATES; a lasso's
                                      # splice shares the cycle head once
   }
 
+  # `cycle` is nil where a single state refutes the property: `pred` and
+  # `always(pred)` are settled by one state, and printing an invented cycle after
+  # it would suggest the reason lay somewhere it does not. A cycle whose actions
+  # are empty is a `terminal` stuttering forever (02-dsl-semantics.md §5.3).
   @type lasso :: %{
     prefix: t(),
-    cycle: t()
+    cycle: t() | nil
   }
 
   @doc "Generate the shortest trace from an initial state to the target."
-  @spec generate(TLA.StateGraph.t(), TLA.StateGraph.state_id()) :: t()
   def generate(graph, target_state_id)
 
-  @doc "Generate a lasso trace for a liveness violation."
-  @spec generate_lasso(TLA.StateGraph.t(), [TLA.StateGraph.state_id()]) :: lasso()
-  def generate_lasso(graph, scc)
+  # A lasso is BUILT BY THE LIVENESS CHECKER, not by a public function here.
+  #
+  # `TLA.ModelChecker.Liveness` has the witness — which property, which instance
+  # binding, which cycle, and the steps that reach it — and a lasso whose prefix
+  # is a `Trace` and whose cycle is another is assembled there from
+  # `replay/4` and `from/4` below. A `generate_lasso(graph, scc)` here would have
+  # to rediscover the witness from the SCC alone, which is the search's answer
+  # and not a fact about the graph.
 
   @doc """
   Pretty-print a trace for terminal output.
   Shows each state with changed variables highlighted.
   """
-  @spec format(t() | lasso()) :: String.t()
   def format(trace)
 
   @doc """
   Export trace as a sequence of state diffs (for programmatic consumption).
   """
-  @spec to_diffs(t()) :: [%{action: atom(), changed: map(), full_state: map()}]
   def to_diffs(trace)
 
   @doc """
   Evaluate named expressions at every state, as a table.
   """
-  @spec explore(t() | lasso(), keyword((TLA.State.t() -> term())), keyword()) :: String.t()
   def explore(trace_or_lasso, expressions, opts \\ [])
 end
 ```
@@ -1366,16 +1432,24 @@ defmodule TLA.ModelChecker.Parallel do
   @doc """
   Run parallel BFS exploration.
 
-  Architecture:
-  - 1 coordinator process manages the frontier queue
-  - N worker processes pull states, compute successors, check safety
-  - State graph stored in ETS (concurrent read/write)
-  - Fingerprint table in ETS for O(1) duplicate detection
-  - Workers report violations immediately; coordinator halts all workers
+  Architecture (D-27, and `06-architecture.md` §Concurrency):
+  - level-synchronous BFS: one whole BFS level per round, and no worker starts
+    level k+1 until every worker has finished level k
+  - the coordinator cuts each level into `workers * 8` batches and pushes them;
+    work SHARING, not stealing, so the only structure two processes touch at
+    once is ETS
+  - workers register their own states, which is where fingerprinting and the §6
+    term check happen — 77% of the work on `raft`
+  - a violation anywhere in a level ends the level: every state in it has the
+    same depth, so no worker still running could report a shorter counterexample
+
+  It takes and returns the SEARCH — the same accumulator the single-threaded
+  search carries, so `check_temporals/1` and `finish/3` cannot tell which
+  produced the result they are given. A signature taking a spec and a config
+  would make this an entry point rather than a strategy, and `run/2` would then
+  have two.
   """
-  @spec explore(TLA.Spec.Compiled.t(), TLA.ModelChecker.config()) ::
-    {TLA.ModelChecker.result(), TLA.StateGraph.t()}
-  def explore(spec, config)
+  def explore(run)
 end
 ```
 

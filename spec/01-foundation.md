@@ -38,45 +38,38 @@ end
 @doc """
 Create a new state from a keyword list or map of variable assignments.
 """
-@spec new(Enumerable.t()) :: t()
 def new(assignments)
 
 @doc """
 Return the value of a variable in the given state.
 """
-@spec get(t(), variable_name()) :: value()
 def get(state, var)
 
 @doc """
 Return a new state with the given variable updated.
 Analogous to TLA+ primed variable assignment: x' = value.
 """
-@spec prime(t(), variable_name(), value()) :: t()
 def prime(state, var, value)
 
 @doc """
 Return a new state with multiple variables updated.
 """
-@spec prime_many(t(), %{variable_name() => value()}) :: t()
 def prime_many(state, assignments)
 
 @doc """
 Check if two states are identical (stuttering step).
 """
-@spec stuttering?(step()) :: boolean()
 def stuttering?({pre, post})
 
 @doc """
 Return the set of variables that changed between states.
 """
-@spec changed_vars(step()) :: MapSet.t(variable_name())
 def changed_vars({pre, post})
 
 @doc """
 Assert that specified variables did NOT change between states.
 Analogous to TLA+ UNCHANGED <<x, y, z>>.
 """
-@spec unchanged?(step(), [variable_name()]) :: boolean()
 def unchanged?({pre, post}, vars)
 
 @doc """
@@ -84,7 +77,6 @@ Assert that every value in the state is deterministically serializable, per
 `02-dsl-semantics.md` §6. Returns the state; raises `TLA.State.InvalidTermError`
 naming the variable and the position inside it.
 """
-@spec validate!(t()) :: t() | no_return()
 def validate!(state)
 ```
 
@@ -154,31 +146,24 @@ defmodule TLA.Temporal do
   @type lasso_start :: non_neg_integer() | nil
 
   @doc "[]P — P holds in every state. Refutable by any trace; established only by a lasso."
-  @spec always(behavior(), predicate(), lasso_start()) :: verdict()
   def always(behavior, predicate, lasso_start \\ nil)
 
   @doc "<>P — P holds in at least one state. The mirror of always/3."
-  @spec eventually(behavior(), predicate(), lasso_start()) :: verdict()
   def eventually(behavior, predicate, lasso_start \\ nil)
 
   @doc "<>[]P — decided by the cycle alone: nothing outside it recurs."
-  @spec eventually_always(behavior(), predicate(), lasso_start()) :: verdict()
   def eventually_always(behavior, predicate, lasso_start \\ nil)
 
   @doc "[]<>P — whether P occurs somewhere in the cycle."
-  @spec always_eventually(behavior(), predicate(), lasso_start()) :: verdict()
   def always_eventually(behavior, predicate, lasso_start \\ nil)
 
   @doc "P ~> Q — whenever P holds, Q holds then or later."
-  @spec leads_to(behavior(), predicate(), predicate(), lasso_start()) :: verdict()
   def leads_to(behavior, p, q, lasso_start \\ nil)
 
   @doc "[][A]_v — every step satisfies A or leaves `vars` alone."
-  @spec box_action(behavior(), action_predicate(), [atom()], lasso_start()) :: verdict()
   def box_action(behavior, action, vars, lasso_start \\ nil)
 
   @doc "<><A>_v — some step satisfies A and changes something in `vars`."
-  @spec diamond_action(behavior(), action_predicate(), [atom()], lasso_start()) :: verdict()
   def diamond_action(behavior, action, vars, lasso_start \\ nil)
 
   @doc """
@@ -187,11 +172,9 @@ defmodule TLA.Temporal do
   constraint is most often satisfied by, and would give a cycle of one state no
   steps at all.
   """
-  @spec steps(behavior(), lasso_start()) :: [TLA.State.step()]
   def steps(behavior, lasso_start \\ nil)
 
   @doc "The states that recur forever: the cycle of a lasso, or nil without one."
-  @spec cycle(behavior(), lasso_start()) :: behavior() | nil
   def cycle(behavior, lasso_start)
 
   @doc """
@@ -209,15 +192,12 @@ defmodule TLA.Temporal do
   `binding` restricts the check to one binding of the leading params, for
   per-binding fairness (02-dsl-semantics.md 5.2); `%{}` means any binding.
   """
-  @spec enabled?(TLA.State.t(), TLA.Spec.Compiled.action_def(), constants :: map(), binding :: map()) :: boolean()
   def enabled?(state, action, constants, binding \\ %{})
 
   @doc "The same question against bindings already computed."
-  @spec enabled_among?([map()], map()) :: boolean()
   def enabled_among?(enabled_bindings, binding)
 
   @doc "Whether a full binding agrees with a partial one everywhere the partial one speaks."
-  @spec extends?(map(), map()) :: boolean()
   def extends?(full, partial)
 end
 ```
@@ -244,7 +224,6 @@ defmodule TLA.Temporal.Fairness do
   ranges over (02-dsl-semantics.md 5.2). The order is the bit order of
   `TLA.StateGraph`'s enabled bitstrings, so it has to be deterministic.
   """
-  @spec expand(TLA.Spec.Compiled.t(), map(), TLA.State.t()) :: [constraint()]
   def expand(spec, constants, state)
 
   @doc """
@@ -254,12 +233,9 @@ defmodule TLA.Temporal.Fairness do
   of states, true when some binding the constraint permits carries the first to the
   second.
   """
-  @spec constraint_predicates(TLA.Spec.Compiled.t(), map(), constraint()) ::
-    {TLA.Temporal.action_predicate(), TLA.Temporal.predicate()}
   def constraint_predicates(spec, constants, constraint)
 
   @doc "How a constraint reads, for a message: SF(acquire_lock, p: :p1) or WF(timeout)."
-  @spec describe(constraint()) :: String.t()
   def describe(constraint)
 
   @doc """
@@ -273,9 +249,6 @@ defmodule TLA.Temporal.Fairness do
   occurs INSIDE it". Those are the conditions `TLA.ModelChecker.Liveness` reads off a
   strongly connected component, arrived at from the other direction.
   """
-  @spec weak_fairness(TLA.Temporal.behavior(), TLA.Temporal.action_predicate(),
-                      TLA.Temporal.predicate(), [atom()], TLA.Temporal.lasso_start()) ::
-    TLA.Temporal.verdict()
   def weak_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
 
   @doc """
@@ -288,9 +261,6 @@ defmodule TLA.Temporal.Fairness do
   quantifier is the whole distance between the two, and it is why `no_starvation`
   needs the strong form.
   """
-  @spec strong_fairness(TLA.Temporal.behavior(), TLA.Temporal.action_predicate(),
-                        TLA.Temporal.predicate(), [atom()], TLA.Temporal.lasso_start()) ::
-    TLA.Temporal.verdict()
   def strong_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
 end
 ```
@@ -320,7 +290,6 @@ defmodule TLA.Set do
   TLA+ equivalent: SUBSET S
   Warning: exponential in |S|. Use with small sets only.
   """
-  @spec powerset(MapSet.t()) :: MapSet.t(MapSet.t())
   def powerset(set)
 
   @doc """
@@ -328,7 +297,6 @@ defmodule TLA.Set do
   Returns set of all tuples {a, b} where a ∈ S1 and b ∈ S2.
   TLA+ equivalent: S1 \\X S2
   """
-  @spec cross(MapSet.t(), MapSet.t()) :: MapSet.t(tuple())
   def cross(s1, s2)
 
   @doc """
@@ -339,28 +307,24 @@ defmodule TLA.Set do
   That is the answer the DSL needs when an action has no parameters: one binding,
   binding nothing. The empty set would mean the action can never fire.
   """
-  @spec cross_many([MapSet.t()]) :: MapSet.t(tuple())
   def cross_many(sets)
 
   @doc """
   UNION S — distributed union. Flattens a set of sets.
   TLA+ equivalent: UNION S
   """
-  @spec distributed_union(MapSet.t(MapSet.t())) :: MapSet.t()
   def distributed_union(set_of_sets)
 
   @doc """
   Set mapping: {f(x) : x ∈ S}
   TLA+ equivalent: {expr : x \\in S}
   """
-  @spec map(MapSet.t(), (term() -> term())) :: MapSet.t()
   def map(set, fun)
 
   @doc """
   Set filtering: {x ∈ S : P(x)}
   TLA+ equivalent: {x \\in S : predicate}
   """
-  @spec filter(MapSet.t(), (term() -> boolean())) :: MapSet.t()
   def filter(set, predicate)
 
   @doc """
@@ -377,28 +341,24 @@ defmodule TLA.Set do
   returning nil would put an unspecified value into a state variable.
   TLA+ equivalent: CHOOSE x \\in S : P(x)
   """
-  @spec choose(MapSet.t(), (term() -> boolean())) :: term()
   def choose(set, predicate \\ fn _ -> true end)
 
   @doc """
   Check if predicate holds for all elements.
   TLA+ equivalent: \\A x \\in S : P(x)
   """
-  @spec for_all?(MapSet.t(), (term() -> boolean())) :: boolean()
   def for_all?(set, predicate)
 
   @doc """
   Check if predicate holds for at least one element.
   TLA+ equivalent: \\E x \\in S : P(x)
   """
-  @spec exists?(MapSet.t(), (term() -> boolean())) :: boolean()
   def exists?(set, predicate)
 
   @doc """
   Integer range as a MapSet.
   TLA+ equivalent: a..b
   """
-  @spec range(integer(), integer()) :: MapSet.t(integer())
   def range(a, b)
 end
 ```
@@ -420,7 +380,6 @@ defmodule TLA.Function do
   Construct a function: [x ∈ S ↦ expr(x)]
   TLA+ equivalent: [x \\in S |-> expr]
   """
-  @spec construct(MapSet.t(), (term() -> term())) :: map()
   def construct(domain, mapping)
 
   @doc """
@@ -434,14 +393,12 @@ defmodule TLA.Function do
   empty one; an empty RANGE with a non-empty domain gives none, since no total
   function into an empty set exists.
   """
-  @spec function_set(MapSet.t(), MapSet.t()) :: MapSet.t(map())
   def function_set(domain, range)
 
   @doc """
   DOMAIN f — the domain of a function.
   TLA+ equivalent: DOMAIN f
   """
-  @spec domain(map()) :: MapSet.t()
   def domain(f)
 
   @doc """
@@ -453,14 +410,12 @@ defmodule TLA.Function do
   reachable behavior can produce — while still fingerprinting it as if it were one.
   Same for except_with/3.
   """
-  @spec except(map(), [{term(), term()}]) :: map()
   def except(f, updates)
 
   @doc """
   EXCEPT with self-reference — update using the old value.
   TLA+ equivalent: [f EXCEPT ![a] = @ + 1]
   """
-  @spec except_with(map(), term(), (term() -> term())) :: map()
   def except_with(f, key, update_fn)
 
   @doc """
@@ -468,7 +423,6 @@ defmodule TLA.Function do
   drawn from respective sets.
   TLA+ equivalent: [field1: S1, field2: S2]
   """
-  @spec record_set(keyword(MapSet.t())) :: MapSet.t(map())
   def record_set(field_specs)
 end
 ```
@@ -504,13 +458,11 @@ defmodule TLA.Fingerprint do
   versions, so two equal states could encode differently and be explored twice — or,
   worse, a stored fingerprint could stop matching after an OTP upgrade.
   """
-  @spec canonical(TLA.State.t()) :: binary()
   def canonical(state), do: :erlang.term_to_binary(state, [:deterministic])
 
   @doc """
   Fingerprint a state. 64 bits by default; `bits: 128` for very large runs.
   """
-  @spec compute(TLA.State.t(), keyword()) :: t()
   def compute(state, opts \\ [])
 
   @doc """
@@ -518,7 +470,6 @@ defmodule TLA.Fingerprint do
   bound: n^2 / 2^(bits+1). Reported in every `TLA.ModelChecker.result()` so a run's
   soundness margin is visible rather than assumed.
   """
-  @spec collision_estimate(non_neg_integer(), pos_integer()) :: float()
   def collision_estimate(distinct_states, bits)
 end
 ```
@@ -620,7 +571,6 @@ defmodule TLA.Config do
   Maximum states to explore during model checking before aborting.
   Prevents runaway exploration.
   """
-  @spec max_states() :: pos_integer()
   def max_states do
     Application.get_env(:extla, :max_states, 1_000_000)
   end
@@ -628,7 +578,6 @@ defmodule TLA.Config do
   @doc """
   Number of workers for parallel state exploration.
   """
-  @spec workers() :: pos_integer()
   def workers do
     Application.get_env(:extla, :workers, System.schedulers_online())
   end

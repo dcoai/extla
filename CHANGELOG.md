@@ -14,6 +14,27 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Fixed
+
+- **The specification's API blocks are held to `API_SURFACE.md`** (#164, closes #153). `spec/01–05`
+  published **seventeen signatures and seven type shapes the code does not have** — a reader
+  coding to them got `UndefinedFunctionError` on the first call — and nothing had compared the
+  two, because until #271 there was no side derived from the code to compare against.
+  `test/docs/spec_api_test.exs` is the comparison, in four layers: every `defmodule` fence must
+  parse (two did not, and three findings hid in them); every head and arity must be a row in the
+  golden; every record type's keys must match; and **no `@spec` may appear in the specification
+  at all**, which is #68's decision about `lib/` applied to the document that had the same
+  problem — 116 of them, wrong in seventeen places. `result()` gains `:deadlock`, `diameter` and
+  `profile`, and deliberately not `:unsound_symmetry`, which is `mix tla.check`'s JSON status
+  rather than one `run/2` returns.
+
+  Writing the gate first, and running it red before correcting anything, is what made the rest
+  visible: **layer 2 passed vacuously on every shape finding it exists for**, because its row
+  pattern let the shape column swallow the version cell. The anti-vacuity test now counts parsed
+  key sets rather than matched rows. It also surfaced two defects in the golden's own scanner —
+  a `def` inside a compile-time conditional was never read, and a wide union was rendered with
+  newlines inside a table cell, breaking the row.
+
 ### Added
 
 - **`PACKAGE_SURFACE.md`, and the published docs stop advertising what the package omits**

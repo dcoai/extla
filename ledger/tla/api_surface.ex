@@ -92,6 +92,7 @@ defmodule TLA.ApiSurface do
   defp items(statements, module, path) do
     functions =
       statements
+      |> Enum.flat_map(&conditional_statements/1)
       |> Enum.flat_map(&function_clause/1)
       |> Enum.group_by(fn {kind, name, _arities, _node} -> {kind, name} end)
       |> Enum.map(fn {{kind, name}, clauses} ->
@@ -123,6 +124,26 @@ defmodule TLA.ApiSurface do
 
     functions ++ types
   end
+
+  # A `def` inside a compile-time conditional is still a public head. `TLA.Invariant.Test`
+  # defines `valid_states/3` in both arms of an `if Code.ensure_loaded?(StreamData)` — one
+  # that works and one that raises with an actionable message — so a walk of the module's
+  # top-level statements alone missed a function that ships, and the golden said the module
+  # declared nothing of the sort. Both arms are read; identical heads collapse to one item,
+  # which is what `Enum.group_by/2` below already does for multi-clause functions.
+  defp conditional_statements({conditional, _, args}) when conditional in [:if, :unless] do
+    args
+    |> List.last()
+    |> case do
+      branches when is_list(branches) ->
+        Enum.flat_map(branches, fn {_key, body} -> statements(body) end)
+
+      _other ->
+        []
+    end
+  end
+
+  defp conditional_statements(statement), do: [statement]
 
   @public [:def, :defmacro, :defguard]
 
@@ -306,8 +327,16 @@ defmodule TLA.ApiSurface do
     end
   end
 
-  # A `|` inside a table cell ends the cell; escaped, it renders as itself.
-  defp cell_safe(text), do: String.replace(text, "|", "\\|")
+  # A `|` inside a table cell ends the cell; escaped, it renders as itself. A NEWLINE ends the
+  # row outright, so a wide union — `temporal_formula()`'s five alternatives — was rendered as
+  # five lines, of which a reader (and any parser of this golden) saw one. Collapsed to one
+  # line: a table cell is a line, and a shape too wide to read on one is a shape whose type is
+  # worth naming rather than inlining.
+  defp cell_safe(text) do
+    text
+    |> String.replace("|", "\\|")
+    |> String.replace(~r/\s*\n\s*/, " ")
+  end
 
   @doc "Render the golden."
   def render(groups), do: groups |> golden_spec() |> Surfex.Golden.render()
