@@ -428,29 +428,28 @@ Stating these keeps the scope honest, and each has a better tool already:
 
 ## Dependencies
 
-```elixir
-# mix.exs
-defp deps do
-  [
-    # Required
-    {:stream_data, "~> 1.0", only: [:dev, :test]},
+**The list itself is `PACKAGE_SURFACE.md`**, generated from `mix.exs` by
+`mix tla.package_surface --write` and gated by `surface-drift`. This section carried a copy
+of the `deps` block from the initial commit until #274 — a fence whose first line was the
+comment `# mix.exs`, so it announced itself as a copy — and by then it listed `dialyxir`,
+which #69 removed, omitted `surfex`, which #64 added, and pinned `ex_doc` three minor
+versions behind. A copy of a file that changes on its own is the second-copy failure #73 and
+#80 diagnosed, and the fix is the same one the verification ledger uses: derive it, and gate
+the derivation.
 
-    # Optional — enhanced visualization, and observability
-    {:jason, "~> 1.4", optional: true},     # JSON export for state graphs
-    {:telemetry, "~> 1.0", optional: true}, # Layer 1 violation events (03 §Telemetry)
-
-    # Development
-    {:ex_doc, "~> 0.31", only: :dev, runtime: false},
-    {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-    {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
-  ]
-end
-```
+What belongs here is what a list cannot say.
 
 **Zero *required* runtime dependencies.** The core library uses only Elixir/OTP standard
-modules. `stream_data` is dev/test only (for property test generation). The two optional
-ones are absent-tolerant by construction: whether they are present is decided when ExTLA
-itself compiles, so a consumer who takes neither carries no code for either.
+modules. `stream_data` is dev/test only (property-test generation); `surfex` is dev/test only
+and renders the goldens, which is why `ledger/` may depend on it and `lib/` may not. The two
+optional ones — `jason` and `telemetry` — are absent-tolerant by construction: whether they
+are present is decided when ExTLA itself compiles, so a consumer who takes neither carries no
+code for either.
+
+**Dev/test dependencies are not transitive**, which is what makes the split load-bearing
+rather than hygiene: nothing marked `only: [:dev, :test]` reaches anyone who depends on
+ExTLA. That is the answer to #1's objection that consumers would inherit a documentation
+framework.
 
 ---
 

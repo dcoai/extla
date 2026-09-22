@@ -16,6 +16,17 @@ release it merely follows.
 
 ### Added
 
+- **`PACKAGE_SURFACE.md`, and the published docs stop advertising what the package omits**
+  (#274, from #270). `mix docs` runs under `MIX_ENV=dev` because `ex_doc` is a dev dependency,
+  and `elixirc_paths(:dev)` includes `ledger/` — so the published documentation carried
+  **eleven modules** a consumer cannot call, `TLA.Ledger` and `mix tla.coverage` among them.
+  Nobody decided to document the ledger; the docs job's environment did, and the two halves of
+  the promise were checked in two environments that cannot see each other (`consumer-compile`
+  compiles the package and has no `ex_doc`; the docs job builds pages and never reads
+  `files:`). `mix.exs` now filters the docs on the same `files:` list the package is built
+  from, `test/docs/package_docs_test.exs` joins the two, and the golden lists every dependency
+  as declared beside every module and whether it ships.
+
 - **Every compile diagnostic carries a `kind`, and `DIAGNOSTICS.md` lists them** (#273, from
   #270). `02-dsl-semantics.md` §7 tabulates the diagnostics under a preamble promising that a
   spec violating any rule does not compile, and nothing held the table to the code — nothing
@@ -47,6 +58,14 @@ release it merely follows.
   compared against when #153 found seventeen signatures the code does not have.
 
 ### Changed
+
+- **`spec/06-architecture.md` §Dependencies is a link, not a copy** (#274). It carried the
+  `deps` block from the initial commit — a fence whose first line was the comment `# mix.exs`,
+  so it announced itself as a copy — and by then listed `dialyxir`, which #69 removed, omitted
+  `surfex`, which #64 added, and pinned `ex_doc` three minor versions behind. The list is now
+  `PACKAGE_SURFACE.md`; what stays in the section is what a list cannot say, and the two
+  claims that carry weight — zero required runtime dependencies, and dev/test dependencies are
+  not transitive — are pinned by tests rather than trusted.
 
 - **One `surface-drift` job for every golden.** `tla-coverage-drift` is renamed and runs both
   `mix tla.coverage --check` and `mix tla.api_surface --check`; the goldens #270 still owes
