@@ -14,6 +14,20 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Changed
+
+- **The decision log is reopened, and every decision is pinned to a test** (#275, for #176).
+  `spec/08-decisions.md`'s last edit was 2026-08-31; **fifteen decisions were made in the
+  three weeks after it**, in commit messages and moduledocs where nobody looking for the
+  project's reasoning would find them — and one of them contradicted D-18 in the same file
+  that cites it. Four decisions are amended (D-7's tagged delivery, D-10's `allow_incomplete`
+  escape hatch, D-17's refusal to compare a truncated run, D-18's `desc:` surface), five are
+  backfilled as D-28–D-32, and **all thirty-two now carry a `Pinned by:` line** naming the
+  test that would fail if they were reversed — or `nothing — <why>`, because "unguarded by
+  decision" and "unguarded by oversight" read identically in an empty space.
+  `test/docs/spec_decisions_test.exs` holds the two to each other, and `spec/README.md` states
+  the three rules that keep this specification true.
+
 ### Fixed
 
 - **The specification's API blocks are held to `API_SURFACE.md`** (#164, closes #153). `spec/01–05`

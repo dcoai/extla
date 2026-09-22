@@ -84,3 +84,31 @@ ExTLA is not a theorem prover, does not explore process interleavings, does not 
 models from source code, does not generate implementations from specs, and has no
 real-time or probabilistic extensions. Each has a better tool already; see
 `06-architecture.md` §Non-goals and `00-prior-art.md`.
+
+## How this specification stays true
+
+Three rules, each learned from a document that had stopped being true while reading as
+though it were.
+
+**A decision goes in `08-decisions.md`, in the merge request that makes it.** A commit
+whose subject says *rather than*, *instead*, *refuse*, *never* or *one meaning* is
+recording a decision, and the place for it is a new `D-` entry or an amendment to an
+existing one. The log stopped on 2026-08-31 and fifteen decisions were made over the
+following three weeks in commit messages and moduledocs, where nobody looking for the
+project's reasoning would find them — and one of them, #160's option sets, silently
+contradicted D-18. Every decision carries a `**Pinned by:**` line naming the test that
+would fail if it were reversed, or `nothing — <why>`; `test/docs/spec_decisions_test.exs`
+holds the two to each other.
+
+**An enumeration of what the code declares is generated, never written** (D-32). Five
+goldens — `API_SURFACE.md`, `CLI_SURFACE.md`, `DIAGNOSTICS.md`, `PACKAGE_SURFACE.md` and
+`TLA_COVERAGE.md` — are produced from source and byte-compared by the `surface-drift` job.
+A table in `spec/` that lists functions, switches, diagnostics or dependencies either *is*
+one of those or is checked against one. Every hand-kept list this project has had was
+wrong, and none of them announced it.
+
+**A universal claim needs a gate or a qualifier.** "Every rule here is enforced at compile
+time", "every code block on this page is compiled and run", "this section is the single
+source of truth for what is built" — each was written truthfully and each became false as
+the thing it described grew. A sentence with *every* or *always* above a list is a claim
+about the list's completeness: gate it, or say which parts it does not cover.
