@@ -47,7 +47,11 @@ defmodule TLA.Spec.Params do
           {name, generator, kind}
 
         other ->
-          bad!(ctx, nil, "malformed `params:` entry: #{Macro.to_string(other)}",
+          bad!(
+            :malformed_params_entry,
+            ctx,
+            nil,
+            "malformed `params:` entry: #{Macro.to_string(other)}",
             hint: "`params:` is a keyword list, as in `params: [from: ^accounts]`."
           )
       end)
@@ -57,7 +61,11 @@ defmodule TLA.Spec.Params do
   end
 
   def compile!(other, ctx, _constants, _state, _bound) do
-    bad!(ctx, nil, "`params:` must be a keyword list, got: #{Macro.to_string(other)}",
+    bad!(
+      :params_not_a_keyword_list,
+      ctx,
+      nil,
+      "`params:` must be a keyword list, got: #{Macro.to_string(other)}",
       hint: "As in `params: [from: ^accounts, amount: 1..10]`."
     )
   end
@@ -104,7 +112,11 @@ defmodule TLA.Spec.Params do
   end
 
   defp generator!(name, {:fn, meta, clauses}, ctx, _c, _s, _b) when length(clauses) > 1 do
-    bad!(ctx, meta, "the `#{name}` generator has #{length(clauses)} clauses",
+    bad!(
+      :param_generator_clauses,
+      ctx,
+      meta,
+      "the `#{name}` generator has #{length(clauses)} clauses",
       hint:
         "A generator is a single-clause function of the pre-state — `fn s -> … end` — so " <>
           "that it is a total, deterministic function of the state (02-dsl-semantics.md §3)."
@@ -113,6 +125,7 @@ defmodule TLA.Spec.Params do
 
   defp generator!(name, other, ctx, _c, _s, _b) do
     bad!(
+      :param_draws_from_a_non_set,
       ctx,
       meta_of(other),
       "param #{inspect(name)} draws from a non-set: " <>
@@ -131,7 +144,7 @@ defmodule TLA.Spec.Params do
   end
 
   defp bad_arity!(ctx, meta, name, arity) do
-    bad!(ctx, meta, "the `#{name}` generator takes #{arity} arguments",
+    bad!(:param_generator_arity, ctx, meta, "the `#{name}` generator takes #{arity} arguments",
       hint:
         "A generator takes the pre-state, `fn s -> … end`, or the pre-state and the params " <>
           "bound before it, `fn s, %{p: p} -> … end` (02-dsl-semantics.md §3)."
@@ -163,13 +176,14 @@ defmodule TLA.Spec.Params do
     :ok
   end
 
-  defp bad!(ctx, meta, problem, extra) do
+  defp bad!(kind, ctx, meta, problem, extra) do
     CompileError.raise!(
       module: ctx.module,
       declaration: ctx.declaration,
       line: (is_list(meta) && Keyword.get(meta, :line)) || ctx.line,
       problem: problem,
-      hint: Keyword.get(extra, :hint)
+      hint: Keyword.get(extra, :hint),
+      kind: kind
     )
   end
 end

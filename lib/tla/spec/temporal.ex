@@ -29,6 +29,7 @@ defmodule TLA.Spec.Temporal do
   """
   def parse!({:__block__, meta, statements}, ctx) when length(statements) > 1 do
     bad!(
+      :temporal_block_not_one_formula,
       ctx,
       meta,
       "a `temporal` block is a single formula, got #{length(statements)} statements",
@@ -92,7 +93,11 @@ defmodule TLA.Spec.Temporal do
        )
        when is_atom(var) and is_atom(var_ctx) do
     unless quantifiable_set?(set) do
-      bad!(ctx, meta, "a temporal quantifier must range over a constant or a literal list",
+      bad!(
+        :temporal_quantifier_domain,
+        ctx,
+        meta,
+        "a temporal quantifier must range over a constant or a literal list",
         hint:
           "Write `Enum.all?(^processes, fn p -> … end)`. A state-dependent set would make " <>
             "the formula's shape depend on the state, so there would be no fixed set of " <>
@@ -120,7 +125,11 @@ defmodule TLA.Spec.Temporal do
 
   defp formula(other, ctx) do
     if op = unsupported_op(other) do
-      bad!(ctx, meta_of(other), "unsupported temporal operator: #{op}",
+      bad!(
+        :unsupported_temporal_operator,
+        ctx,
+        meta_of(other),
+        "unsupported temporal operator: #{op}",
         hint: """
         The supported fragment (02-dsl-semantics.md §5.1) is:
 
@@ -140,7 +149,11 @@ defmodule TLA.Spec.Temporal do
 
   defp predicate(ast, ctx) do
     if op = unsupported_op(ast) do
-      bad!(ctx, meta_of(ast), "temporal operator #{op} where a state predicate is required",
+      bad!(
+        :temporal_operator_in_state_predicate,
+        ctx,
+        meta_of(ast),
+        "temporal operator #{op} where a state predicate is required",
         hint:
           "The operands of `~>` are state predicates, not formulas " <>
             "(02-dsl-semantics.md §5.1)."
@@ -179,13 +192,14 @@ defmodule TLA.Spec.Temporal do
   defp meta_of({_, meta, _}) when is_list(meta), do: meta
   defp meta_of(_), do: nil
 
-  defp bad!(ctx, meta, problem, extra) do
+  defp bad!(kind, ctx, meta, problem, extra) do
     CompileError.raise!(
       module: ctx.module,
       declaration: ctx.declaration,
       line: (is_list(meta) && Keyword.get(meta, :line)) || ctx.line,
       problem: problem,
-      hint: Keyword.get(extra, :hint)
+      hint: Keyword.get(extra, :hint),
+      kind: kind
     )
   end
 end

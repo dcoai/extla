@@ -236,6 +236,7 @@ defmodule TLA.Spec do
 
       {name, [_ | _] = dupes} ->
         CompileError.raise!(
+          kind: :duplicate_declaration,
           module: module,
           declaration: "#{kind} #{inspect(name)}",
           line: List.last(dupes).line,
@@ -251,6 +252,7 @@ defmodule TLA.Spec do
   # checker would report "0 states, no violations" — a pass, over nothing.
   defp check_has_init!(module, env, [], [_ | _]) do
     CompileError.raise!(
+      kind: :no_init_block,
       module: module,
       declaration: "the spec",
       line: env.line,
@@ -268,6 +270,7 @@ defmodule TLA.Spec do
 
     unless action do
       CompileError.raise!(
+        kind: :unknown_action_in_fairness,
         module: module,
         declaration: "fairness",
         line: line,
@@ -280,6 +283,7 @@ defmodule TLA.Spec do
 
     unless List.starts_with?(param_names, per) do
       CompileError.raise!(
+        kind: :fairness_params_not_a_prefix,
         module: module,
         declaration: "fairness",
         line: line,
@@ -295,6 +299,7 @@ defmodule TLA.Spec do
     Enum.each(per, fn param ->
       if List.keyfind(action.param_sources, param, 0) == {param, :state} do
         CompileError.raise!(
+          kind: :fairness_over_a_state_drawn_param,
           module: module,
           declaration: "fairness",
           line: line,

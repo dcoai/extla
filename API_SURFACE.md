@@ -377,21 +377,21 @@ key whose value is a union of atoms; any other type is shown as written.
 | `assignments!/2` | `:def` | (classified, ctx) | `362130c4` | `lib/tla/spec/block.ex` |
 | `bind_params/2` | `:def` | (names, params_ast) | `83f0ba42` | `lib/tla/spec/block.ex` |
 | `boolean!/3` | `:def` | (body, module, declaration) | `412bb20d` | `lib/tla/spec/block.ex` |
-| `check_no_shadow!/3` | `:def` | (pattern, meta, ctx, binder \\ …) | `8a964a2e` | `lib/tla/spec/block.ex` |
-| `check_no_shadow!/4` | `:def` | (pattern, meta, ctx, binder \\ …) | `8a964a2e` | `lib/tla/spec/block.ex` |
-| `classify!/2` | `:def` | (_, _ctx) | `92716579` | `lib/tla/spec/block.ex` |
+| `check_no_shadow!/3` | `:def` | (pattern, meta, ctx, binder \\ …) | `acf3235a` | `lib/tla/spec/block.ex` |
+| `check_no_shadow!/4` | `:def` | (pattern, meta, ctx, binder \\ …) | `acf3235a` | `lib/tla/spec/block.ex` |
+| `classify!/2` | `:def` | (_, _ctx) | `1a250458` | `lib/tla/spec/block.ex` |
 | `desugar_predicate!/2` | `:def` | (block, ctx) | `3a0bcfd9` | `lib/tla/spec/block.ex` |
 | `guard_body/2` | `:def` | (classified, ctx) | `60aba074` | `lib/tla/spec/block.ex` |
-| `init_body/3` | `:def` | (classified, ctx, declared) | `67335850` | `lib/tla/spec/block.ex` |
+| `init_body/3` | `:def` | (classified, ctx, declared) | `9154abbc` | `lib/tla/spec/block.ex` |
 | `near_miss/1` | `:def` | (desugared) | `e2537b50` | `lib/tla/spec/block.ex` |
-| `reject_assignment!/2` | `:def` | (ast, ctx) | `a8568f44` | `lib/tla/spec/block.ex` |
+| `reject_assignment!/2` | `:def` | (ast, ctx) | `286ec1ca` | `lib/tla/spec/block.ex` |
 | `statements/1` | `:def` | (_) | `6116632e` | `lib/tla/spec/block.ex` |
 | `transition_body/3` | `:def` | (classified, ctx, state_ast) | `f6af7ee8` | `lib/tla/spec/block.ex` |
 ## TLA.Spec.CompileError — 1 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `raise!/1` | `:def` | (opts) | `9b9c3e85` | `lib/tla/spec/compile_error.ex` |
+| `raise!/1` | `:def` | (opts) | `77761716` | `lib/tla/spec/compile_error.ex` |
 ## TLA.Spec.Compiled — 23 items
 
 | Item | Kind | Shape | Version | Locus |
@@ -433,7 +433,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `action_property/3` | `:defmacro` | (name, opts \\ …, block) | `2e9aec71` | `lib/tla/spec/dsl.ex` |
 | `constant/1` | `:defmacro` | (name, opts \\ …) | `b78b6914` | `lib/tla/spec/dsl.ex` |
 | `constant/2` | `:defmacro` | (name, opts \\ …) | `b78b6914` | `lib/tla/spec/dsl.ex` |
-| `fairness/2` | `:defmacro` | (kind, entries) | `53b48b4e` | `lib/tla/spec/dsl.ex` |
+| `fairness/2` | `:defmacro` | (kind, entries) | `fa8b0e26` | `lib/tla/spec/dsl.ex` |
 | `init/1` | `:defmacro` | (opts, block) | `b716ad1b` | `lib/tla/spec/dsl.ex` |
 | `init/2` | `:defmacro` | (opts, block) | `b716ad1b` | `lib/tla/spec/dsl.ex` |
 | `invariant/2` | `:defmacro` | (name, opts \\ …, block) | `e4fdea67` | `lib/tla/spec/dsl.ex` |
@@ -510,7 +510,7 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `compile!/5` | `:def` | (_, _ctx, _constants, _state, _bound) | `7b38262d` | `lib/tla/spec/params.ex` |
+| `compile!/5` | `:def` | (_, _ctx, _constants, _state, _bound) | `17e5caf3` | `lib/tla/spec/params.ex` |
 ## TLA.Spec.PredicateError — 2 items
 
 | Item | Kind | Shape | Version | Locus |
@@ -533,7 +533,7 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `parse!/2` | `:def` | (_, ctx) | `a2d414ed` | `lib/tla/spec/temporal.ex` |
+| `parse!/2` | `:def` | (_, ctx) | `058a7674` | `lib/tla/spec/temporal.ex` |
 ## TLA.Spec.Test — 2 items
 
 | Item | Kind | Shape | Version | Locus |

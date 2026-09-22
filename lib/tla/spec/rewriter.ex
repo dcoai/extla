@@ -69,7 +69,7 @@ defmodule TLA.Spec.Rewriter do
 
   defp walk({:^, meta, [{name, _, var_ctx}]}, ctx) when is_atom(name) and is_atom(var_ctx) do
     unless MapSet.member?(ctx.constants, name) do
-      bad!(ctx, meta, "undeclared constant: ^#{name}",
+      bad!(:undeclared_constant, ctx, meta, "undeclared constant: ^#{name}",
         hint:
           "Constants are declared with `constant :#{name}` before the block that uses them. " <>
             declared_note(ctx.constants)
@@ -135,7 +135,7 @@ defmodule TLA.Spec.Rewriter do
         {name, meta, var_ctx}
 
       MapSet.member?(ctx.constants, name) ->
-        bad!(ctx, meta, "constant #{inspect(name)} referenced without `^`",
+        bad!(:constant_without_pin, ctx, meta, "constant #{inspect(name)} referenced without `^`",
           hint:
             "Write `^#{name}`. A bare name means a state variable and a pinned name means a " <>
               "constant (02-dsl-semantics.md §1.1); without the pin this would read as a " <>
@@ -143,7 +143,7 @@ defmodule TLA.Spec.Rewriter do
         )
 
       true ->
-        bad!(ctx, meta, "undeclared variable: #{name}",
+        bad!(:undeclared_variable, ctx, meta, "undeclared variable: #{name}",
           hint:
             "Declare it with `variable :#{name}`, bind it with `let #{name} = …`, or write " <>
               "`^#{name}` if it is a constant. " <> declared_note(ctx.variables)
@@ -157,7 +157,7 @@ defmodule TLA.Spec.Rewriter do
 
   defp read_variable(name, meta, _var_ctx, %{read: {:reject, builder}} = ctx) do
     {problem, hint} = builder.(name)
-    bad!(ctx, meta, problem, hint: hint)
+    bad!(:variable_not_readable_here, ctx, meta, problem, hint: hint)
   end
 
   @doc """
@@ -252,13 +252,14 @@ defmodule TLA.Spec.Rewriter do
 
   defp line_of(meta, ctx), do: (is_list(meta) && Keyword.get(meta, :line)) || ctx.line || 0
 
-  defp bad!(ctx, meta, problem, extra) do
+  defp bad!(kind, ctx, meta, problem, extra) do
     CompileError.raise!(
       module: ctx.module,
       declaration: ctx.declaration,
       line: (is_list(meta) && Keyword.get(meta, :line)) || ctx.line,
       problem: problem,
-      hint: Keyword.get(extra, :hint)
+      hint: Keyword.get(extra, :hint),
+      kind: kind
     )
   end
 
