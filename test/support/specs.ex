@@ -304,7 +304,10 @@ defmodule TLA.TestSpecs do
       n = n + 1
     end
 
-    temporal :eventually_two do
+    # The one `desc:` in this file, and it is here because this property is REFUTED: the
+    # description has to travel to the counterexample, and a property that holds prints
+    # nothing to carry it (#176).
+    temporal :eventually_two, desc: "the counter reaches two and does not spin forever" do
       eventually(n == 2)
     end
 

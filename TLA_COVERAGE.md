@@ -192,7 +192,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 |---|---|---|---|---|---|---|
 | `advance` | `:action` | `e4623413` | `:model_checked` | `:unstamped` | enabled in 4 | `test/support/specs.ex` |
 | `arrived` | `:terminal` | `0621e388` | `:model_checked` | `:unstamped` | admitted 2 end states | `test/support/specs.ex` |
-| `eventually_two` | `:temporal` | `1f6c393b` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
+| `eventually_two` | `:temporal` | `67eb3167` | `:refuted` | `:unstamped` | REFUTED | `test/support/specs.ex` |
 | `spin` | `:action` | `971901a2` | `:model_checked` | `:unstamped` | enabled in 2 | `test/support/specs.ex` |
 ## TLA.TestSpecs.LetScopes — 1 items · gap 0
 

@@ -389,6 +389,10 @@ defmodule TLA.Spec.Compiled do
   # has a value until a run assigns one.
   @type temporal_def :: %{
     name: atom(),
+    # What `desc:` said the property means. Carried to the refutation message, the
+    # way an invariant's is — a name alone asks the reader of a counterexample to
+    # reconstruct the intent from `:eventually_done` (D-33).
+    description: String.t(),
     formula: (constants() -> temporal_formula()),
     opts: keyword()
   }

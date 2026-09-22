@@ -412,9 +412,9 @@ key whose value is a union of atoms; any other type is shown as written.
 | `resolve_constants/1` | `:def` | (spec) | `cc9ff139` | `lib/tla/spec/compiled.ex` |
 | `state_predicate()` | `:type` | (TLA.State.t() -> boolean()) | `bcfbd5bb` | `lib/tla/spec/compiled.ex` |
 | `t()` | `:type` | module, constants, variables, init, actions, invariants, action_properties, temporals, terminals, fairness | `356a0d6c` | `lib/tla/spec/compiled.ex` |
-| `temporal_def()` | `:type` | name, formula, opts | `f4f709f4` | `lib/tla/spec/compiled.ex` |
+| `temporal_def()` | `:type` | name, description, formula, opts | `1ef129d3` | `lib/tla/spec/compiled.ex` |
 | `temporal_formula()` | `:type` | {:always, temporal_formula()} \| {:eventually, temporal_formula()} \| {:leads_to, state_predicate(), state_predicate()} \| {:predicate, state_predicate()} \| {:for_all, (constants() -> Enumerable.t()), (term() -> temporal_formula())} | `2a9c8fa9` | `lib/tla/spec/compiled.ex` |
-| `temporal_instances/2` | `:def` | (temporal, constants) | `b5f68976` | `lib/tla/spec/compiled.ex` |
+| `temporal_instances/2` | `:def` | (temporal, constants) | `a71e9df8` | `lib/tla/spec/compiled.ex` |
 | `terminal_def()` | `:type` | name, predicate | `2640532e` | `lib/tla/spec/compiled.ex` |
 | `type_expr()` | `:type` | Macro.t() | `5f670250` | `lib/tla/spec/compiled.ex` |
 | `variable_def()` | `:type` | name, type, opts | `100d394e` | `lib/tla/spec/compiled.ex` |

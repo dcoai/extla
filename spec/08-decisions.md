@@ -922,3 +922,36 @@ job" — a golden whose task can `--write` and `--check` and is not in `surface-
 it, so a sixth cannot be added ungated.
 
 See `06-architecture.md` §Dependencies, `02-dsl-semantics.md` §7.
+
+---
+
+## D-33 — A description declared is a description shown
+
+**Decided.** A declaration that accepts `desc:` must surface it where the reader meets the
+finding: an invariant's and an action property's in the violation that is raised, a
+temporal property's in the refutation message its counterexample carries. D-18 says which
+declarations accept the option; this says what accepting one obliges.
+
+**Why.** #160 settled that an option nothing reads is the same defect as an unknown key,
+and closed the gap by *refusing* `desc:` on the four declarations that had no reader for
+it. `temporal` kept the option on the strength of a reader that did not exist: the DSL
+stored the description, `compiled_temporals/1` emitted a map without it, and the property
+a user was shown when their property was refuted was the bare name `:eventually_done`.
+Nothing noticed, because the test written for #160 asserted that a spec carrying `desc:`
+compiles — which the code that drops it does too (#225's shape E).
+
+The same hop was missing one level down. Every finding — invariant, action property,
+deadlock, liveness — writes a `message` saying what was refuted, `TLA.Trace.to_json/1`
+carried it out to a file, and `TLA.Trace.format/1` printed the banner and dropped it. So
+"the description reaches the struct" would have been a green test over a counterexample
+that still showed the reader nothing, which is why the pin below is asserted on the
+**rendering**.
+
+**Recorded 2026-09-22 (#176); built at #276.**
+
+**Pinned by:** `test/tla/model_checker/liveness_test.exs` "a refuted property's
+counterexample carries the description its author wrote", and
+`test/tla/model_checker_test.exs` "format/1 prints the message the finding wrote, not just
+the property's name" — the hop below it.
+
+See `02-dsl-semantics.md` §5.1, `03-layer1-invariants.md` §Macro Specification.
