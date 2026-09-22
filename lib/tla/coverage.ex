@@ -412,6 +412,19 @@ defmodule TLA.Coverage do
   defp walk({:predicate, predicate}, property, binding),
     do: [probe(property, binding, :consequent, predicate)]
 
+  # The third copy of the fragment's enumeration, and the one a user met FIRST: coverage runs
+  # by default, so `always(Enum.all?(^procs, fn p -> … end))` — which is `always(pred)` and
+  # means exactly what it looks like — died here with a `FunctionClauseError` before liveness
+  # was ever asked for (#277). The front end now takes that formula as a predicate and refuses
+  # what is genuinely off-fragment, so this clause is an internal invariant.
+  defp walk(formula, property, _binding) do
+    raise ArgumentError,
+          "temporal property #{inspect(property)} reached the coverage probes as a shape " <>
+            "they do not walk: #{inspect(formula)}. This is a bug in ExTLA, not in the " <>
+            "specification: `TLA.Spec.Temporal` refuses a formula outside " <>
+            "02-dsl-semantics.md §5.1 at compile time. Please report it."
+  end
+
   defp probe(property, binding, role, predicate) do
     %{
       property: property,

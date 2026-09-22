@@ -693,6 +693,72 @@ defmodule TLA.Spec.DiagnosticsTest do
       assert error =~ "no negation, conjunction or disjunction OF FORMULAS"
     end
 
+    # #277. §5.1 promised "a compile error naming the unsupported operator", and every
+    # operator here IS supported — it is the NESTING that is outside the fragment. That was
+    # enforced at run time, by `Liveness.shape/4`, only under `check_liveness: true`, in an
+    # `ArgumentError` carrying no module, declaration or line. Under the default configuration
+    # the formula was never looked at and the run reported `:ok`.
+    test "a nesting deeper than the fragment evaluates is refused, at compile time" do
+      nested = fn formula ->
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          temporal :t do
+            #{formula}
+          end
+          """,
+          :temporal_nesting_outside_fragment
+        )
+      end
+
+      assert nested.("always(always(x == 1))") =~ "`always` directly inside `always(…)`"
+      assert nested.("eventually(eventually(x == 1))") =~ "`eventually` directly inside"
+      assert nested.("always(eventually(always(x == 1)))") =~ "only a state predicate"
+      assert nested.("eventually((x == 0) ~> (x == 1))") =~ "`~>` directly inside"
+    end
+
+    test "and the refusal names the declaration and the line, as §7 requires" do
+      error =
+        refuse(
+          """
+          variable :x
+          init do
+            x = 0
+          end
+          temporal :deep do
+            always(always(x == 1))
+          end
+          """,
+          :temporal_nesting_outside_fragment
+        )
+
+      assert error =~ "temporal :deep"
+      assert error =~ ~r/:\d+, in temporal :deep/
+      assert error =~ "nests at most two operators deep"
+    end
+
+    # The half that is NOT an error, and the reason this fix is not simply a stricter
+    # grammar. `always(Enum.all?(^c, fn p -> pred end))` is `always(pred)`: a quantifier over
+    # a constant with a boolean body is an ordinary state predicate, which an `invariant` has
+    # accepted all along. Read as a formula-level `\A` it built `{:always, {:for_all, …}}`,
+    # which died in `TLA.Coverage.walk/3` — under the DEFAULT configuration, on a formula
+    # that means exactly what it looks like.
+    test "a quantifier under a temporal operator is a predicate, not a refusal" do
+      accepts("""
+      constant :procs, default: [:p1, :p2]
+      variable :done, type: [^procs ~> [false, true]]
+      init do
+        done = Map.new(^procs, fn p -> {p, false} end)
+      end
+      temporal :all_done do
+        always(Enum.all?(^procs, fn p -> is_boolean(done[p]) end))
+      end
+      """)
+    end
+
     test "a formula where a state predicate is required is rejected" do
       assert refuse(
                """

@@ -388,13 +388,29 @@ consumer — the checker, trace replay, coverage, the ledger — gets the same r
 ExTLA does **not** implement full LTL. The supported fragment is:
 
 ```
-formula  ::= always(formula) | eventually(formula) | pred ~> pred | pred
-           | Enum.all?(^constant, fn x -> formula end)
+formula  ::= temporal | Enum.all?(^constant, fn x -> formula end)
+temporal ::= pred | always(pred) | eventually(pred)
+           | always(eventually(pred)) | eventually(always(pred))
+           | pred ~> pred | always(pred ~> pred)
 pred     ::= any boolean expression over variables and constants
 ```
 
+**The nesting is bounded, and the grammar has to say so.** It read
+`always(formula) | eventually(formula) | …` until #277 — recursive, and therefore a
+promise that `always(always(P))` is in the fragment. It is not: the checker evaluates the
+seven shapes above by SCC analysis and no others. A formula the grammar admitted and the
+checker could not evaluate compiled, and then died three frames into a run — as an
+`ArgumentError` with no module, declaration or line, only under `check_liveness: true`,
+and under the default configuration never at all. The bound is now enforced where this
+document says every rule is enforced: at compile time, by
+`TLA.Spec.Temporal`'s nesting table.
+
+`always(always(P))` is `always(P)` and `eventually(eventually(P))` is `eventually(P)`, so
+nothing expressible is lost by refusing them; what is gained is that the reader is told so
+at the declaration rather than left with a formula that means less than it says.
+
 There is no negation, conjunction or disjunction *of formulas* (a `pred` may of course
-contain `not`/`and`/`or`). The one exception is the quantifier on the second line:
+contain `not`/`and`/`or`). The one exception is the quantifier on the first line:
 `Enum.all?` over a **constant** with a formula body is `\A x \in C : F(x)`, a
 conjunction of instantiated formulas that the checker checks one at a time — each
 instance is itself in the fragment, so nothing new is needed to check it. Every
@@ -402,10 +418,19 @@ per-process property in `07-examples.md` is written this way. The set must be a
 constant or a literal; a state-dependent set would make the formula's shape depend on
 the state.
 
+**A quantifier under a temporal operator is a predicate, not that form.**
+`always(Enum.all?(^procs, fn p -> done[p] end))` is `always(pred)`: an `Enum.all?` over a
+constant with a *boolean* body is an ordinary state predicate, and an `invariant` has
+accepted one all along. Read as the formula-level `\A` it produced `always(\A x : F(x))`,
+a shape no consumer evaluates — it died in the coverage probes, under the default
+configuration, on a formula that means exactly what it looks like (#277). Only at the
+formula position is `Enum.all?` the quantifier; everywhere else it is part of the
+predicate, and a *temporal operator* inside its body is `temporal_operator_in_state_predicate`.
+
 This is deliberate: the fragment above covers the properties people actually write,
 and it is checkable by SCC analysis without constructing a Büchi automaton. A formula
-outside the fragment is a compile error naming the unsupported operator — never a
-silently weaker check.
+outside the fragment is a compile error — naming the unsupported operator, or the
+nesting that goes deeper than the fragment evaluates — never a silently weaker check.
 
 `P ~> Q` already means `always(P implies eventually(Q))`, so `always(P ~> Q)` is
 accepted and means the same thing as `P ~> Q`; the compiler collapses it rather than
@@ -582,7 +607,8 @@ raised from more than one place, and `DIAGNOSTICS.md` lists the sites.
 
 | Kind | Trigger |
 |---|---|
-| `unsupported_temporal_operator` | A formula outside the §5.1 fragment |
+| `unsupported_temporal_operator` | A formula built with an operator the fragment has no place for — `and`/`or`/`not` OF FORMULAS |
+| `temporal_nesting_outside_fragment` | Supported operators nested deeper than §5.1 evaluates: `always(always(P))`, `eventually(P ~> Q)`, a third operator under the first two |
 | `temporal_operator_in_state_predicate` | A temporal operator where a state predicate is required — inside `always(…)`'s argument, or under a quantifier |
 | `temporal_quantifier_domain` | A temporal quantifier ranging over something that is not a constant or a literal list |
 | `temporal_block_not_one_formula` | A `temporal` block with more than one statement. Unlike `invariant`, there is no single state in which to compute an intermediate value: the formula is evaluated over a behavior |

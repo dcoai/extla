@@ -193,14 +193,18 @@ defmodule TLA.ModelChecker.Liveness do
   defp shape({:leads_to, p, q}, _i, preds, n),
     do: {{:leads_to, n, n + 1}, [q, p | preds], n + 2}
 
+  # An INTERNAL invariant, not a diagnostic. `TLA.Spec.Temporal`'s `@nesting` table refuses a
+  # formula outside the fragment at compile time (#277), so a shape arriving here is a hole in
+  # the front end rather than a mistake in the specification being checked — and the message
+  # has to say which, because the previous one addressed the author of the spec about a
+  # constraint they can no longer violate.
   defp shape(formula, instance, _preds, _n) do
     raise ArgumentError,
-          "temporal property #{inspect(instance.name)} nests operators more deeply than the " <>
-            "checker evaluates: #{describe_shape(formula)}. The shapes it checks are " <>
-            "`pred`, `always(pred)`, `eventually(pred)`, `always(eventually(pred))`, " <>
-            "`eventually(always(pred))` and `p ~> q`, each optionally under " <>
-            "`Enum.all?(^constant, …)` (02-dsl-semantics.md §5.1). Approximating this one " <>
-            "with a shape it is not would be a weaker check reported as the real thing."
+          "temporal property #{inspect(instance.name)} reached the checker as a shape it " <>
+            "does not evaluate: #{describe_shape(formula)}. This is a bug in ExTLA, not in " <>
+            "the specification: `TLA.Spec.Temporal` refuses a formula outside " <>
+            "02-dsl-semantics.md §5.1 at compile time, so nothing should build this. " <>
+            "Please report it."
   end
 
   defp describe_shape({op, inner}) when op in [:always, :eventually],

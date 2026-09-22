@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 382 items** · functions 320 · arities 393 · types 62
+**59 modules · 383 items** · functions 321 · arities 394 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -525,11 +525,12 @@ key whose value is a union of atoms; any other type is shown as written.
 | `reject_param/1` | `:def` | (state_arg) | `802ce740` | `lib/tla/spec/rewriter.ex` |
 | `rewrite/2` | `:def` | (ast, ctx) | `fda3ad70` | `lib/tla/spec/rewriter.ex` |
 | `t()` | `:type` | %__MODULE__{} | `6a08a0ca` | `lib/tla/spec/rewriter.ex` |
-## TLA.Spec.Temporal — 1 items
+## TLA.Spec.Temporal — 2 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `parse!/2` | `:def` | (_, ctx) | `058a7674` | `lib/tla/spec/temporal.ex` |
+| `nesting/0` | `:def` | () | `95ad1fdd` | `lib/tla/spec/temporal.ex` |
+| `parse!/2` | `:def` | (_, ctx) | `e2e85d2a` | `lib/tla/spec/temporal.ex` |
 ## TLA.Spec.Test — 2 items
 
 | Item | Kind | Shape | Version | Locus |
