@@ -13,13 +13,17 @@ defmodule TLA.PackageDocsTest do
   from it — and has no `ex_doc`, so it never builds docs. The docs job builds them and never
   looks at the package. This is the join.
 
-  It needs a built `doc/`, which only the `docs` job produces, so it lives in `test/docs/` —
-  the directory that job runs. That placement is the whole subject of #156/#217: the same
-  requirement expressed as a runtime branch is a test that passes by taking its else-branch,
-  and the guard below therefore **fails** on an absent `doc/` rather than reporting a
-  non-answer, so this cannot become one.
+  It needs a built `doc/`, which only the `docs` job produces. That requirement is a **tag**,
+  not a directory: `test/docs/` is run by the `test` job too, where `doc/` does not exist, and
+  a first version of this file learned that by failing there. `:needs_built_docs` is excluded
+  in `test_helper.exs` and included by the job that has the artifact — which is #217's
+  recommendation, adopted here because without it this test can only be written two ways that
+  are both wrong: absent, or passing on an absence. The guard below **fails** when `doc/` is
+  missing, so under the tag it cannot become the vacuous check #156 found next door to it.
   """
   use ExUnit.Case, async: true
+
+  @moduletag :needs_built_docs
 
   @root Path.expand("../..", __DIR__)
   @built Path.join(@root, "doc")

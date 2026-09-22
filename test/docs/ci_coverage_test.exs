@@ -22,12 +22,16 @@ defmodule TLA.CiCoverageTest do
   `test` job runs a bare `mix test`, so the tree is covered and this passes; the value is that
   narrowing it fails here instead of silently shrinking the suite.
 
-  It does **not** catch the `guide_links_test.exs` case, and the distinction is worth stating
-  rather than letting the citation above imply otherwise. That test *is* run by the `test`
-  job. Its problem is different: it needs a built `doc/`, and only the `docs` job builds one,
-  so it runs where the artifact is absent and takes its else-branch every time. Detecting
-  "this test needs an artifact another job produces" is not something a coverage check can
-  see. #156 fixes that one by moving it into the job that has the artifact.
+  It also catches a **tag** excluded by default that no job includes (#274). That closes the
+  gap this section used to record as out of reach: "detecting that a test needs an artifact
+  another job produces is not something a coverage check can see" was true while the
+  requirement was a runtime branch, and stops being true once it is a tag — a tag is a
+  declaration, and `test_helper.exs` and `.gitlab-ci.yml` can be read against each other.
+  `:needs_built_docs` is the first of them.
+
+  `test/guides/guide_links_test.exs`'s slug cross-check is still outside this: it *is* run by
+  the `test` job, and its problem is that it handles an absent `doc/` by passing. #156 fixes
+  that one by moving it behind the same tag.
 
   It also says nothing about whether a directory's tests are meaningful. The rest of the
   suite is where that question lives.
@@ -36,6 +40,7 @@ defmodule TLA.CiCoverageTest do
 
   @ci Path.expand("../../.gitlab-ci.yml", __DIR__)
   @test_root Path.expand("../..", __DIR__) |> Path.join("test")
+  @test_helper Path.expand("../test_helper.exs", __DIR__)
 
   # Directories that hold support code rather than tests, and are compiled into the test
   # environment instead of being run. Listed rather than inferred, so adding one is a
@@ -117,5 +122,34 @@ defmodule TLA.CiCoverageTest do
 
     Add the directory to a job, or move the tests to one that is already covered.
     """
+  end
+
+  # The gap this file's moduledoc says a coverage check cannot see — "this test needs an
+  # artifact another job produces" — is visible once the requirement is a TAG rather than a
+  # directory (#274, adopting #217's recommendation). A tag excluded by default and included
+  # by no job is a set of tests that runs nowhere, which looks exactly like a set that passes.
+  test "every tag excluded by default is included by some job" do
+    excluded =
+      ~r/exclude:\s*\[([^\]]*)\]/
+      |> Regex.run(File.read!(@test_helper))
+      |> List.last()
+      |> String.split(",")
+      |> Enum.map(&(&1 |> String.trim() |> String.trim_leading(":")))
+      |> Enum.reject(&(&1 == ""))
+
+    assert excluded != [], "test_helper.exs excludes nothing; this assertion would be vacuous"
+
+    ci = File.read!(@ci)
+
+    for tag <- excluded do
+      assert ci =~ ~r/mix test[^\n]*--(only|include) #{tag}\b/,
+             """
+             `#{tag}` is excluded in test_helper.exs and no job includes it.
+
+             Those tests run nowhere: `mix test` skips them by default, and no `--only #{tag}`
+             or `--include #{tag}` appears in .gitlab-ci.yml. A tag with no job is the
+             directory-with-no-job defect one level in, and it reads the same way — silence.
+             """
+    end
   end
 end

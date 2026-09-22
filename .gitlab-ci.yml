@@ -359,7 +359,7 @@ docs:
   stage: verify
   script:
     - MIX_ENV=dev mix docs
-    - mix test test/docs
+    - mix test test/docs --include needs_built_docs
 
 tlc-corpus:
   stage: verify
