@@ -15,8 +15,7 @@ defmodule ExTLA.MixProject do
       description: "TLA+-inspired formal verification for Elixir/OTP systems",
       package: [
         licenses: ["MIT"],
-        files:
-          ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec guides research/tla-plus-primer.md)
+        files: packaged_files()
       ],
       # `guides/` ships and renders beside `spec/` (#94): the guides teach, the spec is the
       # authority they link to. Every code block in a guide is compiled and its claimed verdict
@@ -24,6 +23,19 @@ defmodule ExTLA.MixProject do
       # build rather than teaching an API that does not exist.
       docs: [
         main: "readme",
+        # The published docs advertise only what the package ships (#274).
+        #
+        # `mix docs` runs under `MIX_ENV=dev`, because `ex_doc` is a dev dependency, and
+        # `elixirc_paths(:dev)` includes `ledger/` — so until this filter the published
+        # documentation carried `TLA.Ledger`, `TLA.Spec.Version` and `mix tla.coverage`,
+        # eleven modules in all, to a reader whose `mix deps.get` brings them `lib/` only.
+        # Nobody decided to document the ledger: the docs job's environment did, and the
+        # `consumer-compile` job that proves the package is right cannot see the docs.
+        #
+        # Derived from `files:` rather than listed, so the two cannot disagree — an explicit
+        # list here would be a fourth hand-kept answer to "what is ExTLA". The same predicate
+        # renders `PACKAGE_SURFACE.md`'s `packaged?` column.
+        filter_modules: &ExTLA.MixProject.packaged?/2,
         # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
         # and the order here is the order the sidebar lists them in.
         #
@@ -75,6 +87,30 @@ defmodule ExTLA.MixProject do
   # Declaring its environment here is what lets it be invoked as `mix tla.mutants` instead
   # of `MIX_ENV=test mix tla.mutants`, which is a prefix everyone forgets once.
   def cli, do: [preferred_envs: ["tla.mutants": :test]]
+
+  @doc """
+  Whether the package ships the module a doc chunk came from (#274).
+
+  ExDoc hands `filter_modules` the module and its doc metadata, and the metadata carries
+  `source_path` — so "would a consumer receive this?" is answerable from the same `files:`
+  list the package is built from, rather than from a second list that would drift from it.
+
+  A module with no `source_path` is kept: that is a module ExDoc could not locate, and
+  dropping it silently would hide it from the docs on a technicality rather than a rule.
+  """
+  def packaged?(_module, %{source_path: source_path}) do
+    relative = Path.relative_to(to_string(source_path), File.cwd!())
+
+    Enum.any?(packaged_files(), fn entry ->
+      relative == entry or String.starts_with?(relative, entry <> "/")
+    end)
+  end
+
+  def packaged?(_module, _metadata), do: true
+
+  defp packaged_files do
+    ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec guides research/tla-plus-primer.md)
+  end
 
   # `ledger/` is the verification ledger's tooling (#1): the content-version scan, the
   # coverage golden and its mix task. Dev and test only, and never shipped — it depends on

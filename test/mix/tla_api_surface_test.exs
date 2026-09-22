@@ -10,25 +10,24 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
   """
   use ExUnit.Case, async: true
 
-  import ExUnit.CaptureIO
-
   @moduletag :tmp_dir
 
   describe "TLA.Surface.check!/4" do
-    # `Mix.shell/1` is VM-global, and `tla_coverage_test.exs` sets it for its own assertions.
-    # Two async tests swapping one global between them is a race whose loser reads an empty
-    # mailbox — which is what this file did to that one when it was first written. Capturing
-    # the default shell's output asserts the same thing and mutates nothing.
+    # This asserts that a match does not raise, and nothing about what is printed.
+    #
+    # `Mix.shell/1` is VM-global. `tla_coverage_test.exs` sets it to `Mix.Shell.Process` for
+    # its own assertions, so anything this file claims about output is a race with it: swap
+    # the global here and that file reads an empty mailbox; capture stdout here and the
+    # message goes to *its* mailbox instead and the capture is blank. Both were tried, and
+    # both failed only under the full suite, which is the worst way to learn it.
+    #
+    # The success message has one owner — `tla_coverage_test.exs`, over the same shared
+    # `TLA.Surface.check!/4` — and one owner is what a global permits.
     test "passes when the file matches what was rendered", %{tmp_dir: tmp} do
       path = Path.join(tmp, "API_SURFACE.md")
       File.write!(path, "identical")
 
-      output =
-        capture_io(fn ->
-          TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical")
-        end)
-
-      assert output =~ "API_SURFACE.md is current"
+      assert TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical") == :ok
     end
 
     test "raises on drift, naming the golden and how to regenerate it", %{tmp_dir: tmp} do
