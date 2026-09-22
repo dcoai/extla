@@ -14,7 +14,23 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Added
+
+- **`API_SURFACE.md`: what `lib/` declares, as a surfex golden** (#271, from #270). Every
+  public function head with the arities its defaults imply, and every named type with its key
+  set and atom unions, scanned from source by `Surfex.SourceScan` — so the gate runs before the
+  build — and rendered by `mix tla.api_surface --write`. `--check` is HARD: a signature or type
+  change without a regenerate fails the build, and so does a hand edit. It is the code's side of
+  the comparison the specification's API blocks are held to (#164), which had no side to be
+  compared against when #153 found seventeen signatures the code does not have.
+
 ### Changed
+
+- **One `surface-drift` job for every golden.** `tla-coverage-drift` is renamed and runs both
+  `mix tla.coverage --check` and `mix tla.api_surface --check`; the goldens #270 still owes
+  join it rather than each minting a job. The three-outcome check — current, drifted, missing —
+  is now `TLA.Surface.check!/4`, shared by both tasks, so there is one definition of "drifted".
+  `TLA_COVERAGE.md`'s header names the new gate and was regenerated.
 
 - **CI's compiled dependencies come from the depdep store alone** (#251, closes #250). depdep
   v0.4.0 never keyed `surfex`, a leaf git dependency, so #247 kept the `mix.lock`-keyed

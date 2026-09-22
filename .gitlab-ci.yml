@@ -22,10 +22,11 @@
 #
 # The second matters as much as the first, and is the whole lesson of this milestone. Between #64
 # and #71 this pipeline failed at `mix deps.get`, so `verify` never started and `mutation`,
-# `tla-coverage-drift` and `tlc-corpus` reported **skipped**. FIVE merge requests landed on `main`
-# that way. A skipped gate and a passing gate look identical in a merge request, and without the
-# second setting GitLab would treat one as the other -- which is the same confusion between
-# presence and evidence that TLA_COVERAGE.md exists to prevent one layer down.
+# `surface-drift` (then named `tla-coverage-drift`) and `tlc-corpus` reported **skipped**. FIVE
+# merge requests landed on `main` that way. A skipped gate and a passing gate look identical in a
+# merge request, and without the second setting GitLab would treat one as the other -- which is
+# the same confusion between presence and evidence that TLA_COVERAGE.md exists to prevent one
+# layer down.
 #
 # `only_allow_merge_if_all_discussions_are_resolved` is deliberately OFF. The defect was about
 # pipeline status, not review threads; turning it on would add a blocking condition for a problem
@@ -324,13 +325,19 @@ mutation:
 # runs the mix TASK — its argv parsing, `--check`, and `check!/2`. Deleting it would leave that
 # task with no coverage at all. Its `Mix.raise` branches are covered by
 # `test/mix/tla_coverage_test.exs` since #84; before that they had never executed anywhere.
-tla-coverage-drift:
+#
+# ONE JOB FOR EVERY SURFACE GOLDEN (#270). `tla-coverage-drift` was this job's name while the
+# ledger was the only golden; `API_SURFACE.md` (#271) joined it, and the goldens #270 still
+# owes join it here rather than each minting a job — a golden's header names `surface-drift`
+# as its gate, and that name has to be one job or the header is a claim about nothing.
+surface-drift:
   extends: .elixir
   stage: verify
   variables:
     MIX_ENV: test
   script:
     - mix tla.coverage --check
+    - mix tla.api_surface --check
 
 # The only job that builds the documentation, and the only place the built-docs link gate can
 # run (#102, #103).

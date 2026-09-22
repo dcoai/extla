@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Tla.CoverageTest do
   `mix tla.coverage --check` is the HARD gate on `TLA_COVERAGE.md` (#1, open question 2).
 
   These tests exist because **its failure paths had never executed** (#75, #84). No test
-  invoked the task, and in CI the `tla-coverage-drift` job sits in `verify`, which never starts
+  invoked the task, and in CI the `surface-drift` job sits in `verify`, which never starts
   when `ledger_test.exs`'s own drift assertion fails first in `check`. The job therefore proved
   only that the task *succeeds*; that it correctly *fails* was unverified — a gate whose red
   path nobody had run.

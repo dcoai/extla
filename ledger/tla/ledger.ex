@@ -392,7 +392,7 @@ defmodule TLA.Ledger do
       name: "TLA_COVERAGE.md",
       purpose: "Every item each TLA.Spec declares, and the verification that covers it.",
       task: "tla.coverage",
-      gate: "tla-coverage-drift",
+      gate: "surface-drift",
       hardness: :hard,
       prose: prose(),
       stats: [
