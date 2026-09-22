@@ -16,6 +16,17 @@ release it merely follows.
 
 ### Added
 
+- **`CLI_SURFACE.md`: every `mix tla.*` task's switches and exit codes** (#272, from #270).
+  One row per `@switches` entry and per documented exit code, read from source, with the
+  specification section that reproduces each task **found by searching `spec/*.md` for its
+  `defmodule` line**. That derivation replaces `spec_options_test`'s six-entry `@documented`
+  list: the set of tasks is now the directory, a task shipped without a spec section fails a
+  named assertion instead of going unchecked, and a task with no exit-code table (`mix
+  tla.stamp`, #173) reads as a finding rather than a blank. Generating it found two things
+  the hand list could not: `mix tla.visualize`'s exit codes had never been read by anything,
+  because its moduledoc is an interpolated heredoc, and `mix tla.mutants` was a task no gate
+  knew about.
+
 - **`API_SURFACE.md`: what `lib/` declares, as a surfex golden** (#271, from #270). Every
   public function head with the arities its defaults imply, and every named type with its key
   set and atom unions, scanned from source by `Surfex.SourceScan` — so the gate runs before the

@@ -55,13 +55,29 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
   end
 
   describe "the surface-drift job" do
-    # The golden's header names `surface-drift` as its gate. That is a claim about the
-    # pipeline, and this is where it is checked — the shape `ci_coverage_test.exs` uses.
-    test "runs this task's --check, and the ledger's, from one job" do
+    # Every golden's header names `surface-drift` as its gate. That is a claim about the
+    # pipeline, and a golden whose gate does not run it is worse than an ungated one: it
+    # carries a HARD marker nothing enforces. So the job is read here, and the list it must
+    # run is derived from the tasks that HAVE a `--check` rather than named a second time.
+    test "runs every golden's --check from one job" do
       ci = File.read!(Path.expand("../../.gitlab-ci.yml", __DIR__))
       [job] = Regex.run(~r/^surface-drift:\n(?:  .*\n)+/m, ci)
-      assert job =~ "- mix tla.api_surface --check"
-      assert job =~ "- mix tla.coverage --check"
+
+      # A golden's task is the one that can both render and compare: `--write` regenerates,
+      # `--check` refuses a difference. `mix tla.mutants` has a `--check` of its own and no
+      # `--write`, and it is not a golden — the pair is what identifies one.
+      checkers =
+        for task <- TLA.CliSurface.run(),
+            {:check, :boolean} in task.switches,
+            {:write, :boolean} in task.switches,
+            do: task.task
+
+      assert checkers != [], "no task renders a golden; this assertion would be vacuous"
+
+      for name <- checkers do
+        assert job =~ "- mix " <> name <> " --check",
+               "the surface-drift job does not run `mix #{name} --check`"
+      end
     end
 
     test "and the golden's header names that job" do

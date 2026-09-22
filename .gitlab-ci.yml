@@ -338,6 +338,7 @@ surface-drift:
   script:
     - mix tla.coverage --check
     - mix tla.api_surface --check
+    - mix tla.cli_surface --check
 
 # The only job that builds the documentation, and the only place the built-docs link gate can
 # run (#102, #103).
