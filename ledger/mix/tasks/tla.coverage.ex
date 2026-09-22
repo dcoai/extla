@@ -51,24 +51,14 @@ defmodule Mix.Tasks.Tla.Coverage do
     end
   end
 
-  # Public only so its failure paths can be tested. Both `Mix.raise` branches below were
-  # executed by NOTHING before #84: no test invoked this task, and in CI the job that runs it
-  # is in `verify`, which never starts when `ledger_test.exs`'s own drift assertion fails first
-  # in `check`. So the gate's red path had never once run (#75). The success path is exercised
-  # by the `tla-coverage-drift` job on every pipeline.
+  # Public only so its failure paths can be tested. Both `Mix.raise` branches were executed by
+  # NOTHING before #84: no test invoked this task, and in CI the job that runs it is in
+  # `verify`, which never starts when `ledger_test.exs`'s own drift assertion fails first in
+  # `check`. So the gate's red path had never once run (#75). The success path is exercised by
+  # the `surface-drift` job on every pipeline. The check itself is `TLA.Surface.check!/4`,
+  # shared with every other golden's task (#270), so there is one definition of "drifted".
   @doc false
-  def check!(path, rendered) do
-    case File.read(path) do
-      {:ok, ^rendered} ->
-        Mix.shell().info("#{@golden} is current")
-
-      {:ok, _stale} ->
-        Mix.raise("#{@golden} has drifted from the specs. Regenerate: mix tla.coverage --write")
-
-      {:error, :enoent} ->
-        Mix.raise("#{@golden} is missing. Generate it: mix tla.coverage --write")
-    end
-  end
+  def check!(path, rendered), do: TLA.Surface.check!(@golden, "tla.coverage", path, rendered)
 
   defp summarise(sections) do
     gaps = Ledger.gaps(sections)
