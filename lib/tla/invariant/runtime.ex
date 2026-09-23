@@ -135,6 +135,36 @@ defmodule TLA.Invariant.Runtime do
   end
 
   @doc """
+  The same, timing each check that RAN and emitting a `:checked` event. Called only from a
+  module compiled under `config :extla, telemetry: :verbose`.
+
+  A `:no_match` fires nothing. The generated clause answers `:no_match` without evaluating
+  the predicate — the declaration is not about this message — so an event saying a check
+  happened would be a measurement of a check that did not occur, and its `duration` would
+  be the cost of a pattern match reported as the cost of a precondition.
+  """
+  def check_preconditions!(module, callback, message, state, :verbose) do
+    Enum.each(module.__tla_conditions__(:precondition), fn {index, description} ->
+      case measured(:precondition, module, callback, fn ->
+             module.__tla_precondition__(index, message, state)
+           end) do
+        false ->
+          report(module, %Violation{
+            type: :precondition,
+            name: callback,
+            module: module,
+            message: description,
+            state: state,
+            args: message
+          })
+
+        _matched_or_not ->
+          :ok
+      end
+    end)
+  end
+
+  @doc """
   Check every postcondition whose pattern matches `message`.
   """
   def check_postconditions!(module, callback, message, old_state, new_state) do
@@ -156,6 +186,32 @@ defmodule TLA.Invariant.Runtime do
             old_state: old_state,
             args: message
           })
+      end
+    end)
+  end
+
+  @doc """
+  The same, under `:verbose`. A `:no_match` fires nothing, for the reason on
+  `check_preconditions!/5`.
+  """
+  def check_postconditions!(module, callback, message, old_state, new_state, :verbose) do
+    Enum.each(module.__tla_conditions__(:postcondition), fn {index, description} ->
+      case measured(:postcondition, module, callback, fn ->
+             module.__tla_postcondition__(index, message, old_state, new_state)
+           end) do
+        false ->
+          report(module, %Violation{
+            type: :postcondition,
+            name: callback,
+            module: module,
+            message: description,
+            state: new_state,
+            old_state: old_state,
+            args: message
+          })
+
+        _matched_or_not ->
+          :ok
       end
     end)
   end
@@ -336,17 +392,27 @@ defmodule TLA.Invariant.Runtime do
 
   # A `:checked` event carries how long the predicate took, which is the only number that
   # answers "is this check worth its place on this callback".
+  # A precondition's clause answers `:no_match` for a message it is not about, which is not
+  # a check and is not timed (#279). An invariant's answers only true or false, so the
+  # `:no_match` clause below never fires for one — it is here because the alternative is a
+  # second timing bracket, and two brackets are two places for the event's metadata to drift
+  # apart.
   defp measured(kind, module, name, check) do
     started = System.monotonic_time()
-    held? = check.()
 
-    emit([:extla, kind, :checked], %{
-      module: module,
-      name: name,
-      duration: System.monotonic_time() - started
-    })
+    case check.() do
+      :no_match ->
+        :no_match
 
-    held?
+      held? ->
+        emit([:extla, kind, :checked], %{
+          module: module,
+          name: name,
+          duration: System.monotonic_time() - started
+        })
+
+        held?
+    end
   end
 
   defp unless_ok(true, _report), do: :ok

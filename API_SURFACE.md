@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 383 items** · functions 321 · arities 394 · types 62
+**59 modules · 383 items** · functions 321 · arities 396 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -193,8 +193,10 @@ key whose value is a union of atoms; any other type is shown as written.
 | `check_initial_invariants!/5` | `:def` | (module, names, result, shape) | `c5e2979a` | `lib/tla/invariant/runtime.ex` |
 | `check_invariants!/3` | `:def` | (module, names, state) | `4e57efa9` | `lib/tla/invariant/runtime.ex` |
 | `check_invariants!/4` | `:def` | (module, names, state) | `4e57efa9` | `lib/tla/invariant/runtime.ex` |
-| `check_postconditions!/5` | `:def` | (module, callback, message, old_state, new_state) | `b847d9f5` | `lib/tla/invariant/runtime.ex` |
-| `check_preconditions!/4` | `:def` | (module, callback, message, state) | `8540b765` | `lib/tla/invariant/runtime.ex` |
+| `check_postconditions!/5` | `:def` | (module, callback, message, old_state, new_state) | `927688bf` | `lib/tla/invariant/runtime.ex` |
+| `check_postconditions!/6` | `:def` | (module, callback, message, old_state, new_state) | `927688bf` | `lib/tla/invariant/runtime.ex` |
+| `check_preconditions!/4` | `:def` | (module, callback, message, state) | `b5c3d45a` | `lib/tla/invariant/runtime.ex` |
+| `check_preconditions!/5` | `:def` | (module, callback, message, state) | `b5c3d45a` | `lib/tla/invariant/runtime.ex` |
 | `extract_state/2` | `:def` | (result, pre_state) | `7ddbd8b1` | `lib/tla/invariant/runtime.ex` |
 | `extract_statem_state/2` | `:def` | (result, pre) | `98d0a560` | `lib/tla/invariant/runtime.ex` |
 | `initial_state/1` | `:def` | (result) | `d80258d7` | `lib/tla/invariant/runtime.ex` |

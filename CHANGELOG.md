@@ -30,6 +30,28 @@ release it merely follows.
 
 ### Fixed
 
+- **The two `:checked` telemetry events that could not fire, now fire** (#279, for #177).
+  `03-layer1-invariants.md` documents four success events under `telemetry: :verbose` and
+  argues from that count — "a single transition can fire four of them" is the reason they
+  are opt-in — while `emit_wrapper/3` passed `:verbose` to the invariant and
+  action-property checks only, and `TLA.Invariant.Runtime` had no `:verbose` arity for
+  `check_preconditions!` or `check_postconditions!` to receive it. The same file said so
+  three hundred lines down, where its API block listed the two arities that existed: #22
+  amended the block from the code and left the event table alone.
+  `[:extla, :precondition, :checked]` and `[:extla, :postcondition, :checked]` now carry
+  `module`, `name` and `duration` like the other two.
+
+  A declaration whose pattern does not match the message fires **nothing**. Its clause
+  answers `:no_match` without evaluating the predicate, so an event there would time a
+  pattern match and report it as the cost of a check that never ran.
+
+  `telemetry: :verbose` had **no test coverage at all** — #175's third hole, where two
+  independent mutations of it stayed green. `test/tla/telemetry_verbose_test.exs` is its
+  first: all four events from one transition, their metadata, the `:no_match` silence,
+  the opt-in asserted under the default (and the violation events still firing there, so
+  "nothing fired" cannot pass on a module that emits nothing at all), and the events held
+  to the table in `spec/03` that lists them.
+
 - **A recorded behaviour says what its buffer threw away, and a truncated one cannot
   settle a claim about its beginning** (#278, for #177). `TLA.GenServer.Runtime`'s trace
   buffer drops oldest-first — correctly; an unbounded per-process trace is a memory leak in

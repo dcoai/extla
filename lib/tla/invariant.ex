@@ -608,6 +608,11 @@ defmodule TLA.Invariant do
     message = message_expression(callback, args)
     state = state_expression(callback, args)
 
+    # `verbose` is spliced into all FOUR calls. It reached only the two below it until #279,
+    # so `[:extla, :precondition, :checked]` and `[:extla, :postcondition, :checked]` were
+    # documented in `03-layer1-invariants.md` and could not fire — and the same file's API
+    # block, three hundred lines down, listed the two arities the code actually had. #22
+    # amended the block from the code and left the event table where it was.
     pre =
       if context.preconditions != [] do
         quote do
@@ -615,7 +620,8 @@ defmodule TLA.Invariant do
             __MODULE__,
             unquote(callback),
             unquote(message),
-            unquote(state)
+            unquote(state),
+            unquote_splicing(verbose)
           )
         end
       end
@@ -628,7 +634,8 @@ defmodule TLA.Invariant do
             unquote(callback),
             unquote(message),
             unquote(state),
-            var!(tla_new_state)
+            var!(tla_new_state),
+            unquote_splicing(verbose)
           )
         end
       end
