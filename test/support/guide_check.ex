@@ -195,6 +195,37 @@ defmodule TLA.GuideCheck do
   # reasonless skip is an unchecked claim wearing an annotation. The reason is what a
   # reader sees on the page — #215's point, and `TLA_COVERAGE.md`'s: something nobody
   # verified is recorded as unverified, never omitted.
+  # A dependency snippet: not a spec, and checkable anyway (#154).
+  #
+  # `guides/getting-started.md`'s install block is the repository's only `deps` entry, and
+  # it read `tag: "v0.1.0"` against a current release of **v0.3.20** — in documentation
+  # that SHIPS in the package, on a page whose next chapter teaches two features that
+  # install does not have. Every other Elixir block on that page is compiled and its
+  # verdict asserted. The one block the harness was told to skip is the one that drifted.
+  #
+  # "Not a spec" was true, and was taken to mean "not checkable". A `mix.exs` fragment
+  # parses, and a `tag:` is a string that can be compared with the release record, so this
+  # directive does that and the block stops being exempt.
+  #
+  # The record is `CHANGELOG.md`'s newest release heading rather than `git tag`, for two
+  # reasons: it is in the tree, so a shallow CI clone with no tags still checks it; and
+  # #282 established the changelog as the project's record of what is built, so tying the
+  # install instruction to it means one place goes stale instead of two.
+  defp verify(%{kind: :deps}, code) do
+    with {:ok, tag} <- documented_tag(code),
+         {:ok, release} <- newest_release() do
+      if tag == "v" <> release do
+        :ok
+      else
+        {:error,
+         "tla:deps documents #{inspect(tag)}, and the newest release in CHANGELOG.md is " <>
+           "v#{release}. A reader follows this block and gets a version the rest of the " <>
+           "page does not describe — which is how v0.1.0 came to be the published install " <>
+           "instruction for v0.3.20 (#154). Update the tag with the release."}
+      end
+    end
+  end
+
   defp verify(%{kind: :skip} = annotation, _code) do
     case annotation[:reason] do
       reason when is_binary(reason) and reason != "" ->
@@ -575,6 +606,45 @@ defmodule TLA.GuideCheck do
 
   defp unquote_value(<<?", rest::binary>>), do: String.trim_trailing(rest, "\"")
   defp unquote_value(value), do: value
+
+  # The `tag:` of the `:extla` dependency, wherever in the snippet it sits.
+  defp documented_tag(code) do
+    with {:ok, ast} <- Code.string_to_quoted(code),
+         {_ast, tag} when is_binary(tag) <- Macro.prewalk(ast, nil, &extla_tag/2) |> elem_pair() do
+      {:ok, tag}
+    else
+      {:error, {meta, message, token}} ->
+        {:error, "tla:deps does not parse: #{message}#{token} (line #{meta[:line]})"}
+
+      _no_tag ->
+        {:error,
+         "tla:deps has no `{:extla, …, tag: \"…\"}` entry. The directive exists to hold " <>
+           "that tag to the release record; a block without one is either a different " <>
+           "kind of snippet (use tla:skip with a reason) or is missing its pin."}
+    end
+  end
+
+  defp elem_pair({ast, acc}), do: {ast, acc}
+
+  defp extla_tag({:extla, opts} = node, nil) when is_list(opts) do
+    {node, Keyword.get(opts, :tag)}
+  end
+
+  defp extla_tag(node, acc), do: {node, acc}
+
+  # The newest `## [x.y.z] — date` heading. `[Unreleased]` is deliberately not a release:
+  # what a reader can install is what has been tagged.
+  defp newest_release do
+    case Regex.run(~r/^## \[(\d+\.\d+\.\d+)\]/m, File.read!("CHANGELOG.md")) do
+      [_match, version] ->
+        {:ok, version}
+
+      nil ->
+        {:error,
+         "CHANGELOG.md has no `## [x.y.z]` release heading, so tla:deps has nothing to " <>
+           "check the documented tag against"}
+    end
+  end
 
   defp line_of(source, offset) do
     source
