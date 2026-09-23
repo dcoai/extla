@@ -318,13 +318,23 @@ defmodule TLA.Invariant.Runtime do
   @doc """
   Check every precondition whose pattern matches `message`, for the given
   callback. A message no pattern matches has no preconditions and passes.
+
+  The `:verbose` form emits `[:extla, :precondition, :checked]` for each
+  declaration whose predicate RAN. A `:no_match` fires nothing: the clause
+  answered without evaluating the predicate, so an event there would time a
+  pattern match and report it as the cost of a check (#279).
   """
   def check_preconditions!(module, callback, message, state)
 
+  def check_preconditions!(module, callback, message, state, :verbose)
+
   @doc """
-  Check every postcondition whose pattern matches `message`.
+  Check every postcondition whose pattern matches `message`. The `:verbose` form
+  is as above.
   """
   def check_postconditions!(module, callback, message, old_state, new_state)
+
+  def check_postconditions!(module, callback, message, old_state, new_state, :verbose)
 
   @doc """
   Extract the post-state from a GenServer callback return value.
@@ -588,6 +598,13 @@ Layer 1 emits telemetry for observability:
 [:extla, :precondition, :checked]
 [:extla, :postcondition, :checked]
 ```
+
+**All four fire, and two of them could not until #279.** `emit_wrapper/3` passed
+`:verbose` to the invariant and action-property checks and not to the precondition and
+postcondition ones, which had no `:verbose` arity to pass it to — so this table listed four
+events, the argument below counted four, and the code emitted two. The API block for
+`TLA.Invariant.Runtime` three hundred lines down said so plainly, listing the two arities
+that existed: #22 amended that block from the code and left this table where it was.
 
 **Success events are opt-in, and off by default.** `:telemetry.execute/3` costs on the
 order of a microsecond even with no handlers attached, and a single transition can fire
