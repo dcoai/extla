@@ -129,6 +129,23 @@ defmodule TLA.GuideCheck do
   def guides, do: Enum.sort(Path.wildcard("guides/**/*.md"))
 
   @doc """
+  Every page this harness checks: the guides, then `spec/`, then `README.md` (#281).
+
+  `spec/` holds seventy-odd `elixir` fences that nothing compiled. They are not a tutorial —
+  most are API sketches whose signatures `spec_api_test` already holds to `API_SURFACE.md` —
+  but "nothing compiles this" and "something else gates this" are different facts, and only
+  one of them is acceptable silently. Under this harness each block says which it is.
+
+  Sorted within each tree, because within a tree the order is a dependency: `spec/07`'s
+  `MyApp.LockServer` conforms to the `Specs.DistributedLock` declared earlier on its own
+  page. Across trees there are none — a spec page has never referred to a guide's module —
+  so the trees are concatenated in the order a reader meets them rather than interleaved.
+  """
+  def pages do
+    guides() ++ Enum.sort(Path.wildcard("spec/**/*.md")) ++ ["README.md"]
+  end
+
+  @doc """
   Check one guide. Returns a list of failure strings — empty when the guide tells the truth.
   """
   def check(path) do
@@ -173,7 +190,23 @@ defmodule TLA.GuideCheck do
          "before the fence (<!-- tla:spec -->, tla:check, tla:liveness, tla:compile_error, " <>
          "tla:simulate, tla:run) or <!-- tla:skip reason=... -->"}
 
-  defp verify(%{kind: :skip}, _code), do: :ok
+  # A bare `tla:skip` was accepted until #281, which makes the harness's own principle
+  # false: "an unannotated block is an unchecked claim" is enforced one line up, and a
+  # reasonless skip is an unchecked claim wearing an annotation. The reason is what a
+  # reader sees on the page — #215's point, and `TLA_COVERAGE.md`'s: something nobody
+  # verified is recorded as unverified, never omitted.
+  defp verify(%{kind: :skip} = annotation, _code) do
+    case annotation[:reason] do
+      reason when is_binary(reason) and reason != "" ->
+        :ok
+
+      _missing ->
+        {:error,
+         "tla:skip needs a reason: <!-- tla:skip reason=why this block is not compiled -->. " <>
+           "A skip without one records that a block is unchecked and not why, which is the " <>
+           "gap this annotation exists to make visible."}
+    end
+  end
 
   defp verify(%{kind: :spec}, code) do
     case compile(code) do
@@ -525,7 +558,23 @@ defmodule TLA.GuideCheck do
       [_, key, "", bare], acc -> Map.put(acc, String.to_atom(key), bare)
       [_, key, quoted, _], acc -> Map.put(acc, String.to_atom(key), quoted)
     end)
+    |> whole_reason(info)
   end
+
+  # `reason=` runs to the end of the annotation. Every other value is a token — a module
+  # name, a count, a property — and the scan above reads one; a reason is a sentence, and
+  # the scan read `reason=a shell invocation, and the timing below is from this machine` as
+  # the word "a". Nothing failed, because nothing had ever asked what a reason SAID. #281
+  # does, so it has to be the whole of it.
+  defp whole_reason(annotation, info) do
+    case Regex.run(~r/\breason=(.+)$/s, info) do
+      [_match, reason] -> Map.put(annotation, :reason, reason |> String.trim() |> unquote_value())
+      nil -> annotation
+    end
+  end
+
+  defp unquote_value(<<?", rest::binary>>), do: String.trim_trailing(rest, "\"")
+  defp unquote_value(value), do: value
 
   defp line_of(source, offset) do
     source

@@ -10,6 +10,7 @@ Represents a snapshot of all variables at a single point in time, and transition
 
 ### Types
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.State do
   @moduledoc """
@@ -34,6 +35,7 @@ end
 
 ### Core Functions
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 @doc """
 Create a new state from a keyword list or map of variable assignments.
@@ -137,6 +139,7 @@ every operator gives a definite answer. `lasso_start` is the index the cycle ret
 
 ### Operators
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Temporal do
   @type verdict :: :holds | :violated | :inconclusive
@@ -204,6 +207,7 @@ end
 
 ### Fairness
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Temporal.Fairness do
   @moduledoc """
@@ -278,6 +282,7 @@ answer lives.
 
 Extended set operations matching TLA+ built-in set operators.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Set do
   @moduledoc """
@@ -369,6 +374,7 @@ end
 
 TLA+ function operations (functions as total maps from domain to range).
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Function do
   @moduledoc """
@@ -439,6 +445,7 @@ collision silently drops an unexplored state, and the run then reports success o
 state space it never visited — the worst failure mode a verification tool has. It is
 specified here, in the foundation, rather than left as an implementation detail.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Fingerprint do
   @moduledoc """
@@ -505,6 +512,7 @@ variable rather than silently mis-fingerprinting.
 
 ## Configuration
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Config do
   @moduledoc """

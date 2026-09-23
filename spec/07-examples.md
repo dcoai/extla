@@ -15,6 +15,7 @@ considered settled. A construct no example needs is a construct the DSL does not
 
 ### Specification (Layer 2)
 
+<!-- tla:spec -->
 ```elixir
 defmodule Specs.DistributedLock do
   use TLA.Spec
@@ -120,6 +121,7 @@ end
 
 ### Implementation with Conformance (Layers 1 + 3)
 
+<!-- tla:skip reason=blocked by #284: validate! probes concrete_message/2 with an empty binding and a param'd mapping cannot answer it. Remove this skip when #284 lands -->
 ```elixir
 defmodule MyApp.LockServer do
   use GenServer
@@ -217,6 +219,7 @@ end
 
 ### Tests (All Layers)
 
+<!-- tla:skip reason=an ExUnit module, run by your suite rather than by this page -->
 ```elixir
 defmodule MyApp.LockServerTest do
   use ExUnit.Case
@@ -282,6 +285,7 @@ network".
 
 ### Specification
 
+<!-- tla:spec -->
 ```elixir
 defmodule Specs.RaftElection do
   use TLA.Spec
@@ -497,6 +501,7 @@ Two notes on this spec:
 
 ### Tests
 
+<!-- tla:skip reason=an ExUnit module, run by your suite rather than by this page -->
 ```elixir
 defmodule Specs.RaftElectionTest do
   use ExUnit.Case
@@ -540,6 +545,7 @@ A classic concurrency problem exercising every property type.
 
 ### Specification
 
+<!-- tla:spec -->
 ```elixir
 defmodule Specs.BoundedBuffer do
   use TLA.Spec
@@ -678,6 +684,7 @@ end
 
 ### Test Suite
 
+<!-- tla:skip reason=an ExUnit module, run by your suite rather than by this page -->
 ```elixir
 defmodule Specs.BoundedBufferTest do
   use ExUnit.Case
@@ -737,6 +744,7 @@ end
 The minimal boilerplate for full verification on a counter — and a demonstration of
 exactly what Layer 3's step check buys.
 
+<!-- tla:spec -->
 ```elixir
 # ── Layer 2: Specification ──
 defmodule Specs.Counter do
@@ -859,6 +867,7 @@ properties would report conformance here. This is the bug class that step legali
 exists to catch, and it is the ordinary case, not a corner one: an implementation that
 takes a shortcut the design did not sanction.
 
+<!-- tla:skip reason=an ExUnit module, run by your suite rather than by this page -->
 ```elixir
 # ── Tests ──
 defmodule MyApp.CounterTest do

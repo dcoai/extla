@@ -268,6 +268,7 @@ Another contract library in the space. Less documented than the others.
 - Commands with `pre` (guards), `args` (generators), `next` (state transitions), `post` (assertions)
 
 **DSL example:**
+<!-- tla:skip reason=a comparison with Makina's DSL, which this project does not depend on -->
 ```elixir
 defmodule MyModel do
   use Makina

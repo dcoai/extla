@@ -24,6 +24,7 @@ The primary macro module for annotating GenServer modules with invariants.
 
 ### Usage
 
+<!-- tla:spec -->
 ```elixir
 defmodule BankAccount do
   use GenServer
@@ -120,6 +121,7 @@ end
 
 ### Macro Specification
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Invariant do
   @moduledoc """
@@ -212,6 +214,7 @@ mistake silently changes dispatch. `defoverridable` has none of that problem —
 all the original clauses intact as the superseded definition, and `super` dispatches to
 them with the original pattern matching:
 
+<!-- tla:skip reason=the code the wrapper emits, shown for the reader; what it emits is asserted by invariant_modes_test -->
 ```elixir
 # Emitted by @before_compile, once per instrumented callback:
 defoverridable handle_call: 3
@@ -285,6 +288,7 @@ cost" means no emitted code, not cheap emitted code.
 
 Runtime checking engine (not used directly by developers).
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Invariant.Runtime do
   @moduledoc """
@@ -349,6 +353,7 @@ end
 
 ### Violation Handling
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Invariant.Violation do
   @moduledoc """
@@ -460,6 +465,7 @@ Two consequences that the rest of Layer 1 does not have (D-25):
 
 ### GenStateMachine Integration
 
+<!-- tla:skip reason=requires GenStateMachine, a hex package this project does not depend on; the :gen_statem instrumentation is covered by invariant_behaviours_test -->
 ```elixir
 defmodule TrafficLight do
   use GenStateMachine
@@ -493,6 +499,7 @@ end
 
 ## Testing Integration
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Invariant.Test do
   @moduledoc """
@@ -548,6 +555,7 @@ other two behind another test run.
 
 ### Example Test
 
+<!-- tla:skip reason=an ExUnit module, run by your suite rather than by this page -->
 ```elixir
 defmodule BankAccountTest do
   use ExUnit.Case
@@ -585,6 +593,7 @@ end
 
 Layer 1 emits telemetry for observability:
 
+<!-- tla:skip reason=telemetry event names, not code; the events are held to this list by telemetry_verbose_test -->
 ```elixir
 # Always emitted:
 [:extla, :invariant, :violated]        # metadata: %{module: m, name: n, violation: v}
@@ -633,6 +642,7 @@ the author's.
 
 Three levers when checking is too expensive for a given environment:
 
+<!-- tla:skip reason=declaration options and config, shown on their own -->
 ```elixir
 # 1. Compile the check out entirely, per invariant
 invariant :expensive_check, enabled: Mix.env() == :test do

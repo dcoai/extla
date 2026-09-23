@@ -5,6 +5,7 @@ TLA+-inspired formal verification for Elixir/OTP systems.
 Write specifications as Elixir code, model-check them exhaustively in Elixir, and check
 that running GenServers actually conform to them.
 
+<!-- tla:spec -->
 ```elixir
 defmodule Specs.Counter do
   use TLA.Spec

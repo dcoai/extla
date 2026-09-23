@@ -33,6 +33,7 @@ An earlier draft of this DSL wrote constants as bare atoms (`:accounts`), which 
 meant "the literal atom `:idle`". Those two readings of the same syntax cannot be
 separated in general, so the DSL now marks constants with `^`:
 
+<!-- tla:skip reason=constant and variable declarations on their own, not a compilable module -->
 ```elixir
 constant :accounts
 constant :max_balance
@@ -68,6 +69,7 @@ state depends on the block:
 Because `=` on a declared variable name means "assign the post-state" (§2), an
 intermediate value needs its own form:
 
+<!-- tla:skip reason=an action declaration on its own, not a compilable module -->
 ```elixir
 action :complete_transfer, params: [t: fn s -> s.pending end] do
   require status == :transferring
@@ -200,6 +202,7 @@ set of next-state equations — not a sequence of statements. Concretely:
 
 So this action:
 
+<!-- tla:skip reason=an action declaration on its own, not a compilable module -->
 ```elixir
 action :swap do
   x = y
@@ -209,6 +212,7 @@ end
 
 swaps `x` and `y`. It does not set both to the old `y`. And this:
 
+<!-- tla:skip reason=an action that is MEANT not to compile, shown as a fragment; the diagnostic is pinned by diagnostics_test -->
 ```elixir
 action :broken do
   x = 1
@@ -237,6 +241,7 @@ The order is load-bearing rather than incidental, and §1.6 is why. Function app
 is strict, so `f[x]` outside `f`'s domain raises `TLA.Spec.DomainError` rather than
 returning `nil`. That makes this legal and necessary:
 
+<!-- tla:skip reason=an action declaration on its own, not a compilable module -->
 ```elixir
 action :consume do
   require Map.has_key?(inbox, ^client)
@@ -285,6 +290,7 @@ receiving the params bound before it. This keeps the combinatorial explosion dow
 one param constrains another — filter in the generator rather than generating every
 combination and rejecting most of them in the guard:
 
+<!-- tla:skip reason=a params: option on its own, not a compilable module -->
 ```elixir
 # Generates |servers| x |messages| combinations, most rejected by the guard
 params: [s: ^servers, msg: fn st -> st.messages end]
@@ -299,6 +305,7 @@ The state-function form is what replaces `choose`. It is evaluated on the pre-st
 before the guard, and the checker generates one successor per element of the returned
 enumerable — the direct encoding of TLA+'s `\E t \in pending : …`:
 
+<!-- tla:skip reason=two action bodies compared side by side, neither a compilable module -->
 ```elixir
 # Before (did not work — `choose` cannot fork)
 action :complete_transfer do
@@ -337,6 +344,7 @@ is TLA+'s `CHOOSE`. They do not branch, and they are not a nondeterminism mechan
 An action property constrains a transition, so bare variable names would be ambiguous.
 The block binds two maps and requires explicit qualification:
 
+<!-- tla:skip reason=an action_property declaration on its own, not a compilable module -->
 ```elixir
 action_property :money_is_conserved do
   sum(values(old.balances)) + pending_total(old) ==
@@ -359,6 +367,7 @@ Layer 1, a bare expression in Layer 2).
 
 Both take a bare boolean expression over variables and `^constants`.
 
+<!-- tla:skip reason=an invariant declaration on its own, not a compilable module -->
 ```elixir
 invariant :no_negative_balance do
   Enum.all?(values(balances), &(&1 >= 0))
@@ -447,6 +456,7 @@ checker follows.
 with one process requesting forever while the others take turns. TLA+ writes
 `\A p \in Procs : WF_vars(Acquire(p))`, and so does ExTLA:
 
+<!-- tla:skip reason=fairness declarations on their own, not a compilable module -->
 ```elixir
 fairness :strong, acquire_lock: [:p]                   # SF for each value of p, separately
 fairness :weak, release_lock: [:p], return_to_idle: [:p]
@@ -469,6 +479,7 @@ it as a violation by default. Some specs terminate on purpose — a bounded prod
 that has produced `^max_items`, an election whose term bound is exhausted. Those
 states are declared:
 
+<!-- tla:skip reason=a terminal declaration on its own, not a compilable module -->
 ```elixir
 terminal :all_items_consumed do
   produced_count == ^max_items and len(buffer) == 0
@@ -629,6 +640,7 @@ false for exactly one row.
 
 The transfer protocol from `04-layer2-model-checker.md`, in the settled syntax:
 
+<!-- tla:spec -->
 ```elixir
 defmodule Specs.TransferProtocol do
   use TLA.Spec
