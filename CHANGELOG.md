@@ -30,6 +30,30 @@ release it merely follows.
 
 ### Fixed
 
+- **The guides are reachable from the README** (#289, closes #155). `README.md` contained
+  **zero** occurrences of `guides/`, `getting-started` or `tutorial` while linking into
+  `spec/` eleven times, and its repository-layout table listed the offline proposal tracker
+  and not the guides. `mix.exs` sets `main: "readme"`, so that is the first page every
+  hexdocs reader lands on, and it routed them into the normative specification — which
+  `mix.exs` itself calls "the authority" that the guides link *to*.
+
+  The front page now opens the two paths by name, `guides/` is in the layout table, and the
+  command list names all **six** packaged `mix tla.*` tasks rather than three
+  (`mix tla.explore` and `mix tla.stamp` were absent, as #155 found; `mix tla.visualize`
+  appeared only in prose).
+
+  `test/docs/readme_entry_test.exs` holds that list to **`CLI_SURFACE.md`**, which is
+  generated from the tasks that exist and gated by `surface-drift` — so the README's list
+  is a fact about the code rather than a hand-kept set that goes stale the way the install
+  pin did. It also fails if the README mentions a task that is *not* packaged, since a
+  reader following it could not run one.
+
+  The README's **proportions** are deliberately untouched: the Status section runs half the
+  file, sits above the reasons to use the library, and "who is this for" is never stated.
+  #155 left that for its own decision on the grounds that bundling a rewrite with a
+  navigation fix would stall the fix, and the gate records that rather than quietly
+  adopting it.
+
 - **The tutorial's forward chain is restored, and gated** (#288, for #155). Nine of eleven
   pages ended with a `Next:` line; `07-layer3.md` ended with a "Where to next" section
   listing four links into `spec/` — the heading `getting-started.md` uses where it genuinely
