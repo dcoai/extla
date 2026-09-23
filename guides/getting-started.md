@@ -334,10 +334,13 @@ code, and it is the question the tool exists to make you answer.
 
 ## Where to next
 
-- [The tutorial](tutorial/00-introduction.md) — where this comes from and what it is for,
-  then the same lock taken further: the coverage report,
-  liveness and what fairness does to it, symmetry, and then checking a running GenServer against
-  the spec.
+- [The tutorial](tutorial/00-introduction.md) — eleven pages, in order. Where this comes from
+  and what it is for, the mathematics underneath the DSL, then the same lock taken further: the
+  coverage report, liveness and what fairness does to it, symmetry, and checking a running
+  GenServer against the spec. The last three leave the lock behind and take up your own code —
+  [getting from a system you have to a specification](tutorial/08-modelling.md),
+  [what to do when the state space explodes](tutorial/09-when-it-explodes.md), and
+  [keeping a specification in a project](tutorial/10-in-your-project.md).
 - `mix help tla.check` — the flags, and the exit codes.
 - [`02-dsl-semantics.md`](../spec/02-dsl-semantics.md) — the DSL, normatively: the three name
   classes, what an action body means, where nondeterminism comes from, types.
