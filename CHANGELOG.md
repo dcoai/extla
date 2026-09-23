@@ -30,6 +30,30 @@ release it merely follows.
 
 ### Fixed
 
+- **The docs build fails on an unresolved reference** (#291, closes #156). The `docs` job ran
+  `mix docs` with no `--warnings-as-errors`, so it emitted warnings and **exited 0** — ten
+  when #156 was filed, **34** by the time it was implemented. `TLA.DocLinks` cannot see them:
+  it scans `@href` in the built HTML, and an unresolvable reference emits **no href at all**,
+  rendering as plain inline code. A gate that cannot see the surface the defect lives on,
+  which is #102's shape one door over.
+
+  **Three of the thirty-four were introduced by #277, two days after D-30 was written, by the
+  same hand.** Its moduledoc table named `Liveness.shape/4`, `GenServer.Runtime.verdict/3` and
+  `Coverage.walk/3` in the backticked autolink form that D-30 exists to forbid, and nothing
+  said so. D-30's `Pinned by:` promised this gate; it now names it.
+
+  The thirty-four fell into four classes and each got the treatment its class calls for:
+  **wrong markup, right name** — a callback needs `c:`, a type needs `t:`, and
+  `Kernel.require/2` is `Kernel.SpecialForms.require/2`; **prose about an internal**, which
+  D-30 governs, reworded to name the function plainly; **removed or renamed functions in
+  `CHANGELOG.md`**, which D-30 explicitly exempts — *a changelog that cannot name a removed
+  function cannot record a removal* — implemented as
+  `skip_undefined_reference_warnings_on: ["CHANGELOG.md"]` rather than by rewording history;
+  and **references to filtered modules**, for which ex_doc offers no exemption (its warning
+  is unconditional) and which D-30's *main* rule covers anyway, since a module
+  `filter_modules` keeps out of the published docs is an internal from a consumer's point of
+  view.
+
 - **The slug cross-check runs, for the first time** (#290, for #156). It validates
   `TLA.GuideCheck.Links.slug/1` against ExDoc's **real generated ids** — the only thing
   proving the link gate's anchor model is true, since every `#heading` link in every guide
@@ -360,7 +384,7 @@ release it merely follows.
 - **`PACKAGE_SURFACE.md`, and the published docs stop advertising what the package omits**
   (#274, from #270). `mix docs` runs under `MIX_ENV=dev` because `ex_doc` is a dev dependency,
   and `elixirc_paths(:dev)` includes `ledger/` — so the published documentation carried
-  **eleven modules** a consumer cannot call, `TLA.Ledger` and `mix tla.coverage` among them.
+  **eleven modules** a consumer cannot call, TLA.Ledger and mix tla.coverage among them.
   Nobody decided to document the ledger; the docs job's environment did, and the two halves of
   the promise were checked in two environments that cannot see each other (`consumer-compile`
   compiles the package and has no `ex_doc`; the docs job builds pages and never reads
@@ -411,7 +435,7 @@ release it merely follows.
 - **One `surface-drift` job for every golden.** `tla-coverage-drift` is renamed and runs both
   `mix tla.coverage --check` and `mix tla.api_surface --check`; the goldens #270 still owes
   join it rather than each minting a job. The three-outcome check — current, drifted, missing —
-  is now `TLA.Surface.check!/4`, shared by both tasks, so there is one definition of "drifted".
+  is now TLA.Surface's `check!/4`, shared by both tasks, so there is one definition of "drifted".
   `TLA_COVERAGE.md`'s header names the new gate and was regenerated.
 
 - **CI's compiled dependencies come from the depdep store alone** (#251, closes #250). depdep

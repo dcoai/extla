@@ -362,7 +362,11 @@ docs:
   extends: .elixir
   stage: verify
   script:
-    - MIX_ENV=dev mix docs
+    # `--warnings-as-errors` since #291. The build emitted 34 unresolved references and
+    # exited 0, and `TLA.DocLinks` cannot see them: it scans `@href` in the built HTML, and
+    # an unresolvable reference emits NO href — it renders as plain inline code. A gate that
+    # cannot see the surface the defect lives on, which is #102's shape one door over.
+    - MIX_ENV=dev mix docs --warnings-as-errors
     - mix test test/docs --include needs_built_docs
 
 tlc-corpus:

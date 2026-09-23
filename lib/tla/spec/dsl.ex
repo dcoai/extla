@@ -3,7 +3,7 @@ defmodule TLA.Spec.DSL do
   The macros that form the specification DSL.
 
   Each one accumulates a declaration into a module attribute and defines the
-  functions that declaration compiles to; `TLA.Spec.__before_compile__/1`
+  functions that declaration compiles to; the generated `__before_compile__/1`
   assembles them into a `TLA.Spec.Compiled` struct.
 
   Every rule in `02-dsl-semantics.md` is checked here, when the spec module

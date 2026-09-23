@@ -47,7 +47,7 @@ defmodule TLA do
 
   It looks like Elixir and is not: `=` inside `init` or `action` is a next-state equation
   rather than a rebinding, `^name` is a constant rather than a match pin, and `require` is
-  an enabling condition rather than `Kernel.require/2`.
+  an enabling condition rather than `Kernel.SpecialForms.require/2`.
   [`02-dsl-semantics.md`](spec/02-dsl-semantics.md) is the normative account.
 
   ## Where things are written down
