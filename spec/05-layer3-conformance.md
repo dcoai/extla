@@ -59,6 +59,7 @@ comparison per callback — cheaper than evaluating the invariants beside it.
 
 ### Usage
 
+<!-- tla:skip reason=blocked by #284: validate! probes concrete_message/2 with an empty binding and a param'd mapping cannot answer it. Remove this skip when #284 lands -->
 ```elixir
 defmodule MyApp.TransferServer do
   use GenServer
@@ -184,6 +185,7 @@ end
 
 ### Macro Specification
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.GenServer do
   @moduledoc """
@@ -237,6 +239,7 @@ Like Layer 1, the wrapper is emitted with `defoverridable` and `super/1` rather 
 renaming the original callback (`03-layer1-invariants.md` §Compile-Time Transformation),
 and nothing at all is emitted when `TLA.Config.mode/0` resolves to `:disabled`.
 
+<!-- tla:skip reason=the code the wrapper emits, shown for the reader; what it emits is asserted by conformance step_test -->
 ```elixir
 defoverridable handle_call: 3
 
@@ -295,6 +298,7 @@ layer.
 
 ## Module: `TLA.Refinement`
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Refinement do
   @moduledoc """
@@ -382,6 +386,7 @@ of abstract actions and makes the implementation follow it.
 
 Two sources of such a sequence, and both matter:
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Replay do
   @moduledoc """
@@ -475,6 +480,7 @@ reproduce.
 
 Random-walk simulation of GenServer processes to check conformance over realistic execution traces.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Simulation do
   @moduledoc """
@@ -600,6 +606,7 @@ end
 
 ### Message Generation
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Simulation.Generator do
   @moduledoc """
@@ -645,6 +652,7 @@ end
 
 Automatic generation of property-based tests from specifications.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.PropertyTest do
   @moduledoc """
@@ -752,6 +760,7 @@ end
 
 Formal specification of supervision trees and crash/recovery behavior.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Supervisor.Spec do
   @moduledoc """
@@ -786,6 +795,7 @@ end
 
 ### Example: Supervised Transfer System
 
+<!-- tla:skip reason=deferred past v1 — TLA.Supervisor.Spec is not built; see 06-architecture.md §Implementation Phases -->
 ```elixir
 defmodule Specs.SupervisedTransfer do
   use TLA.Spec
@@ -858,6 +868,7 @@ end
 
 Runtime engine for Layer 3 (not used directly by developers).
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.GenServer.Runtime do
   @moduledoc """
@@ -1050,6 +1061,7 @@ system that is actually running.
 
 ### `mix tla.simulate`
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Simulate do
   @moduledoc """
@@ -1130,6 +1142,7 @@ Off by default, and it runs traces one at a time: containment is a question abou
 
 ### `mix tla.replay`
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Replay do
   @moduledoc """
@@ -1197,6 +1210,7 @@ end
 > generators are those helpers, and they are built. Specified here so the design is not
 > painted into a corner, and not built.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Gen.Test do
   @moduledoc """
@@ -1224,6 +1238,7 @@ It reads `.ex` source directly rather than loading modules, because a stale stam
 project may not compile, and a tool for that situation cannot require the situation not to
 exist.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Stamp do
   @moduledoc """
@@ -1291,6 +1306,7 @@ ordinary `def`s in the module, so a documentation edit does not restamp every ma
 > formats are **refused** by the task with a message naming that decision, rather than
 > quietly ignored. Graphviz renders whatever else is wanted: `dot -Tsvg`, `-Tpng`, `-Tpdf`.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Visualize do
   @moduledoc """

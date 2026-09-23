@@ -254,25 +254,56 @@ defmodule TLA.GuideCheckTest do
     end
   end
 
-  describe "the real guides/" do
+  describe "the real pages" do
     # Written before any guide existed (#95), so the gate was wired before the prose -- nobody
-    # retrofits a gate to a guide that already passes. It now covers getting-started (#96) and
-    # every page of the tutorial (#97, #99).
-    test "every guide in guides/ tells the truth" do
-      guides = GuideCheck.guides()
+    # retrofits a gate to a guide that already passes. It now covers getting-started (#96),
+    # every page of the tutorial (#97, #99), and since #281 all of `spec/` and `README.md`.
+    test "every page tells the truth" do
+      pages = GuideCheck.pages()
 
-      if guides == [] do
-        # Stated rather than skipped. A silently vacuous test is the "gate that cannot fail"
-        # this project keeps rejecting; saying so out loud is the same move TLA_COVERAGE.md
-        # makes when it records an item as NOTHING instead of omitting it.
-        assert not File.dir?("guides"),
-               "guides/ exists but holds no .md files — this check would be silently vacuous"
-      else
-        failures = Enum.flat_map(guides, &GuideCheck.check/1)
+      failures = Enum.flat_map(pages, &GuideCheck.check/1)
 
-        assert failures == [],
-               "guides make claims the code does not support:\n\n" <> Enum.join(failures, "\n")
-      end
+      assert failures == [],
+             "pages make claims the code does not support:\n\n" <> Enum.join(failures, "\n")
+    end
+
+    # Anti-vacuity. The test above passes on an empty list, and the list is a glob — one
+    # wrong path and it checks nothing while reporting green, which is the failure shape
+    # #164's layer 2 had. The counts are lower bounds rather than equalities so that adding
+    # a page does not fail an unrelated build; what they catch is a glob that stopped
+    # matching.
+    test "and the pages are actually found, in all three trees" do
+      pages = GuideCheck.pages()
+
+      assert "guides/getting-started.md" in pages
+      assert "spec/02-dsl-semantics.md" in pages
+      assert "README.md" in pages
+
+      blocks = Enum.flat_map(pages, &GuideCheck.blocks/1)
+
+      assert length(pages) >= 18
+      assert length(blocks) >= 100, "only #{length(blocks)} blocks found; the glob is wrong"
+    end
+
+    # `spec/` is the half #281 added, and the one whose blocks are mostly NOT compiled —
+    # they are API sketches another gate owns. "Nothing compiles this" and "something else
+    # gates this" are different facts, and this asserts the second is what is written down:
+    # every block in `spec/` and `README.md` is annotated, one way or the other.
+    test "every block in spec/ and README.md is compiled or skipped with a reason" do
+      unannotated =
+        for path <- GuideCheck.pages(),
+            String.starts_with?(path, "spec/") or path == "README.md",
+            {annotation, _code, line} <- GuideCheck.blocks(path),
+            annotation.kind in [:none, :bad_fence] or
+              (annotation.kind == :skip and annotation[:reason] in [nil, ""]),
+            do: "#{path}:#{line} — #{annotation.kind}"
+
+      assert unannotated == [], """
+      #{length(unannotated)} blocks in the specification are neither compiled nor skipped
+      with a reason:
+
+        #{Enum.join(unannotated, "\n  ")}
+      """
     end
   end
 
@@ -373,6 +404,35 @@ defmodule TLA.GuideCheckTest do
          %{tmp_dir: tmp} do
       path = guide(tmp, block("tla:skip reason=illustrative-pseudocode", ":whatever\n"))
 
+      assert GuideCheck.check(path) == []
+    end
+
+    # #215, enforced by #281. "An unannotated block is an unchecked claim" is the rule one
+    # test up, and a reasonless skip is an unchecked claim wearing an annotation.
+    test "a skip with no reason is rejected", %{tmp_dir: tmp} do
+      path = guide(tmp, block("tla:skip", ":whatever\n"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "tla:skip needs a reason"
+    end
+
+    test "and an empty reason is the same thing", %{tmp_dir: tmp} do
+      path = guide(tmp, block(~s(tla:skip reason=""), ":whatever\n"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "needs a reason"
+    end
+
+    # A reason is a sentence, and the value scanner reads one token: `reason=a shell
+    # invocation, and the timing is from this machine` was parsed as "a". Nothing failed,
+    # because until #281 nothing asked what a reason SAID — and a rule that reads one word
+    # of it would accept `reason=x` for anything.
+    test "a reason runs to the end of the annotation, spaces and all", %{tmp_dir: tmp} do
+      reason = "an API sketch, gated by spec_api_test"
+      path = guide(tmp, block("tla:skip reason=#{reason}", ":whatever\n"))
+
+      assert [{annotation, _code, _line}] = GuideCheck.blocks(path)
+      assert annotation[:reason] == reason
       assert GuideCheck.check(path) == []
     end
 

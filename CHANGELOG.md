@@ -30,6 +30,30 @@ release it merely follows.
 
 ### Fixed
 
+- **`spec/` and `README.md` are under the guide harness: 76 blocks, compiled or skipped with
+  a reason** (#281, for #178). Every `elixir` fence in the specification was compiled by
+  nothing. Most are API sketches whose signatures `spec_api_test` already holds to
+  `API_SURFACE.md`, so the gap was smaller than the count suggests — but "nothing compiles
+  this" and "something else gates this" read identically in an unannotated block, and only
+  one of them is acceptable. D-34 records the rule and the four kinds of skip.
+
+  **The pass found three things nobody was looking for.** An **empty** `elixir` block stood
+  in for `TLA.Profile`'s API block (§Per-declaration cost, since #130) — the section's prose
+  describes `instrument/1` beside a fence containing nothing; it now carries the sketch, and
+  `spec_api_test` holds it to the golden. And the two conformance examples a reader is most
+  likely to copy — `spec/05`'s `MyApp.TransferServer` and `spec/07`'s `MyApp.LockServer` —
+  **do not compile**: `TLA.Refinement.validate!/3` probes `concrete_message/2` with an empty
+  binding, which a mapping for an action with params cannot answer, so it raises
+  `FunctionClauseError` from inside the validator. Filed as #284; both blocks are skipped
+  naming it, and those skips are meant to disappear.
+
+  `<!-- tla:skip -->` with no reason is now **refused** (#215): the harness's own rule is
+  that an unannotated block is an unchecked claim, and a reasonless skip is an unchecked
+  claim wearing an annotation. A `reason=` also runs to the end of the annotation rather
+  than to the first space — `reason=a shell invocation, and the timing is from this machine`
+  had been parsed as the word "a" ever since reasons existed, which nothing noticed because
+  nothing had ever asked what a reason said.
+
 - **`spec/07`'s examples are the corpus, not a copy of it** (#280, for #178). Three corpus
   moduledocs said "Example N verbatim, which is the point: the corpus checks the
   documentation, not a paraphrase of it". `git log` dates that sentence to 2026-08-30/31

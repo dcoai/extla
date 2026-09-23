@@ -955,3 +955,41 @@ counterexample carries the description its author wrote", and
 the property's name" — the hop below it.
 
 See `02-dsl-semantics.md` §5.1, `03-layer1-invariants.md` §Macro Specification.
+
+---
+
+## D-34 — A block the specification shows is compiled, or says why not
+
+**Decided.** Every `elixir` block in `spec/` and `README.md` is either compiled by the
+guide harness or carries `<!-- tla:skip reason=… -->`, and the reason names **what the
+block is** and, where another gate owns it, **which one**. A bare `tla:skip` is refused.
+
+**Why.** Seventy-six fences were compiled by nothing. Most are API sketches whose
+signatures `spec_api_test` already holds to `API_SURFACE.md`, so the gap was smaller than
+the count suggests — but "nothing compiles this" and "something else gates this" read
+identically in an unannotated block, and only one of them is acceptable. This is #156's
+rule about empty spaces, applied to code fences, and `TLA_COVERAGE.md`'s about items:
+something nobody verified is recorded as unverified, never omitted.
+
+The pass found three things nobody was looking for: an **empty** `elixir` block standing
+in for `TLA.Profile`'s API (§Per-declaration cost, since #130), and two conformance
+examples — the ones a reader copies — that cannot compile, because `TLA.Refinement`'s
+validator probes `concrete_message/2` with an empty binding and a mapping for an action
+with params cannot answer it (#284).
+
+**What the skips record, and what they are not.** Four kinds:
+
+- an API sketch, gated by `spec_api_test` — the largest group, and not a gap at all;
+- a fragment: an `action` or `invariant` declaration shown on its own, which is not a
+  compilable module and is not meant to be;
+- a deferred design — `TLA.Supervisor.Spec`, `Mix.Tasks.Tla.Gen.Test` — skipped with the
+  phase that owns it, so the block reads as unbuilt rather than as broken;
+- a block blocked by a defect, naming the issue. Those are the only skips that should
+  disappear: when #284 lands, two of them go.
+
+**Recorded 2026-09-23 (#178); built at #281.**
+
+**Pinned by:** `test/guides/guide_check_test.exs` "every block in spec/ and README.md is
+compiled or skipped with a reason" and "a skip with no reason is rejected".
+
+See `spec/README.md` §How this specification stays true.

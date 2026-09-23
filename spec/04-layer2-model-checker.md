@@ -35,6 +35,7 @@ The three rules from that file that shape everything here:
 
 ### DSL Macro Reference
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Spec do
   # Registered in the macro BODY, not inside the quote, and the DSL macros
@@ -65,6 +66,7 @@ end
 parameter pattern matches only the second shape. The macros merge the two and
 pop `:do`, so both call forms work.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Spec.DSL do
   @moduledoc """
@@ -184,6 +186,7 @@ end
 
 An earlier draft ended each spec with:
 
+<!-- tla:skip reason=TLA+ notation, not Elixir — the shape this DSL deliberately does not have -->
 ```elixir
 spec do
   init()
@@ -205,6 +208,7 @@ with defined semantics, added to `02-dsl-semantics.md` first.
 
 ### Helper Functions Available in DSL Blocks
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Spec.Helpers do
   @moduledoc """
@@ -282,6 +286,7 @@ end
 
 The `@before_compile` hook transforms DSL declarations into a compiled specification data structure:
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Spec.Compiled do
   @moduledoc """
@@ -453,6 +458,7 @@ The core model checking engine. Performs breadth-first exhaustive exploration of
 
 ### API
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.ModelChecker do
   @moduledoc """
@@ -535,6 +541,7 @@ until #208, and the budget one is the case that mattered: `mix tla.check
 went unmentioned in a green result. A spec with no temporal property gets no such warning;
 it was not deprived of a check it never asked for.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.ModelChecker do
   @type result :: %{
@@ -618,6 +625,7 @@ end
 
 ### State Graph
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.StateGraph do
   @moduledoc """
@@ -789,6 +797,7 @@ mechanisms, in order of cost to implement and value delivered.
 expanded. This bounds an otherwise-unbounded variable (a growing sequence, an
 unbounded counter) without changing the spec:
 
+<!-- tla:skip reason=one config option on its own, not a compilable module -->
 ```elixir
 state_constraint: fn s -> length(s.log) <= 5 end
 ```
@@ -857,6 +866,7 @@ it pays off (`00-prior-art.md`).
 
 ## Module: `TLA.ModelChecker.Safety`
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.ModelChecker.Safety do
   @moduledoc """
@@ -899,6 +909,7 @@ end
 
 ## Module: `TLA.ModelChecker.Liveness`
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.ModelChecker.Liveness do
   @moduledoc """
@@ -1018,6 +1029,7 @@ work, and every one is a cheap read off the state graph the checker already
 built. Reporting them is not a nice-to-have — it is the difference between a
 verdict and a claim.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Coverage do
   @moduledoc """
@@ -1140,7 +1152,53 @@ answer cost, which is the half a spec author can act on: "invariant checking is 
 about the checker, and "`quorum_agrees` costs 2,400 reductions each of 58,359 times" is a fact
 about the spec in front of them.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
+defmodule TLA.Profile do
+  @moduledoc """
+  What each of *your* declarations cost, measured in reductions.
+
+  Reductions rather than milliseconds: a number in milliseconds is a fact about the
+  machine that produced it, and a specification is not re-read on that machine.
+  `calibrate/0` states the conversion this machine implies, once, beside the table.
+  """
+
+  @type kind :: :invariant | :terminal | :action_property | :guard | :transition
+
+  @type key :: {kind(), atom()}
+
+  @type entry :: %{
+    evaluations: non_neg_integer(),
+    reductions: non_neg_integer(),
+    per_eval: float(),
+    observed: non_neg_integer(),
+    settled: boolean()
+  }
+
+  @type t :: %__MODULE__{
+    declarations: %{key() => entry()},
+    calibration: float() | nil,
+    run_reductions: non_neg_integer(),
+    otp_version: String.t()
+  }
+
+  @doc """
+  Wrap a compiled spec's closures so each call is counted and measured.
+
+  No macro work and no recompilation: the closures `TLA.Spec.Compiled` already holds are
+  wrapped, which is why an unprofiled run pays nothing at all.
+  """
+  def instrument(spec)
+
+  @doc "A fresh accumulator for `spec`, with an entry per declaration it makes."
+  def init(spec)
+
+  @doc "The per-declaration table, ordered by total cost."
+  def format(profile, opts \\ [])
+
+  @doc "Reductions per second on this machine, so a reduction count can be read as time."
+  def calibrate()
+end
 ```
 
 Enabled by `profile: true` (`mix tla.check --profile`) and **off by default**: `instrument/1`
@@ -1264,6 +1322,7 @@ the run.
 
 Counterexample trace generation.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Trace do
   @moduledoc """
@@ -1341,6 +1400,7 @@ and doing arithmetic by hand.
 `explore/3` evaluates the reader's own expressions instead, one row each, one column per
 state:
 
+<!-- tla:skip reason=a call shown on its own, gated by trace_explore_test -->
 ```elixir
 TLA.Trace.explore(trace,
   waiting: &length(&1.waiting),
@@ -1434,6 +1494,7 @@ State 3 [VIOLATION]:
 
 Parallel state exploration using BEAM concurrency.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.ModelChecker.Parallel do
   @moduledoc """
@@ -1473,6 +1534,7 @@ end
 
 ### Mix Task: `mix tla.check`
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Check do
   @moduledoc """
@@ -1716,6 +1778,7 @@ actually in scope — rather than the same typo reported once per state in cells
 Exit codes: `0` when the table was rendered, `1` for a bad `--expr` or a file that is not a
 counterexample for this spec.
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule Mix.Tasks.Tla.Explore do
   @moduledoc """
@@ -1745,6 +1808,7 @@ end
 
 ### ExUnit Integration
 
+<!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
 defmodule TLA.Spec.Test do
   @moduledoc """
