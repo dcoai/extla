@@ -30,6 +30,23 @@ release it merely follows.
 
 ### Fixed
 
+- **The slug cross-check runs, for the first time** (#290, for #156). It validates
+  `TLA.GuideCheck.Links.slug/1` against ExDoc's **real generated ids** — the only thing
+  proving the link gate's anchor model is true, since every `#heading` link in every guide
+  is accepted or rejected by that reimplementation. It lived in `test/guides/`, and the
+  `docs` job — the only one that builds `doc/` — runs `mix test test/docs`. So in CI it
+  always took its `else` branch, asserted that a directory does not exist, and passed.
+
+  Its author had anticipated vacuity and written a guard; the guard fired on the wrong
+  condition, so the check reported green for never having run. **This project's own
+  cardinal sin, arriving through directory layout rather than through anyone's decision.**
+
+  It now lives in `test/docs/slug_model_test.exs` with `@moduletag :needs_built_docs`
+  (#217's mechanism, which `package_docs_test.exs` next door already uses — and whose
+  moduledoc names this very test as what it was avoiding becoming), and its guard **fails**
+  on an absent `doc/` rather than passing. Run against a real build it passes, which is the
+  first evidence the slug model was ever correct.
+
 - **The guides are reachable from the README** (#289, closes #155). `README.md` contained
   **zero** occurrences of `guides/`, `getting-started` or `tutorial` while linking into
   `spec/` eleven times, and its repository-layout table listed the offline proposal tracker

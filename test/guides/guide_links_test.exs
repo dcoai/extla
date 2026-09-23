@@ -115,33 +115,10 @@ defmodule TLA.GuideCheck.LinksTest do
              "guides link to things that do not exist:\n\n" <> Enum.join(failures, "\n")
     end
 
-    test "the slug matches what ExDoc actually generated, where the docs have been built" do
-      # A slug is only useful if it is ExDoc's. When `mix docs` has run, compare against the ids
-      # in the output rather than trusting the reimplementation; when it has not, say so instead
-      # of passing vacuously.
-      built = "doc/02-dsl-semantics.html"
-
-      if File.regular?(built) do
-        ids =
-          ~r/id="([^"]+)"/
-          |> Regex.scan(File.read!(built))
-          |> Enum.map(fn [_, id] -> id end)
-          |> MapSet.new()
-
-        headings =
-          ~r/^\#{2,6}[ \t]+(.+?)[ \t]*$/m
-          |> Regex.scan(File.read!("spec/02-dsl-semantics.md"))
-          |> Enum.map(fn [_, heading] -> heading end)
-
-        for heading <- headings do
-          assert MapSet.member?(ids, Links.slug(heading)),
-                 "slug/1 gave #{inspect(Links.slug(heading))} for #{inspect(heading)}, " <>
-                   "which is not an id in #{built}"
-        end
-      else
-        assert not File.dir?("doc"),
-               "doc/ exists but #{built} does not — this comparison would be silently vacuous"
-      end
-    end
+    # The slug cross-check moved to `test/docs/slug_model_test.exs` (#290). It lived here,
+    # and the `docs` job — the only one that builds `doc/` — runs `mix test test/docs`, so
+    # it took its `else` branch on every CI run, asserted that a directory does not exist,
+    # and passed. It had never run. It now carries `:needs_built_docs` and FAILS on an
+    # absent `doc/` rather than passing, which is the shape `package_docs_test.exs` uses.
   end
 end
