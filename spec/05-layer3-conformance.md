@@ -59,7 +59,7 @@ comparison per callback — cheaper than evaluating the invariants beside it.
 
 ### Usage
 
-<!-- tla:skip reason=blocked by #284: validate! probes concrete_message/2 with an empty binding and a param'd mapping cannot answer it. Remove this skip when #284 lands -->
+<!-- tla:spec -->
 ```elixir
 defmodule MyApp.TransferServer do
   use GenServer
@@ -365,6 +365,22 @@ defmodule TLA.Refinement do
   5. Every spec action is named by at least one `abstract_action/1` clause.
      An action the mapping can never produce is dead in this implementation, and
      is reported the way `TLA.Coverage` reports a never-enabled action.
+
+  **Rules 4 and 5 need a binding to probe with, and an action with params has
+  none where the constants have no values.** A published example declares
+  `constant :processes` without a `default:` — the assignment belongs to a run —
+  so at the point this runs there is no initial state to draw a binding from.
+  Those actions are **not probed**, and are named in the returned list of rules
+  that could not be decided.
+
+  Probing them anyway is what this function used to do, with `%{}` for a binding.
+  For an action with no params that is the real binding and the probe is sound;
+  for one with params it is a binding the search would never produce, so a mapping
+  written for the real ones matched no clause and the probe raised
+  `FunctionClauseError` from inside the validator — on both conformance examples
+  in this specification (#284). An action this call cannot bind is not evidence of
+  a mapping that never names it, which is `08-decisions.md` D-28's rule about
+  conclusions drawn from an absence.
 
   It does NOT attempt to verify that `abstract/1` is pure. An earlier draft
   claimed it did; that is not decidable, and a validator that claims a guarantee

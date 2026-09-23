@@ -320,8 +320,8 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `__using__/1` | `:defmacro` | (_opts) | `902e722d` | `lib/tla/refinement.ex` |
 | `abstract!/3` | `:def` | (refinement, spec, concrete) | `f59064ba` | `lib/tla/refinement.ex` |
-| `validate!/2` | `:def` | (refinement, spec, constants \\ …) | `3f007e43` | `lib/tla/refinement.ex` |
-| `validate!/3` | `:def` | (refinement, spec, constants \\ …) | `3f007e43` | `lib/tla/refinement.ex` |
+| `validate!/2` | `:def` | (refinement, spec, constants \\ …) | `2abf145b` | `lib/tla/refinement.ex` |
+| `validate!/3` | `:def` | (refinement, spec, constants \\ …) | `2abf145b` | `lib/tla/refinement.ex` |
 ## TLA.Replay — 4 items
 
 | Item | Kind | Shape | Version | Locus |

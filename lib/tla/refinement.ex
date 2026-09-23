@@ -117,7 +117,7 @@ defmodule TLA.Refinement do
       # than "this action does not round-trip", and it is the same fault.
       names_every_action!(refinement, spec, constants)
       round_trips!(refinement, spec, constants)
-      {:ok, deferred}
+      {:ok, deferred ++ unprobed(spec, constants)}
     else
       {:ok,
        deferred ++
@@ -177,6 +177,45 @@ defmodule TLA.Refinement do
       do: "",
       else: "\n  extra:   #{inspect(Enum.sort(extra))}"
   end
+
+  # The actions the two probes above could not reach, as deferred rules rather than as
+  # silence (#284).
+  #
+  # This is what `deferred` is for — "the rules it could not decide, so a caller can say so
+  # rather than imply everything was checked" — and it is the honest answer to a question
+  # this function could not previously ask. An action with params and no resolvable
+  # constants is not checked for being named or for round-tripping, and a validator that
+  # returned a fixed list would report the same two deferrals whether it had probed nine
+  # actions or none.
+  #
+  # Not a warning, deliberately: a published specification declares `constant :processes`
+  # without a `default:` because the assignment belongs to a run, so this is the ordinary
+  # state of a correct example and a compile-time warning on it would be noise the reader
+  # cannot act on. The caller asked for the list and is given it.
+  defp unprobed(spec, constants) do
+    case for action <- spec.actions, sample_params(spec, action, constants) == [], do: action.name do
+      [] ->
+        []
+
+      names ->
+        [
+          "every spec action is named by an `abstract_action/1` clause, and round-trips — " <>
+            "except #{inspect(Enum.sort(names))}, whose params have no binding here: " <>
+            "#{unassigned(spec, constants)}. Both rules are checked for those actions " <>
+            "wherever the constants have values."
+        ]
+    end
+  end
+
+  defp unassigned(spec, constants) do
+    case Enum.reject(Spec.Compiled.constant_names(spec), &is_map_key(constants, &1)) do
+      [] -> "no initial state could be built to draw one from"
+      missing -> "#{inspect(Enum.sort(missing))} #{was_were(missing)} not assigned"
+    end
+  end
+
+  defp was_were([_one]), do: "is"
+  defp was_were(_many), do: "are"
 
   # ── Compile-time rules ──────────────────────────────────────────────────────
 
@@ -288,18 +327,40 @@ defmodule TLA.Refinement do
 
   # One binding per action, drawn on an initial state — enough to round-trip a mapping
   # without exploring the state space, which is `mix tla.check`'s job and not this one's.
+  # The bindings to probe a mapping with, and `[]` where there are none to probe it with.
+  #
+  # An action with no params has exactly one binding — the empty one — so `%{}` is the real
+  # thing and every check below is meaningful for it. An action WITH params has no binding
+  # this call can construct when it has no state to draw from: `%{}` is not a binding the
+  # search would ever produce, and a mapping written for the real ones cannot match it.
+  #
+  # It used to be probed anyway, and `concrete_message(:request_lock, %{})` raised
+  # `FunctionClauseError` from inside the validator — on the two conformance examples the
+  # specification publishes, which is to say on the shape most likely to be copied (#284).
+  # A published example declares `constant :processes` without a `default:`, because the
+  # assignment belongs to a run; that is exactly when `initial_state/2` is `nil`.
+  #
+  # So it is not probed. An action this call cannot bind is not evidence of a mapping that
+  # never names it, and reporting one would be a finding drawn from an absence — the rule
+  # `TLA.Conformance.against_graph/3` applies when it refuses to audit a bounded run, and
+  # D-28 states for a negative existential out of a bounded search.
   defp sample_params(spec, action, constants) do
     case initial_state(spec, constants) do
       nil ->
-        [%{}]
+        unbindable(action)
 
       state ->
         case TLA.ModelChecker.bindings(action, constants, state) do
-          [] -> [%{}]
+          # A param whose set is empty in the initial state leaves an action with params
+          # and no bindings, which is the same position as `nil` above.
+          [] -> unbindable(action)
           bound -> Enum.take(bound, 3)
         end
     end
   end
+
+  defp unbindable(%{params: []}), do: [%{}]
+  defp unbindable(_action), do: []
 
   # One initial state, for drawing sample bindings from. `nil` when the spec has a
   # constant this call was given no value for — a mapping can still be validated on the

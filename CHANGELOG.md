@@ -30,6 +30,29 @@ release it merely follows.
 
 ### Fixed
 
+- **A refinement mapping is probed only where a binding exists** (#286, closes #284).
+  `TLA.Refinement.validate!/3` applied `concrete_message/2` to `%{}` whenever the spec's
+  constants had no values — which is whenever a *published* example is compiled, since
+  `constant :processes` without a `default:` is what a reader should write. For an action
+  with no params `%{}` is the real binding; for one with params it is a binding the search
+  would never produce, so a mapping written for the real ones matched no clause and the
+  probe raised **`FunctionClauseError` from inside the validator**. Both conformance
+  examples in the specification — `spec/05`'s `MyApp.TransferServer` and `spec/07`'s
+  `MyApp.LockServer` — could not compile, which is how #281 found this.
+
+  An action this call cannot bind is not evidence of a mapping that never names it, so it
+  is **not probed and not reported** — D-28's rule about conclusions drawn from an
+  absence, which `against_graph/3` and #278 already apply. It is not silent either: the
+  un-probed actions are returned in the list of rules `validate!` "could not decide",
+  which is what that list has always been for. No compiler warning, because a published
+  example has no constants by design and a warning there is noise a reader cannot act on.
+
+  It survived because **every refinement fixture in `test/conformance/` is for a spec
+  whose actions take no params**, so the suite exercised exactly the one case the fallback
+  handled. `test/conformance/param_mapping_test.exs` is the missing case, and the two
+  specification blocks lost their `tla:skip` — so the guide harness compiles them and a
+  regression reddens the gate rather than a unit test.
+
 - **§Implementation Phases withdraws its single-source claim; the graph and §Concurrency
   describe the code** (#282, for #179). The four phases were written as a *plan* and ended
   honestly on 2026-09-01; the sentence "this section is the single source of truth for what
