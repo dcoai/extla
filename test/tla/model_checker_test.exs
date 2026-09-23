@@ -44,17 +44,55 @@ defmodule TLA.ModelCheckerTest do
     # The §8 worked example appends to `log` on every completed transfer and
     # `reset`s back to :idle, so its state space is infinite. That is what state
     # constraints are for, and the status says the run was bounded.
+    #
+    # `invariants: [:type_ok]` rather than `[]`, which is what stood here and carried a
+    # comment about the constraint and none about itself (#280). This spec is DELIBERATELY
+    # refutable — `fail_transfer` discards `pending` without refunding it, which is the
+    # counterexample `04-layer2-model-checker.md` prints as its worked example — so leaving
+    # every invariant selected would halt the search at depth 3 and this test would be
+    # measuring a violation rather than a bound. Deselecting all of them instead made the
+    # run check nothing at all, and the documented violation was pinned by no test
+    # anywhere. `:type_ok` holds over the whole constrained space, so the run reaches its
+    # bound while still checking something, and the violation is pinned below.
     test "explores a spec with params, under a constraint that bounds its log" do
       result =
         ModelChecker.run(Transfer, %{
           constants: %{accounts: MapSet.new([:alice, :bob]), max_balance: 2},
-          invariants: [],
+          invariants: [:type_ok],
           check_deadlock: false,
           state_constraint: fn state -> length(state.log) <= 1 end
         })
 
       assert result.status == :constrained
       assert result.distinct_states > 10
+    end
+
+    # `02-dsl-semantics.md` §8 says its example is refuted by `conservation_of_money`, and
+    # `04-layer2-model-checker.md` §Example Trace Output prints the counterexample: three
+    # states, ending with `pending` emptied and the money gone. Nothing asserted it. A
+    # "fix" to `fail_transfer` — which is what #280 was originally scoped to do — would
+    # have left that printed trace describing a run that no longer happens, silently.
+    test "and the worked example is refuted exactly as §04's trace output shows" do
+      result =
+        ModelChecker.run(Transfer, %{
+          constants: %{accounts: MapSet.new([:alice, :bob]), max_balance: 2},
+          check_deadlock: false,
+          state_constraint: fn state -> length(state.log) <= 1 end
+        })
+
+      assert result.status == :violation
+      assert result.violation.property == :conservation_of_money
+      assert result.violation.length == 3
+
+      [initial | _] = result.violation.states
+      last = List.last(result.violation.states)
+
+      assert result.violation.actions == [:begin_transfer, :fail_transfer]
+      assert last.status == :error
+      assert Enum.empty?(last.pending)
+
+      # The money is gone: the total over balances and pending is less than it was.
+      assert total(last) < total(initial)
     end
 
     test "reports the fingerprint width and the soundness margin it implies" do
@@ -97,6 +135,10 @@ defmodule TLA.ModelCheckerTest do
       assert ModelChecker.run(Broken, %{invariants: [], check_deadlock: false}).status == :ok
       assert ModelChecker.run(Broken, %{invariants: [:below_three]}).status == :violation
     end
+  end
+
+  defp total(state) do
+    Enum.sum(Map.values(state.balances)) + Enum.sum(Enum.map(state.pending, &elem(&1, 1)))
   end
 
   describe "action properties" do

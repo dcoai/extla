@@ -1,12 +1,15 @@
+# Generated from spec/07-examples.md Example 1 — do not edit.
+#
+# Regenerate with `mix tla.examples --write`; the `surface-drift` job fails on a
+# difference. The specification is the page's fence: editing this file is editing a
+# copy, which is the drift D-21 introduced and #280 closed.
 defmodule TLA.Differential.DistributedLock do
   @moduledoc """
-  `DistributedLock.tla`, in the ExTLA DSL — and `spec/07-examples.md` Example 1
-  verbatim, which is the point: the corpus checks the documentation, not a
-  paraphrase of it.
+  `DistributedLock.tla`, in the ExTLA DSL — generated from `spec/07-examples.md` Example
+  1, so "verbatim" holds by construction rather than by discipline.
 
-  TLC checks the safety half. The temporal properties and the fairness
-  constraints below are declared and unchecked in Phase 1; the run says so in its
-  warnings, and Phase 2 is what makes them mean something.
+  What this entry adds over the others is in `test/differential/README.md`. What it
+  *specifies* is the page, and only the page.
   """
   use TLA.Spec
 

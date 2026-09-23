@@ -22,21 +22,23 @@ defmodule Specs.DistributedLock do
   constant :processes
   constant :resources
 
-  variable :owner,   type: [^resources ~> (^processes | :none)]
-  variable :waiting, type: [^resources ~> :set]
-  variable :pc,      type: [^processes ~> (:idle | :requesting | {:holding, ^resources} | :releasing)]
+  variable :owner, type: [^resources ~> (^processes | :none)]
+  variable :waiting, type: [^resources ~> set(^processes)]
+
+  variable :pc,
+    type: [^processes ~> (:idle | :requesting | {:holding, ^resources} | :releasing)]
 
   init do
-    owner   = for_each(^resources, fn _ -> :none end)
+    owner = for_each(^resources, fn _ -> :none end)
     waiting = for_each(^resources, fn _ -> set() end)
-    pc      = for_each(^processes, fn _ -> :idle end)
+    pc = for_each(^processes, fn _ -> :idle end)
   end
 
   action :request_lock, params: [p: ^processes, r: ^resources] do
     require pc[p] == :idle
 
     waiting = update(waiting, r, &put(&1, p))
-    pc      = update(pc, p, fn _ -> :requesting end)
+    pc = update(pc, p, fn _ -> :requesting end)
   end
 
   action :acquire_lock, params: [p: ^processes, r: ^resources] do
@@ -44,9 +46,9 @@ defmodule Specs.DistributedLock do
     require owner[r] == :none
     require member?(waiting[r], p)
 
-    owner   = update(owner, r, fn _ -> p end)
+    owner = update(owner, r, fn _ -> p end)
     waiting = update(waiting, r, &delete(&1, p))
-    pc      = update(pc, p, fn _ -> {:holding, r} end)
+    pc = update(pc, p, fn _ -> {:holding, r} end)
   end
 
   action :release_lock, params: [p: ^processes, r: ^resources] do
@@ -54,7 +56,7 @@ defmodule Specs.DistributedLock do
     require owner[r] == p
 
     owner = update(owner, r, fn _ -> :none end)
-    pc    = update(pc, p, fn _ -> :releasing end)
+    pc = update(pc, p, fn _ -> :releasing end)
   end
 
   action :return_to_idle, params: [p: ^processes] do
@@ -66,10 +68,7 @@ defmodule Specs.DistributedLock do
   # ── Safety ──
 
   # Stated over `pc`, which is per PROCESS, so two processes can in principle
-  # both be `{:holding, r}` — that is what gives this invariant content. An
-  # earlier draft counted processes equal to `owner[r]`, a single-valued field,
-  # which can never exceed one: the property was a tautology of the model's
-  # type, and `near_misses` would have reported 0 for it.
+  # both be `{:holding, r}` — that is what gives this invariant content.
   invariant :mutual_exclusion,
     desc: "at most one process holds any given resource — THE lock property" do
     Enum.all?(^resources, fn r ->
@@ -92,8 +91,6 @@ defmodule Specs.DistributedLock do
     end)
   end
 
-  # `old` and `new` are implicitly bound; a bare variable name here is a
-  # compile error (02-dsl-semantics.md §4).
   action_property :lock_not_stolen do
     Enum.all?(^resources, fn r ->
       old.owner[r] == new.owner[r] or
@@ -101,7 +98,7 @@ defmodule Specs.DistributedLock do
     end)
   end
 
-  # ── Liveness ──
+  # ── Liveness (Phase 2) ──
 
   temporal :no_starvation,
     desc: "every requesting process eventually acquires; needs SF per process" do
@@ -116,13 +113,8 @@ defmodule Specs.DistributedLock do
     end)
   end
 
-  # PER-BINDING fairness (02-dsl-semantics.md §5.2). Whole-action
-  # `fairness :weak, [:acquire_lock]` only guarantees that SOMEBODY acquires,
-  # which is consistent with p1 requesting forever; `no_starvation` needs the
-  # constraint for each p. Strong, because a lock's availability is
-  # intermittent: it is free, another process takes it, it is free again.
-  fairness :strong, acquire_lock: [:p]
-  fairness :weak, release_lock: [:p], return_to_idle: [:p]
+  fairness(:strong, acquire_lock: [:p])
+  fairness(:weak, release_lock: [:p], return_to_idle: [:p])
 end
 ```
 
@@ -297,42 +289,60 @@ defmodule Specs.RaftElection do
   constant :servers
   constant :max_term
 
-  variable :current_term,  type: [^servers ~> 0..^max_term]
-  variable :voted_for,     type: [^servers ~> (^servers | :none)]
-  variable :srv_state,     type: [^servers ~> [:follower, :candidate, :leader]]
-  variable :votes_granted, type: [^servers ~> :set]
-  variable :messages,      type: :set
+  variable :current_term, type: [^servers ~> 0..^max_term]
+  variable :voted_for, type: [^servers ~> (^servers | :none)]
+  variable :srv_state, type: [^servers ~> [:follower, :candidate, :leader]]
+  variable :votes_granted, type: [^servers ~> set(^servers)]
+
+  # TLA+'s `Message`, element for element.
+  variable :messages,
+    type:
+      set(
+        %{type: :request_vote, term: 0..^max_term, from: ^servers, to: ^servers}
+        | %{
+            type: :vote_response,
+            term: 0..^max_term,
+            from: ^servers,
+            to: ^servers,
+            granted: [true, false]
+          }
+      )
 
   init do
-    current_term  = for_each(^servers, fn _ -> 0 end)
-    voted_for     = for_each(^servers, fn _ -> :none end)
-    srv_state     = for_each(^servers, fn _ -> :follower end)
+    current_term = for_each(^servers, fn _ -> 0 end)
+    voted_for = for_each(^servers, fn _ -> :none end)
+    srv_state = for_each(^servers, fn _ -> :follower end)
     votes_granted = for_each(^servers, fn _ -> set() end)
-    messages      = set()
+    messages = set()
   end
 
   # ── Actions ──
 
+  # `^max_term` is a model bound, not part of Raft: the real protocol times out
+  # again. The bound is what makes the state space finite.
   action :timeout, params: [s: ^servers] do
     require srv_state[s] in [:follower, :candidate]
     require current_term[s] < ^max_term
 
     let new_term = current_term[s] + 1
-    let vote_requests =
-      set(for t <- ^servers, t != s do
-        %{type: :request_vote, term: new_term, from: s, to: t}
-      end)
 
-    current_term  = update(current_term, s, fn _ -> new_term end)
-    srv_state     = update(srv_state, s, fn _ -> :candidate end)
-    voted_for     = update(voted_for, s, fn _ -> s end)
+    let vote_requests =
+          set(
+            for t <- ^servers, t != s do
+              %{type: :request_vote, term: new_term, from: s, to: t}
+            end
+          )
+
+    current_term = update(current_term, s, fn _ -> new_term end)
+    srv_state = update(srv_state, s, fn _ -> :candidate end)
+    voted_for = update(voted_for, s, fn _ -> s end)
     votes_granted = update(votes_granted, s, fn _ -> set([s]) end)
-    messages      = union(messages, vote_requests)
+    messages = union(messages, vote_requests)
   end
 
-  # `msg` draws from the PRE-STATE. Params bind left to right, so `msg`'s
+  # `msg` draws from the PRE-state. Params bind left to right, so `msg`'s
   # function receives `s` and can filter on it — one successor per matching
-  # message, which is exactly `\E msg \in messages`.
+  # message, which is exactly `\\E msg \\in messages`.
   action :handle_request_vote,
     params: [
       s: ^servers,
@@ -341,17 +351,19 @@ defmodule Specs.RaftElection do
       end
     ] do
     let grant =
-      msg.term >= current_term[s] and
-        (voted_for[s] == :none or voted_for[s] == msg.from)
+          msg.term >= current_term[s] and
+            (voted_for[s] == :none or voted_for[s] == msg.from)
 
     let response = %{
-      type: :vote_response, term: msg.term,
-      from: s, to: msg.from, granted: grant
-    }
+          type: :vote_response,
+          term: msg.term,
+          from: s,
+          to: msg.from,
+          granted: grant
+        }
 
     # Every RHS reads the PRE-state, so `current_term[s]` below is the old term
-    # even though `current_term` is assigned in this same block. Under the old
-    # sequential reading this was ambiguous; under §2 it is not.
+    # even though `current_term` is assigned in this same block (§2).
     current_term =
       if msg.term > current_term[s],
         do: update(current_term, s, fn _ -> msg.term end),
@@ -368,16 +380,18 @@ defmodule Specs.RaftElection do
     messages = messages |> delete(msg) |> put(response)
   end
 
-  # The term check is what makes `election_safety` hold, and it is the thing an
-  # earlier draft of this example left out: without it a candidate that timed
-  # out twice counts a vote granted in the EARLIER term towards its current
-  # candidacy, and two servers reach `:leader` in the same term. TLC hands back
-  # an 8-state counterexample; the corpus entry is what found it.
+  # The term check is what makes `election_safety` hold. Without it a candidate
+  # that timed out twice counts a vote granted in the EARLIER term towards its
+  # current candidacy, and two servers reach `:leader` in the same term — an
+  # 8-state counterexample TLC hands back in under a second.
   action :handle_vote_response,
     params: [
       s: ^servers,
       msg: fn st, %{s: s} ->
-        Enum.filter(st.messages, &(&1.type == :vote_response and &1.to == s and &1.granted))
+        Enum.filter(
+          st.messages,
+          &(&1.type == :vote_response and &1.to == s and &1.granted)
+        )
       end
     ] do
     require msg.term == current_term[s]
@@ -387,13 +401,15 @@ defmodule Specs.RaftElection do
     let new_votes = put(votes_granted[s], msg.from)
 
     votes_granted = update(votes_granted, s, fn _ -> new_votes end)
-    messages      = delete(messages, msg)
-    srv_state     =
+    messages = delete(messages, msg)
+
+    srv_state =
       if size(new_votes) >= quorum,
         do: update(srv_state, s, fn _ -> :leader end),
         else: srv_state
   end
 
+  # Seeing a higher term is not consuming the message: `messages` is unchanged.
   action :step_down,
     params: [
       s: ^servers,
@@ -402,19 +418,15 @@ defmodule Specs.RaftElection do
       end
     ] do
     current_term = update(current_term, s, fn _ -> msg.term end)
-    srv_state    = update(srv_state, s, fn _ -> :follower end)
-    voted_for    = update(voted_for, s, fn _ -> :none end)
+    srv_state = update(srv_state, s, fn _ -> :follower end)
+    voted_for = update(voted_for, s, fn _ -> :none end)
   end
 
   # A split vote at `^max_term` leaves every server at the bound with nothing
-  # deliverable left. That is the model bound, not a Raft deadlock
-  # (02-dsl-semantics.md §5.3).
-  #
-  # "Nothing deliverable" is not the same as "nothing left": the vote responses
-  # still in the network are refusals, grants to a server that has stopped being
-  # a candidate, or grants for a term it has moved past, and nothing ever removes
-  # those. An earlier draft said `size(messages) == 0`, which no reachable end
-  # state satisfies — so every one of them was reported as a deadlock instead.
+  # deliverable left: the vote responses still in the network are refusals, or
+  # grants to a server that is no longer a candidate, or grants for a term it
+  # has moved past. That is the model bound, not a Raft deadlock
+  # (`02-dsl-semantics.md` §5.3).
   terminal :term_bound_exhausted do
     Enum.all?(^servers, fn s -> current_term[s] == ^max_term end) and
       Enum.all?(messages, fn m ->
@@ -426,7 +438,8 @@ defmodule Specs.RaftElection do
 
   # ── Safety ──
 
-  invariant :election_safety, desc: "at most one leader per term — Raft's fundamental property" do
+  invariant :election_safety,
+    desc: "at most one leader per term — Raft's fundamental property" do
     Enum.all?(0..^max_term, fn term ->
       Enum.count(^servers, fn s ->
         srv_state[s] == :leader and current_term[s] == term
@@ -448,14 +461,17 @@ defmodule Specs.RaftElection do
     end)
   end
 
-  # ── Liveness ──
+  # ── Liveness (Phase 2) ──
 
+  # Refuted by the term bound, by design: the split vote above ends in
+  # `term_bound_exhausted` with no leader. The counterexample is the bound, not
+  # Raft.
   temporal :eventually_elect_leader do
     eventually(Enum.any?(^servers, fn s -> srv_state[s] == :leader end))
   end
 
-  fairness :weak, [:handle_request_vote, :handle_vote_response]
-  fairness :strong, [:timeout]
+  fairness(:weak, [:handle_request_vote, :handle_vote_response])
+  fairness(:strong, [:timeout])
 end
 ```
 
@@ -533,18 +549,20 @@ defmodule Specs.BoundedBuffer do
   constant :buffer_size
   constant :max_items
 
-  variable :buffer,         type: :seq
+  # TLA+'s `Item`, element for element; the bound is one short of `^max_items`
+  # because the first item produced is numbered 0.
+  variable :buffer, type: seq(%{producer: ^producers, seq: 0..(^max_items - 1)})
   variable :produced_count, type: 0..^max_items
   variable :consumed_count, type: 0..^max_items
-  variable :producer_pc,    type: [^producers ~> [:ready, :waiting, :producing]]
-  variable :consumer_pc,    type: [^consumers ~> [:ready, :waiting, :consuming]]
+  variable :producer_pc, type: [^producers ~> [:ready, :waiting, :producing]]
+  variable :consumer_pc, type: [^consumers ~> [:ready, :waiting, :consuming]]
 
   init do
-    buffer         = seq()
+    buffer = seq()
     produced_count = 0
     consumed_count = 0
-    producer_pc    = for_each(^producers, fn _ -> :ready end)
-    consumer_pc    = for_each(^consumers, fn _ -> :ready end)
+    producer_pc = for_each(^producers, fn _ -> :ready end)
+    consumer_pc = for_each(^consumers, fn _ -> :ready end)
   end
 
   action :produce, params: [p: ^producers] do
@@ -552,9 +570,9 @@ defmodule Specs.BoundedBuffer do
     require len(buffer) < ^buffer_size
     require produced_count < ^max_items
 
-    buffer         = append(buffer, %{producer: p, seq: produced_count})
+    buffer = append(buffer, %{producer: p, seq: produced_count})
     produced_count = produced_count + 1
-    producer_pc    = update(producer_pc, p, fn _ -> :producing end)
+    producer_pc = update(producer_pc, p, fn _ -> :producing end)
   end
 
   action :producer_done, params: [p: ^producers] do
@@ -578,9 +596,9 @@ defmodule Specs.BoundedBuffer do
     require consumer_pc[c] == :ready
     require len(buffer) > 0
 
-    buffer         = tail(buffer)
+    buffer = tail(buffer)
     consumed_count = consumed_count + 1
-    consumer_pc    = update(consumer_pc, c, fn _ -> :consuming end)
+    consumer_pc = update(consumer_pc, c, fn _ -> :consuming end)
   end
 
   action :consumer_done, params: [c: ^consumers] do
@@ -615,7 +633,17 @@ defmodule Specs.BoundedBuffer do
     consumed_count <= ^max_items
   end
 
-  # ── Liveness ──
+  # Legitimate end state (`02-dsl-semantics.md` §5.3): everything produced and
+  # consumed, producers idle, consumers parked. Without this the checker reports
+  # a deadlock — and it would be right to, since the spec had not said this
+  # state was intended. TLC does report one, which is what the corpus compares.
+  terminal :all_items_consumed do
+    produced_count == ^max_items and consumed_count == ^max_items and
+      Enum.all?(^producers, fn p -> producer_pc[p] == :ready end) and
+      Enum.all?(^consumers, fn c -> consumer_pc[c] == :waiting end)
+  end
+
+  # ── Liveness (Phase 2) ──
 
   temporal :producers_make_progress do
     always(eventually(produced_count > 0))
@@ -635,31 +663,16 @@ defmodule Specs.BoundedBuffer do
   # buffer drains and every consumer parks in :waiting for good — correctly, in
   # the spec's own terms. A starvation-freedom property has to except that end
   # state, or it is refuted by the model bound rather than by the design.
-  # Compare the Raft example.
   temporal :no_consumer_starvation do
     Enum.all?(^consumers, fn c ->
-      (consumer_pc[c] == :waiting) ~>
-        (consumer_pc[c] == :ready or produced_count == ^max_items)
+      (consumer_pc[c] == :waiting)
+      ~> (consumer_pc[c] == :ready or produced_count == ^max_items)
     end)
   end
 
-  # Legitimate end state (02-dsl-semantics.md §5.3): everything produced and
-  # consumed, producers idle, consumers parked. Without this the checker reports
-  # a deadlock — and it would be right to, since the spec had not said this
-  # state was intended.
-  terminal :all_items_consumed do
-    produced_count == ^max_items and consumed_count == ^max_items and
-      Enum.all?(^producers, fn p -> producer_pc[p] == :ready end) and
-      Enum.all?(^consumers, fn c -> consumer_pc[c] == :waiting end)
-  end
-
-  fairness :weak, [:produce, :consume, :producer_done, :consumer_done]
-  # A waiting producer's wake is continuously enabled once the buffer stays
-  # below capacity, which it does after the last item: weak suffices. A waiting
-  # consumer's wake is enabled only while the buffer is non-empty, which the
-  # other consumers keep undoing: strong, per consumer.
-  fairness :weak, producer_wake: [:p]
-  fairness :strong, consumer_wake: [:c]
+  fairness(:weak, [:produce, :consume, :producer_done, :consumer_done])
+  fairness(:weak, producer_wake: [:p])
+  fairness(:strong, consumer_wake: [:c])
 end
 ```
 

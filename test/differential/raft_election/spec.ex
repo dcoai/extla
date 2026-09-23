@@ -1,18 +1,15 @@
+# Generated from spec/07-examples.md Example 2 — do not edit.
+#
+# Regenerate with `mix tla.examples --write`; the `surface-drift` job fails on a
+# difference. The specification is the page's fence: editing this file is editing a
+# copy, which is the drift D-21 introduced and #280 closed.
 defmodule TLA.Differential.RaftElection do
   @moduledoc """
-  `RaftElection.tla`, in the ExTLA DSL — and `spec/07-examples.md` Example 2,
-  which is the point: the corpus checks the documentation rather than a
-  paraphrase of it.
+  `RaftElection.tla`, in the ExTLA DSL — generated from `spec/07-examples.md` Example
+  2, so "verbatim" holds by construction rather than by discipline.
 
-  This is the first entry whose params are drawn from the **pre-state** rather
-  than from a constant: nearly every action here begins "pick a message from the
-  network", so the set a param ranges over changes from state to state. It is
-  also the first entry that ends somewhere — the split vote at `^max_term` is a
-  `terminal`, not a deadlock.
-
-  TLC checks the safety half. The temporal properties and the fairness
-  constraints are declared and unchecked in Phase 1; the run says so in its
-  warnings.
+  What this entry adds over the others is in `test/differential/README.md`. What it
+  *specifies* is the page, and only the page.
   """
   use TLA.Spec
 
