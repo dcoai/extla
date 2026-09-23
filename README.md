@@ -54,7 +54,16 @@ end
 mix tla.check Specs.Counter        # exhaustive model checking + coverage
 mix tla.simulate MyApp.Counter     # does the implementation conform?
 mix tla.replay   MyApp.Counter     # replay a counterexample against real code
+mix tla.explore  Specs.Counter     # evaluate your own expressions over a counterexample
+mix tla.visualize Specs.Counter    # the state graph as DOT
+mix tla.stamp                      # refinement mappings, against the spec version they were read at
 ```
+
+**New here?** [Getting started](guides/getting-started.md) is install, one specification and
+one counterexample, in half an hour. The [tutorial](guides/tutorial/00-introduction.md) is the
+long path — eleven pages, one lock running through all of them, ending with how to keep a
+specification in a project of your own. Every code block on both is compiled and run by this
+repository's test suite.
 
 ## Status
 
@@ -190,6 +199,7 @@ probabilistic extensions.
 
 | Path | Contents |
 |---|---|
+| `guides/` | [Getting started](guides/getting-started.md) and the eleven-page [tutorial](guides/tutorial/00-introduction.md) — the way in, and where to start |
 | `spec/` | The specification. `NN-name.md` in dependency order; `README.md` is the index |
 | `pm/` | Offline proposal/work-item tracker, used when GitLab is unreachable |
 | `research/` | Background reading, including a TLA+ primer |
