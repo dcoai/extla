@@ -241,3 +241,11 @@ is [Putting a specification in your project](10-in-your-project.md).
   the distributed lock this tutorial's is a small cousin of.
 - [`08-decisions.md`](../../spec/08-decisions.md) — why the tool is shaped the way it is, decision by
   decision.
+
+---
+
+The four documents above are the normative reference, and they are where to go when this
+tutorial has stopped answering a question. The tutorial itself continues: the next three
+pages are the ones about using this on a system you did not write for it.
+
+Next: [From a system you have to a specification you can check](08-modelling.md).

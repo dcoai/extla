@@ -30,6 +30,26 @@ release it merely follows.
 
 ### Fixed
 
+- **The tutorial's forward chain is restored, and gated** (#288, for #155). Nine of eleven
+  pages ended with a `Next:` line; `07-layer3.md` ended with a "Where to next" section
+  listing four links into `spec/` — the heading `getting-started.md` uses where it genuinely
+  *is* an ending — and `08-modelling.md` ended with closing prose. A reader following the
+  tutorial's own navigation finished page 07 and stopped.
+
+  The three stranded pages are how to get from a system you have to a specification worth
+  checking, what to do when the state space explodes, and how to keep a specification in a
+  project: the three a reader with a real codebase needs most, reachable only from the ExDoc
+  sidebar, which a reader of the repository does not have.
+
+  Both contents lists described a seven-page tutorial and now describe the eleven-page one,
+  including `01-mathematics.md`, which the introduction omitted despite it being its own
+  `Next:` target. The duplicated `specification.` on the introduction's fourth line is gone.
+
+  `test/guides/tutorial_chain_test.exs` is the gate: every page but the last links forward
+  to its successor in sorted order, the last links forward to nothing, and — the
+  anti-vacuity half — the walk is checked to be reading the whole tutorial and parsing the
+  links it finds, since both assertions are comprehensions that pass on an empty list.
+
 - **The install instruction is current, and a gate keeps it that way** (#287, closes #154).
   `guides/getting-started.md` is the repository's only dependency snippet and it read
   `tag: "v0.1.0"` against a release of **v0.3.20** — in documentation that ships in the

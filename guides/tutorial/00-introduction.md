@@ -2,17 +2,22 @@
 
 The ExTLA tutorial starts here. It assumes you write Elixir and have never written a formal
 specification.
-specification.
 
 [Getting started](../getting-started.md) is the shorter path — install, one spec, one
 counterexample, half an hour. This page is the other question: *what is this, and why would I*
 *reach for it?* It is prose, and it is the only page of the tutorial with no code on it.
 
-The pages after it are the long path, and they are meant to be read in order: the DSL as it is
-used, what the coverage report tells you about a verdict, temporal properties and the difference
-fairness makes to them, symmetry and who is responsible for it, and then the two layers that
-connect a specification to running code. **One system runs through all of it** — a lock with three
-clients — and each page adds something to it.
+The pages after it are the long path, and they are meant to be read in order: the mathematics
+the DSL is a notation for, the DSL as it is used, what the coverage report tells you about a
+verdict, temporal properties and the difference fairness makes to them, symmetry and who is
+responsible for it, and then the two layers that connect a specification to running code.
+**One system runs through all of it** — a lock with three clients — and each page adds something
+to it.
+
+The last three pages are the ones about your own code rather than this tutorial's: how to get
+from a system you already have to a specification worth checking, what to do when the state
+space explodes, and how to keep a specification in a project so it stays true. They are where
+the tutorial stops being a worked example.
 
 Every code block in this tutorial is compiled and run by ExTLA's own test suite, and every verdict
 the prose quotes is asserted against the run: if a page says a spec verifies, it does, and if it
