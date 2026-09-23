@@ -144,10 +144,13 @@ bridge — `TLA.GenServer`, `TLA.Refinement`, `mix tla.simulate` and `mix tla.re
 23.4 s to 1.65 s, with the corpus agreeing with TLC at 1, 2, 4 and 8), `TLA.PropertyTest`,
 and `mix tla.visualize`.
 
-What is built, phase by phase, is recorded in
-[spec/06-architecture.md §Implementation Phases](spec/06-architecture.md#implementation-phases)
-and not restated here — a second copy is what let this section claim two phases were
-unbuilt for a day and a half after they shipped.
+**What is built** is [`CHANGELOG.md`](CHANGELOG.md), which is gated: `bin/changelog_guard.exs`
+fails any commit touching `lib/` that adds no entry. **What was planned**, phase by phase,
+and that the plan finished, is
+[spec/06-architecture.md §Implementation Phases](spec/06-architecture.md#implementation-phases).
+Neither is restated here — a second copy is what let this section claim two phases were
+unbuilt for a day and a half after they shipped, and §Phases called itself "the single
+source of truth for what is built" for three weeks after it stopped being extended (#282).
 
 Asking for symmetry reduction and liveness in the same run raises rather than quietly
 checking something weaker: the quotient graph can hold cycles the real state space does
