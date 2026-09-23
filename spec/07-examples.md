@@ -121,7 +121,7 @@ end
 
 ### Implementation with Conformance (Layers 1 + 3)
 
-<!-- tla:skip reason=blocked by #284: validate! probes concrete_message/2 with an empty binding and a param'd mapping cannot answer it. Remove this skip when #284 lands -->
+<!-- tla:spec -->
 ```elixir
 defmodule MyApp.LockServer do
   use GenServer
