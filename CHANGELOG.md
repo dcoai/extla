@@ -30,6 +30,31 @@ release it merely follows.
 
 ### Fixed
 
+- **The install instruction is current, and a gate keeps it that way** (#287, closes #154).
+  `guides/getting-started.md` is the repository's only dependency snippet and it read
+  `tag: "v0.1.0"` against a release of **v0.3.20** — in documentation that ships in the
+  package, on a page whose next chapter teaches `TLA.Trace.explore/3` and
+  `mix tla.explore`, neither of which that install has. A reader who followed it and then
+  followed the tutorial would conclude they had made a mistake.
+
+  **The mechanism was the interesting part, and it is what changed.** Every other Elixir
+  block on that page is compiled and its verdict asserted; the one block exempted by
+  `tla:skip reason=a mix.exs fragment, not a spec` is the one that drifted. "Not a spec"
+  was true and was taken to mean "not checkable" — but a `mix.exs` fragment parses and a
+  `tag:` is a string. `<!-- tla:deps -->` now holds that tag to `CHANGELOG.md`'s newest
+  release heading, which is in the tree (so a shallow CI clone with no tags still checks
+  it) and is, since #282, the project's record of what is built.
+
+  The tag is **named** rather than replaced with a branch or with prose, and the guide now
+  says why: a branch installs unreleased work from a library whose subject is
+  verification, prose cannot be followed without leaving the page, and only a literal tag
+  can be held to the release record. A version requirement is not available while Hex
+  publishing is undecided.
+
+  The other eleven `tla:skip` blocks in `guides/` were reviewed and all are genuine
+  fragments — an action body, an ExUnit module, a shell invocation — with nothing in them
+  that can go stale against the code.
+
 - **No concurrent test writes VM-global state, and a gate says so** (#285, closes #283).
   `test/conformance/step_test.exs` was `async: true` and set
   `Application.put_env(:extla, :trace_buffer, 3)`. That value is read by

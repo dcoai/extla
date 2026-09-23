@@ -445,6 +445,67 @@ defmodule TLA.GuideCheckTest do
     end
   end
 
+  describe "tla:deps holds an install instruction to the release record" do
+    # The directive #154 asked for: "a block that is not a spec but is still checkable".
+    # The install snippet was `tla:skip reason=a mix.exs fragment, not a spec` — true, and
+    # taken to mean not checkable, and it then read `tag: "v0.1.0"` against a release of
+    # v0.3.20 for a fortnight, in documentation that ships in the package.
+    defp deps_block(tag) do
+      block("tla:deps", """
+      def deps do
+        [
+          {:extla, git: "https://gitlab.conet.yarina.org/dco-tek/extla.git", tag: "#{tag}"}
+        ]
+      end
+      """)
+    end
+
+    defp newest_release do
+      [_match, version] = Regex.run(~r/^## \[(\d+\.\d+\.\d+)\]/m, File.read!("CHANGELOG.md"))
+      version
+    end
+
+    test "accepts the tag that matches CHANGELOG.md's newest release", %{tmp_dir: tmp} do
+      path = guide(tmp, deps_block("v" <> newest_release()))
+
+      assert GuideCheck.check(path) == []
+    end
+
+    # The failure this exists for, in the shape it actually took.
+    test "rejects a tag from an older release", %{tmp_dir: tmp} do
+      path = guide(tmp, deps_block("v0.1.0"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ ~s(documents "v0.1.0")
+      assert failure =~ "newest release in CHANGELOG.md is v#{newest_release()}"
+    end
+
+    test "and a tag from a release that does not exist yet", %{tmp_dir: tmp} do
+      path = guide(tmp, deps_block("v99.0.0"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ ~s(documents "v99.0.0")
+    end
+
+    test "a block with no extla dependency says so rather than passing", %{tmp_dir: tmp} do
+      path =
+        guide(
+          tmp,
+          block("tla:deps", "def deps do\n  [{:jason, \"~> 1.4\"}]\nend\n")
+        )
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "no `{:extla, …, tag:"
+    end
+
+    test "and one that does not parse is a finding, not a crash", %{tmp_dir: tmp} do
+      path = guide(tmp, block("tla:deps", "def deps do\n  [{:extla,\nend\n"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "does not parse"
+    end
+  end
+
   describe "a block that will not render is wrong before its claim is read" do
     # The first harness put the annotation on the fence: ```elixir tla:spec. Earmark accepts one
     # word after the backticks and nothing else, so under `mix docs` that block was not a block

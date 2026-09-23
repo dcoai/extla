@@ -5,21 +5,38 @@ abstraction until it hands you a concrete sequence of steps that reaches a state
 impossible. That moment is the point of this guide, and everything before it is setup.
 
 Every code block on this page is compiled and run by ExTLA's own test suite, and every verdict
-the prose quotes is asserted against the run. If the page says a spec verifies, it does; if it
-says a trace is seven states long, it is.
+the prose quotes is asserted against the run — including the dependency snippet below, whose
+tag is held to the release record. If the page says a spec verifies, it does; if it says a
+trace is seven states long, it is.
 
 ## 1. Add ExTLA to a project
 
 ExTLA is not on Hex. Point a Mix project at the repository and its tag:
 
-<!-- tla:skip reason=a mix.exs fragment, not a spec -->
+<!-- tla:deps -->
 ```elixir
 def deps do
   [
-    {:extla, git: "https://gitlab.conet.yarina.org/dco-tek/extla.git", tag: "v0.1.0"}
+    {:extla, git: "https://gitlab.conet.yarina.org/dco-tek/extla.git", tag: "v0.3.20"}
   ]
 end
 ```
+
+A **tag**, named here, rather than a branch or a pointer at "the latest release". Three
+things were weighed (#154):
+
+- `branch: "main"` would install unreleased work, which is the wrong advice from a library
+  whose subject is verification — and it is not checkable either, because every branch
+  state is equally valid.
+- Prose directing you to the newest tag without naming one cannot go stale, and cannot be
+  followed without leaving the page. Uncheckable in the same breath.
+- A literal tag **does** go stale — it is how this block came to say `v0.1.0` while the
+  release was v0.3.20 — and it is the only one of the three a gate can hold to the release
+  record. So it is named, and `tla:deps` fails the build when it stops matching
+  `CHANGELOG.md`'s newest release.
+
+A version requirement is not available: publishing to Hex is undecided, so there is no
+`{:extla, "~> 0.3"}` to write.
 
 ```sh
 mix deps.get
