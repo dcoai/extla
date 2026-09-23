@@ -17,14 +17,14 @@ System architecture, module dependency graph, and implementation strategy.
 ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
 │ModelChecker│ │TLA.Coverage│ │ Simulation │ │ TLA.Replay │ │PropertyTest│
 │            │ │            │ │            │ │            │ │            │
-│.run/2      │ │.compute/2  │ │.run/2      │ │.counter-   │ │.action_    │
-│.check_     │ │.format/1   │ │.run_trace/2│ │ example/3  │ │ sequences/3│
-│ safety/2   │ │            │ │            │ │.trace/3    │ │            │
-│.check_     │ │ never-     │ │            │ │            │ │            │
-│ liveness/2 │ │ enabled,   │ │            │ │ replay a   │ │            │
-│.explore/2  │ │ vacuity    │ │            │ │ CE or a    │ │            │
-│            │ │            │ │            │ │ captured   │ │            │
-│            │ │            │ │            │ │ trace      │ │            │
+│.run/2      │ │.init/3     │ │.run/2      │ │.counter-   │ │.action_    │
+│.check_     │ │.observe_*  │ │.run_trace/2│ │ example/3  │ │ sequences/3│
+│ safety/2   │ │.finalize/2 │ │            │ │.trace/3    │ │.init_      │
+│.explore/2  │ │.format/1   │ │            │ │            │ │ states/2   │
+│.enabled_   │ │            │ │            │ │ replay a   │ │            │
+│ steps/3    │ │ never-     │ │            │ │ CE or a    │ │            │
+│            │ │ enabled,   │ │            │ │ captured   │ │            │
+│            │ │ vacuity    │ │            │ │ trace      │ │            │
 └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘
       │              │              │              │              │
       │              │        ┌─────▼──────────────▼──────┐       │
@@ -56,8 +56,13 @@ System architecture, module dependency graph, and implementation strategy.
                  │  DSL macros + the §7    │
                  │  compile-time validator │
                  └────────────┬────────────┘
+                              │   rests on the foundation directly:
+                              │   State · Set · Function. NOT on the
+                              │   three boxes below (#282).
                               │
-      ┌───────────────────────┼───────────────────────┐
+   What the CHECKER and Layer 1 rest on — reached from the top row, not from the DSL:
+
+      ┌───────────────────────┬───────────────────────┐
       ▼                       ▼                       ▼
 ┌──────────────┐   ┌──────────────────┐   ┌────────────────────┐
 │TLA.Invariant │   │  TLA.StateGraph  │   │     TLA.Trace      │
@@ -65,7 +70,8 @@ System architecture, module dependency graph, and implementation strategy.
 │ Layer 1      │   │ fingerprint →    │   │ walk parents, then │
 │ runtime      │   │ {parent, action, │   │ REPLAY forward to  │
 │ checking     │   │  params}         │   │ regenerate states  │
-│              │   │ + SCC analysis   │   │                    │
+│ ◄─ GenServer │   │ + SCC analysis   │   │                    │
+│              │   │ ◄─ ModelChecker  │   │ ◄─ ModelChecker    │
 └────┬─────────┘   └────────┬─────────┘   └─────────┬──────────┘
      │                      │                       │
 ┌────▼──────────────────────▼───────────────────────▼──────────┐
@@ -73,12 +79,31 @@ System architecture, module dependency graph, and implementation strategy.
 │                                                              │
 │  TLA.State       — state snapshots and transitions           │
 │  TLA.Fingerprint — canonical encoding + 64-bit identity      │
-│  TLA.Temporal    — temporal operators (bounded fragment)     │
+│  TLA.Temporal    — temporal operators (bounded fragment);    │
+│                    fairness asks ModelChecker.enabled_       │
+│                    bindings/3 back up the stack (temporal.ex)│
 │  TLA.Set         — extended set operations                   │
 │  TLA.Function    — TLA+ function operations                  │
 │  TLA.Config      — COMPILE-time configuration                │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+**Nothing checks this diagram, and that is worth saying out loud.** Every other claim in
+this repository that can go stale has a gate — `API_SURFACE.md` for the signatures,
+`DIAGNOSTICS.md` for the kinds, `CHANGELOG.md` for what shipped, the guide harness for
+every code block. A picture is prose, and prose about module structure is exactly the kind
+that rots: until #282 this one drew `ModelChecker.check_liveness/2` and
+`Coverage.compute/2`, neither of which has ever existed, an edge from `TLA.Spec` to
+`TLA.Invariant` that the code does not have, and omitted `TLA.Temporal`'s call back up to
+`ModelChecker.enabled_bindings/3`. It was never a copy of the code; it is a copy of the
+design's module tree, from the initial commit.
+
+**The review rule, until something better exists:** check this diagram whenever
+`lib/tla/*.ex` gains or loses a module, or when a box's named function changes. That is one
+`grep -l` per box — `grep -rn "def check_safety(" lib/` and so on — and it is how the
+corrections above were found. Generating it from source would be the real answer; it is not
+a hard problem (the five `surface-drift` goldens do the same kind of work), and it is the
+obvious next thing for anyone who finds this diagram wrong again.
 
 ---
 
@@ -247,22 +272,37 @@ most once per run. `04-layer2-model-checker.md` §State Graph specifies this.
                                │
                     ┌──────────▼──────────┐
                     │    ETS Tables        │
-                    │                     │
+                    │      — SHARED —      │
                     │  :nodes — id→{parent,│
                     │     action, params}  │
                     │  :fps   — fp→id      │
-                    │  :edges — id→[edge]  │ liveness only
-                    │  :enab  — id→bits    │ liveness only
+                    └─────────────────────┘
+
+                    ┌─────────────────────┐
+                    │  Per-struct MAPS     │
+                    │    — NOT shared —    │
+                    │  edges   — id→[edge] │ liveness only
+                    │  enabled — id→bits   │ liveness only
                     └─────────────────────┘
 ```
 
+**The second box is why liveness and `workers:` are refused together** (D-27). The two
+liveness structures are maps in the `TLA.StateGraph` struct, not ETS tables: under workers
+each process would hold its own fragment, and a cycle spanning two of them would not exist
+anywhere to be found. They were drawn inside the ETS box until #282 — which made the
+refusal read as a policy rather than as the consequence of the storage that it is, and
+left a reader of the diagram unable to derive the rule that governs the feature.
+
 Work distribution is coordinator-push — work *sharing*, not work stealing; workers never
-take from one another, so the only contended structure is ETS:
-1. Coordinator pushes batches of states to worker mailboxes
-2. Workers process their batch, writing results to ETS
-3. Workers send new frontier states back to coordinator
-4. When a worker's batch is empty, coordinator sends more
-5. On violation, coordinator sends `:halt` to all workers
+take from one another, so the only contended structure is ETS. It is `Task.async_stream`
+over one BFS level at a time, cut into eight batches per worker, and the paragraphs below
+are the whole of it.
+
+*(A five-step message protocol stood here until #282 — a coordinator pushing batches to
+worker mailboxes, workers sending frontier states back, a `:halt` message on violation.
+#38 built `Task.async_stream` instead and added the true description underneath the false
+one without deleting it, which was the right half of the move; the section then read as a
+protocol that does not exist, followed by prose saying what does.)*
 
 **The rounds are BFS levels, and that is load-bearing** (D-27). The coordinator dispatches
 one whole level and waits for every worker before dispatching the next, rather than
@@ -278,19 +318,35 @@ fingerprinting and the §6 term check as well as the ETS write, and the three to
 work parallel. What makes it safe is `insert_new/2`: of two workers that discover the same
 state, exactly one claims it.
 
-**Liveness is refused alongside `workers:`**, the way D-22 refuses symmetry with it. The
-edge table and ENABLED bits above are drawn as ETS tables and are built as per-struct maps;
-under workers each process would hold a fragment, and a cycle spanning two of them would
-not exist to be found.
+**Liveness is refused alongside `workers:`**, the way D-22 refuses symmetry with it, and
+for the reason the second storage box above now states rather than contradicts.
 
 ---
 
 ## Implementation Phases
 
-**This section is the single source of truth for what is built.** Each phase below carries
-its own status, and nothing else in the repository restates it — `README.md` links here
-rather than keeping a second copy, because the second copy is what drifted (#73: it claimed
-Phases 1 and 2 were done and Phase 3 and 4 were "not yet", two phases after they shipped).
+**This section is the record of a plan, and of its completion.** It is not the record of
+what is built, and it said it was for three weeks: the four phases below were written as a
+plan and ended honestly on 2026-09-01 (`d61a1df`, "Record that Phase 4 is complete, and
+hand off"); on 09-02 the sentence "the single source of truth for what is built" was added
+to a finished enumeration nobody was extending. Eight features shipped after it with no
+home here — surfex goldens, the decision log's reopening, the temporal fragment's
+compile-time bound — and the claim made each of them look like an omission rather than
+like what they were, which is work done after a plan completed.
+
+There is no Phase 5, deliberately. A fifth phase would be a third hand-maintained list of
+shipped work standing beside a **gated** one: `bin/changelog_guard.exs` fails any commit
+touching `lib/` that does not add a `CHANGELOG.md` entry or say in a commit trailer why it
+does not. So:
+
+- **What was planned, and that it was finished:** this section.
+- **What is built:** `CHANGELOG.md`, which is gated and cannot silently stop being true.
+- **What was decided along the way:** `08-decisions.md`, pinned per decision.
+
+`README.md` points at the second rather than at this one. The original fear was right —
+#73's second copy did drift, claiming two phases unbuilt a day and a half after they
+shipped — and the answer to a copy that drifts is a record something checks, not a
+sentence forbidding copies.
 
 ### The ordering rationale
 
@@ -394,6 +450,9 @@ against the real GenServer.
 Entering the phase, `raft_election` took 23.4 s. It now takes 1.65 s — 2.65x from
 validating each state once at discovery (D-26) and 5.40x from the workers, and the
 differential corpus holds throughout.
+
+**The plan ends here.** Work since Phase 4 — and there has been a good deal of it — is
+recorded in `CHANGELOG.md` as it lands, under a gate. Nothing below this line is a status.
 
 ### Deferred past v1, deliberately
 

@@ -30,6 +30,37 @@ release it merely follows.
 
 ### Fixed
 
+- **§Implementation Phases withdraws its single-source claim; the graph and §Concurrency
+  describe the code** (#282, for #179). The four phases were written as a *plan* and ended
+  honestly on 2026-09-01; the sentence "this section is the single source of truth for what
+  is built" was added the next day, to a finished enumeration nobody was extending — so
+  eight shipped features looked like omissions rather than like work done after a plan
+  completed. There is **no Phase 5**: that would be a third hand-maintained list beside a
+  gated one. §Phases records the plan, `CHANGELOG.md` records what is built and
+  `bin/changelog_guard.exs` fails any `lib/` commit that adds no entry, and `README.md`
+  now points at the gated record. D-34's neighbour in `spec/08` is not needed; the
+  withdrawal is pinned by `test/docs/shipped_has_a_home_test.exs`, which asserts the eight
+  orphans each have a home.
+
+- **The five-step concurrency protocol is deleted rather than corrected** (#282). #38 built
+  `Task.async_stream` and added the true description *underneath* the false one without
+  removing it, so §Concurrency read as a protocol that does not exist followed by prose
+  saying what does. The protocol is gone; #38's paragraphs stand alone.
+
+- **§Storage draws the liveness structures where they live** (#282). The edge table and
+  ENABLED bits were drawn inside the ETS box and are per-struct **maps** — the fact that
+  *governs* D-27's refusal of liveness alongside `workers:`, admitted in prose seventy
+  lines below the diagram. They are now their own box, marked not-shared, so a reader of
+  the picture can derive the rule that governs the feature.
+
+- **The module graph describes the code as written** (#282). It drew
+  `ModelChecker.check_liveness/2` and `Coverage.compute/2`, neither of which has ever
+  existed, and an edge from `TLA.Spec` to `TLA.Invariant` that the code does not have,
+  while omitting `TLA.Temporal`'s call back *up* to `ModelChecker.enabled_bindings/3`. It
+  was never a copy of the code — it is the design's module tree, from the initial commit.
+  Nothing gates it, and the section now says so and states the review rule: check it
+  whenever `lib/tla/*.ex` gains or loses a module, which is one `grep -l` per box.
+
 - **`spec/` and `README.md` are under the guide harness: 76 blocks, compiled or skipped with
   a reason** (#281, for #178). Every `elixir` fence in the specification was compiled by
   nothing. Most are API sketches whose signatures `spec_api_test` already holds to
