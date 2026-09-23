@@ -30,6 +30,30 @@ release it merely follows.
 
 ### Fixed
 
+- **No concurrent test writes VM-global state, and a gate says so** (#285, closes #283).
+  `test/conformance/step_test.exs` was `async: true` and set
+  `Application.put_env(:extla, :trace_buffer, 3)`. That value is read by
+  `TLA.GenServer.Runtime.record_transition!/4` **in whatever process is recording**, so for
+  the duration of that one test every concurrently running test that recorded a transition
+  saw a 3-state buffer.
+
+  Nothing could have failed on it: a neighbour's trace was truncated, its temporal verdicts
+  became `:inconclusive`, and the assertion beside it reads
+  `verdict in [:holds, :inconclusive]` — exactly what a corrupted run still satisfies. A
+  passing result that meant nothing was checked, arriving through the config of a different
+  test file.
+
+  The test moves to `test/conformance/trace_buffer_test.exs`, `async: false`, unchanged —
+  it is the only coverage of the bound reached through the **instrumented callback** rather
+  than through `Runtime` directly. `test/docs/async_isolation_test.exs` is the guard: it
+  reads each test file's **AST** (a textual scan would fail `truncated_behaviour_test.exs`
+  for explaining in a comment why it avoids a global) and fails any `async: true` file that
+  calls `Application.put_env/delete_env` or `:persistent_term.put/erase`.
+
+  `Process.register/2` is deliberately not checked, and the gate says why: a per-test
+  unique name is legitimate and a fixed one is not, and nothing distinguishes them without
+  judgment the gate does not have.
+
 - **A refinement mapping is probed only where a binding exists** (#286, closes #284).
   `TLA.Refinement.validate!/3` applied `concrete_message/2` to `%{}` whenever the spec's
   constants had no values — which is whenever a *published* example is compiled, since

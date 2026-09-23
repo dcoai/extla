@@ -197,36 +197,11 @@ defmodule TLA.ConformanceStepTest do
     end
   end
 
-  describe "the trace is bounded" do
-    test "and drops oldest-first rather than growing without limit" do
-      previous = Application.get_env(:extla, :trace_buffer)
-      Application.put_env(:extla, :trace_buffer, 3)
-
-      on_exit(fn ->
-        if previous,
-          do: Application.put_env(:extla, :trace_buffer, previous),
-          else: Application.delete_env(:extla, :trace_buffer)
-      end)
-
-      server = start(Impl.Conforming)
-
-      for _ <- 1..4 do
-        assert {:ok, :ok} = call(server, :increment)
-        assert {:ok, :ok} = call(server, :done)
-      end
-
-      trace = Runtime.get_trace(server)
-      assert length(trace.states) == 3
-      assert List.last(trace.states) == %{count: 4, status: :ready}
-
-      # And it says how many it dropped to stay at three, which is what makes a verdict
-      # about the behaviour's first state refusable rather than wrong (#278). Ten states
-      # were recorded — the initial one, then a pre and a post for the first transition and
-      # a post for each of the seven after it — and three are kept.
-      assert trace.dropped == 7
-      assert length(trace.states) + trace.dropped == 10
-    end
-  end
+  # `describe "the trace is bounded"` moved to `trace_buffer_test.exs` (#285). It set
+  # `trace_buffer` — application config, read by `record_transition!/4` in whatever
+  # process is recording — from this `async: true` file, so for its duration every
+  # concurrently running test that recorded a transition saw a 3-state buffer. The test
+  # is unchanged; only its neighbours are.
 
   describe "Refinement.validate!/3 is not weakened by the layer above it" do
     test "the conforming mapping still validates against the spec" do
