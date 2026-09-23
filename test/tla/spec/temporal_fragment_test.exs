@@ -129,7 +129,9 @@ defmodule TLA.Spec.TemporalFragmentTest do
 
     # The door `mix tla.simulate` and Layer 3 come through. A behaviour, not a state graph.
     test "is evaluated by the runtime checker, over a behaviour" do
-      behavior = [%{n: 0}, %{n: 1}, %{n: 2}]
+      # `dropped: 0` is a claim about this list, and it is true: it was written here, not
+      # kept in a bounded buffer (#278).
+      behavior = %{states: [%{n: 0}, %{n: 1}, %{n: 2}], dropped: 0}
 
       verdicts = TLA.GenServer.Runtime.check_temporal_properties(EveryShape, behavior)
 
