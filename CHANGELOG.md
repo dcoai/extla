@@ -30,6 +30,37 @@ release it merely follows.
 
 ### Fixed
 
+- **`spec/07`'s examples are the corpus, not a copy of it** (#280, for #178). Three corpus
+  moduledocs said "Example N verbatim, which is the point: the corpus checks the
+  documentation, not a paraphrase of it". `git log` dates that sentence to 2026-08-30/31
+  and D-21 to **forty-three minutes later**, where it rewrote every corpus spec's types and
+  left the page — so for a month the page a reader copies from declared
+  `type: [^resources ~> :set]` where the checker had been given `set(^processes)`.
+  `mix tla.examples --write` now generates `test/differential/<entry>/spec.ex` **from the
+  page's fence**, and `surface-drift` fails on a difference; the page carries the types
+  D-21 settled on.
+
+  The drift was **invisible to the corpus itself** — TLC agrees either way, so all 88
+  differential assertions passed with the wrong type on the page. That is the argument for
+  a byte-level gate rather than against it: the only instrument that can see this class of
+  error is one that compares the text.
+
+  Generating code from a document is the inverse of the five goldens that render documents
+  from code, and D-32's reasoning is unchanged: an enumeration kept by hand does not
+  announce that it has stopped being true. Compiling the fence in place — the guide
+  harness's own principle — would be purer, and #281 should revisit it; it cannot be done
+  without taking three specs out of `TLA_COVERAGE.md`, since the ledger finds items by
+  parsing the file the BEAM records as a module's source.
+
+- **`spec/02` §8's worked example is pinned to the trace `spec/04` prints** (#280). Its
+  `conservation_of_money` is refuted at depth 3 — deliberately: `fail_transfer` discards
+  `pending`, and that *is* `04-layer2-model-checker.md`'s worked counterexample, "⚠ money
+  lost!" included. Nothing asserted it, and the one test that ran the spec passed
+  `invariants: []`, so "fixing" `fail_transfer` — which is what this work item was scoped
+  to do — would have left §04's printed trace describing a run that no longer happens,
+  with the suite green. The bare `invariants: []` is now `[:type_ok]`, which holds over the
+  whole constrained space, so that test still reaches its bound while checking something.
+
 - **The two `:checked` telemetry events that could not fire, now fire** (#279, for #177).
   `03-layer1-invariants.md` documents four success events under `telemetry: :verbose` and
   argues from that count — "a single transition can fire four of them" is the reason they

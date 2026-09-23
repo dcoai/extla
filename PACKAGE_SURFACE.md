@@ -10,7 +10,7 @@ and the package is `lib/` only, so a module can be documented to a consumer who 
 call it. `mix.exs` filters the published docs on this same rule, and
 `test/docs/package_docs_test.exs` holds the built pages to these rows.
 
-**6 dependencies · 74 modules** · packaged 63 · not packaged 11 · required at runtime 0
+**6 dependencies · 76 modules** · packaged 63 · not packaged 13 · required at runtime 0
 
 ## Dependencies — as `mix.exs` declares them
 
@@ -31,6 +31,7 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `Mix.Tasks.Tla.CliSurface` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.cli_surface.ex` |
 | `Mix.Tasks.Tla.Coverage` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.coverage.ex` |
 | `Mix.Tasks.Tla.Diagnostics` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.diagnostics.ex` |
+| `Mix.Tasks.Tla.Examples` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.examples.ex` |
 | `Mix.Tasks.Tla.Explore` | `:packaged` | ships to a consumer | `lib/mix/tasks/tla.explore.ex` |
 | `Mix.Tasks.Tla.PackageSurface` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.package_surface.ex` |
 | `Mix.Tasks.Tla.Replay` | `:packaged` | ships to a consumer | `lib/mix/tasks/tla.replay.ex` |
@@ -44,6 +45,7 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `TLA.Conformance` | `:packaged` | ships to a consumer | `lib/tla/conformance.ex` |
 | `TLA.Coverage` | `:packaged` | ships to a consumer | `lib/tla/coverage.ex` |
 | `TLA.Diagnostics` | `:not_packaged` | this project only | `ledger/tla/diagnostics.ex` |
+| `TLA.Examples` | `:not_packaged` | this project only | `ledger/tla/examples.ex` |
 | `TLA.Fingerprint` | `:packaged` | ships to a consumer | `lib/tla/fingerprint.ex` |
 | `TLA.Function` | `:packaged` | ships to a consumer | `lib/tla/function.ex` |
 | `TLA.GenServer` | `:packaged` | ships to a consumer | `lib/tla/gen_server.ex` |

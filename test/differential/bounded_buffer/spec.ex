@@ -1,16 +1,15 @@
+# Generated from spec/07-examples.md Example 3 — do not edit.
+#
+# Regenerate with `mix tla.examples --write`; the `surface-drift` job fails on a
+# difference. The specification is the page's fence: editing this file is editing a
+# copy, which is the drift D-21 introduced and #280 closed.
 defmodule TLA.Differential.BoundedBuffer do
   @moduledoc """
-  `BoundedBuffer.tla`, in the ExTLA DSL — and `spec/07-examples.md` Example 3,
-  which is the point: the corpus checks the documentation rather than a
-  paraphrase of it.
+  `BoundedBuffer.tla`, in the ExTLA DSL — generated from `spec/07-examples.md` Example
+  3, so "verbatim" holds by construction rather than by discipline.
 
-  The first entry with a **sequence** in state. Order matters in a sequence and
-  does not in a set, so a fingerprint that canonicalised a list the way it
-  canonicalises a set would collapse states that differ only in what is at the
-  head, and the state count is where that shows up.
-
-  TLC checks the safety half. The temporal properties and the fairness
-  constraints are declared and unchecked in Phase 1.
+  What this entry adds over the others is in `test/differential/README.md`. What it
+  *specifies* is the page, and only the page.
   """
   use TLA.Spec
 

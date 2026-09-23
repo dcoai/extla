@@ -702,9 +702,20 @@ defmodule Specs.TransferProtocol do
 end
 ```
 
-Note that `conservation_of_money` now *fails* — `fail_transfer` discards `pending`
-without refunding it. That is the intended counterexample in
-`04-layer2-model-checker.md`'s trace example, and it is reachable in this spec.
+**This example is deliberately refutable, and that is the one thing about it a reader
+must not have to guess.** `fail_transfer` discards `pending` without refunding it, so
+`conservation_of_money` is violated — at depth 3, by `begin_transfer` then
+`fail_transfer`, which is exactly the counterexample `04-layer2-model-checker.md`
+§Example Trace Output prints, down to the `⚠ money lost!` on `pending`.
+
+So do not copy this spec expecting it to verify: it is a worked example of a checker
+finding a bug, and the bug is the point. The `action` blocks, the `params:` and the
+`invariant` syntax above are what to copy.
+
+**Pinned by:** `test/tla/model_checker_test.exs` "and the worked example is refuted
+exactly as §04's trace output shows". Until #280 nothing asserted it, and the one test
+that ran this spec passed `invariants: []` — so "fixing" `fail_transfer` would have left
+§04's printed trace describing a run that no longer happens, with the whole suite green.
 
 Note also that this spec's state space is **infinite**: `complete_transfer` appends to
 `log` and `reset` returns to `:idle`, so the log grows without bound. Checking it

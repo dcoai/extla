@@ -121,9 +121,9 @@ declaration of record: it is what `PROPERTIES` is read from.
 |---|---|---|---|
 | `die_hard` | Lamport, *Specifying Systems* | ✅ | ✅ |
 | `two_phase_commit` | Lamport, TLA+ examples | ✅ | ✅ |
-| `distributed_lock` | `spec/07-examples.md` Example 1 | ✅ | ✅ |
-| `raft_election` | `spec/07-examples.md` Example 2 (its liveness property is refuted by the term bound, by design) | ✅ | ✅ |
-| `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | ✅ |
+| `distributed_lock` | `spec/07-examples.md` Example 1 | ✅ | generated from the page |
+| `raft_election` | `spec/07-examples.md` Example 2 (its liveness property is refuted by the term bound, by design) | ✅ | generated from the page |
+| `bounded_buffer` | `spec/07-examples.md` Example 3 | ✅ | generated from the page |
 | `paxos` | Lamport, *Paxos Made Simple* TLA+ | ✅ | ✅ |
 | `audit_log` | #112's reproduction — the only entry written for this corpus rather than translated into it | ✅ | ✅ |
 
@@ -163,6 +163,40 @@ one-state trace with no violation in it, and a correct one hands back four state
 verdicts alone cannot see. Reintroducing #112 fails this entry with `ExTLA returned 1 states`
 against TLC's 4 while leaving the other six green, which is the measurement that says the
 decoy is doing the work and not the entry's mere presence.
+
+## The three entries `spec/07-examples.md` publishes
+
+`distributed_lock`, `raft_election` and `bounded_buffer` are **generated from the page**
+by `mix tla.examples --write`, and the `surface-drift` job fails on a difference. Their
+`spec.ex` files are artifacts: edit the fence in `spec/07-examples.md` and regenerate.
+
+This is #280's doing, and the reason is a measurement. Those three moduledocs used to say
+"Example N verbatim, which is the point: the corpus checks the documentation, not a
+paraphrase of it" — and D-21 rewrote every corpus spec's types **forty-three minutes
+after that sentence was written**, leaving the page behind. For a month the page a reader
+copies from declared `type: [^resources ~> :set]` where the checker had been given
+`set(^processes)`. Two files agreeing by discipline is what discipline spends first.
+
+What the generator changes, and why neither is drift: the module name (`Specs.X` on the
+page, `TLA.Differential.X` here, because this is a test tree) and `default:` on the
+constants (the page shows what a reader writes — the assignment belongs to a run — while
+`TLA.Ledger` needs one to resolve the spec at all). `TLA.Examples` holds those defaults
+to the constants this corpus passes TLC's side, so the ledger and the oracle cannot end
+up checking two different models.
+
+What each of the three is *for*, which their moduledocs used to carry:
+
+- **`distributed_lock`** — a product of param sets, and a tuple in state. TLC checks the
+  safety half; the temporal properties and fairness constraints are declared and
+  unchecked in Phase 1, and the run says so in its warnings.
+- **`raft_election`** — params drawn from the **pre-state** rather than from a constant,
+  because nearly every action begins "pick a message from the network", so the set a
+  param ranges over changes from state to state. It is also the first entry that *ends*
+  somewhere: the split vote at `^max_term` is a `terminal`, not a deadlock.
+- **`bounded_buffer`** — a **sequence** in state. Order matters in a sequence and does not
+  in a set, so a fingerprint that canonicalised a list the way it canonicalises a set
+  would collapse states differing only in what is at the head — and the state count is
+  where that shows up.
 
 ## Writing an entry
 
