@@ -369,16 +369,16 @@ defmodule TLA.Refinement do
   # `TLA.Conformance.against_graph/3` applies when it refuses to audit a bounded run, and
   # D-28 states for a negative existential out of a bounded search.
   defp sample_params(spec, action, constants) do
-    case initial_state(spec, constants) do
-      nil ->
+    case initial_states(spec, constants) do
+      [] ->
         unbindable(action)
 
-      state ->
-        case TLA.ModelChecker.bindings(action, constants, state) do
-          # A param whose set is empty in the initial state leaves an action with params
-          # and no bindings, which is the same position as `nil` above.
+      states ->
+        case Enum.flat_map(states, &TLA.ModelChecker.bindings(action, constants, &1)) do
+          # A param whose set is empty in every initial state leaves an action with params
+          # and no bindings, which is the same position as having no initial state at all.
           [] -> unbindable(action)
-          bound -> Enum.take(bound, 3)
+          bound -> Enum.uniq(bound)
         end
     end
   end
@@ -389,10 +389,32 @@ defmodule TLA.Refinement do
   # One initial state, for drawing sample bindings from. `nil` when the spec has a
   # constant this call was given no value for — a mapping can still be validated on the
   # empty binding, and saying less is better than guessing a value the spec never had.
-  defp initial_state(spec, constants) do
-    if spec.init != [] and
-         Enum.all?(Spec.Compiled.constant_names(spec), &is_map_key(constants, &1)) do
-      spec.init |> hd() |> apply([constants])
+  # EVERY initial state, not the first (#169).
+  #
+  # This took `hd(spec.init)` and `Enum.take(bound, 3)`, so the round-trip rule was probed
+  # against at most three bindings from one `init` block, while `05-layer3-conformance.md`
+  # promised "every action and every params combination reachable in the spec". #169 asked
+  # whether widening was worth its cost; measured on the corpus, the answer is that there
+  # was no cost to speak of:
+  #
+  #     DistributedLock  request_lock 4, acquire_lock 4, release_lock 4, return_to_idle 2
+  #     RaftElection     timeout 3, and 0 for the three message-handling actions
+  #     Paxos            phase_1a 2, phase_2a 4, and 0 for the two that read the network
+  #     TwoPhaseCommit   3, 1, 1, 3, 3, 3, 3
+  #
+  # Every action in the corpus has between 0 and 4 bindings AT AN INITIAL STATE, because the
+  # sets a param draws from are mostly empty there — no messages in flight, no locks held.
+  # The cap of 3 was therefore excluding at most one binding per action, and every corpus
+  # spec has exactly one `init` block, so the two restrictions together were buying nothing.
+  #
+  # This is still a probe, not the promise `spec/05` made: bindings reachable LATER in the
+  # search are not drawn, and cannot be without running the search. What changed is that it
+  # no longer discards bindings it already has.
+  defp initial_states(spec, constants) do
+    if Enum.all?(Spec.Compiled.constant_names(spec), &is_map_key(constants, &1)) do
+      Enum.map(spec.init, &apply(&1, [constants]))
+    else
+      []
     end
   end
 end

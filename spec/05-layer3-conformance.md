@@ -208,8 +208,13 @@ defmodule TLA.GenServer do
   claim than conformance — see §What conformance means here.
 
   `validate!/2` runs on the refinement module at compile time, so a mapping that
-  does not cover the spec's variables or actions fails the build rather than
-  producing misleading passes at runtime.
+  does not name one of the spec's **actions** fails the build rather than
+  producing misleading passes at runtime — where `concrete_message/2` exists to
+  enumerate them with. Covering the spec's **variables** cannot be decided
+  without a concrete state to map, so it is checked on every mapping at runtime
+  instead, and `use TLA.GenServer` prints at compile time which rules were left
+  undecided for this mapping. See `validate!/2`'s own documentation for the
+  division; this sentence claimed both for the build until #169.
   """
 
   defmacro __using__(opts) do
@@ -348,23 +353,53 @@ defmodule TLA.Refinement do
   end
 
   @doc """
-  Verify that a refinement mapping is well-formed. Checks, in order:
+  Verify that a refinement mapping is well-formed.
+
+  Five rules, and **they are not all decided here.** A compile has no concrete
+  state and no run, so two of the five are deferred to runtime and a third is a
+  probe rather than an exhaustive check. `validate!/2` returns the ones it could
+  not decide, and `use TLA.GenServer` prints those that went undecided for this
+  mapping in particular (#169). Saying which is which is the point: a validator
+  that claims a check it cannot perform is worse than one that states its limits.
+
+  **Decided at compile time:**
+
+  3. `abstract_action/1` is total — it has a catch-all clause, so an
+     unanticipated message produces `:unmapped` rather than a FunctionClauseError
+     inside a callback wrapper. Established by probing it with a term no
+     implementation can have anticipated.
+  5. Every spec action is named by at least one `abstract_action/1` clause.
+     An action the mapping can never produce is dead in this implementation, and
+     is reported the way `TLA.Coverage` reports a never-enabled action.
+     **Only where `concrete_message/2` is defined** — it is optional, and without
+     it there is nothing to enumerate the actions with, so this rule is deferred
+     and coverage reports the absence instead.
+
+  **A probe, not a proof:**
+
+  4. Where `concrete_message/2` is defined, it round-trips modulo partial params:
+     `abstract_action(concrete_message(a, p))` is `{a, p'}` with `p'` agreeing
+     with `p` on every key `p'` has. A mapping that names a param must name it
+     correctly; one that omits it is deferring to the search in `check_step!/5`.
+     The bindings probed are every binding each `init` block yields — which is
+     every binding this call can construct, and **not** every binding reachable
+     in the spec, since the rest exist only once a search has run. An action with
+     params and no binding at any initial state is not probed at all, and is
+     named in the deferred list rather than reported as checked.
+
+  **Deferred to runtime, for every mapping:**
 
   1. `abstract/1` returns a map whose keys are exactly the spec's variables.
      Any missing or extra key is an error naming it.
   2. Every value it returns is a permitted state term
      (`02-dsl-semantics.md` §6).
-  3. `abstract_action/1` is total — it has a catch-all clause, so an
-     unanticipated message produces `:unmapped` rather than a FunctionClauseError
-     inside a callback wrapper.
-  4. Where `concrete_message/2` is defined, it round-trips modulo partial params:
-     for every action and every params combination reachable in the spec,
-     `abstract_action(concrete_message(a, p))` is `{a, p'}` with `p'` agreeing
-     with `p` on every key `p'` has. A mapping that names a param must name it
-     correctly; one that omits it is deferring to the search in `check_step!/5`.
-  5. Every spec action is named by at least one `abstract_action/1` clause.
-     An action the mapping can never produce is dead in this implementation, and
-     is reported the way `TLA.Coverage` reports a never-enabled action.
+
+  Both need a concrete state to map, which exists only once the server is
+  running. `abstract!/2` checks them on **every** mapping, so the guarantee is
+  per-transition rather than per-build — stronger in coverage and later in time.
+  An earlier version of this section listed all five as "checked, in order" and
+  said a mapping that does not cover the spec's variables "fails the build",
+  which was true of neither.
 
   **Rules 4 and 5 need a binding to probe with, and an action with params has
   none where the constants have no values.** A published example declares

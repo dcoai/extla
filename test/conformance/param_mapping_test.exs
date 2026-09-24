@@ -168,4 +168,60 @@ defmodule TLA.Conformance.ParamMappingTest do
       assert Exception.message(error) =~ "names no message for"
     end
   end
+
+  describe "the round-trip probe" do
+    # Five resources, so an action has five bindings at the initial state — more than the
+    # three the probe used to take (#169). `WrongForTheFourth` round-trips correctly for
+    # :r1, :r2 and :r3 and wrongly for :r4, which the old sample could not reach.
+    #
+    # D-35 records why taking all of them costs nothing: measured across the differential
+    # corpus, every action has between 0 and 4 bindings at an initial state, because the
+    # sets a param draws from are mostly empty there.
+    defmodule FiveResources do
+      @moduledoc false
+      use TLA.Spec
+
+      constant :resources, default: MapSet.new([:r1, :r2, :r3, :r4, :r5])
+
+      variable :held, type: [^resources ~> [false, true]]
+
+      init do
+        held = for_each(^resources, fn _ -> false end)
+      end
+
+      action :grab, params: [r: ^resources] do
+        require held[r] == false
+        held = update(held, r, fn _ -> true end)
+      end
+    end
+
+    defmodule WrongForTheFourth do
+      @moduledoc false
+      use TLA.Refinement
+
+      def abstract(%{locks: locks}), do: %{held: locks}
+
+      def abstract_action({:grab, :r4}), do: {:grab, %{r: :wrong}}
+      def abstract_action({:grab, r}), do: {:grab, %{r: r}}
+      def abstract_action(_other), do: :unmapped
+
+      def concrete_message(:grab, %{r: r}), do: {:grab, r}
+    end
+
+    test "reaches a binding the old sample of three could not" do
+      error =
+        assert_raise Refinement.Error, fn ->
+          Refinement.validate!(__MODULE__.WrongForTheFourth, __MODULE__.FiveResources)
+        end
+
+      assert Exception.message(error) =~ "does not round-trip grab"
+      assert Exception.message(error) =~ ":r4"
+    end
+
+    test "and a mapping right for all five passes" do
+      assert {:ok, deferred} = Refinement.validate!(Mapping, __MODULE__.FiveResources)
+
+      refute Enum.any?(deferred, &match?({:for_this_mapping, _rule}, &1))
+    end
+  end
 end
