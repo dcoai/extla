@@ -172,6 +172,33 @@ defmodule TLA.InvariantBehavioursTest do
       assert violation.old_state == %{count: 0, ceiling: 10}
     end
 
+    # D-25 records that an `Agent`'s checks dispatch at runtime and that `:disabled` still
+    # costs a call there — so `cast/3` is the path that decision is about, and it was held by
+    # nothing: replacing its `check_agent_step!/3` with a plain `fun.(state)` left the suite
+    # green (#175). A cast is asynchronous, so the violation arrives as the agent's exit,
+    # which is also what makes the check invisible unless something watches for it.
+    test "a cast that breaks an invariant kills the agent", %{agent: agent} do
+      Process.flag(:trap_exit, true)
+      ref = Process.monitor(agent)
+
+      assert Agent.cast(CounterRules, agent, &%{&1 | count: &1.count - 5}) == :ok
+
+      assert_receive {:DOWN, ^ref, :process, ^agent, reason}, 1_000
+
+      violation = violation_of(reason)
+      assert violation.name == :never_negative
+      assert violation.state == %{count: -5, ceiling: 10}
+    end
+
+    test "and a legal cast leaves it running", %{agent: agent} do
+      ref = Process.monitor(agent)
+
+      assert Agent.cast(CounterRules, agent, &%{&1 | count: &1.count + 1}) == :ok
+
+      refute_receive {:DOWN, ^ref, :process, ^agent, _reason}, 200
+      assert Agent.get(CounterRules, agent, & &1.count) == 1
+    end
+
     test "get_and_update checks the new state and returns the reply", %{agent: agent} do
       assert Agent.get_and_update(CounterRules, agent, fn state ->
                {state.count, %{state | count: state.count + 2}}
@@ -202,6 +229,13 @@ defmodule TLA.InvariantBehavioursTest do
 
   # `Agent.update/3` is a call, so a violation reaches the caller as an exit. The update
   # is made from a task whose own exit is observed, rather than by catching one.
+  # A violation raised inside an agent reaches a watcher wrapped in one of two shapes,
+  # depending on whether it came through a call or a cast.
+  defp violation_of({:exited, {%TLA.Invariant.Violation{} = violation, _stack}, _}), do: violation
+  defp violation_of({{%TLA.Invariant.Violation{} = violation, _stack}, _}), do: violation
+  defp violation_of({%TLA.Invariant.Violation{} = violation, _stack}), do: violation
+  defp violation_of(%TLA.Invariant.Violation{} = violation), do: violation
+
   defp agent_update(agent, fun) do
     parent = self()
 

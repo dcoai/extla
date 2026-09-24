@@ -33,9 +33,56 @@ defmodule TLA.InvariantHelpersTest do
       assert error.message =~ "carries no Layer 1 predicates"
       assert error.message =~ "mode: :disabled"
     end
+
+    # A DIFFERENT emptiness from the one above, and the one that passed (#175). `URI` is not
+    # instrumented at all, which was already refused. This module is instrumented and has had
+    # every invariant compiled out by `enabled: false` — so `__tla_names__(:invariant)` is
+    # `[]`, the comprehension over it is `[]`, and the assertion said `:ok` for every state,
+    # including the ones the invariant existed to reject.
+    #
+    # `refute_invariant/3` has always guarded its equivalent through `__ensure_declared__/2`.
+    # The sibling did not, and the asymmetry is the finding.
+    test "and a module whose invariants were all compiled out cannot be asserted about" do
+      defmodule AllCompiledOut do
+        use TLA.Invariant
+
+        invariant :never_negative, enabled: false do
+          state.count >= 0
+        end
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          assert_invariants(AllCompiledOut, %{count: -999})
+        end
+
+      assert error.message =~ "declares no invariant that is compiled in"
+      assert error.message =~ "would pass for every state"
+      assert error.message =~ "enabled:"
+    end
   end
 
   describe "assert_action_properties/3" do
+    # The same hole, in the sibling assertion. #175 named `assert_invariants/2`; fixing only
+    # the site it was found at is how a mechanism goes on running one door over, which is
+    # what #192 was about.
+    test "a module whose action properties were all compiled out cannot be asserted about" do
+      defmodule NoPropertiesLeft do
+        use TLA.Invariant
+
+        action_property :never_falls, enabled: false do
+          new.count >= old.count
+        end
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          assert_action_properties(NoPropertiesLeft, %{count: 5}, %{count: 1})
+        end
+
+      assert error.message =~ "declares no action_property that is compiled in"
+    end
+
     test "passes on a transition every property admits" do
       assert_action_properties(CounterRules, @good, %{count: 2, ceiling: 10})
     end

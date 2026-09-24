@@ -53,6 +53,8 @@ defmodule TLA.Invariant.Test do
   """
   defmacro assert_invariants(module, state) do
     quote bind_quoted: [module: module, state: state] do
+      TLA.Invariant.Test.__ensure_any__(module, :invariant)
+
       case TLA.Invariant.Test.__failing_invariants__(module, state) do
         [] ->
           :ok
@@ -71,6 +73,8 @@ defmodule TLA.Invariant.Test do
   """
   defmacro assert_action_properties(module, old_state, new_state) do
     quote bind_quoted: [module: module, old_state: old_state, new_state: new_state] do
+      TLA.Invariant.Test.__ensure_any__(module, :action_property)
+
       case TLA.Invariant.Test.__failing_properties__(module, old_state, new_state) do
         [] ->
           :ok
@@ -140,6 +144,30 @@ defmodule TLA.Invariant.Test do
       raise ArgumentError,
             "TLA.Invariant.Test.valid_states/3 needs `stream_data`, which is not loaded. " <>
               "Add `{:stream_data, \"~> 1.0\", only: [:dev, :test]}` to your deps."
+    end
+  end
+
+  @doc false
+  # A module with nothing of this kind left to check cannot be asserted about, and saying
+  # `:ok` is the answer an empty list gives for free (#175).
+  #
+  # `enabled: Mix.env() == :test` is the ordinary way an invariant disappears, and it
+  # disappears at COMPILE time — so `assert_invariants(Module, state)` in a project that
+  # compiled them out passed every state, including the ones the invariant existed to
+  # reject. `refute_invariant/3` has guarded this since it was written, through
+  # `__ensure_declared__/2`; its sibling did not, and that asymmetry is the whole finding.
+  def __ensure_any__(module, kind) do
+    __ensure_instrumented__(module)
+
+    if module.__tla_names__(kind) == [] do
+      raise ArgumentError, """
+      #{inspect(module)} declares no #{kind} that is compiled in, so there is nothing for \
+      this assertion to check and it would pass for every state.
+
+      An `enabled:` option that is false at compile time removes a declaration entirely \
+      (03-layer1-invariants.md §Performance). If that is deliberate here, assert something \
+      else; if it is not, the declaration is not in this build.
+      """
     end
   end
 
