@@ -1392,9 +1392,36 @@ defmodule Mix.Tasks.Tla.Stamp do
   | `:unstamped` | no `spec_version:` was given |
   | `:unverifiable` | the spec's hash could not be computed |
 
+  `:unverifiable` has two causes and the report says which, because they call
+  for different fixes:
+
+      (spec source not found)
+          the `spec:` names a module no source under the scanned roots declares
+
+      (spec: is not a literal alias, ...)
+          the `spec:` is `@an_attribute`, a variable, anything the AST does not
+          name outright. It cannot be resolved without compiling, which this
+          task deliberately does not do
+
+  A mapping of the second kind used to be **dropped** before it was given any
+  status, so the task could go on to say "no refinement mappings found" about a
+  file it had read and could not understand -- collapsing *cannot be checked*
+  into *absent*, which is the one thing the four-status design exists to
+  prevent.
+
   ## Options
 
       --restamp   Rewrite stale stamps to the spec's current hash.
+                  ONE rewrite per {file, stamp}: two mappings in one file
+                  sharing a stale stamp is the normal case, since they share a
+                  spec and a resolution, and rewriting per mapping meant the
+                  second found nothing to replace and aborted the whole run.
+
+                  It REFUSES rather than guessing where a group's members
+                  resolve to different versions -- an 8-hex collision between
+                  two specs in one file. Rewriting them together would stamp a
+                  mapping against a spec nobody read it against, which is the
+                  one thing this must not do.
   """
   use Mix.Task
 

@@ -115,6 +115,37 @@ release it merely follows.
 
 ### Fixed
 
+- **`mix tla.stamp --restamp` handles two stale mappings in one file, and reports a mapping
+  it cannot read rather than dropping it** (#310, for #173).
+
+  **The crash.** `rewrite!/1` uses `String.replace/3`, which replaces every occurrence by
+  design — and two mappings in one file sharing a stale stamp is the **normal** case, since
+  they share a spec and therefore a resolution. `restamp/1` still iterated per mapping, so
+  the first call fixed both and the second found nothing: `Mix.raise` told the user to
+  hand-edit something already done, and **aborted before any other file was processed**,
+  which is most of the damage. It is one rewrite per `{file, stamp}` now, and the guard on a
+  stamp that genuinely is not there is unchanged.
+
+  It **refuses rather than guessing** where a group's members resolve to different versions
+  — an 8-hex collision between two specs in one file. Rewriting them together would stamp a
+  mapping against a spec nobody read it against, and `--restamp` records a judgement rather
+  than performing one.
+
+  **The silent drop.** `spec_of/1` returned `nil` for a `spec:` that is not a literal alias
+  — `@an_attribute`, a variable, anything the AST does not name outright — and `mappings/1`
+  rejected the entry, so the task could go on to say "no refinement mappings found" about a
+  file it had read and could not understand. That collapses *cannot be checked* into
+  *absent*, which is the one thing the four-status design exists to prevent. Such a mapping
+  is `:unverifiable` now, and because `:unverifiable` has two causes calling for different
+  fixes, the report says which:
+
+      (spec source not found)
+      (spec: is not a literal alias, so it cannot be resolved without compiling)
+
+  Both demonstrated red, and every `--restamp` test works on a **copy** — one that let the
+  task rewrite the committed fixture would pass once and then run forever against a tree
+  with no stale stamp in it.
+
 - **A bounded run stops accusing, and `--strict-coverage` fails on exactly what the
   specification gives it** (#307, closes #167). Three defects, one theme: a run that did not
   see the whole state space may not make a negative existential claim.
