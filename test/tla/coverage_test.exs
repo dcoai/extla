@@ -380,7 +380,12 @@ defmodule TLA.CoverageTest do
       assert coverage.vacuous == []
     end
 
-    test "vacuity is reported per binding under a quantifier" do
+    # Named for the per-binding REPORT and asserting that nothing is reported (#175). What
+    # it actually establishes is the sibling claim, and a useful one: an instance whose
+    # antecedent held is unchecked, not vacuous, so it is not flagged. The per-binding
+    # message is asserted by "under a nested quantifier every outer instance is its own
+    # probe" below, which #200 added — so the claim was covered and the name was not.
+    test "an instance whose antecedent held is not vacuous, under a quantifier" do
       defmodule PerProcess do
         use TLA.Spec
         constant :procs

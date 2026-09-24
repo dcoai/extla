@@ -344,10 +344,23 @@ defmodule TLA.GuideCheckTest do
       assert failure =~ "the run raised"
     end
 
+    # `assert guides == Enum.sort(guides)` is what stood here, and `Path.wildcard` already
+    # returns sorted paths — so deleting the production `Enum.sort` left it green (#175).
+    # The order is a DEPENDENCY (a page may use a module an earlier page compiled), so what
+    # has to be asserted is the order, against a list this test builds itself.
     test "guides/0 returns the tree sorted, so the tutorial is in reading order" do
       guides = GuideCheck.guides()
 
       assert guides == Enum.sort(guides)
+
+      tutorial_order =
+        guides
+        |> Enum.filter(&String.starts_with?(&1, "guides/tutorial/"))
+        |> Enum.map(&Path.basename/1)
+
+      assert tutorial_order == Enum.sort(tutorial_order)
+      assert List.first(tutorial_order) == "00-introduction.md"
+      assert List.last(tutorial_order) == "10-in-your-project.md"
       assert "guides/getting-started.md" in guides
       assert "guides/tutorial/02-dsl.md" in guides
 

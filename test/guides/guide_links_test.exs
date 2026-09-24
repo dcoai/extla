@@ -109,10 +109,23 @@ defmodule TLA.GuideCheck.LinksTest do
 
   describe "the real guides" do
     test "every link in every guide resolves" do
-      failures = Enum.flat_map(TLA.GuideCheck.guides(), &Links.check/1)
+      guides = TLA.GuideCheck.guides()
+
+      # Renaming `guides/` left 57 of 58 tests green, this one among them: `flat_map` over
+      # an empty list is `[]`, and `[] == []` (#175). The corpus is asserted before it is
+      # walked, and by a count the emptying change cannot satisfy.
+      assert length(guides) >= 12,
+             "only #{length(guides)} guides found — this gate would pass by having nothing " <>
+               "to check. Did `guides/` move?"
+
+      failures = Enum.flat_map(guides, &Links.check/1)
 
       assert failures == [],
              "guides link to things that do not exist:\n\n" <> Enum.join(failures, "\n")
+
+      # That `check/1` itself can fail is established by the tmp_dir tests above, each of
+      # which feeds it a link that goes nowhere and asserts the failure. This test's own
+      # vacuity risk is the corpus, and the count is the guard for it.
     end
 
     # The slug cross-check moved to `test/docs/slug_model_test.exs` (#290). It lived here,

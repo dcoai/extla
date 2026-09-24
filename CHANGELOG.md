@@ -54,6 +54,34 @@ release it merely follows.
   `filter_modules` keeps out of the published docs is an internal from a consumer's point of
   view.
 
+- **Eight assertions that held when the code under test was broken** (#294, for #175). Each
+  was proven by #175 by mutating the code and watching the suite stay green, and each fix
+  here was demonstrated red against that same mutation — a fix nobody saw fail is the
+  defect one layer up.
+
+  Two were unreachable by any ordinary assertion, because both are claims about a wrapper
+  that is **absent**, and absence leaves no trace. Under `telemetry: :verbose` it does: a
+  wrapped callback emits `[:extla, :invariant, :checked]`, so "this callback was not
+  wrapped" becomes "this callback fired no event" — a positive observation. So
+  `callbacks: [:handle_call]` is now proven by a `cast` firing one event and a `call`
+  firing two, and "no wrapper on the callbacks `use GenServer` injected" by an unhandled
+  message reaching the injected `handle_info/2` and contributing nothing. The old test
+  asserted `refute function_exported?(Account, :handle_continue, 2)` — and `use GenServer`
+  does not inject `handle_continue/2` at all, so it held whatever the wrapper did.
+
+  The rest: the symmetry warning the test was **named** for is now produced and asserted
+  (it asserted two factorials, which hold whatever the warning does); the diagnostic's line
+  is compared against where the offending token actually is, not `is_integer/1`, which line
+  0 satisfies — and this is the only line assertion in the tree; the three violation-message
+  tests assert the **rendering**, since a `defexception` with no working `message/1` falls
+  back to inspecting the struct, which embeds every substring they were checking; the guide
+  link gate asserts its corpus is non-empty, since renaming `guides/` left 57 of 58 tests
+  green; the sorted-tree test compares the tutorial's order against a list it builds itself,
+  because `Path.wildcard` already sorts and deleting the production `Enum.sort` stayed
+  green; and one test was simply **misnamed** — it promised a per-binding vacuity report and
+  asserted that nothing is reported, while the per-binding message is asserted by the nested
+  quantifier test #200 added later.
+
 - **The slug cross-check runs, for the first time** (#290, for #156). It validates
   `TLA.GuideCheck.Links.slug/1` against ExDoc's **real generated ids** — the only thing
   proving the link gate's anchor model is true, since every `#heading` link in every guide

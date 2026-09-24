@@ -45,6 +45,13 @@ defmodule TLA.InvariantTest do
       assert message =~ "INVARIANT VIOLATED: never_negative"
       assert message =~ "an account may not go below zero"
       assert message =~ ~r/balance\s+= -400/
+
+      # And it is the RENDERER's output, not `inspect/1`'s (#175). A `defexception` with no
+      # working `message/1` falls back to inspecting the struct, which embeds `message:` and
+      # `state:` — so every substring above passes on a violation whose formatting is gone.
+      # The banner rule is produced by nothing else.
+      assert String.starts_with?(message, "═══ INVARIANT VIOLATED")
+      refute message =~ "%TLA.Invariant.Violation{"
     end
 
     # `callbacks:` is resolved when the wrapper is generated, so this is not a filter that
@@ -121,6 +128,8 @@ defmodule TLA.InvariantTest do
       assert message =~ "before:"
       assert message =~ "after:"
       assert message =~ "← changed"
+      assert String.starts_with?(message, "═══ ACTION_PROPERTY VIOLATED")
+      refute message =~ "%TLA.Invariant.Violation{"
     end
   end
 
@@ -130,7 +139,10 @@ defmodule TLA.InvariantTest do
 
       assert violation.type == :precondition
       assert violation.args == {:withdraw, -5}
-      assert Exception.message(violation) =~ "a withdrawal is of a positive amount"
+      message = Exception.message(violation)
+      assert message =~ "a withdrawal is of a positive amount"
+      assert String.starts_with?(message, "═══ PRECONDITION VIOLATED")
+      refute message =~ "%TLA.Invariant.Violation{"
     end
 
     # A message the pattern does not match has nothing to say about it. That is a

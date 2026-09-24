@@ -190,6 +190,92 @@ defmodule TLA.TelemetryVerboseTest do
     end
   end
 
+  # Two claims in `invariant_test.exs` that no assertion could reach, because both are about
+  # a wrapper that is ABSENT and absence leaves no trace (#175). Under `:verbose` it does:
+  # a wrapped callback emits `[:extla, :invariant, :checked]`, so "this callback was not
+  # wrapped" becomes "this callback fired no event", which is a positive observation.
+  describe "what the wrapper is put on" do
+    @restricted """
+    defmodule <NAME> do
+      use GenServer
+      use TLA.Invariant
+
+      invariant :everywhere do
+        state.n >= 0
+      end
+
+      invariant :calls_only, callbacks: [:handle_call] do
+        state.n < 100
+      end
+
+      def init(n), do: {:ok, %{n: n}}
+      def handle_call(:peek, _from, state), do: {:reply, state.n, state}
+      def handle_cast(:bump, state), do: {:noreply, %{state | n: state.n + 1}}
+    end
+    """
+
+    defp compile_restricted(name, telemetry) do
+      previous = Application.get_env(:extla, :telemetry)
+      Application.put_env(:extla, :telemetry, telemetry)
+
+      on_exit(fn ->
+        if previous,
+          do: Application.put_env(:extla, :telemetry, previous),
+          else: Application.delete_env(:extla, :telemetry)
+      end)
+
+      [{module, _binary} | _] =
+        Code.compile_string(String.replace(@restricted, "<NAME>", Atom.to_string(name)))
+
+      module
+    end
+
+    defp names_checked do
+      drain() |> Enum.map(fn {_event, _m, metadata} -> metadata.name end)
+    end
+
+    # `invariant_test.exs:53` asserted that the FIRST violation reported is the unrestricted
+    # one — true, and equally true of a build that ignores `callbacks:` entirely.
+    test "a callbacks:-restricted invariant is not checked in the others" do
+      listen([[:extla, :invariant, :checked]])
+      module = compile_restricted(RestrictedCast, :verbose)
+
+      {:ok, pid} = GenServer.start_link(module, 0)
+      Process.unlink(pid)
+      drain()
+
+      GenServer.cast(pid, :bump)
+      _sync = GenServer.call(pid, :peek)
+
+      cast_then_call = names_checked()
+
+      assert :everywhere in cast_then_call
+      # `calls_only` appears once — for the `call` — and not for the `cast`.
+      assert Enum.count(cast_then_call, &(&1 == :calls_only)) == 1
+      assert Enum.count(cast_then_call, &(&1 == :everywhere)) == 2
+    end
+
+    # `invariant_test.exs:163` asserted `refute function_exported?(Account, :handle_continue, 2)`
+    # — and `use GenServer` does not inject `handle_continue/2` at all, so it held whatever the
+    # wrapper did. `handle_info/2` IS injected, and a wrapper on it would check invariants on a
+    # message the author never handled.
+    test "and no wrapper is put on the callbacks use GenServer injected" do
+      listen([[:extla, :invariant, :checked]])
+      module = compile_restricted(InjectedDefaults, :verbose)
+
+      {:ok, pid} = GenServer.start_link(module, 0)
+      Process.unlink(pid)
+      drain()
+
+      # Reaches the injected `handle_info/2`, which the author did not write.
+      send(pid, :nothing_handles_this)
+      _sync = GenServer.call(pid, :peek)
+
+      # Exactly the events of the `call` that followed it: the `info` contributed none.
+      assert names_checked() == [:everywhere, :calls_only]
+    end
+  end
+
   describe "the events and the document" do
     # The recurrence guard. `spec/03`'s table is the only statement of which events exist,
     # and it drifted from the code once already — by three hundred lines, inside one file.
