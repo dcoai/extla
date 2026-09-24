@@ -28,6 +28,27 @@ release it merely follows.
   `test/docs/spec_decisions_test.exs` holds the two to each other, and `spec/README.md` states
   the three rules that keep this specification true.
 
+### Added
+
+- **`usage-rules.md`, and it is gated** (#292, for #181). The project's own governing
+  instructions require one and there was none — but the convention is the weaker half of
+  the case. The stronger half is that **the DSL is written in Elixir syntax and is not
+  Elixir**: assignment is a next-state relation rather than a rebinding, `^name` is a
+  constant rather than a match pin, `require` is an enabling condition rather than
+  `Kernel.SpecialForms.require/2`, and guard order decides between a disabled action and a
+  raised `DomainError`. An agent writing what looks like ordinary Elixir gets each of those
+  wrong, and each is a compile error or a silent misspecification. It ships in `files:`, so
+  `mix usage_rules.sync` can pull it into a consumer project.
+
+  A usage-rules file is a hand-written enumeration of what the compiler refuses, which is
+  this project's most familiar defect class — so it is held to the generated goldens rather
+  than trusted. Every diagnostic kind it names must exist in `DIAGNOSTICS.md`; every `D-n`
+  it cites must exist in `spec/08-decisions.md`; every `mix tla.*` it tells a reader to run
+  must be one the package ships, per `CLI_SURFACE.md`. Its six code blocks are under the
+  guide harness like every other page. Demonstrated red by citing `:no_such_diagnostic`
+  and `D-99`.
+
+
 ### Fixed
 
 - **Strong fairness is refuted by something, and the parallel search is asserted to be
