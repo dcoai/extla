@@ -77,11 +77,16 @@ defmodule TLA.Conformance.TraceBufferTest do
       assert List.last(trace.states) == %{count: 4, status: :ready}
 
       # And it says how many it dropped to stay at three, which is what makes a verdict
-      # about the behaviour's first state refusable rather than wrong (#278). Ten states
-      # were recorded — the initial one, then a pre and a post for the first transition and
-      # a post for each of the seven after it — and three are kept.
-      assert trace.dropped == 7
-      assert length(trace.states) + trace.dropped == 10
+      # about the behaviour's first state refusable rather than wrong (#278). Nine states
+      # were recorded — the initial one, then a post for each of the eight transitions —
+      # and three are kept.
+      #
+      # Ten until #168, because `record_initial!/3` recorded a transition from the initial
+      # state to itself and `record_transition!/4` then seeded the empty buffer with its
+      # own `pre`, so the first state landed twice. One state per step plus the one the
+      # behaviour starts at is the arithmetic a reader can check.
+      assert trace.dropped == 6
+      assert length(trace.states) + trace.dropped == 9
     end
   end
 end

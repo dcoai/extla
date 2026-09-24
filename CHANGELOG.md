@@ -51,6 +51,39 @@ release it merely follows.
 
 ### Fixed
 
+- **One invariant for a behaviour trace, held by every producer** (#303, for #168). The
+  rule — *n states, n - 1 actions, one binding each, `length` == n* — was already written
+  down, as a private `misaligned?/1` in `TLA.Trace`, and checked at three **consumers**:
+  `from_json!/1`, `to_diffs/1` and `legal_steps/4`. Two producers broke it and neither said
+  so. It is now `TLA.Trace.well_formed/1`, public and documented, asserted by
+  `well_formed!/2` where a trace is **built** — which is where the fix goes, and what the
+  message names.
+
+  `to_diffs/1`'s own comment records what checking it at the far end cost: the misalignment
+  was found when `Trace.Explore` and `format/1` disagreed about one trace, three modules
+  from where it broke, after `format/1` had rendered three states of four and marked the
+  wrong one `[VIOLATION]` (#204, #260).
+
+  **`TLA.Simulation`'s restart path** pushed a state with no action on a *successful*
+  restart while its own violation branch pushed all three. Both branches now record the
+  same step — a `:restart` from the pre-crash state to where recovery landed — and differ
+  only in the verdict about it. It had to be the success branch that was wrong: a run that
+  ends in a violation stops, and a run that recovers goes on to take more steps against
+  `hd(states)`.
+
+  **`TLA.GenServer.Runtime.record_initial!/3`** recorded a transition from the initial
+  state to itself, and `record_transition!/4` seeds an empty buffer with its own `pre` — so
+  the first state landed **twice** and every recorded behaviour opened with a step that
+  never happened. Fed to `TLA.Conformance.against_graph/3` that self-step classifies as
+  **forbidden**, and the layer's two behaviour sources therefore disagreed about the same
+  server. It seeds the buffer now.
+
+  The conformance corpus could not have caught the second one: its counter spec has
+  `reset`, which from the initial `%{count: 0, status: :ready}` is a **self-loop**, so the
+  duplicated state was a legal step of that spec. `test/conformance/behaviour_invariant_test.exs`
+  adds `Ratchet`, which has no self-loop anywhere — with a test asserting that, since it is
+  the property the central test rests on.
+
 - **`use TLA.GenServer` compiles for a server with no author-written `init/1`, and every
   moduledoc example is compiled** (#301, closes #171 with #300). #300 fixed the injection
   for Layer 1 and left Layer 3, where the same defect is **unconditional** — so

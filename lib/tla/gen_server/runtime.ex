@@ -62,13 +62,22 @@ defmodule TLA.GenServer.Runtime do
   There is no step to check. A first state is not a transition, and the trace has to start
   at it: a temporal property over a behaviour that begins at the second state is a property
   of a different behaviour.
+
+  **It SEEDS the trace rather than recording a transition into it (#168).** It used to call
+  `record_transition!(spec, :init, abstract, abstract)`, and `record_transition!/4` seeds an
+  empty trace with its own `pre` — so the initial state landed in the buffer twice and every
+  recorded behaviour opened with a step from a state to itself. That is a step that never
+  happened, and `TLA.Conformance.against_graph/3` classifies it as **forbidden** unless the
+  spec happens to carry a self-loop at its initial state. The layer's two behaviour sources
+  therefore disagreed with each other about the same server.
   """
   def record_initial!(spec_module, refinement, result) do
     case TLA.Invariant.Runtime.initial_state(result) do
       {:ok, concrete} ->
         abstract = abstract!(spec_module, refinement, concrete)
         check_spec_invariants!(spec_module, abstract)
-        record_transition!(spec_module, :init, abstract, abstract)
+        Process.put(@trace_key, [abstract])
+        :ok
 
       :none ->
         :ok
