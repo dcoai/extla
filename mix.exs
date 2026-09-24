@@ -135,7 +135,8 @@ defmodule ExTLA.MixProject do
   def packaged?(_module, _metadata), do: true
 
   defp packaged_files do
-    ~w(lib mix.exs README.md CHANGELOG.md LICENSE spec guides research/tla-plus-primer.md)
+    ~w(lib mix.exs README.md CHANGELOG.md LICENSE usage-rules.md spec guides
+       research/tla-plus-primer.md)
   end
 
   # `ledger/` is the verification ledger's tooling (#1): the content-version scan, the

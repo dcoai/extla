@@ -142,7 +142,7 @@ defmodule TLA.GuideCheck do
   so the trees are concatenated in the order a reader meets them rather than interleaved.
   """
   def pages do
-    guides() ++ Enum.sort(Path.wildcard("spec/**/*.md")) ++ ["README.md"]
+    guides() ++ Enum.sort(Path.wildcard("spec/**/*.md")) ++ ["README.md", "usage-rules.md"]
   end
 
   @doc """
