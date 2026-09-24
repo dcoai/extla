@@ -350,4 +350,159 @@ defmodule TLA.StampTest do
       assert File.read!(ctx.path) =~ ~s(spec_version: "33333333")
     end
   end
+
+  # ── --check ─────────────────────────────────────────────────────────────────
+
+  describe "--check" do
+    @describetag :tmp_dir
+
+    # A tree per case, so each test says exactly which mapping it is about. The conformance
+    # tree comes along where a spec has to resolve.
+    setup %{tmp_dir: tmp} do
+      %{tmp: tmp, conformance: Path.join(@root, "test/conformance")}
+    end
+
+    defp mapping(tmp, name, opts) do
+      dir = Path.join(tmp, name)
+      File.mkdir_p!(dir)
+
+      version = Keyword.get(opts, :stamp)
+      stamp = if version, do: ",\n    spec_version: #{inspect(version)}", else: ""
+
+      File.write!(Path.join(dir, "m.ex"), """
+      defmodule CheckFixture.#{name} do
+        use GenServer
+
+        use TLA.GenServer,
+          spec: #{Keyword.fetch!(opts, :spec)},
+          refinement: TLA.Conformance.Counter.Refinement#{stamp}
+
+        def init(a), do: {:ok, a}
+      end
+      """)
+
+      dir
+    end
+
+    defp check(roots) do
+      capture_io(fn ->
+        assert catch_exit(Stamp.run(["--check"], roots)) == {:shutdown, 1}
+      end)
+    end
+
+    defp check_passes(roots) do
+      capture_io(fn -> assert Stamp.run(["--check"], roots) == :ok end)
+    end
+
+    test "exits 1 on a stale stamp", ctx do
+      dir =
+        mapping(ctx.tmp, "Stale", spec: "TLA.Conformance.Counter.Spec", stamp: "00000000")
+
+      output = check([dir, ctx.conformance])
+
+      assert output =~ "not verified by anything"
+      assert output =~ "CheckFixture.Stale"
+    end
+
+    # Nothing checks this one: the task cannot find the source, and the compile-time check
+    # only warns. It is the case `--check` exists for on a project that does not compile
+    # with `--warnings-as-errors`.
+    test "and on a stamp whose spec has no source here", ctx do
+      dir = mapping(ctx.tmp, "NoSource", spec: "CheckFixture.NoSuchSpec", stamp: "00000000")
+
+      output = check([dir, ctx.conformance])
+
+      assert output =~ "CheckFixture.NoSource"
+    end
+
+    test "but exits 0 on a fresh stamp", ctx do
+      current = TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec)
+      dir = mapping(ctx.tmp, "Fresh", spec: "TLA.Conformance.Counter.Spec", stamp: current)
+
+      check_passes([dir, ctx.conformance])
+    end
+
+    # The stamp is opt-in. Failing on its absence would make it mandatory by the back door.
+    test "and on an unstamped mapping", ctx do
+      dir = mapping(ctx.tmp, "Unstamped", spec: "TLA.Conformance.Counter.Spec")
+
+      check_passes([dir, ctx.conformance])
+    end
+
+    # THE ROW THAT LOOKS LIKE A FINDING AND IS NOT (D-37). This task cannot resolve an
+    # attribute `spec:` without compiling, so it reports `:unverifiable` — but the compiler
+    # verifies that stamp completely, which the next test measures rather than asserts by
+    # assumption. Failing here would be a false finding about a fully checked mapping.
+    test "and on a mapping whose spec: is an attribute, which the COMPILER verifies", ctx do
+      dir = Path.join(ctx.tmp, "Attr")
+      File.mkdir_p!(dir)
+
+      File.write!(Path.join(dir, "m.ex"), """
+      defmodule CheckFixture.Attr do
+        use GenServer
+        @spec_mod TLA.Conformance.Counter.Spec
+
+        use TLA.GenServer,
+          spec: @spec_mod,
+          refinement: TLA.Conformance.Counter.Refinement,
+          spec_version: "00000000"
+
+        def init(a), do: {:ok, a}
+      end
+      """)
+
+      # The task cannot check it...
+      assert [state] = Stamp.states([dir])
+      assert state.status == :unverifiable
+      assert state.reason == :spec_not_a_literal_alias
+
+      # ...and `--check` does not fail on it, because something else does.
+      check_passes([dir, ctx.conformance])
+    end
+  end
+
+  describe "the compile-time check, which is why there is no CI job" do
+    # D-37 rests on these two facts, so they are measured here rather than described. If
+    # either stops being true, `--check`'s rule is wrong and so is the decision not to gate.
+    test "raises on a stale stamp given as a literal alias" do
+      assert_raise TLA.Spec.CompileError, ~r/is stamped against/, fn ->
+        compile_mapping("TLA.Conformance.Counter.Spec", ~s("deadbeef"))
+      end
+    end
+
+    # The row `--check` deliberately passes: an attribute `spec:` is resolved at expansion,
+    # so the stamp IS verified — by the compiler, not by the task.
+    test "and raises just the same when the spec: is an attribute" do
+      assert_raise TLA.Spec.CompileError, ~r/is stamped against/, fn ->
+        compile_mapping("@spec_mod", ~s("deadbeef"))
+      end
+    end
+
+    # Anti-vacuity: the same shapes with a correct stamp compile, so the two above are
+    # failing on the stamp rather than on anything else about the fixture.
+    test "and compiles either shape with the current stamp" do
+      current = inspect(TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec))
+
+      assert [_ | _] = compile_mapping("TLA.Conformance.Counter.Spec", current)
+      assert [_ | _] = compile_mapping("@spec_mod", current)
+    end
+
+    defp compile_mapping(spec, stamp) do
+      name = "CompileProbe#{System.unique_integer([:positive])}"
+
+      Code.compile_string("""
+      defmodule #{name} do
+        use GenServer
+        @spec_mod TLA.Conformance.Counter.Spec
+
+        use TLA.GenServer,
+          spec: #{spec},
+          refinement: TLA.Conformance.Counter.Refinement,
+          spec_version: #{stamp}
+
+        def init(a), do: {:ok, a}
+      end
+      """)
+    end
+  end
 end

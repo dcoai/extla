@@ -1094,3 +1094,61 @@ call, a cast is handled before the driver returns, and a cast that never complet
 same forms.
 
 See `05-layer3-conformance.md` §`TLA.Refinement` and `usage-rules.md`.
+
+---
+
+## D-37 — `mix tla.stamp --check` fails on an unverified stamp, and there is no CI job for it
+
+**Decided.** `--check` exits 1 where a stamp is **stale**, or where its spec's source is not
+on disk so **nothing verifies it**. It is a flag rather than the default, and **no CI job
+runs this task**.
+
+**The question it asks, once, of each mapping:** *is this stamp verified by something?*
+
+| status | verified by | `--check` |
+|---|---|---|
+| `:fresh` | this task | 0 |
+| `:stale` | this task — and it is **wrong** | **1** |
+| `:unstamped` | nothing to verify; the mechanism is opt-in | 0 |
+| `:unverifiable`, spec source not on disk | nothing | **1** |
+| `:unverifiable`, `spec:` not a literal alias | **the compiler** | 0 |
+
+**The last row is the finding.** A `spec:` given as `@an_attribute` cannot be resolved by a
+task that reads source without compiling — that is what `:unverifiable` means here. But
+`use TLA.GenServer` has the attribute's *value* at expansion, so the compile-time check
+verifies that stamp completely. Measured rather than assumed:
+
+    attribute spec, correct stamp:  :compiled
+    attribute spec, stale stamp:    {:raised, TLA.Spec.CompileError}
+
+Failing a build on it would be a **false finding about a mapping that is fully checked** —
+and a false finding is how a check gets turned off.
+
+**Why no CI job, which is what #173 asked and expected a yes to.** A stale stamp is
+*already* a compile error, and a spec whose source is not on disk *already* emits a compile
+warning. On any project whose CI compiles with `--warnings-as-errors` — this one does — both
+failures arrive from the `compile` job, earlier and with a better message. A job running
+this task would add a second way to learn the same thing, and a second place to keep in
+step with the first.
+
+So the flag's purpose is the workflow the compiler **cannot** serve: the project does not
+compile, and a script wants the list of mappings to re-read rather than one error at a
+time. That is the situation the task was built for — it reads source and loads nothing for
+exactly this reason — and an exit code is what lets a script act on it.
+
+**Why a flag and not the default.** The task is a *report*, and a report that exits non-zero
+by default breaks every script that runs it to see the numbers. `05-layer3-conformance.md`'s
+reasoning about `--restamp` does not apply here and was checked against: it says an
+automatic *repair* must not be easy, because "a stamp applied without reading is worse than
+no stamp". It says nothing against a build that fails on a stale stamp — arguably the
+opposite, since a failing build is what makes someone read the spec diff. The default is
+about not surprising a caller, not about the judgement.
+
+**Recorded and built 2026-09-24 (#311).**
+
+**Pinned by:** `test/mix/tla_stamp_test.exs` — `--check` exits 1 for a stale stamp and for a
+spec with no source, exits 0 for an unstamped mapping and for one whose `spec:` is an
+attribute, and the compile-time behaviour that makes the last row right is asserted rather
+than described.
+
+See `05-layer3-conformance.md` §`mix tla.stamp`.

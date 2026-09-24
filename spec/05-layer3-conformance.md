@@ -1381,6 +1381,7 @@ defmodule Mix.Tasks.Tla.Stamp do
   ## Usage
 
       mix tla.stamp             # report every mapping's status
+      mix tla.stamp --check     # report, and exit 1 if a stamp is unverified
       mix tla.stamp --restamp   # rewrite stale stamps in place
 
   Each mapping is reported as one of four statuses:
@@ -1410,6 +1411,22 @@ defmodule Mix.Tasks.Tla.Stamp do
   prevent.
 
   ## Options
+
+      --check     Exit 1 if any stamp is not verified by anything. One
+                  question, asked of each mapping:
+
+                    :fresh                            yes, by this task
+                    :stale                            no -- checked, and WRONG
+                    :unstamped                        no stamp; opt-in
+                    :unverifiable, spec not on disk   no. Nothing verifies it
+                    :unverifiable, spec: not an alias yes, by the COMPILER
+
+                  The last is the one that looks like a finding and is not. A
+                  `spec:` given as `@an_attribute` cannot be resolved by a task
+                  that reads source without compiling, but `use TLA.GenServer`
+                  has the attribute's VALUE at expansion, so the compile-time
+                  check verifies it completely. Failing on it would be a false
+                  finding about a mapping that is fully checked.
 
       --restamp   Rewrite stale stamps to the spec's current hash.
                   ONE rewrite per {file, stamp}: two mappings in one file

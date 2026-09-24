@@ -45,8 +45,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `module_index/1` | `:def` | (roots \\ …) | `1cb8213d` | `lib/mix/tasks/tla.stamp.ex` |
 | `restamp/1` | `:def` | (stamps) | `77ceb6d0` | `lib/mix/tasks/tla.stamp.ex` |
 | `roots/0` | `:def` | () | `9e60899b` | `lib/mix/tasks/tla.stamp.ex` |
-| `run/1` | `:def` | (argv) | `4795f1d2` | `lib/mix/tasks/tla.stamp.ex` |
-| `run/2` | `:def` | (argv) | `4795f1d2` | `lib/mix/tasks/tla.stamp.ex` |
+| `run/1` | `:def` | (argv) | `b48d7361` | `lib/mix/tasks/tla.stamp.ex` |
+| `run/2` | `:def` | (argv) | `b48d7361` | `lib/mix/tasks/tla.stamp.ex` |
 | `sources/0` | `:def` | (roots \\ …) | `67137b6c` | `lib/mix/tasks/tla.stamp.ex` |
 | `sources/1` | `:def` | (roots \\ …) | `67137b6c` | `lib/mix/tasks/tla.stamp.ex` |
 | `states/0` | `:def` | (roots \\ …) | `f0213c28` | `lib/mix/tasks/tla.stamp.ex` |
