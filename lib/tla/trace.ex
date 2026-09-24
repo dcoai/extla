@@ -190,6 +190,7 @@ defmodule TLA.Trace do
       bindings: Enum.map(steps, fn {_, params} -> params || %{} end),
       length: length(steps) + 1
     }
+    |> well_formed!("TLA.Trace.from/4")
   end
 
   @doc """
@@ -467,6 +468,78 @@ defmodule TLA.Trace do
 
   # One behaviour: n states, n - 1 actions, one binding per action. Stated in the moduledoc
   # and checked in two places — `validate/3` reports it, and `to_diffs/1` refuses it.
+  @doc """
+  The behaviour-trace invariant, stated once.
+
+      n states, n - 1 actions, one binding each, and `length` == n.
+
+  A trace is a behaviour: states with the steps between them. Everything downstream reads
+  it by zipping the three lists, so a trace that breaks this describes no behaviour at all
+  — and `Enum.zip/2` does not say so, it silently stops at the shortest list.
+
+  ## Why this is public, and asserted at the producers
+
+  It was already written down — as a private `misaligned?/1`, checked at three **consumers**:
+  `from_json!/1`, `to_diffs/1` and `legal_steps/4`. `to_diffs/1`'s own comment records what
+  that cost: "the shape the simulation's restart branch produced was exactly that", found
+  when `Trace.Explore` and `format/1` disagreed about one trace. The producer that broke it
+  was three modules away and the trace had already been rendered wrong by then (#204, #260).
+
+  So the same predicate is now asserted where a trace is **built**. A producer that breaks
+  it fails naming itself, which is where the fix goes.
+
+  `length` is checked too, and it is the field most easily left behind: it counts STATES
+  (#212), so an edit that changes the lists and not the count produces a trace that reads
+  as one shape and reports another.
+
+  Returns `:ok` or `{:error, message}`.
+  """
+  def well_formed(%__MODULE__{} = trace) do
+    cond do
+      trace.states == [] ->
+        {:error, "a trace has at least one state, and this one has none."}
+
+      misaligned?(trace) ->
+        {:error,
+         "a trace with #{shape(trace)} cannot describe one behaviour: n states need " <>
+           "n - 1 actions and one binding each."}
+
+      trace.length != length(trace.states) ->
+        {:error,
+         "the trace says length #{trace.length} and carries #{length(trace.states)} " <>
+           "states. `length` counts states (#212)."}
+
+      true ->
+        :ok
+    end
+  end
+
+  def well_formed(%{prefix: prefix, cycle: nil}), do: well_formed(prefix)
+
+  def well_formed(%{prefix: prefix, cycle: %__MODULE__{} = cycle}) do
+    with :ok <- well_formed(prefix), do: well_formed(cycle)
+  end
+
+  @doc """
+  `well_formed/1`, raising and naming the producer that broke it.
+
+  `produced_by` is the function that built the trace, because the message is read by
+  whoever has to fix it and "a trace with 4 states and 4 actions" does not say whose.
+
+  Deliberately a raise rather than a returned error: a malformed trace is a bug in this
+  library, not a condition a caller can handle, and the project's rule is to surface one at
+  the earliest possible moment rather than to carry it to a consumer that will zip it away.
+  """
+  def well_formed!(trace, produced_by) do
+    case well_formed(trace) do
+      :ok ->
+        trace
+
+      {:error, message} ->
+        raise ArgumentError, "#{produced_by} produced a malformed trace: #{message}"
+    end
+  end
+
   defp misaligned?(%__MODULE__{} = trace) do
     length(trace.actions) != length(trace.states) - 1 or
       length(trace.bindings) != length(trace.actions)

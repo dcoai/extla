@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 386 items** · functions 324 · arities 399 · types 62
+**59 modules · 388 items** · functions 326 · arities 401 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -143,7 +143,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `context/1` | `:def` | (spec_module) | `8218d102` | `lib/tla/gen_server/runtime.ex` |
 | `finding()` | `:type` | :ok \| {:violation, Violation.t()} | `4ce2beda` | `lib/tla/gen_server/runtime.ex` |
 | `get_trace/1` | `:def` | (pid) | `8834025a` | `lib/tla/gen_server/runtime.ex` |
-| `record_initial!/3` | `:def` | (spec_module, refinement, result) | `215c7341` | `lib/tla/gen_server/runtime.ex` |
+| `record_initial!/3` | `:def` | (spec_module, refinement, result) | `4c5de752` | `lib/tla/gen_server/runtime.ex` |
 | `record_transition!/4` | `:def` | (_spec_module, _message, pre, post) | `ae5e5404` | `lib/tla/gen_server/runtime.ex` |
 | `trace/0` | `:def` | () | `846537ad` | `lib/tla/gen_server/runtime.ex` |
 ## TLA.GenServer.Violation — 2 items
@@ -677,7 +677,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `strong_fairness/5` | `:def` | (behavior, action, enabled, vars, lasso_start \\ …) | `982a50ce` | `lib/tla/temporal/fairness.ex` |
 | `weak_fairness/4` | `:def` | (behavior, action, enabled, vars, lasso_start \\ …) | `5fc0431e` | `lib/tla/temporal/fairness.ex` |
 | `weak_fairness/5` | `:def` | (behavior, action, enabled, vars, lasso_start \\ …) | `5fc0431e` | `lib/tla/temporal/fairness.ex` |
-## TLA.Trace — 17 items
+## TLA.Trace — 19 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
@@ -686,8 +686,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `explore/2` | `:defdelegate` | (trace_or_lasso, expressions, opts \\ …) | `382060a6` | `lib/tla/trace.ex` |
 | `explore/3` | `:defdelegate` | (trace_or_lasso, expressions, opts \\ …) | `382060a6` | `lib/tla/trace.ex` |
 | `format/1` | `:def` | (_) | `d5877f28` | `lib/tla/trace.ex` |
-| `from/3` | `:def` | (graph, initial, steps, opts \\ …) | `190e0293` | `lib/tla/trace.ex` |
-| `from/4` | `:def` | (graph, initial, steps, opts \\ …) | `190e0293` | `lib/tla/trace.ex` |
+| `from/3` | `:def` | (graph, initial, steps, opts \\ …) | `6302ddef` | `lib/tla/trace.ex` |
+| `from/4` | `:def` | (graph, initial, steps, opts \\ …) | `6302ddef` | `lib/tla/trace.ex` |
 | `from_json!/1` | `:def` | (data) | `7ed2e3ff` | `lib/tla/trace.ex` |
 | `generate/2` | `:def` | (graph, target, opts \\ …) | `f947d670` | `lib/tla/trace.ex` |
 | `generate/3` | `:def` | (graph, target, opts \\ …) | `f947d670` | `lib/tla/trace.ex` |
@@ -702,6 +702,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `to_json/1` | `:def` | (trace) | `aa236ce2` | `lib/tla/trace.ex` |
 | `validate!/3` | `:def` | (trace_or_lasso, spec, constants) | `269c4d8a` | `lib/tla/trace.ex` |
 | `validate/3` | `:def` | (trace_or_lasso, spec, constants) | `e87a5e29` | `lib/tla/trace.ex` |
+| `well_formed!/2` | `:def` | (trace, produced_by) | `52c36434` | `lib/tla/trace.ex` |
+| `well_formed/1` | `:def` | (trace) | `c8eddff6` | `lib/tla/trace.ex` |
 ## TLA.Trace.Explore — 1 items
 
 | Item | Kind | Shape | Version | Locus |

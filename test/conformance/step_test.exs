@@ -50,9 +50,15 @@ defmodule TLA.ConformanceStepTest do
 
       # `%{states:, dropped:}` since #278: a bare list cannot say whether it still holds
       # the behaviour's beginning, and the bare-predicate verdict depends on that.
+      #
+      # Four states until #168, because the initial one was recorded twice — this test
+      # asserted the duplicate and so agreed with the defect. Two `:increment`/`:done`
+      # calls are two steps, and two steps have three states. The opening self-step was a
+      # transition that never happened, which `TLA.Conformance.against_graph/3` classifies
+      # as FORBIDDEN unless the spec carries a self-loop at its initial state — see the
+      # `against_graph/3` test below, which is the case that could not pass before.
       assert Runtime.get_trace(server) == %{
                states: [
-                 %{count: 0, status: :ready},
                  %{count: 0, status: :ready},
                  %{count: 1, status: :incrementing},
                  %{count: 1, status: :ready}

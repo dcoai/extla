@@ -304,27 +304,29 @@ defmodule TLA.Simulation do
     end
   end
 
+  # Both branches record the same STEP — a `:restart` from the pre-crash state to where
+  # recovery landed — and differ only in the verdict about it. The success branch used to
+  # push the state alone (#168), which is one more state than actions and therefore not a
+  # behaviour: `Trace.to_diffs/1` refuses that shape by name and `format/1` rendered it
+  # anyway, marking the wrong state `[VIOLATION]` (#204, #260). It had to be the success
+  # branch, because a run that ends in a violation stops and a run that recovers goes on to
+  # take more steps against `hd(state.states)`.
+  #
+  # `:restart` is not an action of the spec and is excluded from the action census
+  # (`coverage/2`); what it records is that the behaviour moved, which is true.
   defp recovery(state, server, recovered, verdict) do
-    case verdict do
-      :ok ->
-        %{
-          state
-          | server: server,
-            restarts: state.restarts + 1,
-            states: [recovered | state.states]
-        }
+    recorded = %{
+      state
+      | server: server,
+        restarts: state.restarts + 1,
+        states: [recovered | state.states],
+        actions: [:restart | state.actions],
+        bindings: [%{} | state.bindings]
+    }
 
-      {:violation, violation} ->
-        %{
-          state
-          | server: server,
-            restarts: state.restarts + 1,
-            status: :violation,
-            violation: violation,
-            states: [recovered | state.states],
-            actions: [:restart | state.actions],
-            bindings: [%{} | state.bindings]
-        }
+    case verdict do
+      :ok -> recorded
+      {:violation, violation} -> %{recorded | status: :violation, violation: violation}
     end
   end
 
@@ -477,6 +479,7 @@ defmodule TLA.Simulation do
       bindings: Enum.reverse(outcome.bindings),
       length: length(outcome.states)
     }
+    |> Trace.well_formed!("TLA.Simulation")
   end
 
   # What a reader wants in the trace's header. An invariant or an action property has a
