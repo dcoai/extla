@@ -74,7 +74,13 @@ defmodule TLA.Coverage do
           # mid-expansion, so its counts are a lower bound for exactly the same
           # reason a bounded run's are. Leaving it out would let a partial census
           # read as a complete one.
-          bounded_by: :none | :state_constraint | :max_states | :violation
+          bounded_by: :none | :state_constraint | :max_states | :violation,
+
+          # How many states a `state_constraint:` actually held back. `0` with a constraint
+          # CONFIGURED is a run that reached every state anyway, and there is nothing partial
+          # about it -- which is a different fact from "no constraint was given", and the
+          # reason this is a count rather than a flag (#167).
+          held_back: non_neg_integer()
         }
 
   defstruct actions: %{},
@@ -85,6 +91,7 @@ defmodule TLA.Coverage do
             terminal_but_live: [],
             terminals: %{},
             bounded_by: :none,
+            held_back: 0,
 
             # Accumulator-only, dropped by finalize/3.
             probes: %{},
@@ -314,9 +321,20 @@ defmodule TLA.Coverage do
           merge_with(into.terminals, from.terminals, fn a, b ->
             %{admitted: a.admitted + b.admitted}
           end),
-        live_terminals: MapSet.union(into.live_terminals, from.live_terminals)
+        live_terminals: MapSet.union(into.live_terminals, from.live_terminals),
+        held_back: into.held_back + from.held_back
     }
   end
+
+  @doc """
+  One more state the `state_constraint:` held back.
+
+  Counted where the constraint is applied rather than inferred from the config, because
+  "a constraint was configured" and "a constraint bound this run" are different facts and
+  only the second is a reason to call the result partial (#167).
+  """
+  def observe_held_back(%__MODULE__{} = coverage),
+    do: %{coverage | held_back: coverage.held_back + 1}
 
   # Both accumulators come from the same `init/3`, so their key sets are identical and a
   # key present in one and not the other would be a bug rather than a case to handle.
@@ -370,7 +388,8 @@ defmodule TLA.Coverage do
       unreached_params: unreached(coverage),
       terminal_but_live: coverage.live_terminals |> MapSet.to_list() |> Enum.sort(),
       terminals: coverage.terminals,
-      bounded_by: bounded_by
+      bounded_by: bounded_by,
+      held_back: coverage.held_back
     }
   end
 
@@ -484,32 +503,98 @@ defmodule TLA.Coverage do
 
   @doc """
   Whether this run found anything worth a warning.
+
+  Everything a run can say about itself, including the two that are **not** failures — a
+  `terminal` that admitted a live state and an invariant never at risk. This is what decides
+  whether the report is printed, and a report that stayed silent about them would hide the
+  thing it exists to surface.
+
+  `--strict-coverage` asks a different question, and `strict_failures/1` is where it is
+  asked. Conflating the two is what made `--strict-coverage` fail on conditions the
+  specification does not give it (#167).
   """
   def clean?(coverage) do
-    accusable(coverage) == [] and coverage.vacuous == [] and
-      coverage.terminal_but_live == [] and
+    accusing(coverage) == [] and coverage.terminal_but_live == [] and
       Enum.all?(coverage.invariants, fn {_, entry} -> entry.near_misses != 0 end)
   end
 
-  # A never-enabled action is a finding about the SPEC — "a typo in a guard", as the moduledoc
-  # puts it — and a run that stopped early cannot support that claim. It cannot tell an action
-  # whose guard is never true from one whose states it never reached (#128). The list stays in
-  # the report either way, because it is data; what a truncated run may not do is accuse, and
-  # `--strict-coverage` may not fail a build on it.
+  @doc """
+  What `--strict-coverage` may fail a build on: **a never-enabled action or a vacuous
+  property**, and only where this run is in a position to accuse.
+
+  `04-layer2-model-checker.md` scopes the flag to exactly those two (§Options affecting the
+  VERDICT, §`assert_spec`), and says of `terminal_but_live` that it is "not an error --
+  nothing is cut". The code failed on that and on an invariant with no near misses, which
+  broke the specification's own worked example: it renders `type_ok … <-- never at risk` and
+  then counts **2 warnings**, where the code counted three and failed the build on them.
+
+  Returns a list of `{kind, name}`, so a caller can say which.
+  """
+  def strict_failures(coverage) do
+    never_enabled =
+      for name <- accusable(coverage, :never_enabled), do: {:never_enabled, name}
+
+    vacuous =
+      for entry <- accusable(coverage, :vacuous), do: {:vacuous, entry.property}
+
+    never_enabled ++ vacuous
+  end
+
+  # ── What a run is in a position to claim ────────────────────────────────────
+
+  # **One rule, applied in one place.** A NEGATIVE EXISTENTIAL claim — "no reached state
+  # satisfied P" — is not supportable by a run that did not reach every state: it cannot
+  # tell a P nothing satisfies from a P whose states it never got to (#128). #167 found the
+  # rule established for one of four and absent from the rest.
   #
-  defp accusable(%{bounded_by: :none} = coverage), do: coverage.never_enabled
-  defp accusable(_bounded), do: []
+  # All four are that claim wearing different words:
+  #
+  #   * a never-enabled action — no reached state enabled it;
+  #   * `:antecedent_never_held` — no reached state satisfied P;
+  #   * `:consequent_always_held` — no reached state FAILED Q. The proposal did not name
+  #     this one; it is the same claim with the quantifier turned around, and a bounded run
+  #     can no more support "Q held everywhere" than "P held nowhere";
+  #   * an invariant with zero near misses — no reached state came close to violating it.
+  #
+  # Each stays in the report either way, because it is data; what a truncated run may not do
+  # is accuse, and `--strict-coverage` may not fail a build on it.
+  defp accusable?(%{bounded_by: :none}), do: true
+  defp accusable?(_bounded), do: false
+
+  defp accusable(coverage, :never_enabled) do
+    if accusable?(coverage), do: coverage.never_enabled, else: []
+  end
+
+  defp accusable(coverage, :vacuous) do
+    if accusable?(coverage), do: coverage.vacuous, else: []
+  end
+
+  # The accusations this run is making, whatever kind they are.
+  defp accusing(coverage),
+    do: accusable(coverage, :never_enabled) ++ accusable(coverage, :vacuous)
 
   @doc """
   The warnings, one line each.
   """
   def warnings(coverage) do
     Enum.map(coverage.never_enabled, &never_enabled_line(&1, coverage.bounded_by)) ++
-      Enum.map(coverage.vacuous, &vacuity_line/1) ++
+      Enum.map(coverage.vacuous, &vacuity_line(&1, coverage.bounded_by)) ++
       Enum.map(coverage.terminal_but_live, &"terminal #{inspect(&1)} admitted a live state") ++
       unreached_lines(coverage) ++
       for {name, %{near_misses: 0}} <- coverage.invariants,
-          do: "invariant #{inspect(name)} was never at risk"
+          do: never_at_risk_line(name, coverage.bounded_by)
+  end
+
+  # Every negative existential claim carries the same qualifier on a bounded run, in the
+  # same words `never_enabled_line/2` has used since #128. The line stays -- it is data --
+  # and what it stops doing is accusing.
+  defp bounded_note(bound),
+    do: " -- the run was bounded by #{inspect(bound)}, so this is not a finding about the spec"
+
+  defp never_at_risk_line(name, :none), do: "invariant #{inspect(name)} was never at risk"
+
+  defp never_at_risk_line(name, bound) do
+    "invariant #{inspect(name)} was at risk in no state this run reached" <> bounded_note(bound)
   end
 
   # A binding no reachable state ever drew is a finding of the never-enabled kind, one
@@ -531,9 +616,12 @@ defmodule TLA.Coverage do
   defp never_enabled_line(name, :none), do: "action #{inspect(name)} was never enabled"
 
   defp never_enabled_line(name, bound) do
-    "action #{inspect(name)} was not enabled in any state this run reached — the run was " <>
-      "bounded by #{inspect(bound)}, so this is not a finding about the spec"
+    "action #{inspect(name)} was not enabled in any state this run reached" <> bounded_note(bound)
   end
+
+  defp vacuity_line(entry, :none), do: vacuity_line(entry)
+
+  defp vacuity_line(entry, bound), do: vacuity_line(entry) <> bounded_note(bound)
 
   defp vacuity_line(%{property: property, binding: [], reason: reason}),
     do: "property #{inspect(property)} is VACUOUS: #{reason(reason)}"
@@ -556,10 +644,14 @@ defmodule TLA.Coverage do
     strict =
       if is_map(opts), do: Map.get(opts, :strict_coverage, false), else: opts[:strict_coverage]
 
-    case {clean?(coverage), strict} do
-      {true, _} -> :ok
-      {false, true} -> {:error, warnings(coverage)}
-      {false, _} -> Enum.each(warnings(coverage), &IO.puts(:stderr, "warning: " <> &1))
+    # Two questions, and they are not the same one (#167). `clean?/1` decides whether there
+    # is anything to PRINT, which includes the two the specification calls warnings and not
+    # errors; `strict_failures/1` decides whether to FAIL, and is scoped to the two the
+    # specification gives the flag.
+    cond do
+      strict and strict_failures(coverage) != [] -> {:error, warnings(coverage)}
+      clean?(coverage) -> :ok
+      true -> Enum.each(warnings(coverage), &IO.puts(:stderr, "warning: " <> &1))
     end
   end
 
@@ -654,7 +746,16 @@ defmodule TLA.Coverage do
             "bound, not a census.\n"
       end
 
-    count = length(warnings(coverage))
+    # `strict_failures/1` and not `warnings/1`, because the sentence beside the number says
+    # "fail on these" and only these can (#167). `04-layer2-model-checker.md`'s own worked
+    # example is the arbiter: it renders `type_ok … <-- never at risk` in the invariants
+    # table and then counts **2 warnings** — the never-enabled action and the vacuous
+    # property. Counting every line made it three, and failed the build on a condition the
+    # specification calls a warning.
+    #
+    # The uncounted ones are not hidden: the never-at-risk marker is in the table above, and
+    # `warn_unless_clean/2` prints every line to stderr.
+    count = length(strict_failures(coverage))
 
     warning =
       if count == 0 do

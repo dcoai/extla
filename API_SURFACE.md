@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 389 items** · functions 327 · arities 403 · types 62
+**59 modules · 391 items** · functions 329 · arities 405 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -67,29 +67,31 @@ key whose value is a union of atoms; any other type is shown as written.
 | `against_graph/3` | `:def` | (graph, behaviour, opts) | `43ea7512` | `lib/tla/conformance.ex` |
 | `explain/1` | `:def` | (_) | `ab441add` | `lib/tla/conformance.ex` |
 | `finding()` | `:type` | :ok \| :nothing_observed \| {:checker, map()} \| {:absent_state, map()} \| {:not_a_step_of_the_spec, map()} | `f4477bef` | `lib/tla/conformance.ex` |
-## TLA.Coverage — 17 items
+## TLA.Coverage — 19 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
 | `action_coverage()` | `:type` | enabled_in, states_generated, distinct_generated | `5186a60f` | `lib/tla/coverage.ex` |
-| `clean?/1` | `:def` | (coverage) | `f1342159` | `lib/tla/coverage.ex` |
-| `finalize/2` | `:def` | (coverage, bounded_by) | `fdaa7260` | `lib/tla/coverage.ex` |
+| `clean?/1` | `:def` | (coverage) | `360301fe` | `lib/tla/coverage.ex` |
+| `finalize/2` | `:def` | (coverage, bounded_by) | `9a83af38` | `lib/tla/coverage.ex` |
 | `format/1` | `:def` | (coverage, opts \\ …) | `720a34a5` | `lib/tla/coverage.ex` |
 | `format/2` | `:def` | (coverage, opts \\ …) | `720a34a5` | `lib/tla/coverage.ex` |
 | `init/3` | `:def` | (spec, constants, invariants) | `1e2e6d8c` | `lib/tla/coverage.ex` |
 | `invariant_coverage()` | `:type` | evaluated_in, near_misses | `6b19f87d` | `lib/tla/coverage.ex` |
-| `merge/2` | `:def` | (into, from) | `8fe8e836` | `lib/tla/coverage.ex` |
+| `merge/2` | `:def` | (into, from) | `8fe1b7f3` | `lib/tla/coverage.ex` |
 | `observe_enabled/3` | `:def` | (coverage, _name, _) | `cd34c5f6` | `lib/tla/coverage.ex` |
 | `observe_generated/4` | `:def` | (coverage, name, generated, distinct) | `6d645fed` | `lib/tla/coverage.ex` |
+| `observe_held_back/1` | `:def` | (coverage) | `df025392` | `lib/tla/coverage.ex` |
 | `observe_live_terminal/4` | `:def` | (coverage, spec, constants, state) | `cb3bb317` | `lib/tla/coverage.ex` |
 | `observe_state/4` | `:def` | (coverage, invariants, constants, state) | `e61dd7ff` | `lib/tla/coverage.ex` |
 | `observe_stuck/2` | `:def` | (coverage, admitting) | `efad176a` | `lib/tla/coverage.ex` |
 | `observe_universe/4` | `:def` | (coverage, action, constants, state) | `9a48324e` | `lib/tla/coverage.ex` |
-| `t()` | `:type` | actions, never_enabled, invariants, vacuous, unreached_params, terminal_but_live, terminals, bounded_by: :max_states \| :none \| :state_constraint \| :violation | `87978e4d` | `lib/tla/coverage.ex` |
+| `strict_failures/1` | `:def` | (coverage) | `95708da5` | `lib/tla/coverage.ex` |
+| `t()` | `:type` | actions, never_enabled, invariants, vacuous, unreached_params, terminal_but_live, terminals, bounded_by: :max_states \| :none \| :state_constraint \| :violation, held_back | `369ca9ac` | `lib/tla/coverage.ex` |
 | `vacuity()` | `:type` | property, binding, reason: :antecedent_never_held \| :consequent_always_held | `7fd0e2de` | `lib/tla/coverage.ex` |
-| `warn_unless_clean/1` | `:def` | (coverage, opts \\ …) | `8c60878f` | `lib/tla/coverage.ex` |
-| `warn_unless_clean/2` | `:def` | (coverage, opts \\ …) | `8c60878f` | `lib/tla/coverage.ex` |
-| `warnings/1` | `:def` | (coverage) | `5e4d1520` | `lib/tla/coverage.ex` |
+| `warn_unless_clean/1` | `:def` | (coverage, opts \\ …) | `f8af7aa0` | `lib/tla/coverage.ex` |
+| `warn_unless_clean/2` | `:def` | (coverage, opts \\ …) | `f8af7aa0` | `lib/tla/coverage.ex` |
+| `warnings/1` | `:def` | (coverage) | `1005d356` | `lib/tla/coverage.ex` |
 ## TLA.Fingerprint — 5 items
 
 | Item | Kind | Shape | Version | Locus |

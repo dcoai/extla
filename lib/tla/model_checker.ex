@@ -415,7 +415,14 @@ defmodule TLA.ModelChecker do
         {:violation, run, invariant_trace(run, id, name, state)}
 
       :ok ->
-        if constrained?(run.config, state), do: {:ok, run, :hold}, else: {:ok, run, :explore}
+        if constrained?(run.config, state) do
+          # Counted where it happens. "A constraint was configured" and "a constraint bound
+          # this run" are different facts, and only the second makes the result partial
+          # (#167) -- so the second is measured rather than inferred from the config.
+          {:ok, %{run | coverage: Coverage.observe_held_back(run.coverage)}, :hold}
+        else
+          {:ok, run, :explore}
+        end
     end
   end
 
@@ -739,9 +746,18 @@ defmodule TLA.ModelChecker do
 
         :ok ->
           cond do
-            config.check_deadlock and deadlock? -> {:violation, deadlock_trace(run)}
-            config.state_constraint != nil -> {:constrained, nil}
-            true -> {:ok, nil}
+            config.check_deadlock and deadlock? ->
+              {:violation, deadlock_trace(run)}
+
+            # Whether the constraint HELD SOMETHING BACK, not whether one was configured
+            # (#167). An exhaustive run whose constraint never fired reached every state,
+            # and reporting it as unverified made `mix tla.check` exit 2 and `assert_spec`
+            # fail over a predicate that turned out to exclude nothing.
+            run.coverage.held_back > 0 ->
+              {:constrained, nil}
+
+            true ->
+              {:ok, nil}
           end
       end
 
@@ -768,7 +784,16 @@ defmodule TLA.ModelChecker do
     # state, whose counts are a census. Both reach `:violation` there; `run.outcome` still has
     # them separate. `check_temporals/1` does not touch it, so the existing rule that coverage is
     # bounded by what the SAFETY pass did survives unchanged.
-    coverage = Coverage.finalize(run.coverage, bounded_by(run.outcome, config))
+    # The same question as `:constrained` above, and it has to be the same answer: a
+    # constraint that held nothing back did not bound this run, so its counts are a census
+    # rather than a lower bound and every negative existential claim over them stands.
+    bound =
+      case {bounded_by(run.outcome, config), run.coverage.held_back} do
+        {:none, held} when held > 0 -> :state_constraint
+        {other, _held} -> other
+      end
+
+    coverage = Coverage.finalize(run.coverage, bound)
 
     %{
       status: status,
@@ -790,8 +815,7 @@ defmodule TLA.ModelChecker do
 
   defp bounded_by(:max_states_reached, _config), do: :max_states
   defp bounded_by({:violation, _trace}, _config), do: :violation
-  defp bounded_by(_outcome, %{state_constraint: nil}), do: :none
-  defp bounded_by(_outcome, _config), do: :state_constraint
+  defp bounded_by(_outcome, _config), do: :none
 
   defp invariant_trace(run, id, name, state) do
     Trace.generate(run.graph, id,

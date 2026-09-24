@@ -82,6 +82,41 @@ release it merely follows.
 
 ### Fixed
 
+- **A bounded run stops accusing, and `--strict-coverage` fails on exactly what the
+  specification gives it** (#307, closes #167). Three defects, one theme: a run that did not
+  see the whole state space may not make a negative existential claim.
+
+  **The rule, applied once instead of four times.** *No reached state satisfied P* is not
+  supportable by a bounded run — it cannot tell a P nothing satisfies from a P whose states
+  it never got to. #128 established that for `never_enabled` and it stopped there. The other
+  three are the same claim in different words: `:antecedent_never_held`, an invariant with
+  zero near misses, and — not named in the proposal — `:consequent_always_held`, which is the
+  same claim with the quantifier turned around. All four now downgrade together, and each
+  keeps its line in the report carrying the qualifier `never_enabled_line/2` has used since
+  #128.
+
+  **`:constrained` meant "a constraint was configured", not "a constraint bound this run".**
+  An exhaustive run whose `state_constraint` never fired was reported as unverified, exited
+  2, and flunked `assert_spec` — over a predicate that turned out to exclude nothing. The
+  coverage accumulator now counts `held_back` where the constraint is applied, so it merges
+  correctly under `--workers`, and both the status and `bounded_by` are derived from it.
+
+  **`--strict-coverage` failed on two conditions the specification never gave it.** spec/04
+  scopes it to a never-enabled action or a vacuous property and says of `terminal_but_live`
+  that it is "not an error — nothing is cut"; the code also failed on that and on zero near
+  misses. The root cause was one predicate answering two questions, so they are now two:
+  `clean?/1` decides whether there is anything worth **printing** — including the two that
+  are not errors — and the new `strict_failures/1` decides what may **fail a build**.
+
+  **The specification's own worked example was the witness.** It renders
+  `type_ok … <-- never at risk` and then counts **2 warnings**; the code counted three and
+  failed on all of them. The footer now counts `strict_failures/1`, so the sentence beside
+  the number — "fail on these" — is true of the things counted. `test/tla/bounded_accusation_test.exs`
+  reads the number **out of spec/04** rather than restating it, so an edit to the example
+  moves the test.
+
+  All three demonstrated red.
+
 - **An action the server takes by cast is drivable, not merely checkable** (#306, closes
   #172). `TLA.GenServer.Driver` sent `{:"$gen_call", …}` unconditionally and is the sole
   delivery path for both Layer 3 drivers, while **spec/05's own canonical refinement maps

@@ -414,7 +414,11 @@ defmodule Mix.Tasks.Tla.Check do
       not allow_incomplete and Enum.any?(statuses, &(&1 in [:max_states_reached, :constrained])) ->
         exit({:shutdown, 2})
 
-      strict and Enum.any?(coverages, &(not Coverage.clean?(&1))) ->
+      # `strict_failures/1` and not `clean?/1`: the specification scopes `--strict-coverage`
+      # to a never-enabled action or a vacuous property (§Options affecting the VERDICT),
+      # and calls a `terminal` that admitted a live state "not an error". `clean?/1` decides
+      # whether there is anything to print, which is a wider question (#167).
+      strict and Enum.any?(coverages, &(Coverage.strict_failures(&1) != [])) ->
         exit({:shutdown, 3})
 
       true ->

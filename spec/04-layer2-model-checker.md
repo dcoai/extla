@@ -1092,7 +1092,16 @@ defmodule TLA.Coverage do
     # Set when `state_constraint` or `max_states` bounded the run, or when it
     # stopped at a counterexample mid-expansion — the coverage numbers are then a
     # lower bound, not a census.
-    bounded_by: :none | :state_constraint | :max_states | :violation
+    #
+    # For a `state_constraint`, "bounded" means it HELD A STATE BACK, not that one
+    # was configured. A predicate that excluded nothing did not bound anything,
+    # and a run under one reached every state.
+    bounded_by: :none | :state_constraint | :max_states | :violation,
+
+    # How many states the `state_constraint` held back. Counted where the
+    # constraint is applied, because "configured" and "bound this run" are
+    # different facts and only the second makes the census partial.
+    held_back: non_neg_integer()
   }
 
   # Accumulated WHILE the search runs, not computed from the finished graph: the
@@ -1112,6 +1121,34 @@ defmodule TLA.Coverage do
   and errors under `--strict-coverage`.
   """
   def format(coverage)
+
+  @doc """
+  Whether anything in this run is worth printing -- which includes the two that
+  are NOT errors: a `terminal` that admitted a live state, and an invariant never
+  at risk. A report silent about those would hide what it exists to surface.
+  """
+  def clean?(coverage)
+
+  @doc """
+  What `--strict-coverage` may fail a build on: a never-enabled action or a
+  vacuous property, and only where this run is in a position to accuse.
+
+  A different question from `clean?/1`, and the distinction is the point. A
+  NEGATIVE EXISTENTIAL claim -- "no reached state satisfied P" -- is not
+  supportable by a run that did not reach every state: it cannot tell a P
+  nothing satisfies from a P whose states it never got to. The rule applies to
+  all four of them uniformly:
+
+    * a never-enabled action        -- no reached state enabled it
+    * `:antecedent_never_held`      -- no reached state satisfied P
+    * `:consequent_always_held`     -- no reached state failed Q
+    * an invariant with no near miss -- no reached state came close
+
+  Each stays in the report on a bounded run, carrying the qualifier "the run was
+  bounded by X, so this is not a finding about the spec". What a truncated run
+  may not do is accuse.
+  """
+  def strict_failures(coverage)
 end
 ```
 
@@ -1576,7 +1613,11 @@ defmodule Mix.Tasks.Tla.Check do
   ## Options affecting the VERDICT
 
       --strict-coverage    Treat a never-enabled action or a vacuous property
-                           as a failure rather than a warning.
+                           as a failure rather than a warning. Those two and no
+                           others: a `terminal` that admitted a live state and an
+                           invariant never at risk are reported and are not
+                           failures. Nor is any of them a failure on a BOUNDED
+                           run, which is in no position to make the claim.
       --allow-incomplete   Exit 0 even if the state limit was reached.
                            Off by default: see below.
       --fingerprint-bits   64 (default) or 128.
@@ -1822,7 +1863,8 @@ defmodule TLA.Spec.Test do
   - `allow_incomplete: true` — pass even if the state limit was reached.
     Default `false`.
   - `strict_coverage: true` — fail on a never-enabled action or a vacuous
-    property. Default `false` (they are reported, not fatal).
+    property. Default `false` (they are reported, not fatal). Those two only,
+    and only on a run that reached every state: see `TLA.Coverage.strict_failures/1`.
   """
   defmacro assert_spec(spec_module, config) do
     quote do
