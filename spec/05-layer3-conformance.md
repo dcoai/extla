@@ -341,6 +341,52 @@ defmodule TLA.Refinement do
 
   Optional. Without it the implementation can still be CHECKED as it runs, but
   it cannot be DRIVEN from the spec, which forgoes most of what Layer 3 is for.
+
+  ## How the message is delivered
+
+  The mapping says, because only the author knows: a term is a message, and a
+  message does not carry how it arrives.
+
+      {:call, msg}   -> `{:"$gen_call", from, msg}`, answered by `handle_call/3`
+      {:cast, msg}   -> `{:"$gen_cast", msg}`,       taken by `handle_cast/2`
+      {:info, msg}   -> `msg`,                       taken by `handle_info/2`
+      msg            -> a call. What a bare term has always meant
+
+  A bare term keeps its meaning, so every mapping written before this reads the
+  same way. A mapping that must send the literal two-tuple `{:cast, 5}` as a
+  call writes `{:call, {:cast, 5}}`, which is the escape from the one ambiguity
+  the tagging introduces.
+
+  Inferring delivery from which callback has a matching clause was rejected: it
+  guesses, and a message two callbacks both match is not decidable that way.
+  Declaring it on the SPEC side was rejected as the wrong layer -- delivery is an
+  implementation detail and the specification is meant not to know one.
+
+  ## How a cast's completion is observed
+
+  A call hands the driver "answered, refused, or died" as a value. A cast has no
+  reply, so conformance has to decide when the transition is complete before it
+  may compare the next step -- and a driver that moved on early would compare an
+  action against a stale state, which is the defect class of #168.
+
+  **A monitored `:sys.get_state/2`, which both drivers already make.** It is a
+  system message through the same mailbox, so it is ordered BEHIND the cast that
+  was just sent: when its reply arrives, the cast has been handled.
+
+  It costs **no additional round-trip**. `TLA.Replay` and `TLA.Simulation` each
+  already call `:sys.get_state/1` after every step, to map the post-state through
+  `abstract/1`; for a cast that same call becomes the completion signal as well.
+
+  All four outcomes stay distinguishable, because the monitor is what carries
+  them: a conformance violation raised in `handle_cast/2` kills the server and
+  arrives as the same `:DOWN` a call's would, and a cast that never completes is
+  a `{:timeout, ms}` -- a **named finding**, never a silent "followed".
+
+  > **Not yet delivered (#306).** `TLA.GenServer.Driver` sends `{:"$gen_call", ...}`
+  > unconditionally today, so a mapping naming a cast is CHECKED and not DRIVABLE.
+  > This section is the decided contract (D-36); #306 implements it and adds a
+  > conformance-corpus entry that handles an action by cast, since the corpus is
+  > `handle_call`-only and that is why the gap went unseen.
   """
   @callback concrete_message(action :: atom(), params :: map()) :: term()
 
