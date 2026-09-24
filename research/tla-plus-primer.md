@@ -2,6 +2,26 @@
 
 A comprehensive guide to TLA+, a formal specification language for designing, modeling, and verifying systems — especially concurrent and distributed systems.
 
+> **This page is about TLA+ the language, not about ExTLA.** It ships with ExTLA as
+> background reading and names the library nowhere else, so it is worth saying once, here,
+> which parts of what follows this tool implements.
+>
+> **ExTLA implements the specification and model-checking parts** — state, actions, the
+> temporal operators of the bounded fragment, fairness, invariants, and exhaustive checking
+> — **in Elixir syntax rather than in TLA+'s.** Where this page writes `[]P` or `<>P`, an
+> ExTLA specification writes `always(p)` and `eventually(p)`; where it writes a module with
+> `VARIABLES` and `Next`, ExTLA writes `variable` and `action` declarations. The mapping is
+> [the tutorial](../guides/tutorial/00-introduction.md), and the rules are
+> [`usage-rules.md`](../usage-rules.md).
+>
+> **It does not implement PlusCal or TLAPS**, both of which have chapters below. PlusCal is
+> TLA+'s algorithm language, compiled down to TLA+; ExTLA's DSL fills that role in Elixir, so
+> those chapters describe a notation this library does not use. TLAPS is a theorem prover,
+> and **ExTLA is not one** — it checks bounded models exhaustively and observed behaviours
+> concretely, which is the first entry in
+> [§Non-goals](../spec/06-architecture.md#non-goals). The distributed-TLC material is
+> likewise about a tool this project does not build.
+
 ---
 
 ## Table of Contents

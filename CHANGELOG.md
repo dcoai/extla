@@ -51,6 +51,28 @@ release it merely follows.
 
 ### Fixed
 
+- **The TLA+ primer says which parts of TLA+ this library implements** (#293, closes #181).
+  1321 published lines with **zero** occurrences of "ExTLA", shipping in the package and
+  rendering in the sidebar, with chapters on PlusCal, TLAPS and TLC's distributed mode. A
+  reader arriving from the sidebar got TLA+ with nothing indicating which parts this tool
+  implements, which it does not, and which are translated into Elixir syntax.
+
+  The header now says all three, and points at the tutorial for the mapping and at
+  `usage-rules.md` for the rules. PlusCal gets the accurate framing rather than a claim the
+  project does not make: it is TLA+'s algorithm language and ExTLA's DSL fills that role in
+  Elixir, so those chapters describe a notation this library does not use. Not being a
+  theorem prover **is** a stated non-goal, and the header cites `spec/06` §Non-goals for
+  it — which `test/docs/primer_framing_test.exs` holds to that section, so a non-goal
+  becoming a goal cannot leave this page contradicting the architecture.
+
+  **#291's gate caught two real defects while this landed**, which is the first work it has
+  done since it was turned on: `usage-rules.md` shipped in `files:` but was not an ExDoc
+  `extras:` page, so the primer's link to it would have 404'd in the published docs; and
+  the usage rules linked `DIAGNOSTICS.md`, which is a generated golden this repository
+  keeps and **does not ship**, so a consumer following it would find nothing. The first is
+  fixed by publishing the page, the second by pointing at `spec/02` §7 — the table a
+  consumer actually receives.
+
 - **Strong fairness is refuted by something, and the parallel search is asserted to be
   parallel** (#296, closes #174). Two mechanisms that were only ever exercised in the mode
   where they cannot be told apart from their own absence.

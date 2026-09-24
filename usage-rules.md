@@ -6,8 +6,10 @@ difference is the point: these blocks describe a *specification*, which a model 
 enumerates, not a program that runs.
 
 Every rule below is enforced at compile time and names a diagnostic you will see if you
-break it. The full list is [`DIAGNOSTICS.md`](DIAGNOSTICS.md), generated from the code; the
-normative semantics are [`spec/02-dsl-semantics.md`](spec/02-dsl-semantics.md).
+break it. The full table, keyed by kind, is
+[`spec/02-dsl-semantics.md` §7](spec/02-dsl-semantics.md), which is also the normative
+semantics. (This repository generates `DIAGNOSTICS.md` from the raise sites and holds §7's
+table to it, but that golden is not part of the package — the specification is.)
 
 ## The eight things that look like Elixir and are not
 
