@@ -75,7 +75,7 @@ defmodule ExTLA.MixProject do
         # preformatted text; without it that link is a 404 in the published docs, which is the
         # second defect the built-docs gate found.
         extras:
-          ["README.md", "CHANGELOG.md"] ++
+          ["README.md", "usage-rules.md", "CHANGELOG.md"] ++
             Path.wildcard("guides/*.md") ++
             Path.wildcard("guides/tutorial/*.md") ++
             Enum.map(Path.wildcard("spec/*.md"), fn
