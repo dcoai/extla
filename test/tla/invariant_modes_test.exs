@@ -469,4 +469,83 @@ defmodule TLA.InvariantModesTest do
       assert module.__tla_telemetry__() == :quiet
     end
   end
+
+  describe "a GenServer whose author wrote no init/1" do
+    # `** (ArgumentError) cannot make function init/1 overridable because it was not
+    # defined` — from `Module.make_overridable/2`, naming neither this library nor the
+    # cause (#171). Layer 1 hit it for any module with an invariant that applies to
+    # `init`; Layer 3 hit it unconditionally. The example at the top of `TLA.Invariant`'s
+    # own moduledoc produced it, which is the first thing a reader copies.
+    #
+    # `use GenServer` injects `init/1` from its `@before_compile`, AFTER the hook is
+    # installed, so `@on_definition` sees it and `{:init, 1}` lands in the wrapped set for
+    # a module that never wrote one.
+    test "compiles under Layer 1" do
+      [{module, _binary} | _] =
+        Code.compile_string("""
+        defmodule NoInitLayerOne do
+          use GenServer
+          use TLA.Invariant
+
+          invariant :never_negative do
+            state.balance >= 0
+          end
+
+          def handle_call(:balance, _from, state), do: {:reply, state.balance, state}
+        end
+        """)
+
+      assert function_exported?(module, :handle_call, 3)
+    end
+
+    # The example as PRINTED, copied from the moduledoc. #301 gates every such example;
+    # this one is the reason the bug mattered, so it keeps an assertion of its own.
+    test "and so does the front-page example, exactly as printed" do
+      assert [{_module, _binary} | _] =
+               Code.compile_string("""
+               defmodule FrontPageAccount do
+                 use GenServer
+                 use TLA.Invariant
+
+                 invariant :never_negative, desc: "an account may not go below zero" do
+                   state.balance >= 0
+                 end
+
+                 action_property :no_free_money do
+                   new.balance <= old.balance or new.deposits > old.deposits
+                 end
+
+                 precondition {:withdraw, amount} do
+                   amount > 0
+                 end
+               end
+               """)
+    end
+
+    # An author-written `init/1` is still wrapped — the guard asks whether the callback is
+    # in the definitions table, not whether it is called `init`, so it must not have
+    # turned the wrapper off for everyone.
+    test "while an author-written init/1 is still checked" do
+      [{module, _binary} | _] =
+        Code.compile_string("""
+        defmodule AuthorWroteInit do
+          use GenServer
+          use TLA.Invariant
+
+          invariant :never_negative do
+            state.balance >= 0
+          end
+
+          def init(balance), do: {:ok, %{balance: balance}}
+        end
+        """)
+
+      Process.flag(:trap_exit, true)
+
+      assert {:error, {%TLA.Invariant.Violation{} = violation, _stack}} =
+               GenServer.start(module, -1)
+
+      assert violation.name == :never_negative
+    end
+  end
 end

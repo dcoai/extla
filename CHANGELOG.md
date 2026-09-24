@@ -51,6 +51,28 @@ release it merely follows.
 
 ### Fixed
 
+- **A GenServer with no author-written `init/1` compiles** (#300, for #171). It failed with
+
+      ** (ArgumentError) cannot make function init/1 overridable because it was not defined
+
+  from `Module.make_overridable/2`, naming neither this library nor the cause. Layer 1 hit
+  it for any module with an invariant that applies to `init`; `use TLA.GenServer` hit it
+  **unconditionally**. The example at the top of `TLA.Invariant`'s own moduledoc — the
+  first thing a reader copies — produced it.
+
+  `@on_definition` keeps the wrapper off the defaults `use GenServer` injects, which is
+  what the moduledoc claimed, and it is true of `handle_call/3`, `handle_cast/2` and
+  `handle_info/2`: GenServer injects those in `__using__`, **before** the hook is
+  installed. `init/1` it injects from its own `@before_compile`, **after** — so the hook
+  does see it, `{:init, 1}` lands in the wrapped set for a module that never wrote one, and
+  by then GenServer's `defoverridable init: 1` has moved it out of the definitions table.
+
+  The wrapper is now emitted only for a callback still in the definitions table when
+  `__before_compile__/1` runs — which is exactly what `make_overridable/2` requires, asked
+  as a question rather than assumed, so it is right for any future callback of the same
+  shape rather than a special case for one name. The moduledoc says what is true of
+  `init/1` instead of denying the case.
+
 - **`spec/05` says which of its five rules are decided at compile time, and the probe draws
   every binding it can** (#298, closes #169). The section listed five rules "checked, in
   order" and said a mapping not covering the spec's variables "fails the build". Neither
