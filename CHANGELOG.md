@@ -30,6 +30,39 @@ release it merely follows.
 
 ### Added
 
+- **`mix tla.stamp` is exercised end to end, over a tree with all four statuses** (#308, for
+  #173). It is the only code in the project that rewrites files under `lib/`, and it was the
+  least covered thing in it: **replacing `run/1`'s entire body with a raise left the full
+  suite green**. The tests called `states/0` and `module_index/0` and nothing else.
+
+  Two of its four statuses had **never executed**. The real corpus holds only fresh and
+  unstamped mappings, so collapsing `:stale` and `:unverifiable` into `:fresh` stayed green
+  and the coverage gate did not move, because the golden records `stale 0`. Dead with them:
+  both `detail/1` clauses, the "N stale" report, and the documented stale-wins-over-fresh
+  precedence. Nor could the corpus hold them — a genuinely stale stamp in a compiled tree is
+  a **compile error**, which is what the mechanism is for.
+
+  So `test/fixtures/stamp/` is a tree outside every path the task scans and outside
+  `elixirc_paths` in every environment: inert, invisible to this repository's own report,
+  and unable to fail a build once #311 makes the task gate. `run/2`, `states/1`, `sources/1`
+  and `module_index/1` take their roots as an argument for exactly that — a seam, said to be
+  one, rather than a `--root` flag added to the CLI for a test.
+
+  It also separates two defects that look alike: `unverifiable.ex` **reaches** `state/2` and
+  is given a status, because its spec's source is not in the index; `dropped.ex` never gets
+  that far, because `spec_of/1` returns `nil` for a `spec:` that is not a literal alias and
+  the mapping is silently rejected. The second is #173's defect 4, pinned here so that #310
+  changing it is deliberate.
+
+### Changed
+
+- **`mix tla.stamp` scans the project's own `elixirc_paths` rather than hardcoded
+  directories** (#308). It appended `["lib", "test", "ledger"]` unconditionally — `ledger`
+  is a directory of *this* repository, and a consumer running the task got it scanned along
+  with their whole `test` tree. `elixirc_paths` is the project's own answer to "where is my
+  code", and for this repository it already names `ledger` and the compiled test trees:
+  measured before and after, the same 95 sources and the same 8 mappings.
+
 - **The refinement mapping says how a message is delivered, and a cast's completion has an
   answer** (#305, for #172). A decision, not yet a change to the driver — D-36 records it
   and #306 builds it.

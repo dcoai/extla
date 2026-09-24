@@ -34,9 +34,17 @@ defmodule Mix.Tasks.Tla.Stamp do
   @switches [restamp: :boolean]
 
   @impl Mix.Task
-  def run(argv) do
+  def run(argv), do: run(argv, roots())
+
+  @doc false
+  # The roots are an argument so a test can point the whole task at a fixture tree (#308).
+  # `:stale` and `:unverifiable` cannot be produced by this project's own sources -- a
+  # genuinely stale stamp in `lib/` would redden the stamp check for everyone, which is why
+  # none exists -- so the only way to exercise them is a tree outside the ones scanned here.
+  # A `--root` flag would be surface added for a test; this is a seam, said to be one.
+  def run(argv, roots) do
     {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
-    stamps = states()
+    stamps = states(roots)
 
     if opts[:restamp], do: restamp(stamps), else: report(stamps)
   end
@@ -47,8 +55,8 @@ defmodule Mix.Tasks.Tla.Stamp do
   `status` is `:fresh`, `:stale`, `:unstamped` or `:unverifiable`. Read from source, so this
   answers even when a stale stamp is stopping the project from compiling.
   """
-  def states do
-    index = module_index()
+  def states(roots \\ roots()) do
+    index = module_index(roots)
 
     index
     |> mappings()
@@ -56,19 +64,32 @@ defmodule Mix.Tasks.Tla.Stamp do
     |> Enum.sort_by(& &1.module)
   end
 
-  @doc "Every `.ex` file on the project's compile paths, plus its test support trees."
-  def sources do
+  @doc """
+  The directories this scans: the project's own `elixirc_paths`, and `lib` as a floor.
+
+  It used to append `["lib", "test", "ledger"]` unconditionally. `ledger` is a directory of
+  THIS repository, and a consumer running `mix tla.stamp` got it scanned along with their
+  whole `test` tree -- a library reaching for directory names that are not its business.
+  `elixirc_paths` is the project's own answer to "where is my code", and for this repository
+  it already names `ledger` and the compiled test trees, so nothing is lost by asking it.
+  """
+  def roots do
     Mix.Project.config()
     |> Keyword.get(:elixirc_paths, ["lib"])
-    |> Kernel.++(["lib", "test", "ledger"])
+    |> Kernel.++(["lib"])
     |> Enum.uniq()
+  end
+
+  @doc "Every `.ex` file under `roots`."
+  def sources(roots \\ roots()) do
+    roots
     |> Enum.flat_map(&Path.wildcard(Path.join(&1, "**/*.ex")))
     |> Enum.uniq()
   end
 
   @doc "A `module => source path` index built by parsing `defmodule` declarations."
-  def module_index do
-    for path <- sources(),
+  def module_index(roots \\ roots()) do
+    for path <- sources(roots),
         module <- modules_in(File.read!(path)),
         into: %{},
         do: {module, path}
