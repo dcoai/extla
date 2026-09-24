@@ -155,10 +155,6 @@ A cast completes when a `:sys.get_state/2` behind it replies, which both drivers
 make, so this costs no extra round-trip. A cast that never completes is a named finding,
 not a silent pass (D-36).
 
-> **Not yet delivered (#306).** The driver sends a call unconditionally today, so a mapping
-> naming a cast is checked and not drivable. The contract above is decided; #306 implements
-> it.
-
 ## What a verdict does and does not say
 
 `mix tla.check` exits **2** when the run was bounded — `max_states` was hit, or a

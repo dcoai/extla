@@ -382,11 +382,10 @@ defmodule TLA.Refinement do
   arrives as the same `:DOWN` a call's would, and a cast that never completes is
   a `{:timeout, ms}` -- a **named finding**, never a silent "followed".
 
-  > **Not yet delivered (#306).** `TLA.GenServer.Driver` sends `{:"$gen_call", ...}`
-  > unconditionally today, so a mapping naming a cast is CHECKED and not DRIVABLE.
-  > This section is the decided contract (D-36); #306 implements it and adds a
-  > conformance-corpus entry that handles an action by cast, since the corpus is
-  > `handle_call`-only and that is why the gap went unseen.
+  The route is stripped before the compile-time round-trip: `abstract_action/1` is
+  given what the callback will receive, not the envelope the driver puts it in. A
+  mapping that correctly says `{:cast, :done}` would otherwise round-trip to
+  `:unmapped` and be reported as naming no message for the action.
   """
   @callback concrete_message(action :: atom(), params :: map()) :: term()
 

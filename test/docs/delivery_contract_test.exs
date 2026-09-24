@@ -8,23 +8,17 @@ defmodule TLA.DeliveryContractTest do
   term is a **call**. A cast completes when a `:sys.get_state/2` behind it replies. D-36
   records the reasoning.
 
-  ## Why a gate, when nothing is implemented yet
+  ## Why a gate
 
-  Because this is the interval in which a documented contract most easily becomes a lie. It
-  lives in three documents — `spec/05-layer3-conformance.md`, `usage-rules.md` and
-  `spec/08-decisions.md` — and until #306 lands, **none of it is true of the code**. Both
-  reader-facing documents therefore carry a "not yet delivered" marker naming #306, and
-  this file asserts:
+  The contract lives in three documents — `spec/05-layer3-conformance.md`, `usage-rules.md`
+  and `spec/08-decisions.md` — so one can be edited and the others forgotten. This file
+  holds them to the same forms and the same meaning for a bare term.
 
-  * all three state the same forms, so one cannot be edited and the others forgotten;
-  * both markers name the issue that removes them, so "not yet" cannot outlive its plan;
-  * the driver really does still send a call unconditionally — because a marker saying
-    "not yet" after the work has landed is the same defect pointing the other way.
-
-  The third assertion is what makes this file self-retiring: when #306 changes the driver,
-  it fails, and whoever lands #306 removes the markers as part of the same change. The
-  precedent is `--init-arg` in `spec/05`, documented as accepted and not read (#165) and
-  held by the options gate.
+  It was written at #305, before the driver could honour any of it, and asserted then that
+  the driver *still* sent a call unconditionally — so the "not yet delivered (#306)"
+  markers could not outlive the work they pointed at. #306 landed, that assertion fired as
+  designed, and the markers came out. What remains is the agreement between the documents
+  and the code; the behaviour itself is `test/conformance/cast_delivery_test.exs`.
   """
 
   use ExUnit.Case, async: true
@@ -89,29 +83,24 @@ defmodule TLA.DeliveryContractTest do
     end
   end
 
-  describe "the 'not yet delivered' markers" do
-    test "name the issue that removes them" do
-      assert squeeze(spec()) =~ "Not yet delivered (#306)"
-      assert squeeze(rules()) =~ "Not yet delivered (#306)"
-    end
-
-    # Self-retiring, and the reason this file can exist before the code does. A marker that
-    # outlives the work it points at is the same defect as an undocumented change, pointing
-    # the other way — so the marker is held to the code it describes.
-    test "and are still true: the driver sends a call unconditionally" do
+  describe "the documents and the code" do
+    # The inverse of what this file asserted at #305, against the same line of source. A
+    # document describing a capability the code does not have is this project's signature
+    # defect; a "not yet" that outlived its plan is the same defect pointing the other way.
+    test "agree that a cast is delivered as a cast" do
       driver = read("lib/tla/gen_server/driver.ex")
 
-      assert driver =~ ~s|send(pid, {:"$gen_call", {self(), ref}, message})|,
-             """
-             `TLA.GenServer.Driver` no longer sends `{:"$gen_call", …}` unconditionally, so
-             #306 has landed — and the "not yet delivered (#306)" markers in
-             `spec/05-layer3-conformance.md` and `usage-rules.md` are now false. Remove
-             them, and replace this test with one that asserts the delivery forms behave
-             as D-36 says.
-             """
+      assert driver =~ ~s|{:"$gen_cast", message}|,
+             "`TLA.GenServer.Driver` cannot send a cast, so spec/05 and usage-rules.md " <>
+               "describe a capability that does not exist."
+    end
 
-      refute driver =~ ~s|{:"$gen_cast"|,
-             "the driver can send a cast; see the message above"
+    test "and no 'not yet delivered' marker is left over" do
+      refute squeeze(spec()) =~ "Not yet delivered",
+             "spec/05 still says the delivery contract is undelivered, and #306 has landed."
+
+      refute squeeze(rules()) =~ "Not yet delivered",
+             "usage-rules.md still says the delivery contract is undelivered."
     end
   end
 end

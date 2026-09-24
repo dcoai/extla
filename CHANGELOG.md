@@ -82,6 +82,44 @@ release it merely follows.
 
 ### Fixed
 
+- **An action the server takes by cast is drivable, not merely checkable** (#306, closes
+  #172). `TLA.GenServer.Driver` sent `{:"$gen_call", …}` unconditionally and is the sole
+  delivery path for both Layer 3 drivers, while **spec/05's own canonical refinement maps
+  `:complete_transfer` and `:reset` to `handle_cast/2` clauses**. Delivered as a call those
+  reached a `handle_call/3` with no matching clause: the server died and replay reported
+  `:not_followed` — "the spec permits a behaviour the implementation does not take" — about
+  a server that is correct.
+
+  `Driver.deliver/3` now routes by the form the mapping returns — `{:call, msg}`,
+  `{:cast, msg}`, `{:info, msg}`, and a bare term is still a call, so no mapping written
+  before this changes. D-36 has the reasoning; `call/3` remains, as `deliver/3` with a
+  `{:call, …}`.
+
+  **A cast completes at a `:get_state` system message sent straight after it**, which rides
+  the same mailbox and is therefore ordered behind it. Sent raw rather than through
+  `:sys.get_state/2`, because that function *exits* the caller on a timeout or a dead
+  server and turning an exit back into a value needs a `try/rescue` — which is what this
+  module exists to avoid. So all four outcomes stay ordinary messages: a violation raised in
+  `handle_cast/2` kills the server and arrives as the same `:DOWN` a call's would, and a
+  cast that never completes is a `{:timeout, ms}`, a named finding rather than a silent
+  "followed". A driver that moved on unconfirmed would compare the next action against a
+  stale state, which is #168's defect class.
+
+  **The compile-time round-trip strips the route before asking**: `abstract_action/1` is
+  given what the callback will receive, not the envelope. Without that, a mapping correctly
+  saying `{:cast, :done}` round-trips to `:unmapped` and `validate!/3` reports the action as
+  one the mapping can never produce — a false finding about a correct mapping, worse than
+  the gap it was added to close. It was the first thing that broke.
+
+  **The corpus entry is the substance, not a nicety.** This went unseen because every entry
+  in the conformance corpus was `handle_call`-only — a corpus that cannot express a case
+  cannot find a bug in it. `Impl.HandlesACast` takes `done` by cast and `reset` by info,
+  keeps `increment` a bare term, and is exercised by **both** Layer 3 drivers, since they
+  share one delivery path and a fix tested through one proves nothing about the other.
+
+  Demonstrated red: routing casts back to calls fails the new entry with exactly the
+  `:not_followed` above.
+
 - **A lasso replays, and a step that names no spec action no longer crashes the replay**
   (#304, closes #168). Two defects in `TLA.Replay`, both on the path from a counterexample
   back to the code — the loop that makes the three layers one tool.

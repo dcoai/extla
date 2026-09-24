@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 388 items** · functions 326 · arities 401 · types 62
+**59 modules · 389 items** · functions 327 · arities 403 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -117,12 +117,14 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `__before_compile__/1` | `:defmacro` | (env) | `428c5375` | `lib/tla/gen_server.ex` |
 | `__using__/1` | `:defmacro` | (opts) | `201b7e7f` | `lib/tla/gen_server.ex` |
-## TLA.GenServer.Driver — 2 items
+## TLA.GenServer.Driver — 3 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `call/2` | `:def` | (server, message, timeout \\ …) | `3e74780c` | `lib/tla/gen_server/driver.ex` |
-| `call/3` | `:def` | (server, message, timeout \\ …) | `3e74780c` | `lib/tla/gen_server/driver.ex` |
+| `call/2` | `:def` | (server, message, timeout \\ …) | `9c5d36db` | `lib/tla/gen_server/driver.ex` |
+| `call/3` | `:def` | (server, message, timeout \\ …) | `9c5d36db` | `lib/tla/gen_server/driver.ex` |
+| `deliver/2` | `:def` | (server, delivery, timeout \\ …) | `7cc33928` | `lib/tla/gen_server/driver.ex` |
+| `deliver/3` | `:def` | (server, delivery, timeout \\ …) | `7cc33928` | `lib/tla/gen_server/driver.ex` |
 | `outcome()` | `:type` | {:ok, term()} \| {:violation, Violation.t()} \| {:stopped, term()} \| {:timeout, timeout()} | `38374997` | `lib/tla/gen_server/driver.ex` |
 ## TLA.GenServer.Runtime — 18 items
 

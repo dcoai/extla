@@ -138,3 +138,31 @@ defmodule TLA.Conformance.Counter.Mutants do
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
   end
 end
+
+defmodule TLA.Conformance.Counter.CastRefinement do
+  @moduledoc """
+  The conforming mapping, naming how each message is delivered (#306, for #172).
+
+  `spec/05-layer3-conformance.md`'s own canonical refinement maps `:complete_transfer` and
+  `:reset` to `handle_cast/2` clauses, and until D-36 a mapping could not say so: the driver
+  sent `{:"$gen_call", …}` for everything. Every entry in this corpus is `handle_call`-only,
+  which is why the gap survived — a corpus that cannot express a case cannot find a bug in it.
+
+  So this is the same mapping as `TLA.Conformance.Counter.Refinement`, with `:done` taken by
+  cast and `:reset` by info. `:increment` stays a bare term, which is the assertion that a
+  mapping written before D-36 still means what it meant.
+  """
+  use TLA.Refinement
+
+  def abstract(%{value: v, status: s}), do: %{count: v, status: s}
+
+  def abstract_action(:increment), do: {:increment, %{}}
+  def abstract_action(:done), do: {:done, %{}}
+  def abstract_action(:reset), do: {:reset, %{}}
+  def abstract_action(_), do: :unmapped
+
+  # A bare term: a call, as it has always been.
+  def concrete_message(:increment, _params), do: :increment
+  def concrete_message(:done, _params), do: {:cast, :done}
+  def concrete_message(:reset, _params), do: {:info, :reset}
+end
