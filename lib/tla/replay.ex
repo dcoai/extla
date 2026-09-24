@@ -330,7 +330,9 @@ defmodule TLA.Replay do
   end
 
   defp send_message(server, message, timeout) do
-    case Driver.call(server, message, timeout) do
+    # `deliver/3` and not `call/3`: the trace's message is `concrete_message/2`'s return,
+    # which under D-36 may name its route. A bare term is still a call.
+    case Driver.deliver(server, message, timeout) do
       {:ok, reply} -> {:ok, reply}
       {:violation, violation} -> {:violation, violation}
       {:stopped, reason} -> {:not_followed, "the server stopped with #{inspect(reason)}"}

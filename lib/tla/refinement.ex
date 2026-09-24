@@ -292,10 +292,21 @@ defmodule TLA.Refinement do
               __STACKTRACE__
   end
 
+  # The route a delivery names is not part of the message, so it is stripped before the
+  # round-trip: `abstract_action/1` is given what `handle_cast/2` will receive, not the
+  # envelope the driver puts it in (D-36). Without this, a mapping that correctly says
+  # `{:cast, :done}` round-trips to `:unmapped` and `names_every_action!/3` reports the
+  # action as one the mapping can never produce -- a false finding about a correct mapping,
+  # which is worse than the gap it was added to close.
+  defp payload({:call, message}), do: message
+  defp payload({:cast, message}), do: message
+  defp payload({:info, message}), do: message
+  defp payload(message), do: message
+
   defp round_trips!(refinement, spec, constants) do
     for action <- spec.actions, params <- sample_params(spec, action, constants) do
       expected = action.name
-      message = refinement.concrete_message(expected, params)
+      message = payload(refinement.concrete_message(expected, params))
 
       case refinement.abstract_action(message) do
         # `names_every_action!/3` owns this one, and has already run.
@@ -333,7 +344,7 @@ defmodule TLA.Refinement do
     unnamed =
       for action <- spec.actions,
           params <- Enum.take(sample_params(spec, action, constants), 1),
-          refinement.abstract_action(refinement.concrete_message(action.name, params)) ==
+          refinement.abstract_action(payload(refinement.concrete_message(action.name, params))) ==
             :unmapped,
           do: action.name
 

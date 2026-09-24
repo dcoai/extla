@@ -165,7 +165,7 @@ defmodule TLA.Simulation do
   #     failed run.
   #   * If the server crashes — a conformance violation raises inside it — the exit arrives
   #     here as an `{:EXIT, _, _}` message rather than as a kill, and the trace goes on to
-  #     report it. `TLA.GenServer.Driver.call/3`'s monitor is still what turns the crash into
+  #     report it. The driver's monitor is still what turns the crash into
   #     an outcome; the EXIT message is left in the mailbox of a process about to end.
   #
   # A `Task` rather than trapping exits in the caller: `run_trace/2` and `replay/3` are called
@@ -236,7 +236,10 @@ defmodule TLA.Simulation do
   defp step(state, module, config, generated) do
     {action, binding, message} = normalize(generated)
 
-    case Driver.call(state.server, message, config.timeout) do
+    # `deliver/3` and not `call/3`: `message` is whatever `concrete_message/2` returned, and
+    # under D-36 that may name its route -- `{:cast, msg}` for an action the server takes in
+    # `handle_cast/2`. A bare term is still a call.
+    case Driver.deliver(state.server, message, config.timeout) do
       {:ok, _reply} ->
         state
         |> record(action, binding, abstract(config, state.server))

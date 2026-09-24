@@ -185,4 +185,40 @@ defmodule TLA.Conformance.Counter.Impl do
       {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
     end
   end
+
+  defmodule HandlesACast do
+    @moduledoc """
+    Correct, and it takes two of the spec's three actions by routes that are not a call:
+    `done` in `handle_cast/2` and `reset` in `handle_info/2` (#306, for #172).
+
+    It is the first entry in this corpus that is not `handle_call`-only, and that is its
+    reason for existing. `spec/05`'s canonical refinement has mapped actions to
+    `handle_cast/2` clauses since it was written, and Layer 3 could check such a server and
+    not drive one — a gap no corpus entry could reach, because every entry avoided it.
+
+    `increment` stays a call, from a bare term, so this entry also carries the claim that
+    D-36 changed nothing for a mapping written before it.
+    """
+    use GenServer
+
+    use TLA.GenServer,
+      spec: TLA.Conformance.Counter.Spec,
+      refinement: TLA.Conformance.Counter.CastRefinement
+
+    def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+    @impl true
+    def init(_opts), do: {:ok, %{value: 0, status: :ready}}
+
+    @impl true
+    def handle_call(:increment, _from, state) do
+      {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+    end
+
+    @impl true
+    def handle_cast(:done, state), do: {:noreply, %{state | status: :ready}}
+
+    @impl true
+    def handle_info(:reset, state), do: {:noreply, %{state | value: 0}}
+  end
 end

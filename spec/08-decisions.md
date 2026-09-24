@@ -1083,13 +1083,14 @@ clock, which makes a run's verdict depend on load); a completion signal emitted 
 runtime wrapper (more machinery for a synchronisation the mailbox already provides, and it
 would only work for instrumented servers).
 
-**Recorded 2026-09-24 (#305); to be built at #306**, which also adds the first
-conformance-corpus entry handling an action by cast — the corpus is `handle_call`-only
-today, which is why this went unseen.
+**Recorded 2026-09-24 (#305); built at #306**, which also added the first
+conformance-corpus entry handling an action by cast — the corpus was `handle_call`-only
+until then, which is why this went unseen.
 
-**Pinned by:** `test/docs/delivery_contract_test.exs` — `05-layer3-conformance.md` and
-`usage-rules.md` state the same three forms and the same meaning for a bare term, and the
-"not yet delivered" marker names the issue that removes it, so the contract cannot be
-documented in one place and forgotten in the other.
+**Pinned by:** `test/conformance/cast_delivery_test.exs` — an action the server takes in
+`handle_cast/2` drives under both `TLA.Replay` and `TLA.Simulation`, a bare term is still a
+call, a cast is handled before the driver returns, and a cast that never completes is a
+`{:timeout, ms}`. `test/docs/delivery_contract_test.exs` holds the three documents to the
+same forms.
 
 See `05-layer3-conformance.md` §`TLA.Refinement` and `usage-rules.md`.
