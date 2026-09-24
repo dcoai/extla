@@ -30,6 +30,31 @@ release it merely follows.
 
 ### Fixed
 
+- **Strong fairness is refuted by something, and the parallel search is asserted to be
+  parallel** (#296, closes #174). Two mechanisms that were only ever exercised in the mode
+  where they cannot be told apart from their own absence.
+
+  **The Emerson–Lei split.** `weak_break/3` breaks a cycle only when the action is enabled
+  in **every** state of it; `strong_break/3` when it is enabled in **any**. That difference
+  is the whole of what makes SF stronger than WF, and every strong-fairness fixture was
+  only ever *verified* — which `[]` achieves just as well, so replacing the strong branch
+  with `[]` left the suite green. Two specs now differ by the single word `:strong`: an
+  action enabled intermittently in a cycle and never taken is **fair** to WF (the run is
+  refuted) and **unfair** to SF (the run verifies). The verdicts differ, so the branch is
+  the only thing that can be producing them.
+
+  **The parallel path.** Setting the batch count and the concurrency both to 1 made
+  `TLA.ModelChecker.Parallel` fully sequential and left everything green, because every
+  parallel test asserts agreement with the single-threaded result — which a sequential run
+  satisfies perfectly. Agreement is the right property and it cannot see this. `batches/2`
+  and `concurrency/1` are now `@doc false` and asserted directly: 200 states over 8 workers
+  is 64 parts, every state in exactly one, and the stream is told to run that many at once.
+
+  What that establishes is stated in the test rather than implied: the work is **divided**
+  and the stream is **told** to run the parts concurrently. It does not establish that the
+  scheduler ran two at the same instant, and no deterministic test can — a timing assertion
+  would be a flake on the two-core runner rather than a gate.
+
 - **Two checks that could not fail** (#295, closes #175). The Agent layer's `cast/3` and
   `TLA.Invariant.Test`'s `assert_invariants/2`, each proven by #175 by mutating the code and
   watching the suite stay green, and each now demonstrated red against that mutation.

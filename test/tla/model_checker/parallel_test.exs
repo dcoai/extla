@@ -7,6 +7,7 @@ defmodule TLA.ModelChecker.ParallelTest do
   use ExUnit.Case, async: true
 
   alias TLA.{ModelChecker, TestSpecs}
+  alias TLA.ModelChecker.Parallel
 
   describe "what a parallel run refuses" do
     # Beside D-22's symmetry-with-liveness refusal, and phrased the same way: the project
@@ -83,6 +84,34 @@ defmodule TLA.ModelChecker.ParallelTest do
     # The gap is documented on `claim/3` and is not a defect: the loser of a race has
     # already taken an id from the atomic, and ids are keys rather than a range. This
     # test says the graph still works when they are not contiguous.
+    # #174: setting the batch count and the concurrency both to 1 — making this module
+    # fully sequential — left everything green, this file included. Every test here asserts
+    # agreement with the single-threaded result, and a sequential run agrees with it
+    # perfectly. Agreement is the right property and it cannot see a degraded search.
+    #
+    # So the two knobs are asserted directly. What this establishes is that the work is
+    # divided and the stream is told to run the parts concurrently; it does not establish
+    # that the scheduler ran two of them at the same instant, and it says so rather than
+    # implying otherwise — a timing assertion would be a flake on the two-core runner
+    # (`feedback_no_timing_or_global_state_in_async_tests`) rather than a gate.
+    test "the level is divided into more parts than there are workers" do
+      level = Enum.to_list(1..200)
+
+      # Eight batches per worker (#41, measured), capped at the level's own size so a small
+      # level yields one state per batch rather than empty ones.
+      assert length(Parallel.batches(level, 8)) == 64
+      assert length(Parallel.batches(level, 1)) == 8
+      assert length(Parallel.batches([:only_one], 8)) == 1
+
+      # Every state lands in exactly one batch, whatever the division.
+      assert level |> Parallel.batches(8) |> List.flatten() |> Enum.sort() == level
+    end
+
+    test "and the stream is told to run that many at once" do
+      assert Parallel.concurrency(%{workers: 8}) == 8
+      assert Parallel.concurrency(%{workers: 1}) == 1
+    end
+
     test "ids may have gaps, and every recorded state is still reachable by its path" do
       {_result, graph} =
         ModelChecker.explore(TestSpecs.Cube, %{workers: 8, invariants: [], action_properties: []})

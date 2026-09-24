@@ -27,6 +27,113 @@ defmodule TLA.ModelChecker.LivenessTest do
     )
   end
 
+  # The one shape that distinguishes SF from WF, and it was refuted by nothing (#174).
+  #
+  # `weak_break/3` breaks a cycle only when the action is enabled in EVERY state of it;
+  # `strong_break/3` when it is enabled in ANY. So a cycle where `grab` is enabled
+  # intermittently and never taken is fair to WF and unfair to SF — and every existing
+  # strong-fairness fixture was only ever VERIFIED, which `[]` also achieves. Replacing the
+  # strong branch with `[]` left the suite green.
+  #
+  # Two specs identical but for the word `:strong`, so the verdict difference can only come
+  # from the branch under test.
+  defmodule IntermittentWeak do
+    @moduledoc false
+    use TLA.Spec
+
+    variable :n, type: 0..1
+    variable :grabbed, type: [false, true]
+
+    init do
+      n = 0
+      grabbed = false
+    end
+
+    action :up do
+      require n == 0
+      n = 1
+    end
+
+    action :down do
+      require n == 1
+      n = 0
+    end
+
+    # Enabled only at n == 0 — in SOME states of the up/down cycle, not all.
+    action :grab do
+      require n == 0
+      require grabbed == false
+      grabbed = true
+    end
+
+    temporal :eventually_grabbed do
+      eventually(grabbed == true)
+    end
+
+    terminal :done do
+      grabbed == true and n == 0
+    end
+
+    fairness(:weak, [:grab])
+  end
+
+  defmodule IntermittentStrong do
+    @moduledoc false
+    use TLA.Spec
+
+    variable :n, type: 0..1
+    variable :grabbed, type: [false, true]
+
+    init do
+      n = 0
+      grabbed = false
+    end
+
+    action :up do
+      require n == 0
+      n = 1
+    end
+
+    action :down do
+      require n == 1
+      n = 0
+    end
+
+    action :grab do
+      require n == 0
+      require grabbed == false
+      grabbed = true
+    end
+
+    temporal :eventually_grabbed do
+      eventually(grabbed == true)
+    end
+
+    terminal :done do
+      grabbed == true and n == 0
+    end
+
+    fairness(:strong, [:grab])
+  end
+
+  describe "strong fairness is not weak fairness" do
+    test "an action enabled intermittently and never taken is fair to WF" do
+      result = check(IntermittentWeak, %{}, [:eventually_grabbed])
+
+      assert result.status == :violation,
+             "the up/down cycle never grabs, and `grab` is disabled at n == 1, so weak " <>
+               "fairness does not require it — the cycle is a legal behaviour"
+    end
+
+    test "and unfair to SF, which is the whole difference between them" do
+      result = check(IntermittentStrong, %{}, [:eventually_grabbed])
+
+      assert result.status == :ok,
+             "`grab` is enabled infinitely often in that cycle, so strong fairness forbids " <>
+               "it — and the property holds"
+    end
+  end
+
   describe "verdicts" do
     test "a property that holds leaves the run verified" do
       assert check(Idling, %{}, [:eventually_two]).status == :ok

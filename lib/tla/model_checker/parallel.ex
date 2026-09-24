@@ -106,7 +106,7 @@ defmodule TLA.ModelChecker.Parallel do
     |> Task.async_stream(&expand_batch(run, &1),
       ordered: false,
       timeout: :infinity,
-      max_concurrency: run.config.workers
+      max_concurrency: concurrency(run.config)
     )
     |> Enum.reduce_while({:ok, run, []}, fn {:ok, worker}, {:ok, run, next} ->
       # Halting closes the stream, which shuts down the workers still running. A violation
@@ -143,7 +143,22 @@ defmodule TLA.ModelChecker.Parallel do
   # batch rather than empty ones.
   @batches_per_worker 8
 
-  defp batches(level, workers) do
+  @doc false
+  # Both knobs of the parallel path, exposed for the gate in `parallel_test.exs` (#174).
+  #
+  # Setting the batch count and the concurrency both to 1 makes this module fully sequential
+  # and left the entire suite green — every parallel test asserts agreement with the
+  # single-threaded result, which a sequential run satisfies perfectly. Agreement is the
+  # right property and it cannot see this.
+  #
+  # What the gate can assert is that the work is DIVIDED and the stream is told to run the
+  # parts concurrently. It cannot assert that the scheduler ran two of them at the same
+  # instant, and no deterministic test can; a timing assertion would be a flake on the
+  # two-core runner rather than a gate.
+  def concurrency(%{workers: workers}), do: workers
+
+  @doc false
+  def batches(level, workers) do
     parts = workers * @batches_per_worker
 
     level

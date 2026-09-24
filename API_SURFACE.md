@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 384 items** · functions 322 · arities 397 · types 62
+**59 modules · 386 items** · functions 324 · arities 399 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -265,10 +265,12 @@ key whose value is a union of atoms; any other type is shown as written.
 | `check/2` | `:def` | (spec, graph, selected \\ …) | `4a388049` | `lib/tla/model_checker/liveness.ex` |
 | `check/3` | `:def` | (spec, graph, selected \\ …) | `4a388049` | `lib/tla/model_checker/liveness.ex` |
 | `verdict()` | `:type` | :ok \| {:violation, atom(), Trace.lasso()} | `d371a6b6` | `lib/tla/model_checker/liveness.ex` |
-## TLA.ModelChecker.Parallel — 1 items
+## TLA.ModelChecker.Parallel — 3 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
+| `batches/2` | `:def` | (level, workers) | `01ff2ef2` | `lib/tla/model_checker/parallel.ex` |
+| `concurrency/1` | `:def` | (_) | `b1906d83` | `lib/tla/model_checker/parallel.ex` |
 | `explore/1` | `:def` | (run) | `ac271f68` | `lib/tla/model_checker/parallel.ex` |
 ## TLA.ModelChecker.Run — 1 items
 
