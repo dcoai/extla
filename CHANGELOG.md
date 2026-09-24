@@ -51,6 +51,28 @@ release it merely follows.
 
 ### Fixed
 
+- **`use TLA.GenServer` compiles for a server with no author-written `init/1`, and every
+  moduledoc example is compiled** (#301, closes #171 with #300). #300 fixed the injection
+  for Layer 1 and left Layer 3, where the same defect is **unconditional** — so
+  `TLA.GenServer`'s own front-page example was still broken after the fix that was supposed
+  to close it. Layer 3 now filters its wrapped set through `Module.defines?/3` the same way
+  Layer 1 does.
+
+  It was found by the gate filed in the same work item rather than by a reader.
+  `test/docs/moduledoc_examples_test.exs` extracts every `defmodule … end` from a doc string
+  under `lib/` and compiles it in its own process, observing the exit. Nothing was checking
+  these: the guide harness globs `guides/`, `spec/` and `README.md` (#281), doctests cover
+  six modules, and the options gate reads option lines rather than code — a `defmodule` in a
+  moduledoc was checked by nothing at all, which is how the first thing a reader copies
+  could be wrong for as long as it had existed.
+
+  A moduledoc has nowhere to carry a `<!-- tla:… -->` annotation, so **compiled is the
+  default and the exceptions are listed with reasons** — one, `TLA.Invariant.Test`, because
+  compiling an `ExUnit.Case` module outside a running ExUnit raises and it is the reader's
+  suite that runs it. Forgetting an exception reddens the build; a skip naming a file with
+  no example reddens it too, and the corpus size is asserted, so an extraction that silently
+  found nothing cannot report green.
+
 - **A GenServer with no author-written `init/1` compiles** (#300, for #171). It failed with
 
       ** (ArgumentError) cannot make function init/1 overridable because it was not defined
