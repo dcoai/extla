@@ -1032,7 +1032,15 @@ defmodule TLA.Spec.DiagnosticsTest do
         end
 
       assert error.declaration == "action :bump"
-      assert is_integer(error.line)
+
+      # `is_integer(error.line)` is what stood here, and line 0 satisfies it (#175) — which
+      # matters because this is the only line assertion in the tree, so every diagnostic's
+      # line number rests on it. The source is built by `source/1` with a fixed preamble, so
+      # the offending `x = nope` sits at a known line and the number can be asserted.
+      assert error.line == line_of(source_fixture(), "x = nope"),
+             "the error points at line #{error.line}, and `x = nope` is on line " <>
+               "#{line_of(source_fixture(), "x = nope")}"
+
       assert Exception.message(error) =~ "in action :bump:"
     end
   end
@@ -1044,6 +1052,27 @@ defmodule TLA.Spec.DiagnosticsTest do
   # spec can start failing a *different* rule that happens to share a phrase, and the test
   # stays green either way. The kind is the identifier §7's table and `DIAGNOSTICS.md`
   # share, so pinning it here is what makes those three documents one claim.
+  # The exact source the test above compiles, so its line numbers can be asserted rather
+  # than merely typed as integers.
+  defp source_fixture do
+    source("""
+    variable :x
+    init do
+      x = 0
+    end
+    action :bump do
+      x = nope
+    end
+    """)
+  end
+
+  defp line_of(text, needle) do
+    text
+    |> String.split("\n")
+    |> Enum.find_index(&String.contains?(&1, needle))
+    |> Kernel.+(1)
+  end
+
   defp refuse(body, kind) do
     error =
       assert_raise TLA.Spec.CompileError, fn ->

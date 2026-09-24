@@ -4,6 +4,53 @@ defmodule TLA.SymmetryTest do
   alias TLA.{ModelChecker, Symmetry, Trace}
   alias TLA.TestSpecs.{Asymmetric, Counter, PerBinding}
 
+  # Two specs whose only purpose is a symmetric constant of a known size: five elements is
+  # 120 permutations, over `symmetry_warning/2`'s threshold of 24; three is 6, under it.
+  # Declared here rather than in `test/support/specs.ex` because nothing else wants them.
+  defmodule FiveWay do
+    @moduledoc false
+    use TLA.Spec
+
+    constant :s
+
+    variable :held, type: [^s ~> [false, true]]
+
+    init do
+      held = for_each(^s, fn _ -> false end)
+    end
+
+    action :take, params: [e: ^s] do
+      require held[e] == false
+      held = update(held, e, fn _ -> true end)
+    end
+
+    terminal :all_taken do
+      Enum.all?(^s, fn e -> held[e] end)
+    end
+  end
+
+  defmodule ThreeWay do
+    @moduledoc false
+    use TLA.Spec
+
+    constant :s
+
+    variable :held, type: [^s ~> [false, true]]
+
+    init do
+      held = for_each(^s, fn _ -> false end)
+    end
+
+    action :take, params: [e: ^s] do
+      require held[e] == false
+      held = update(held, e, fn _ -> true end)
+    end
+
+    terminal :all_taken do
+      Enum.all?(^s, fn e -> held[e] end)
+    end
+  end
+
   @processes %{processes: MapSet.new([:p1, :p2])}
 
   describe "mappings/2" do
@@ -107,12 +154,28 @@ defmodule TLA.SymmetryTest do
       assert MapSet.size(reduced) < MapSet.size(full)
     end
 
+    # This asserted two factorials and was named for a warning it never produced (#175).
+    # `120 == 120` holds whatever `symmetry_warning/2` does, including nothing — so the
+    # sentence a user is supposed to be shown was verified by no test anywhere.
     test "says what it is paying when the permutation count gets large" do
       big = %{s: MapSet.new(for i <- 1..5, do: :"e#{i}")}
       small = %{s: MapSet.new([:a, :b, :c])}
 
+      # The counts are the reason for the threshold, so they stay — 5! is over it, 3! under.
       assert length(Symmetry.mappings(big, [:s])) == 120
       assert length(Symmetry.mappings(small, [:s])) == 6
+
+      # And the run says so, which is the claim in the test's name.
+      loud = ModelChecker.run(FiveWay, %{constants: %{s: big.s}, symmetry: [:s]})
+      quiet = ModelChecker.run(ThreeWay, %{constants: %{s: small.s}, symmetry: [:s]})
+
+      assert Enum.any?(loud.warnings, &(&1 =~ "canonicalizes each state under 120 permutations")),
+             "a 120-permutation run warned nothing: #{inspect(loud.warnings)}"
+
+      assert Enum.any?(loud.warnings, &(&1 =~ "Measure it against the reduction it buys"))
+
+      refute Enum.any?(quiet.warnings, &(&1 =~ "canonicalizes")),
+             "a 6-permutation run warned about its cost: #{inspect(quiet.warnings)}"
     end
   end
 
