@@ -92,7 +92,21 @@ defmodule TLA.GenServer do
     else
       validate!(spec, refinement)
       check_stamp!(env, spec, stamp)
-      wrapped = env.module |> Module.get_attribute(:tla_wrapped, []) |> Enum.uniq()
+      # Still-in-the-definitions-table, for the reason `TLA.Invariant`'s moduledoc gives at
+      # length (#171, #300): `use GenServer` injects `init/1` from its own `@before_compile`,
+      # AFTER `@on_definition` is installed, so the hook records it for a module that never
+      # wrote one — and by now GenServer's `defoverridable init: 1` has moved it out of the
+      # table, so `Module.make_overridable/2` refuses.
+      #
+      # #300 fixed Layer 1 and left this. Layer 3 hits it UNCONDITIONALLY, because
+      # `init_wrapper/1` wraps `init/1` for every mapping rather than only where an invariant
+      # applies — and the example at the top of this very moduledoc failed to compile because
+      # of it. Found by #301, which compiles the moduledoc examples.
+      wrapped =
+        env.module
+        |> Module.get_attribute(:tla_wrapped, [])
+        |> Enum.uniq()
+        |> Enum.filter(&Module.defines?(env.module, &1, :def))
 
       quote do
         @doc false

@@ -115,7 +115,7 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `__before_compile__/1` | `:defmacro` | (env) | `812edd4b` | `lib/tla/gen_server.ex` |
+| `__before_compile__/1` | `:defmacro` | (env) | `428c5375` | `lib/tla/gen_server.ex` |
 | `__using__/1` | `:defmacro` | (opts) | `201b7e7f` | `lib/tla/gen_server.ex` |
 ## TLA.GenServer.Driver — 2 items
 

@@ -203,6 +203,30 @@ defmodule TLA.ConformanceStepTest do
   # concurrently running test that recorded a transition saw a 3-state buffer. The test
   # is unchanged; only its neighbours are.
 
+  describe "a server whose author wrote no init/1" do
+    # #300 fixed this for Layer 1 and left Layer 3, where it is UNCONDITIONAL —
+    # `init_wrapper/1` wraps `init/1` for every mapping rather than only where an invariant
+    # applies. So `TLA.GenServer`'s own front-page example still did not compile after the
+    # work item that was supposed to close it, and #301's moduledoc gate is what found that.
+    #
+    # Kept here as well as there because this is the behaviour; the gate is the reader's
+    # copy of it.
+    test "compiles under use TLA.GenServer" do
+      assert [{_module, _binary} | _] =
+               Code.compile_string("""
+               defmodule NoInitLayerThree do
+                 use GenServer
+
+                 use TLA.GenServer,
+                   spec: TLA.Conformance.Counter.Spec,
+                   refinement: TLA.Conformance.Counter.Refinement
+
+                 def handle_call(:increment, _from, s), do: {:reply, :ok, %{s | value: s.value + 1}}
+               end
+               """)
+    end
+  end
+
   describe "what use TLA.GenServer says about rules it could not decide" do
     # `validate!/3`'s moduledoc argues that "a validator that claims a check it cannot
     # perform is worse than one that states its limits", and the statement of limits was
