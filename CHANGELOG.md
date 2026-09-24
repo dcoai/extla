@@ -51,6 +51,50 @@ release it merely follows.
 
 ### Fixed
 
+- **A lasso replays, and a step that names no spec action no longer crashes the replay**
+  (#304, closes #168). Two defects in `TLA.Replay`, both on the path from a counterexample
+  back to the code — the loop that makes the three layers one tool.
+
+  **The splice.** `ModelChecker.Liveness` builds a cycle with
+  `Trace.from(graph, List.last(prefix.states), cycle_steps, [])`, and `Trace.from/4`
+  prepends the state it is handed, so the cycle's first state **is** the prefix's last.
+  `to_behavior/1` compensates; `splice/2` adjusted `length` for it and **not the list**
+  (#212 saw half of it). `drive/5` zips actions against `Enum.drop(states, 1)`, so from the
+  first cycle step onward every action was compared against the state *before* it, and
+  **every genuine liveness counterexample replayed as `:not_followed`** — which reads as
+  "the implementation does not take a step the spec permits". A true finding, inverted.
+
+  It survived because the only lasso in the suite was hand-written and `Trace.validate/3`
+  **rejects it**: `length: 1` on a two-state prefix, a one-state cycle carrying an action,
+  and a cycle head that is not the prefix's tail. The liveness checker cannot emit that
+  shape, so the one test covering the splice exercised something the defect could not
+  reach. `test/conformance/replay_edges_test.exs` replaces it with a lasso the checker
+  **actually returns**, asserted to pass `validate/3` before it is used for anything.
+
+  **The steps that name no action.** A trace's `actions` are not all actions of the spec:
+  `TLA.Simulation` writes `:unmapped` for a message the mapping does not model — its
+  *normal* answer — and `:restart` for a crash injected by `--inject-failures`.
+  `concrete_message/2` has no clause for either and `drive/5` called it regardless, so the
+  advertised simulation-to-replay handoff died with a `FunctionClauseError` on its ordinary
+  input.
+
+  `:unmapped` is **skipped, and the skip is reported** — in `skipped`, in the human report
+  and in `--format json`. Its claim is that the message does not move the abstract state,
+  so the behaviour is unchanged by it; the trace's post-state is still checked, so a step
+  that claims to stutter and moves is still a finding. A replay that skipped steps and
+  exited `0` would be the defect one door over.
+
+  `:restart` is **reproduced**: the server is killed (`:kill` — a crash runs no
+  `terminate/2`) and started again, and recovery is checked to land where the trace says it
+  did, which is all `TLA.Simulation` checks about a restart either. Skipping it would
+  compare the next step against the pre-crash state. Only for a server this module started:
+  with `:server`, the replay refuses with the new `:not_replayable` status and
+  `mix tla.replay` exits **3** — a limit of the replay, not a claim about the
+  implementation, which is why it is not `2`.
+
+  spec/05 documents both, the new exit code and the `skipped` field; all four defects were
+  demonstrated red first.
+
 - **One invariant for a behaviour trace, held by every producer** (#303, for #168). The
   rule — *n states, n - 1 actions, one binding each, `length` == n* — was already written
   down, as a private `misaligned?/1` in `TLA.Trace`, and checked at three **consumers**:

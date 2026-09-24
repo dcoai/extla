@@ -10,7 +10,7 @@ no section says so instead of going unlisted — the list of tasks is the direct
 hand-kept set. Tasks outside `lib/` — this project's ledger tooling and its test-support
 tasks — are excluded from the package, so they have no specification section by design.
 
-**13 tasks · 43 switches** · shipped 6 · specified 6 · exit codes 14
+**13 tasks · 43 switches** · shipped 6 · specified 6 · exit codes 15
 
 ## `mix tla.api_surface` — ledger tooling, not packaged — 2 switches — NO EXIT-CODE TABLE
 
@@ -81,7 +81,7 @@ tasks — are excluded from the package, so they have no specification section b
 |---|---|---|---|
 | `--check` | `:switch` | `:boolean` | `ledger/mix/tasks/tla.package_surface.ex` |
 | `--write` | `:switch` | `:boolean` | `ledger/mix/tasks/tla.package_surface.ex` |
-## `mix tla.replay` — specified in spec/05-layer3-conformance.md — 4 switches — 3 exit codes
+## `mix tla.replay` — specified in spec/05-layer3-conformance.md — 4 switches — 4 exit codes
 
 | Item | Kind | Detail | Locus |
 |---|---|---|---|
@@ -92,6 +92,7 @@ tasks — are excluded from the package, so they have no specification section b
 | `exit 0` | `:exit` | the behaviour was reproduced, or the capture conforms | `lib/mix/tasks/tla.replay.ex` |
 | `exit 1` | `:exit` | a conformance violation — the step and its finding are printed | `lib/mix/tasks/tla.replay.ex` |
 | `exit 2` | `:exit` | the implementation could not follow the trace. Not a conformance failure: the spec permits a behaviour the code does not take, and which of the two is wrong is not something this can decide | `lib/mix/tasks/tla.replay.ex` |
+| `exit 3` | `:exit` | the trace names a step this cannot reproduce — a `:restart` against a server it was handed and does not own. A limit of the replay rather than a claim about the implementation, which is why it is not 2 | `lib/mix/tasks/tla.replay.ex` |
 ## `mix tla.simulate` — specified in spec/05-layer3-conformance.md — 8 switches — 3 exit codes
 
 | Item | Kind | Detail | Locus |

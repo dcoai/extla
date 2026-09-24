@@ -28,6 +28,23 @@ defmodule Mix.Tasks.Tla.Replay do
   encodings are `TLA.State.Json`'s, so a state is written the way the checker writes one
   and no second format has to be learned.
 
+  ## Steps a trace names and this cannot drive
+
+  A trace's actions are not all actions of the spec. `TLA.Simulation` writes `:unmapped`
+  for a message the refinement mapping does not model — its *normal* answer, not an error —
+  and `:restart` for a crash injected by `--inject-failures`. `concrete_message/2` has no
+  clause for either, and calling it regardless is what this used to do (#168).
+
+  `:unmapped` is **skipped**, and listed in the report and in `skipped` under `--format
+  json`. The claim `:unmapped` makes is that the message does not move the abstract state,
+  so the behaviour is unchanged by it; the trace's post-state is still checked. A replay
+  that skipped a step and then exited `0` would report more than it did.
+
+  `:restart` is **reproduced**: the server is killed and started again, and recovery is
+  checked to land where the trace says it did — all `TLA.Simulation` checks about a restart
+  either. `:kill` rather than a polite stop, because a crash runs no `terminate/2`. Only
+  for a server this task started.
+
   ## Exit codes
 
       0  the behaviour was reproduced, or the capture conforms
@@ -35,6 +52,9 @@ defmodule Mix.Tasks.Tla.Replay do
       2  the implementation could not follow the trace. Not a conformance failure:
          the spec permits a behaviour the code does not take, and which of the two
          is wrong is not something this can decide
+      3  the trace names a step this cannot reproduce — a `:restart` against a
+         server it was handed and does not own. A limit of the replay rather than
+         a claim about the implementation, which is why it is not 2
   """
 
   use Mix.Task
@@ -145,11 +165,17 @@ defmodule Mix.Tasks.Tla.Replay do
   defp verdict(%{status: :violation, violation: %{kind: kind}}), do: "CONFORMANCE: #{kind}"
   defp verdict(%{status: :not_followed}), do: "NOT FOLLOWED"
 
+  # A trace can name a step this task cannot reproduce — a `:restart`, where the caller
+  # supplied the server it is not ours to kill. Its own verdict, because "not followed" is
+  # a claim about the implementation and this is a limit of the replay (#168).
+  defp verdict(%{status: :not_replayable}), do: "NOT REPLAYABLE"
+
   defp json(module, result) do
     %{
       module: inspect(module),
       status: result.status,
       steps_checked: result.steps_checked,
+      skipped: Enum.map(result.skipped, fn {step, action} -> %{step: step, action: action} end),
       detail: result.detail,
       violation:
         result.violation &&
@@ -166,6 +192,10 @@ defmodule Mix.Tasks.Tla.Replay do
   defp exit_with(%{status: :ok}), do: :ok
   defp exit_with(%{status: :violation}), do: exit({:shutdown, 1})
   defp exit_with(%{status: :not_followed}), do: exit({:shutdown, 2})
+
+  # Its own code, and not 2: `2` says the implementation did not take a step the spec
+  # permits, which is a finding about the pair. This says the replay could not try.
+  defp exit_with(%{status: :not_replayable}), do: exit({:shutdown, 3})
 
   @doc false
   # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
