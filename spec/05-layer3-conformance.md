@@ -482,7 +482,13 @@ defmodule TLA.Replay do
     # the code does not, which is a finding about the pair rather than about the
     # implementation, and collapsing it into `:violation` would report the code
     # as wrong when the specification may be.
-    status: :ok | :violation | :not_followed,
+    #
+    # `:not_replayable` is a fourth, and it is a limit of the REPLAY rather than a
+    # claim about either side: the trace names a step this cannot reproduce. A
+    # `:restart` against a server the caller supplied is the case -- reproducing a
+    # crash means killing the server and starting it again, which is not something
+    # to do to a server that was handed over.
+    status: :ok | :violation | :not_followed | :not_replayable,
     steps_checked: non_neg_integer(),
     violation: %{
       step: non_neg_integer(),
@@ -493,7 +499,17 @@ defmodule TLA.Replay do
       detail: String.t()
     } | nil,
 
-    # Why a `:not_followed` was not followed. `nil` otherwise.
+    # The steps that were NOT driven, oldest first. A trace's actions are not all
+    # actions of the spec: `TLA.Simulation` writes `:unmapped` for a message the
+    # mapping does not model, and there is no message to send for one -- the trace
+    # records abstract actions, not the concrete messages that produced them. Such
+    # a step is skipped and its post-state still checked, and it is LISTED here,
+    # because a replay that skipped steps and answered `:ok` would report more
+    # than it did.
+    skipped: [{pos_integer(), atom()}],
+
+    # Why a `:not_followed` was not followed, and what was skipped. `nil` when
+    # neither applies.
     detail: String.t() | nil
   }
 end
@@ -1237,6 +1253,25 @@ defmodule Mix.Tasks.Tla.Replay do
   specification fails with the name that did not resolve, rather than decoding
   into something else, and no file can grow the atom table.
 
+  ## Steps a trace names and this cannot drive
+
+  A trace's actions are not all actions of the spec. `TLA.Simulation` writes
+  `:unmapped` for a message the refinement mapping does not model -- its normal
+  answer, not an error -- and `:restart` for a crash injected by
+  `--inject-failures`. `concrete_message/2` has no clause for either.
+
+      :unmapped  SKIPPED, and listed in `skipped` and in the report. The claim
+                 `:unmapped` makes is that the message does not move the
+                 abstract state, so the behaviour is unchanged by it; the
+                 trace's post-state is still checked. A replay that skipped a
+                 step and then answered `0` would report more than it did.
+
+      :restart   REPRODUCED: the server is killed and started again, and
+                 recovery is checked to land where the trace says it did --
+                 which is all `TLA.Simulation` checks about a restart either.
+                 `:kill`, because a crash runs no `terminate/2`. Only for a
+                 server this task started; with `--server` it exits 3.
+
   ## Exit codes
 
       0  the behaviour was reproduced, or the capture conforms
@@ -1244,6 +1279,9 @@ defmodule Mix.Tasks.Tla.Replay do
       2  the implementation could not follow the trace -- NOT a conformance
          failure, since the spec permits a behaviour the code does not take and
          which of the two is wrong is not something this can decide
+      3  the trace names a step this cannot reproduce -- a `:restart` against a
+         server it was handed and does not own. A limit of the replay rather
+         than a claim about the implementation, which is why it is not 2
   """
   use Mix.Task
 

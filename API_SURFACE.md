@@ -329,11 +329,11 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `counterexample/2` | `:def` | (module, trace, opts \\ …) | `a4fcf28c` | `lib/tla/replay.ex` |
-| `counterexample/3` | `:def` | (module, trace, opts \\ …) | `a4fcf28c` | `lib/tla/replay.ex` |
-| `result()` | `:type` | status: :not_followed \| :ok \| :violation, steps_checked, violation, detail | `041ba336` | `lib/tla/replay.ex` |
-| `trace/2` | `:def` | (module, captured, opts \\ …) | `906710fd` | `lib/tla/replay.ex` |
-| `trace/3` | `:def` | (module, captured, opts \\ …) | `906710fd` | `lib/tla/replay.ex` |
+| `counterexample/2` | `:def` | (module, trace, opts \\ …) | `eb7126c7` | `lib/tla/replay.ex` |
+| `counterexample/3` | `:def` | (module, trace, opts \\ …) | `eb7126c7` | `lib/tla/replay.ex` |
+| `result()` | `:type` | status: :not_followed \| :not_replayable \| :ok \| :violation, steps_checked, violation, detail, skipped | `6471bfc2` | `lib/tla/replay.ex` |
+| `trace/2` | `:def` | (module, captured, opts \\ …) | `016ec491` | `lib/tla/replay.ex` |
+| `trace/3` | `:def` | (module, captured, opts \\ …) | `016ec491` | `lib/tla/replay.ex` |
 | `violation()` | `:type` | step, kind: :action_property \| :diverged \| :invariant \| :not_enabled \| :unmapped_but_moved, action, message, detail | `b248b427` | `lib/tla/replay.ex` |
 ## TLA.Set — 10 items
 

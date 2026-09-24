@@ -41,10 +41,17 @@ defmodule TLA.Replay do
         }
 
   @type result :: %{
-          status: :ok | :violation | :not_followed,
+          status: :ok | :violation | :not_followed | :not_replayable,
           steps_checked: non_neg_integer(),
           violation: violation() | nil,
-          detail: String.t() | nil
+          detail: String.t() | nil,
+
+          # The steps this replay did not drive, oldest first: `{step, action}`. A trace's
+          # `actions` may hold entries that are not actions of the spec — `TLA.Simulation`
+          # writes `:unmapped` for a message the mapping does not model — and those have no
+          # message to send. They are skipped, and they are **listed**, because a replay
+          # that skipped steps and answered `:ok` would report more than it did (#168).
+          skipped: [{pos_integer(), atom()}]
         }
 
   @doc """
@@ -85,6 +92,7 @@ defmodule TLA.Replay do
         status: :not_followed,
         steps_checked: 0,
         violation: nil,
+        skipped: [],
         detail:
           "#{inspect(refinement)} does not define concrete_message/2, so there is no " <>
             "message to drive #{inspect(module)} with. A refinement without it can be " <>
@@ -106,7 +114,8 @@ defmodule TLA.Replay do
   """
   def trace(module, captured, opts \\ [])
 
-  def trace(_module, [], _opts), do: %{status: :ok, steps_checked: 0, violation: nil, detail: nil}
+  def trace(_module, [], _opts),
+    do: %{status: :ok, steps_checked: 0, violation: nil, detail: nil, skipped: []}
 
   def trace(module, [{_message, first} | _] = captured, _opts) do
     spec_module = module.__tla_spec_module__()
@@ -140,8 +149,10 @@ defmodule TLA.Replay do
   # The trace's own states are the oracle beside the wrapper's checks: the implementation
   # may take a legal step that is not the step the counterexample took, and a replay that
   # only asked "was each step legal" would call that a reproduction.
+  #
+  # The server is carried through the fold rather than closed over, because a `:restart`
+  # step replaces it.
   defp drive(module, spec_module, refinement, trace, opts) do
-    server = server(module, opts)
     timeout = Keyword.get(opts, :timeout, 5_000)
     expected = Enum.drop(trace.states, 1)
 
@@ -150,35 +161,141 @@ defmodule TLA.Replay do
       |> Enum.zip()
       |> Enum.with_index(1)
 
-    Enum.reduce_while(steps, ok(0), fn {{action, binding, want}, step}, acc ->
-      message = refinement.concrete_message(action, binding)
+    ctx = %{
+      module: module,
+      spec_module: spec_module,
+      refinement: refinement,
+      timeout: timeout,
+      opts: opts
+    }
 
-      case send_message(server, message, timeout) do
-        {:ok, _reply} ->
-          got = abstract(spec_module, refinement, :sys.get_state(server))
+    {result, _server} =
+      Enum.reduce_while(steps, {ok(0), server(module, opts)}, fn {{action, binding, want}, step},
+                                                                 {acc, server} ->
+        step(ctx, server, acc, {action, binding, want, step})
+      end)
 
-          if got == want do
-            {:cont, %{acc | steps_checked: step}}
-          else
-            {:halt, diverged_from_trace(step, action, message, want, got)}
-          end
+    finish(result)
+  end
 
-        {:violation, violation} ->
-          {:halt, violated(step, message, violation) |> Map.put(:steps_checked, step - 1)}
+  # Not every entry in a trace's `actions` is an action of the spec. `TLA.Simulation` writes
+  # `:unmapped` for a message the mapping does not model — its NORMAL answer, not an error —
+  # and `:restart` for a crash it injected under `--inject-failures`. `concrete_message/2`
+  # has no clause for either, and this used to call it regardless and die with a
+  # `FunctionClauseError` (#168): the advertised simulation-to-replay handoff crashing on
+  # its ordinary input.
+  defp step(ctx, server, acc, {:unmapped, _binding, want, step}),
+    do: skip(ctx, server, acc, want, step)
 
-        {:not_followed, detail} ->
+  defp step(ctx, server, acc, {:restart, _binding, want, step}),
+    do: restart(ctx, server, acc, want, step)
+
+  defp step(ctx, server, acc, {action, binding, want, step}) do
+    message = ctx.refinement.concrete_message(action, binding)
+
+    case send_message(server, message, ctx.timeout) do
+      {:ok, _reply} ->
+        got = abstract(ctx.spec_module, ctx.refinement, :sys.get_state(server))
+
+        if got == want do
+          {:cont, {%{acc | steps_checked: step}, server}}
+        else
           {:halt,
-           %{
-             status: :not_followed,
-             steps_checked: step - 1,
-             violation: nil,
-             detail:
-               "step #{step} (#{action}) could not be delivered: #{detail}. The spec " <>
-                 "permits a behaviour the implementation does not take, so one of the two " <>
-                 "is wrong."
-           }}
+           {with_skips(diverged_from_trace(step, action, message, want, got), acc), server}}
+        end
+
+      {:violation, violation} ->
+        {:halt,
+         {violated(step, message, violation)
+          |> Map.put(:steps_checked, step - 1)
+          |> with_skips(acc), server}}
+
+      {:not_followed, detail} ->
+        {:halt,
+         {%{
+            status: :not_followed,
+            steps_checked: step - 1,
+            violation: nil,
+            skipped: acc.skipped,
+            detail:
+              "step #{step} (#{action}) could not be delivered: #{detail}. The spec " <>
+                "permits a behaviour the implementation does not take, so one of the two " <>
+                "is wrong."
+          }, server}}
+    end
+  end
+
+  # `:unmapped` is a POSITIVE claim — the message does not move the abstract state, which
+  # `Runtime.check_stuttering/3` enforced where the step was recorded — so the abstract
+  # behaviour is unchanged by it and there is nothing to send. The trace holds abstract
+  # actions, not the concrete messages that produced them, so the message is not even
+  # recoverable.
+  #
+  # It is skipped, and **the skip is counted and reported**. A replay that skipped steps and
+  # answered `:ok` would be the same defect as a conformance check passing over a behaviour
+  # it never examined. The trace's own post-state is still checked, so a step claiming to
+  # stutter and moving the state is caught rather than waved past.
+  defp skip(ctx, server, acc, want, step) do
+    got = abstract(ctx.spec_module, ctx.refinement, :sys.get_state(server))
+
+    if got == want do
+      {:cont, {%{acc | steps_checked: step, skipped: acc.skipped ++ [{step, :unmapped}]}, server}}
+    else
+      {:halt,
+       {with_skips(diverged_from_trace(step, :unmapped, :unmapped, want, got), acc), server}}
+    end
+  end
+
+  # A crash is not a message, so it is REPRODUCED rather than sent: stop the server, start
+  # it again, and check that recovery lands where the trace says it did — which is the only
+  # thing `TLA.Simulation` checks about a restart either.
+  #
+  # Skipping it instead would compare the next step against the PRE-crash state, which is
+  # the silent corruption this work item exists to remove. Refusing outright would leave
+  # every `--inject-failures` counterexample unreplayable, which is the defect. Reproducing
+  # is possible only for a server this module started: a caller-supplied `:server` is not
+  # ours to kill, and we do not know what to start in its place.
+  defp restart(ctx, server, acc, want, step) do
+    if Keyword.has_key?(ctx.opts, :server) do
+      {:halt,
+       {%{
+          status: :not_replayable,
+          steps_checked: step - 1,
+          violation: nil,
+          skipped: acc.skipped,
+          detail:
+            "step #{step} is a `:restart` — a crash the simulation injected, not a " <>
+              "message — and reproducing it means stopping the server and starting it " <>
+              "again. The `:server` option gave this replay a server it does not own, so " <>
+              "it will not. Replay without `:server` to reproduce the restart."
+        }, server}}
+    else
+      restarted = restart_owned(ctx, server)
+      got = abstract(ctx.spec_module, ctx.refinement, :sys.get_state(restarted))
+
+      if got == want do
+        {:cont, {%{acc | steps_checked: step}, restarted}}
+      else
+        {:halt,
+         {with_skips(diverged_from_trace(step, :restart, :restart, want, got), acc), restarted}}
       end
-    end)
+    end
+  end
+
+  # `:kill` and not `GenServer.stop/1`: the simulation's injected failure is a crash, and a
+  # crash runs no `terminate/2` (#213). A replay that shut the server down politely would
+  # reproduce a different event.
+  defp restart_owned(ctx, server) do
+    ref = Process.monitor(server)
+    Process.exit(server, :kill)
+
+    receive do
+      {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+    after
+      ctx.timeout -> Process.demonitor(ref, [:flush])
+    end
+
+    server(ctx.module, ctx.opts)
   end
 
   defp server(module, opts) do
@@ -191,6 +308,25 @@ defmodule TLA.Replay do
         Process.unlink(pid)
         pid
     end
+  end
+
+  # A skip is not a silent one: it reaches the caller in `skipped` and, where there were
+  # any, in `detail` — so a green `mix tla.replay` says what it did not drive.
+  defp finish(%{skipped: []} = result), do: result
+
+  defp finish(%{skipped: skipped, detail: nil} = result) do
+    %{result | detail: skipped_detail(skipped)}
+  end
+
+  defp finish(%{skipped: skipped} = result) do
+    %{result | detail: result.detail <> "\n\n" <> skipped_detail(skipped)}
+  end
+
+  defp skipped_detail(skipped) do
+    steps = Enum.map_join(skipped, ", ", fn {step, action} -> "#{step} (#{action})" end)
+
+    "#{length(skipped)} step(s) were not driven, because the trace names no spec action " <>
+      "for them and so no message: #{steps}. Their post-states were still checked."
   end
 
   defp send_message(server, message, timeout) do
@@ -216,24 +352,39 @@ defmodule TLA.Replay do
 
   defp splice(%Trace{} = prefix, nil), do: prefix
 
+  # The cycle's first state IS the prefix's last: `ModelChecker.Liveness` builds it with
+  # `Trace.from(graph, List.last(prefix.states), cycle_steps, [])`, and `Trace.from/4`
+  # prepends the state it was handed. So the shared state is dropped from the cycle's side,
+  # exactly as `Trace.to_behavior/1` has always done.
+  #
+  # `length` alone was adjusted for this and the list was not — #212 saw half of it — so the
+  # spliced trace carried one state more than its actions could describe. `drive/5` zips
+  # `actions` against `Enum.drop(states, 1)`, so from the first cycle step onward every
+  # action was compared against the state BEFORE it, and **every genuine liveness
+  # counterexample replayed as `:not_followed`**: a true finding, inverted, reading as "the
+  # implementation does not take a step the spec permits".
   defp splice(%Trace{} = prefix, %Trace{} = cycle) do
     %Trace{
       prefix
-      | states: prefix.states ++ cycle.states,
+      | states: prefix.states ++ tl(cycle.states),
         actions: prefix.actions ++ cycle.actions,
         bindings: prefix.bindings ++ cycle.bindings,
-        # The cycle's first state is the prefix's last (#212).
         length: prefix.length + cycle.length - 1
     }
+    |> Trace.well_formed!("TLA.Replay.splice/2")
   end
 
-  defp ok(steps), do: %{status: :ok, steps_checked: steps, violation: nil, detail: nil}
+  defp with_skips(result, %{skipped: skipped}), do: Map.put(result, :skipped, skipped)
+
+  defp ok(steps),
+    do: %{status: :ok, steps_checked: steps, violation: nil, detail: nil, skipped: []}
 
   defp violated(step, message, violation) do
     %{
       status: :violation,
       steps_checked: max(step - 1, 0),
       detail: nil,
+      skipped: [],
       violation: %{
         step: step,
         kind: violation.kind,
@@ -252,6 +403,7 @@ defmodule TLA.Replay do
       status: :not_followed,
       steps_checked: step - 1,
       violation: nil,
+      skipped: [],
       detail: """
       step #{step} (#{action}) was legal, but left the implementation in a different \
       abstract state than the counterexample reached.

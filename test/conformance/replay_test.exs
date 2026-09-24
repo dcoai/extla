@@ -252,28 +252,13 @@ defmodule TLA.ConformanceReplayTest do
     end
   end
 
-  describe "a lasso" do
-    test "is replayed as its prefix followed by one pass of its cycle" do
-      lasso = %{
-        prefix: %Trace{
-          type: :liveness,
-          actions: [:increment],
-          bindings: [%{}],
-          states: [%{count: 0, status: :ready}, %{count: 1, status: :incrementing}],
-          length: 1
-        },
-        cycle: %Trace{
-          type: :liveness,
-          actions: [:done],
-          bindings: [%{}],
-          states: [%{count: 1, status: :ready}],
-          length: 1
-        }
-      }
-
-      assert %{status: :ok, steps_checked: 2} = Replay.counterexample(Impl.Conforming, lasso)
-    end
-  end
+  # The lasso tests live in `replay_edges_test.exs` (#304). The fixture that used to be
+  # here was hand-written and `Trace.validate/3` rejects it — `length: 1` on a two-state
+  # prefix, a one-state cycle carrying an action, and a cycle head that is not the prefix's
+  # tail. The liveness checker cannot emit that shape, so this test passed over the defect
+  # it was the only cover for: `splice/2` adjusted `length` for the shared state and not the
+  # list, and every genuine liveness counterexample replayed as `:not_followed`. It is
+  # replaced by a lasso the checker actually returns, asserted to validate before it is used.
 
   defp until_queued(pid) do
     case Process.info(pid, :message_queue_len) do
