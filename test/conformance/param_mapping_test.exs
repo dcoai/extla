@@ -21,7 +21,10 @@ defmodule TLA.Conformance.ParamMappingTest do
   This file is the missing case. `spec/05`'s and `spec/07`'s blocks are the other half of
   the guard, compiled by the guide harness since the skips came off.
   """
-  use ExUnit.Case, async: true
+  # `async: false` since #169: the config-constants describe block writes application
+  # config, which every other test in the VM reads. `async_isolation_test.exs` fails an
+  # `async: true` file that does this, which is how the rule is kept.
+  use ExUnit.Case, async: false
 
   alias TLA.Refinement
 
@@ -74,9 +77,13 @@ defmodule TLA.Conformance.ParamMappingTest do
     test "and the action it could not probe is named in the deferred list" do
       {:ok, deferred} = Refinement.validate!(Mapping, Spec)
 
-      unprobed = Enum.find(deferred, &String.contains?(&1, "except"))
+      # Tagged `:for_this_mapping` since #169, because an un-probed action is news about
+      # THIS mapping rather than a limit of every compile — and that is the tag
+      # `use TLA.GenServer` prints.
+      assert {:for_this_mapping, unprobed} =
+               Enum.find(deferred, &match?({:for_this_mapping, _rule}, &1)),
+             "nothing in #{inspect(deferred)} names the action that was not probed"
 
-      assert unprobed, "nothing in #{inspect(deferred)} names the action that was not probed"
       assert unprobed =~ "[:grab]"
       assert unprobed =~ "[:resources] is not assigned"
 
@@ -87,8 +94,9 @@ defmodule TLA.Conformance.ParamMappingTest do
     test "and is fully checked once the constants have values" do
       {:ok, deferred} = Refinement.validate!(Mapping, Spec, %{resources: MapSet.new([:r1, :r2])})
 
-      refute Enum.any?(deferred, &String.contains?(&1, "except")),
-             "with constants assigned there is a binding to probe with, so nothing is deferred"
+      refute Enum.any?(deferred, &match?({:for_this_mapping, _rule}, &1)),
+             "with constants assigned there is a binding to probe with, so nothing is " <>
+               "deferred beyond the two no compile can decide"
     end
   end
 
@@ -123,6 +131,41 @@ defmodule TLA.Conformance.ParamMappingTest do
       error = assert_raise Refinement.Error, fn -> Refinement.validate!(Unnamed, Spec) end
 
       assert Exception.message(error) =~ "drop_all"
+    end
+  end
+
+  describe "constants that come only from application config" do
+    # `validate!/3` resolved constants with `default_constants/1` — the reader that sees
+    # `default:` options and nothing else — so a spec assigned through
+    # `config :extla, MySpec, constants: %{…}` was validated against the EMPTY assignment
+    # and reported the rules as decided (#169). `resolve_constants/1`, which merges config,
+    # was in the same module and simply not the one called.
+    setup do
+      previous = Application.get_env(:extla, Spec)
+      Application.put_env(:extla, Spec, constants: %{resources: MapSet.new([:r1, :r2])})
+
+      on_exit(fn ->
+        if previous,
+          do: Application.put_env(:extla, Spec, previous),
+          else: Application.delete_env(:extla, Spec)
+      end)
+
+      :ok
+    end
+
+    test "are resolved, so the probes have real bindings to use" do
+      {:ok, deferred} = Refinement.validate!(Mapping, Spec)
+
+      refute Enum.any?(deferred, &match?({:for_this_mapping, _rule}, &1)),
+             "the constants are in config, so `grab` has bindings and nothing about " <>
+               "this mapping is undecided: #{inspect(deferred)}"
+    end
+
+    test "and a mapping that is wrong for them still fails" do
+      error =
+        assert_raise Refinement.Error, fn -> Refinement.validate!(__MODULE__.Unnamed, Spec) end
+
+      assert Exception.message(error) =~ "names no message for"
     end
   end
 end

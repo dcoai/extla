@@ -203,6 +203,71 @@ defmodule TLA.ConformanceStepTest do
   # concurrently running test that recorded a transition saw a 3-state buffer. The test
   # is unchanged; only its neighbours are.
 
+  describe "what use TLA.GenServer says about rules it could not decide" do
+    # `validate!/3`'s moduledoc argues that "a validator that claims a check it cannot
+    # perform is worse than one that states its limits", and the statement of limits was
+    # thrown away at the only call site: `{:ok, _deferred} = …` (#169). A user whose mapping
+    # has no `concrete_message/2` — so action coverage was never checked AT ALL — was never
+    # told.
+    @server """
+    defmodule <NAME> do
+      use GenServer
+
+      use TLA.GenServer,
+        spec: TLA.Conformance.Counter.Spec,
+        refinement: <NAME>.Mapping
+
+      defmodule Mapping do
+        use TLA.Refinement
+
+        def abstract(%{value: v, status: s}), do: %{count: v, status: s}
+        def abstract_action(:increment), do: {:increment, %{}}
+        def abstract_action(:done), do: {:done, %{}}
+        def abstract_action(:reset), do: {:reset, %{}}
+        def abstract_action(_other), do: :unmapped<CONCRETE>
+      end
+
+      def init(_), do: {:ok, %{value: 0, status: :ready}}
+      def handle_call(:increment, _from, s), do: {:reply, :ok, %{s | value: s.value + 1}}
+    end
+    """
+
+    defp compile_server(name, concrete) do
+      @server
+      |> String.replace("<NAME>", Atom.to_string(name))
+      |> String.replace("<CONCRETE>", concrete)
+      |> Code.compile_string()
+    end
+
+    test "it names the rule that went unchecked for this mapping" do
+      warning =
+        ExUnit.CaptureIO.capture_io(:stderr, fn ->
+          compile_server(NoConcreteMessage, "")
+        end)
+
+      assert warning =~ "refinement rule(s) were not checked"
+      assert warning =~ "no `concrete_message/2` to enumerate them with"
+      assert warning =~ "limits of what a compile can decide, not findings"
+    end
+
+    # A compile-time message that fires on every module is one a reader learns to skip,
+    # which would leave the ones that matter unread. The two rules that need a concrete
+    # state are deferred for EVERY mapping — that is how validation works, not news.
+    test "and says nothing when only the always-deferred rules are outstanding" do
+      concrete =
+        "\n\n    def concrete_message(:increment, _params), do: :increment" <>
+          "\n    def concrete_message(:done, _params), do: :done" <>
+          "\n    def concrete_message(:reset, _params), do: :reset"
+
+      warning =
+        ExUnit.CaptureIO.capture_io(:stderr, fn ->
+          compile_server(WithConcreteMessage, concrete)
+        end)
+
+      refute warning =~ "were not checked"
+    end
+  end
+
   describe "Refinement.validate!/3 is not weakened by the layer above it" do
     test "the conforming mapping still validates against the spec" do
       assert {:ok, deferred} = TLA.Refinement.validate!(Refinement, Spec)

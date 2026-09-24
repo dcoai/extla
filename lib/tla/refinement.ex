@@ -104,13 +104,16 @@ defmodule TLA.Refinement do
 
     total!(refinement)
 
-    constants = constants || Spec.Compiled.default_constants(spec)
+    constants = constants || resolved_constants(spec)
 
-    deferred =
-      [
-        "`abstract/1` returns exactly #{inspect(Enum.map(spec.variables, & &1.name))}",
-        "every mapped value is a permitted state term (02-dsl-semantics.md §6)"
-      ]
+    # The two that need a concrete state, which a compile does not have. They are deferred
+    # for EVERY mapping, so they are the ordinary case and are marked as such: a caller
+    # reporting this list should be able to tell "this is how validation always works" from
+    # "this rule went unchecked for your mapping in particular" (#169).
+    deferred = [
+      {:always, "`abstract/1` returns exactly #{inspect(Enum.map(spec.variables, & &1.name))}"},
+      {:always, "every mapped value is a permitted state term (02-dsl-semantics.md §6)"}
+    ]
 
     if function_exported?(refinement, :concrete_message, 2) do
       # Named first: "no message produces this action" is a more useful thing to be told
@@ -122,9 +125,29 @@ defmodule TLA.Refinement do
       {:ok,
        deferred ++
          [
-           "every spec action is named by an `abstract_action/1` clause — no " <>
-             "`concrete_message/2` to enumerate them with, so coverage reports it instead"
+           {:for_this_mapping,
+            "every spec action is named by an `abstract_action/1` clause — no " <>
+              "`concrete_message/2` to enumerate them with, so coverage reports it instead"}
          ]}
+    end
+  end
+
+  # `resolve_constants/1` rather than `default_constants/1` (#169).
+  #
+  # The defaults-only reader sees `constant :accounts, default: …` and nothing else, so a
+  # spec whose constants come from `config :extla, MySpec, constants: %{…}` — which is how a
+  # published example is meant to be assigned, since the assignment belongs to a run — was
+  # validated against the EMPTY assignment, and the rules were reported as decided. The
+  # resolver that merges config is in the same module and was simply not the one called here.
+  #
+  # `{:error, missing}` is not an error at this point: a compile has no run to take an
+  # assignment from, and a spec whose constants arrive later is a normal thing to compile.
+  # What it means is that the probes below have no bindings to draw, which `sample_params/3`
+  # already handles and `unprobed/2` already reports (#284).
+  defp resolved_constants(spec) do
+    case Spec.Compiled.resolve_constants(spec) do
+      {:ok, constants} -> constants
+      {:error, _missing} -> Spec.Compiled.default_constants(spec)
     end
   end
 
@@ -199,10 +222,11 @@ defmodule TLA.Refinement do
 
       names ->
         [
-          "every spec action is named by an `abstract_action/1` clause, and round-trips — " <>
-            "except #{inspect(Enum.sort(names))}, whose params have no binding here: " <>
-            "#{unassigned(spec, constants)}. Both rules are checked for those actions " <>
-            "wherever the constants have values."
+          {:for_this_mapping,
+           "every spec action is named by an `abstract_action/1` clause, and round-trips — " <>
+             "except #{inspect(Enum.sort(names))}, whose params have no binding here: " <>
+             "#{unassigned(spec, constants)}. Both rules are checked for those actions " <>
+             "wherever the constants have values."}
         ]
     end
   end

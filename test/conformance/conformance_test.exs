@@ -13,9 +13,14 @@ defmodule TLA.ConformanceTest do
       # Not a shortfall to be embarrassed about: there is no concrete state at compile
       # time to map, so these are checked on every mapping instead. Saying so is the
       # difference between a validator with limits and one that overstates itself.
+      # Each entry is tagged since #169: `:always` for a rule no compile can decide, and
+      # `:for_this_mapping` for one that went unchecked for this mapping in particular.
+      # `use TLA.GenServer` prints only the second kind, so the tag is what keeps a
+      # compile-time message from firing on every module and being learned as noise.
       assert length(deferred) == 2
-      assert Enum.any?(deferred, &(&1 =~ "abstract/1"))
-      assert Enum.any?(deferred, &(&1 =~ "permitted state term"))
+      assert Enum.all?(deferred, &match?({:always, _rule}, &1))
+      assert Enum.any?(deferred, fn {_tag, rule} -> rule =~ "abstract/1" end)
+      assert Enum.any?(deferred, fn {_tag, rule} -> rule =~ "permitted state term" end)
     end
 
     test "maps a concrete state onto exactly the spec's variables" do
