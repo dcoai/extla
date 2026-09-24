@@ -37,11 +37,24 @@ defmodule TLA.Invariant do
   `use TLA.Invariant` goes directly **after** `use GenServer` and **before** the
   callbacks, and the order is load-bearing rather than stylistic. Only the callbacks the
   module's own author writes are wrapped, and they are identified with `@on_definition`,
-  which sees a definition only after it is installed. That is also what keeps the wrapper
+  which sees a definition only after it is installed. That is what keeps the wrapper
   off the default `handle_call/3`, `handle_cast/2` and `handle_info/2` that `use
   GenServer` injects — `Module.defines?/2` cannot tell those from the author's, calling
   `super` on them is deprecated, and wrapping a default that exists to stop the server
   with a `:bad_call` is checking a transition nobody wrote.
+
+  **`init/1` is the exception, and it needed a second guard** (#171). GenServer injects it
+  from its own `@before_compile`, which runs *after* the hook is installed rather than
+  before — so `@on_definition` does see it, and `{:init, 1}` lands in the wrapped set for a
+  module whose author wrote no `init/1`. By then GenServer's `defoverridable init: 1` has
+  moved it out of the definitions table, and `Module.make_overridable/2` refuses:
+
+      ** (ArgumentError) cannot make function init/1 overridable because it was not defined
+
+  naming neither this library nor the cause. The example at the top of this moduledoc
+  produced exactly that. So the wrapper is emitted only for a callback still in the
+  definitions table when `__before_compile__/1` runs — which is precisely what
+  `make_overridable/2` requires, asked as a question rather than assumed.
 
   ## `:disabled` emits nothing
 
@@ -544,9 +557,33 @@ defmodule TLA.Invariant do
       statem?: {:handle_event, 4} in wrapped
     }
 
-    for {callback, arity} <- @callbacks, {callback, arity} in wrapped do
+    for {callback, arity} <- @callbacks,
+        {callback, arity} in wrapped,
+        still_defined?(env, callback, arity) do
       wrapper(callback, arity, context)
     end
+  end
+
+  # `init/1` is the exception the moduledoc above used to deny, and this is the guard for it
+  # (#171).
+  #
+  # `@on_definition` keeps the wrapper off the defaults `use GenServer` injects — for
+  # `handle_call/3`, `handle_cast/2` and `handle_info/2`, which it injects in `__using__`,
+  # BEFORE the hook is installed. `init/1` is different: GenServer injects it from its own
+  # `@before_compile`, AFTER, so the hook does see it, `{:init, 1}` lands in the wrapped set,
+  # and by the time this runs GenServer's `defoverridable init: 1` has already moved it out
+  # of the definitions table. `Module.make_overridable/2` then refuses with
+  #
+  #     ** (ArgumentError) cannot make function init/1 overridable because it was not defined
+  #
+  # which names neither this library nor the cause, and which the front-page example in this
+  # very moduledoc used to produce.
+  #
+  # Being in the definitions table is exactly the condition `make_overridable/2` requires, so
+  # it is the condition asked. That also makes this guard right for any future callback with
+  # the same shape rather than a special case for one name.
+  defp still_defined?(env, callback, arity) do
+    Module.defines?(env.module, {callback, arity}, :def)
   end
 
   defp wrapper(callback, arity, context) do
