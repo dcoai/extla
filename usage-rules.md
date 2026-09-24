@@ -129,6 +129,36 @@ rather than passing for every state.
 | `mix tla.visualize` | the state graph as DOT |
 | `mix tla.stamp` | record which spec version a refinement mapping was read against |
 
+## Writing a refinement mapping: a bare term is a call
+
+`concrete_message/2` returns the message that causes an action, and a message does not
+carry how it arrives. So the mapping says:
+
+| Return | Delivered as | Handled by |
+|---|---|---|
+| `{:call, msg}` | `{:"$gen_call", from, msg}` | `handle_call/3` |
+| `{:cast, msg}` | `{:"$gen_cast", msg}` | `handle_cast/2` |
+| `{:info, msg}` | `msg` | `handle_info/2` |
+| `msg` | a **call** | `handle_call/3` |
+
+**A bare term is a call.** That is what it has always meant, so no existing mapping changes
+— but it is the trap: map an action to `:process_next` when the server takes it in
+`handle_cast/2`, and the message arrives at `handle_call/3`, which has no clause for it. The
+server dies, and `mix tla.replay` reports `:not_followed` — "the spec permits a behaviour
+the implementation does not take" — about a server that is correct. Write `{:cast,
+:process_next}`.
+
+The one ambiguity has a total escape: to send the literal two-tuple `{:cast, 5}` as a call,
+write `{:call, {:cast, 5}}`.
+
+A cast completes when a `:sys.get_state/2` behind it replies, which both drivers already
+make, so this costs no extra round-trip. A cast that never completes is a named finding,
+not a silent pass (D-36).
+
+> **Not yet delivered (#306).** The driver sends a call unconditionally today, so a mapping
+> naming a cast is checked and not drivable. The contract above is decided; #306 implements
+> it.
+
 ## What a verdict does and does not say
 
 `mix tla.check` exits **2** when the run was bounded — `max_states` was hit, or a

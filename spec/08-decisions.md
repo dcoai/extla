@@ -1036,3 +1036,60 @@ that an `init` block yields is caught, and one whose action has no binding at al
 in the deferred list rather than reported as checked.
 
 See `05-layer3-conformance.md` §`TLA.Refinement`.
+
+---
+
+## D-36 — The mapping says how a message is delivered, and a cast completes at a `:sys.get_state`
+
+**Decided.** `concrete_message/2` may return `{:call, msg}`, `{:cast, msg}` or
+`{:info, msg}`; a bare term is a call. A cast's completion is observed by a **monitored
+`:sys.get_state/2`**, the call both drivers already make.
+
+**Why it had to be decided at all.** `TLA.GenServer.Driver.call/3` sends `{:"$gen_call", …}`
+unconditionally, and it is the sole delivery path for the private `drive/5` in `TLA.Replay`
+and `step/4` in `TLA.Simulation` (D-30). **`05-layer3-conformance.md`'s own canonical refinement maps
+`:complete_transfer` and `:reset` to `handle_cast/2` clauses.** Delivered as a `$gen_call`
+those reach `handle_call/3`, which has no matching clause; the server dies and replay reports
+`:not_followed` — "the spec permits a behaviour the implementation does not take", about a
+server that is fine. Nothing restricts the callback to calls, and the runtime wrapper *does*
+instrument casts and infos, so the gap is exactly **checked but not drivable**.
+
+**Why the mapping and not an inference.** A term is a message and a message does not carry
+how it arrives, so a bare return cannot distinguish a call from a cast. Inferring it from
+which callback has a matching clause guesses, and a message two callbacks both match is not
+decidable that way. Declaring it on the spec side is the wrong layer: delivery is an
+implementation detail and the specification is meant not to know one.
+
+A bare term keeps today's meaning, so no existing mapping changes. The one ambiguity it
+introduces — a mapping whose literal message *is* `{:cast, 5}` — has a total escape:
+`{:call, {:cast, 5}}`.
+
+**The hard half: when is a cast done.** A call hands the driver "answered, refused, or died"
+as a value; a cast has no reply, and a driver that moved on before the cast was handled
+would compare the next action against a stale state. That is #168's defect class, and it
+must not be reintroduced by the fix for a different one.
+
+`:sys.get_state/2` is a system message through the same mailbox, so it is ordered **behind**
+the cast just sent: when its reply arrives, the cast has been handled. Its cost is **no
+additional round-trip** — the private per-step functions of `TLA.Replay` and
+`TLA.Simulation` each already call
+`:sys.get_state/1` after every step to map the post-state through `abstract/1`, so for a
+cast that same call does double duty. The monitor still carries the other outcomes: a
+violation raised in `handle_cast/2` kills the server and arrives as the same `:DOWN`, and a
+cast that never completes is a `{:timeout, ms}` — a named finding, never a silent "followed".
+
+**Considered and rejected:** a bounded wait with no state read (it decides completion by a
+clock, which makes a run's verdict depend on load); a completion signal emitted by the
+runtime wrapper (more machinery for a synchronisation the mailbox already provides, and it
+would only work for instrumented servers).
+
+**Recorded 2026-09-24 (#305); to be built at #306**, which also adds the first
+conformance-corpus entry handling an action by cast — the corpus is `handle_call`-only
+today, which is why this went unseen.
+
+**Pinned by:** `test/docs/delivery_contract_test.exs` — `05-layer3-conformance.md` and
+`usage-rules.md` state the same three forms and the same meaning for a bare term, and the
+"not yet delivered" marker names the issue that removes it, so the contract cannot be
+documented in one place and forgotten in the other.
+
+See `05-layer3-conformance.md` §`TLA.Refinement` and `usage-rules.md`.

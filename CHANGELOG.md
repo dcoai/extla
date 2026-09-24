@@ -30,6 +30,37 @@ release it merely follows.
 
 ### Added
 
+- **The refinement mapping says how a message is delivered, and a cast's completion has an
+  answer** (#305, for #172). A decision, not yet a change to the driver — D-36 records it
+  and #306 builds it.
+
+  `TLA.GenServer.Driver` sends `{:"$gen_call", …}` unconditionally and is the sole delivery
+  path for both Layer 3 drivers, while **spec/05's own canonical refinement maps
+  `:complete_transfer` and `:reset` to `handle_cast/2` clauses**. Delivered as a call those
+  reach `handle_call/3`, which has no matching clause: the server dies and replay reports
+  `:not_followed` — "the spec permits a behaviour the implementation does not take" — about
+  a server that is correct. The gap is exactly *checked but not drivable*, and it went
+  unseen because the whole conformance corpus uses `handle_call` only.
+
+  **The contract.** `concrete_message/2` may return `{:call, msg}`, `{:cast, msg}` or
+  `{:info, msg}`; a bare term is a **call**, which is what it has always meant, so no
+  existing mapping changes. The one ambiguity a tagged tuple introduces has a total escape:
+  `{:call, {:cast, 5}}`. Inferring delivery from which callback matches was rejected — it
+  guesses, and a message two callbacks both match is not decidable that way — and declaring
+  it spec-side was rejected as the wrong layer.
+
+  **When a cast is done**, which is the hard half: a **monitored `:sys.get_state/2`**. It is
+  a system message through the same mailbox, so it is ordered behind the cast just sent.
+  Cost stated rather than asserted: **no additional round-trip**, because both drivers
+  already make that call once per step to map the post-state through `abstract/1`. All four
+  outcomes stay distinguishable through the monitor, and a cast that never completes is a
+  named `{:timeout, ms}` finding, never a silent "followed".
+
+  Both reader-facing documents carry a "not yet delivered (#306)" marker, and
+  `test/docs/delivery_contract_test.exs` holds spec/05, `usage-rules.md` and D-36 to the same
+  forms — **and asserts the driver still sends a call unconditionally**, so the marker
+  cannot outlive the work it points at. The gate retires itself when #306 lands.
+
 - **`usage-rules.md`, and it is gated** (#292, for #181). The project's own governing
   instructions require one and there was none — but the convention is the weaker half of
   the case. The stronger half is that **the DSL is written in Elixir syntax and is not

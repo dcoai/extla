@@ -79,12 +79,13 @@ defmodule TLA.UsageRulesTest do
         for kind <- named,
             not MapSet.member?(known, kind),
             kind not in ~w(state old new type_ok disabled enabled verbose log_only holds
-                           inconclusive violated ok duplicate_declaration),
+                           inconclusive violated ok duplicate_declaration
+                           call cast info not_followed process_next),
             do: kind
 
       assert unknown == [], """
-      usage-rules.md names #{length(unknown)} atom(s) that are not diagnostic kinds and not
-      on the allowed list of DSL names:
+      usage-rules.md names #{length(unknown)} atom(s) that are neither diagnostic kinds nor
+      on the allowed list of DSL names, verdicts and example messages:
 
         #{Enum.join(unknown, ", ")}
 
