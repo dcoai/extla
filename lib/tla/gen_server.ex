@@ -169,8 +169,52 @@ defmodule TLA.GenServer do
     Code.ensure_compiled!(spec)
     Code.ensure_compiled!(refinement)
 
-    {:ok, _deferred} = TLA.Refinement.validate!(refinement, spec)
-    :ok
+    {:ok, deferred} = TLA.Refinement.validate!(refinement, spec)
+    report_deferred(refinement, deferred)
+  end
+
+  # `validate!/3`'s moduledoc argues that "a validator that claims a check it cannot perform
+  # is worse than one that states its limits" — and until #169 the statement of limits was
+  # discarded here, at the only call site: `{:ok, _deferred} = …`. A user whose mapping has
+  # no `concrete_message/2`, so action coverage was never checked at all, was never told.
+  #
+  # Only the entries tagged `:for_this_mapping` are printed. The two rules that need a
+  # concrete state are deferred for every mapping — that is how validation works, not news
+  # about this one — and a compile-time message that fires on every module is one a reader
+  # learns to skip, which would leave the ones that matter unread.
+  defp report_deferred(refinement, deferred) do
+    case for {:for_this_mapping, rule} <- deferred, do: rule do
+      [] ->
+        :ok
+
+      rules ->
+        # A message, not a warning, and the distinction is load-bearing.
+        #
+        # `concrete_message/2` is an `@optional_callbacks` entry: a mapping without one is
+        # legal and documented — it can still be CHECKED as it runs, it just cannot be
+        # DRIVEN. `IO.warn/2` participates in `--warnings-as-errors`, which this project
+        # uses and many consumers do, so warning here would turn a documented choice into a
+        # build failure. The first version of this did exactly that and reddened the
+        # `compile` job on this repository's own `Undrivable` fixture.
+        #
+        # What the reader needs is to know which rules went unchecked. That is information,
+        # and it belongs on stderr in the register of information.
+        IO.puts(
+          :stderr,
+          """
+
+          #{inspect(refinement)}: #{length(rules)} refinement rule(s) were not checked.
+
+            #{Enum.join(rules, "\n  ")}
+
+          These are limits of what a compile can decide, not findings. `TLA.Coverage`
+          reports what a run actually exercised (05-layer3-conformance.md §What
+          `validate!/2` establishes).
+          """
+        )
+
+        :ok
+    end
   end
 
   # `init/1`'s result IS the first abstract state. There is no step to check and no

@@ -51,6 +51,33 @@ release it merely follows.
 
 ### Fixed
 
+- **The deferred list reaches the user, and constants are resolved the way everything else
+  resolves them** (#297, for #169). `TLA.Refinement.validate!/3` is built to return the
+  rules it could not decide — its moduledoc argues that "a validator that claims a check it
+  cannot perform is worse than one that states its limits" — and the only call site was
+  `{:ok, _deferred} = …`. A user whose mapping has no `concrete_message/2`, so action
+  coverage was **never checked at all**, was never told.
+
+  `use TLA.GenServer` now says so at compile time. Each deferred entry is tagged
+  `:always` — the two rules that need a concrete state, deferred for every mapping — or
+  `:for_this_mapping`, and only the second kind is printed. A compile-time message that
+  fires on every module is one a reader learns to skip, which would leave the ones that
+  matter unread.
+
+  It is a **message and not a warning**, and the distinction is load-bearing:
+  `concrete_message/2` is an `@optional_callbacks` entry, so a mapping without one is
+  legal and documented — it can still be *checked* as it runs, it just cannot be *driven*.
+  `IO.warn/2` participates in `--warnings-as-errors`, which this project uses and many
+  consumers do, so warning there would turn a documented choice into a build failure. The
+  first version of this did exactly that, and the `compile` job caught it on this
+  repository's own `Undrivable` fixture.
+
+  **Constants:** `validate!/3` fell back to `default_constants/1`, which reads `default:`
+  options and nothing else, so a spec assigned through
+  `config :extla, MySpec, constants: %{…}` was validated against the **empty** assignment
+  and reported its rules as decided. `resolve_constants/1`, which merges config, was in the
+  same module and simply not the one called.
+
 - **The TLA+ primer says which parts of TLA+ this library implements** (#293, closes #181).
   1321 published lines with **zero** occurrences of "ExTLA", shipping in the package and
   rendering in the sidebar, with chapters on PlusCal, TLAPS and TLC's distributed mode. A
