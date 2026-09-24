@@ -999,3 +999,40 @@ with params cannot answer it (#284).
 compiled or skipped with a reason" and "a skip with no reason is rejected".
 
 See `spec/README.md` §How this specification stays true.
+
+---
+
+## D-35 — A compile-time probe draws every binding it can construct, and says it is a probe
+
+**Decided.** `TLA.Refinement.validate!/3` probes the round-trip rule with **every** binding
+each `init` block yields — every binding a compile can construct — and describes itself as a
+probe rather than as the exhaustive check `05-layer3-conformance.md` used to promise.
+
+**Why not fewer.** It took three bindings from the first `init` block. #169 asked whether
+widening was worth its cost and refused to assume; measured across the differential corpus,
+the cost is nothing:
+
+| Spec | Bindings per action, at an initial state |
+|---|---|
+| `distributed_lock` | 4, 4, 4, 2 |
+| `raft_election` | 3, 0, 0, 0 |
+| `paxos` | 2, 0, 4, 0 |
+| `two_phase_commit` | 3, 1, 1, 3, 3, 3, 3 |
+
+Every action has between **0 and 4**, because the sets a param draws from are mostly empty
+at an initial state — no messages in flight, no locks held. So the cap of three was
+excluding at most one binding per action, and every spec in the corpus has exactly one
+`init` block. Two restrictions, buying nothing between them.
+
+**Why not more.** Bindings reachable later in the search cannot be drawn without running the
+search, and running it at compile time is not a probe, it is the check the model checker
+already performs. So this stays a probe and the specification says so — with what it draws
+from, so a reader can tell what was established from what was assumed.
+
+**Recorded 2026-09-24 (#169); built at #298.**
+
+**Pinned by:** `test/conformance/param_mapping_test.exs` — a mapping wrong for a binding
+that an `init` block yields is caught, and one whose action has no binding at all is named
+in the deferred list rather than reported as checked.
+
+See `05-layer3-conformance.md` §`TLA.Refinement`.

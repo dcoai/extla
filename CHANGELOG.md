@@ -51,6 +51,26 @@ release it merely follows.
 
 ### Fixed
 
+- **`spec/05` says which of its five rules are decided at compile time, and the probe draws
+  every binding it can** (#298, closes #169). The section listed five rules "checked, in
+  order" and said a mapping not covering the spec's variables "fails the build". Neither
+  was true: rules 1 and 2 need a concrete state and are enforced per-callback at runtime,
+  rule 5 runs only where the optional `concrete_message/2` exists, and rule 4 was sampled.
+  The section now sorts them into decided, probed and deferred, and says why each is where
+  it is.
+
+  **The widen-or-not question #169 refused to assume, measured** (D-35). The probe took
+  three bindings from the first `init` block; across the differential corpus every action
+  has between **0 and 4** bindings at an initial state, because the sets a param draws from
+  are mostly empty there — no messages in flight, no locks held — and every corpus spec has
+  exactly one `init` block. So the cap was excluding at most one binding per action and the
+  first-block restriction nothing at all. It now draws every binding every `init` block
+  yields, which is every binding a compile can construct.
+
+  It remains a **probe**, and the specification says so: bindings reachable later in the
+  search cannot be drawn without running the search, and running it at compile time is not
+  a probe — it is the check the model checker already performs.
+
 - **The deferred list reaches the user, and constants are resolved the way everything else
   resolves them** (#297, for #169). `TLA.Refinement.validate!/3` is built to return the
   rules it could not decide — its moduledoc argues that "a validator that claims a check it
