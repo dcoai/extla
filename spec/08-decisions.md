@@ -682,7 +682,7 @@ branch where the state's fingerprint is absent from the table — so once per **
 state. The caller does not validate, and the successor is registered *before* its action
 properties are evaluated.
 
-**Replaced:** validation in `TLA.ModelChecker.take_action/6`, on every generated
+**Replaced:** validation in the private `take_action/6` in `TLA.ModelChecker`, on every generated
 successor. On `TLA.Differential.RaftElection` at the corpus constants that was 255,270
 validations where 58,359 would do, and 77.9% of a 23.4 s search.
 
@@ -867,8 +867,14 @@ removal.
 
 **Recorded 2026-09-22 (#176); the rewording and the CHANGELOG exemption are #156's work.**
 
-**Pinned by:** nothing yet — `mix docs --warnings-as-errors` is what pins it, and turning
-that on is #156's remaining work.
+**Pinned by:** `mix docs --warnings-as-errors` in the `docs` job (#291). A backticked
+`Mod.fun/arity` naming a private, hidden or filtered thing fails the build.
+
+The gate found this decision being broken **two days after it was written**, by the same
+hand: #277's moduledoc table named `Liveness.shape/4`, `GenServer.Runtime.verdict/3` and
+`Coverage.walk/3` in the autolink form, and nothing said so. That is the argument for the
+gate in one example — a decision recorded and not enforced is a decision that lasts until
+the next person writes a sentence.
 
 See `02-dsl-semantics.md` §7.
 

@@ -259,7 +259,7 @@ defmodule TLA.Profile do
   @doc """
   Sum two contributions. Both come from one `init/1`, so their key sets are identical and a key in
   one and not the other would be a bug rather than a case to handle — the same argument
-  `TLA.Coverage.merge_with/3` makes.
+  the private `merge_with/3` in `TLA.Coverage` makes.
   """
   def merge(%__MODULE__{} = into, %__MODULE__{} = from) do
     %{

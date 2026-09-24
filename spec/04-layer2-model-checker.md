@@ -1245,7 +1245,7 @@ fixed workload spread **100.3% in wall time and not at all in reductions**.
 Reductions are per-process, so a profiled parallel run sums one contribution per worker rather
 than reporting whichever process happened to be asked. Each `expand_batch` runs in its own task,
 starts from a zeroed accumulator with its dictionary cleared, and reads its own counts out before
-the process ends; `TLA.ModelChecker.Parallel.merge/2` sums them beside `TLA.Coverage.merge/2`.
+the process ends; the private `merge/2` in `TLA.ModelChecker.Parallel` sums them beside `TLA.Coverage.merge/2`.
 The coordinator's own contribution — seeding the initial states and checking their invariants —
 is merged in at the end, so a single-worker run and an eight-worker run travel one code path.
 

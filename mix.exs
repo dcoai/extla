@@ -36,6 +36,32 @@ defmodule ExTLA.MixProject do
         # list here would be a fourth hand-kept answer to "what is ExTLA". The same predicate
         # renders `PACKAGE_SURFACE.md`'s `packaged?` column.
         filter_modules: &ExTLA.MixProject.packaged?/2,
+        # `CHANGELOG.md` names functions that no longer exist, and must (#291).
+        #
+        # D-30 states the rule — prose about an internal names it without the backticked
+        # `Mod.fun/arity` form, which ExDoc reads as a link claim — and states this exemption
+        # in the same breath: *a changelog that cannot name a removed function cannot record a
+        # removal*. `Coverage.observe_action/5` was removed by #135, `Parallel.merge/2` made
+        # private, `TLA.Mix.TraceFile` hidden; each is named in the entry that did it, which is
+        # exactly where a reader looking for it will be.
+        #
+        # So the exemption is declared here rather than the history being reworded to suit a
+        # linter. It is scoped to the one file: every other page is held to D-30 by
+        # `--warnings-as-errors` in the `docs` job.
+        skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
+        # The ledger's own modules, named in prose and not linked.
+        #
+        # `skip_undefined_reference_warnings_on` above does not cover these: they are not
+        # undefined, they are **filtered** — real modules that `filter_modules` keeps out of
+        # the published docs because a consumer's `mix deps.get` does not bring them. So the
+        # backticks are code formatting and ExDoc reads them as a link request, to a page it
+        # was told not to generate.
+        #
+        # A short hand-kept list, which is usually this project's least favourite thing — but
+        # it is self-maintaining in the only way that matters: naming another ledger module in
+        # prose fails the `docs` job with a warning that says which one. The list cannot go
+        # stale silently, which is the property that makes a hand-kept list acceptable.
+        skip_code_autolink_to: ["TLA.Ledger", "mix tla.coverage"],
         # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
         # and the order here is the order the sidebar lists them in.
         #

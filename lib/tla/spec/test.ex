@@ -6,7 +6,7 @@ defmodule TLA.Spec.Test do
   @doc """
   Assert that a spec passes model checking with the given configuration.
 
-  ## Options, beyond `TLA.ModelChecker.config/0`
+  ## Options, beyond `t:TLA.ModelChecker.config/0`
 
   - `allow_incomplete: true` — pass even if the state limit was reached or a
     state constraint bounded the run. Default `false`.
