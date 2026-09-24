@@ -1,16 +1,15 @@
 defmodule StampFixture.Dropped do
   @moduledoc """
-  Its `spec:` is not a literal alias, so `spec_of/1` returns `nil` and `mappings/1` rejects
-  the entry entirely — **the mapping is silently dropped**.
+  Its `spec:` is not a literal alias, so it cannot be resolved without compiling — which
+  this task deliberately does not do, since a stale stamp means the project may not compile.
 
-  This is not `:unverifiable`; it never reaches `state/2` to be given a status. It is the
-  second half of #173's defect 4: the task can go on to report "no refinement mappings
-  found" for a file it did see and could not read, collapsing *cannot be checked* into
-  *absent*, which the four-status design exists to prevent.
+  It used to be **silently dropped**: `spec_of/1` returned `nil` and `mappings/1` rejected
+  the entry, so the task could go on to report "no refinement mappings found" about a file
+  it had read and could not understand — collapsing *cannot be checked* into *absent*, which
+  is the one thing the four-status design exists to prevent (#173's defect 4).
 
-  **#310 fixes it.** Until then `test/mix/tla_stamp_test.exs` asserts the drop, so the
-  behaviour is recorded rather than merely happening — and that assertion is what will fail
-  when #310 lands, which is where the reader is sent.
+  Since #310 it is `:unverifiable`, with a detail that says which of the two reasons it is.
+  The name stays: it is what this fixture was written to document.
   """
   use GenServer
 

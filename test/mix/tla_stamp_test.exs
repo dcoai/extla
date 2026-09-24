@@ -143,26 +143,30 @@ defmodule TLA.StampTest do
       assert output =~ "(spec source not found)"
     end
 
-    # #173's defect 4, recorded rather than merely happening. `spec_of/1` returns `nil` for
-    # a `spec:` that is not a literal alias and `mappings/1` rejects the entry, so the
-    # mapping never reaches `state/2` to be given ANY status -- *cannot be checked*
-    # collapsed into *absent*, which the four-status design exists to prevent.
-    #
-    # **#310 fixes this, and this assertion is what fails when it does.** That is the
-    # intent: the wrong behaviour is pinned so that changing it is deliberate.
-    test "and a mapping whose spec: is not a literal alias is SILENTLY DROPPED (#310)" do
-      modules = Enum.map(states(), & &1.module)
+    # #173's defect 4, fixed at #310. It used to be dropped before `state/2` saw it, so the
+    # task could report "no refinement mappings found" about a file it had read and could
+    # not understand -- *cannot be checked* collapsed into *absent*.
+    test "and a mapping whose spec: is not a literal alias is reported, not dropped" do
+      assert status_of(StampFixture.Dropped) == :unverifiable
+    end
 
-      refute StampFixture.Dropped in modules,
-             """
-             `StampFixture.Dropped` now has a status, so #310 has landed. Replace this test
-             with one asserting which status it gets, and say in `dropped.ex` that it is no
-             longer dropped.
-             """
+    # Two ways to be unverifiable, and they call for different fixes: a missing source file,
+    # versus a `spec:` this task cannot read without compiling. Reporting only the status
+    # would send a reader looking for the wrong thing.
+    test "and says which of the two kinds of unverifiable it is" do
+      output = capture_io(fn -> Stamp.run([], @roots) end)
 
-      # And it is a real file the task really read, not a name nobody parsed -- otherwise
-      # this test would pass for a fixture that does not exist.
-      assert StampFixture.Dropped in Map.keys(Stamp.module_index(@roots))
+      assert output =~ "(spec source not found)"
+      assert output =~ "(spec: is not a literal alias"
+    end
+
+    # Anti-vacuity for both: a task that found no mappings at all would satisfy neither of
+    # the status assertions above by accident, but it would satisfy a weaker version of them.
+    test "and never says it found nothing about a tree that has mappings" do
+      output = capture_io(fn -> Stamp.run([], @roots) end)
+
+      refute output =~ "no refinement mappings found"
+      assert length(states()) > 5
     end
 
     # `run/1` against the real project, so replacing its body with a raise reddens the suite
@@ -209,6 +213,141 @@ defmodule TLA.StampTest do
       # And none of them can become current by accident when the spec moves.
       current = TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec)
       refute current in ~w(00000000 11111111 22222222 33333333)
+    end
+  end
+
+  # ── --restamp ───────────────────────────────────────────────────────────────
+
+  describe "--restamp" do
+    @describetag :tmp_dir
+
+    # ON A COPY, always. `--restamp` rewrites source in place, and a test that let it rewrite
+    # the committed fixture would pass once and then run forever against a tree with no stale
+    # stamp in it — the shape of green that means nothing. `the fixture's own integrity`
+    # above is the other half of that guarantee.
+    setup %{tmp_dir: tmp} do
+      copy = Path.join(tmp, "stamp")
+      File.cp_r!(Path.join(@root, "test/fixtures/stamp"), copy)
+
+      # Driven with the real conformance tree beside it, so the specs resolve.
+      %{roots: [copy, Path.join(@root, "test/conformance")], copy: copy}
+    end
+
+    defp copied(copy, name), do: copy |> Path.join(name) |> File.read!()
+
+    defp current_version, do: TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec)
+
+    defp occurrences(source, stamp) do
+      source |> String.split(~s(spec_version: "#{stamp}")) |> length() |> Kernel.-(1)
+    end
+
+    # The defect. `String.replace/3` replaces every occurrence by design, so the first call
+    # fixed both mappings and the second found nothing — `Mix.raise` then told the user to
+    # hand-edit something already done.
+    test "rewrites two mappings sharing one stamp in a single pass", ctx do
+      capture_io(fn -> Stamp.run(["--restamp"], ctx.roots) end)
+
+      after_ = copied(ctx.copy, "stale.ex")
+
+      assert occurrences(after_, "00000000") == 0
+      assert occurrences(after_, current_version()) == 2
+    end
+
+    # And it does not abort. The crash took every later file with it, which is most of the
+    # damage it did: one bad file left the rest of the project unstamped.
+    test "and goes on to the next file", ctx do
+      capture_io(fn -> Stamp.run(["--restamp"], ctx.roots) end)
+
+      after_ = copied(ctx.copy, "stale_distinct.ex")
+
+      assert occurrences(after_, "11111111") == 0
+      assert occurrences(after_, "22222222") == 0
+      assert occurrences(after_, current_version()) == 2
+    end
+
+    test "and names every module it restamped, not every rewrite it made", ctx do
+      output = capture_io(fn -> Stamp.run(["--restamp"], ctx.roots) end)
+
+      for module <- ~w(Stale.First Stale.Second StaleDistinct.First StaleDistinct.Second) do
+        assert output =~ "restamped StampFixture.#{module}"
+      end
+    end
+
+    test "and leaves every mapping that is not stale alone", ctx do
+      unstamped = copied(ctx.copy, "unstamped.ex")
+
+      capture_io(fn -> Stamp.run(["--restamp"], ctx.roots) end)
+
+      assert copied(ctx.copy, "unstamped.ex") == unstamped
+      assert occurrences(copied(ctx.copy, "unverifiable.ex"), "33333333") == 1
+      assert occurrences(copied(ctx.copy, "dropped.ex"), "44444444") == 1
+    end
+
+    test "and a second run has nothing to do", ctx do
+      capture_io(fn -> Stamp.run(["--restamp"], ctx.roots) end)
+      output = capture_io(fn -> Stamp.run(["--restamp"], ctx.roots) end)
+
+      assert output =~ "nothing to restamp."
+    end
+  end
+
+  describe "--restamp refuses rather than guessing" do
+    @describetag :tmp_dir
+
+    setup %{tmp_dir: tmp} do
+      path = Path.join(tmp, "one.ex")
+      File.write!(path, ~s(  use TLA.GenServer, spec_version: "aaaaaaaa"\n))
+      %{path: path}
+    end
+
+    defp stale(path, opts) do
+      %{
+        module: Keyword.get(opts, :module, Fixture.One),
+        path: path,
+        stamp: Keyword.fetch!(opts, :stamp),
+        current: Keyword.fetch!(opts, :current),
+        status: :stale
+      }
+    end
+
+    # The dedupe does not weaken the guard: a stamp that genuinely is not in the file is
+    # still a fault, and still says which module to look at.
+    test "when the stamp is not in the file at all", ctx do
+      state = stale(ctx.path, stamp: "deadbeef", current: "cafebabe")
+
+      assert_raise Mix.Error, ~r/does not contain spec_version: "deadbeef"/, fn ->
+        capture_io(fn -> Stamp.restamp([state]) end)
+      end
+    end
+
+    # The one case grouping by `{path, stamp}` could get wrong: two specs sharing an 8-hex
+    # stamp in one file. Rewriting the group to either value would stamp a mapping against a
+    # spec nobody read it against, which is the one thing `--restamp` must not do — the task
+    # records a judgement rather than performing one.
+    test "when two mappings share a stamp and resolve to different versions", ctx do
+      group = [
+        stale(ctx.path, module: Fixture.A, stamp: "aaaaaaaa", current: "11111111"),
+        stale(ctx.path, module: Fixture.B, stamp: "aaaaaaaa", current: "22222222")
+      ]
+
+      assert_raise Mix.Error, ~r/resolve to different versions/, fn ->
+        capture_io(fn -> Stamp.restamp(group) end)
+      end
+
+      # And it refused BEFORE writing, which is the part that matters.
+      assert File.read!(ctx.path) =~ ~s(spec_version: "aaaaaaaa")
+    end
+
+    # Anti-vacuity for both: the same shape, without the fault, rewrites cleanly.
+    test "but rewrites a group that agrees", ctx do
+      group = [
+        stale(ctx.path, module: Fixture.A, stamp: "aaaaaaaa", current: "33333333"),
+        stale(ctx.path, module: Fixture.B, stamp: "aaaaaaaa", current: "33333333")
+      ]
+
+      capture_io(fn -> Stamp.restamp(group) end)
+
+      assert File.read!(ctx.path) =~ ~s(spec_version: "33333333")
     end
   end
 end

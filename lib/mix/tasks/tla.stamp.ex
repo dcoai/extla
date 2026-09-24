@@ -158,14 +158,25 @@ defmodule Mix.Tasks.Tla.Stamp do
       _ ->
         []
     end)
-    |> Enum.reject(&(&1.spec == nil))
   end
 
+  # A `spec:` that is not a literal alias -- `@spec_module`, a variable, anything the AST
+  # does not name outright -- cannot be resolved without compiling, which this task
+  # deliberately does not do (a stale stamp means the project may not compile).
+  #
+  # It used to be `nil` and the whole mapping was then REJECTED (#173), so the task could go
+  # on to say "no refinement mappings found" about a file it had read and could not
+  # understand. That collapses *cannot be checked* into *absent*, which is the one thing the
+  # four-status design exists to prevent. It is `:unresolvable` now and reaches `state/2`.
   defp spec_of(opts) do
     case Keyword.get(opts, :spec) do
       {:__aliases__, _, segs} -> Module.concat(segs)
-      _ -> nil
+      _ -> :unresolvable
     end
+  end
+
+  defp state(%{spec: :unresolvable} = mapping, _index) do
+    Map.merge(mapping, %{current: nil, status: :unverifiable, reason: :spec_not_a_literal_alias})
   end
 
   defp state(mapping, index) do
@@ -182,7 +193,9 @@ defmodule Mix.Tasks.Tla.Stamp do
         true -> :stale
       end
 
-    Map.merge(mapping, %{current: current, status: status})
+    reason = if status == :unverifiable, do: :spec_source_not_found
+
+    Map.merge(mapping, %{current: current, status: status, reason: reason})
   end
 
   # The one formula, from `TLA.Spec.Hash` — this used to re-derive it from `Hash.scan/2`, so
@@ -220,26 +233,71 @@ defmodule Mix.Tasks.Tla.Stamp do
 
   defp detail(%{status: :stale} = s), do: "#{s.stamp} → #{s.current}"
   defp detail(%{status: :fresh} = s), do: s.current
+
+  # Two ways to be unverifiable, and they call for different fixes: one is a missing file,
+  # the other is a `spec:` this task cannot read. Saying only "unverifiable" would send a
+  # reader looking for the wrong thing.
+  defp detail(%{status: :unverifiable, reason: :spec_not_a_literal_alias}),
+    do: "(spec: is not a literal alias, so it cannot be resolved without compiling)"
+
   defp detail(%{status: :unverifiable}), do: "(spec source not found)"
   defp detail(_), do: ""
 
-  defp restamp(stamps) do
+  # ONE REWRITE PER `{path, stamp}`, not one per mapping (#173).
+  #
+  # `rewrite!/1` uses `String.replace/3`, which replaces every occurrence by design -- and
+  # two mappings in one file sharing a stale stamp is the NORMAL case, since they share a
+  # spec and therefore a resolution. The first call fixed both and the second found nothing,
+  # so `Mix.raise` fired: it told the user to hand-edit something already done, and aborted
+  # before any other file was processed.
+  #
+  # The guard is not weakened. It still catches a stamp that genuinely is not there, which
+  # is a real fault and the only thing it was ever for.
+  @doc false
+  # Public for the same reason `run/2` and `switches/0` are: a test seam, said to be one.
+  # Two properties here are only reachable with a hand-built list of states — the guard on a
+  # stamp that is not in the file, and the refusal to rewrite a group whose members resolve
+  # to different versions. Both are safety properties of a tool that edits source, and
+  # neither can be produced by a fixture tree.
+  def restamp(stamps) do
     shell = Mix.shell()
     stale = Enum.filter(stamps, &(&1.status == :stale))
 
     if stale == [] do
       shell.info("nothing to restamp.")
     else
-      Enum.each(stale, fn s ->
-        rewrite!(s)
-        shell.info("restamped #{inspect(s.module)}: #{s.stamp} → #{s.current}")
-      end)
+      stale
+      |> Enum.group_by(&{&1.path, &1.stamp})
+      |> Enum.sort_by(fn {key, _group} -> key end)
+      |> Enum.each(fn {_key, group} -> rewrite_group!(group, shell) end)
     end
   end
 
-  # Replace only the exact `spec_version: "<old>"` this mapping carries. Two mappings in one
-  # file sharing a stale stamp share a spec and a resolution, so replacing both is right;
-  # anything else needs an 8-hex collision between different specs.
+  defp rewrite_group!([first | _] = group, shell) do
+    # Every mapping in the group shares a file and a stamp, so one rewrite serves them all --
+    # unless they resolve to DIFFERENT current hashes, which needs an 8-hex collision between
+    # two specs in one file. Astronomically unlikely and not silently wrong: rewriting the
+    # group to one of the two would put a stamp on a mapping that was never read against it,
+    # which is the one thing `--restamp` must not do.
+    case group |> Enum.map(& &1.current) |> Enum.uniq() do
+      [_one] ->
+        rewrite!(first)
+
+        Enum.each(group, fn s ->
+          shell.info("restamped #{inspect(s.module)}: #{s.stamp} → #{s.current}")
+        end)
+
+      many ->
+        Mix.raise(
+          "#{first.path} has #{length(group)} mappings stamped #{first.stamp} that resolve to " <>
+            "different versions (#{Enum.join(many, ", ")}) — two specs share an 8-hex stamp " <>
+            "here. Edit them by hand: rewriting them together would stamp a mapping against " <>
+            "a spec nobody read it against."
+        )
+    end
+  end
+
+  # Replace the exact `spec_version: "<old>"` this mapping carries, everywhere in the file.
   defp rewrite!(s) do
     source = File.read!(s.path)
     from = ~s(spec_version: "#{s.stamp}")
