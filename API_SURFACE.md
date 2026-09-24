@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 391 items** · functions 329 · arities 405 · types 62
+**59 modules · 392 items** · functions 330 · arities 410 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -36,15 +36,20 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `run/1` | `:def` | (args) | `10fcf432` | `lib/mix/tasks/tla.simulate.ex` |
 | `switches/0` | `:def` | () | `db9269b8` | `lib/mix/tasks/tla.simulate.ex` |
-## Mix.Tasks.Tla.Stamp — 6 items
+## Mix.Tasks.Tla.Stamp — 7 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
 | `mappings/1` | `:def` | (index) | `b3cc0f13` | `lib/mix/tasks/tla.stamp.ex` |
-| `module_index/0` | `:def` | () | `b5318d8e` | `lib/mix/tasks/tla.stamp.ex` |
-| `run/1` | `:def` | (argv) | `62d5e8d2` | `lib/mix/tasks/tla.stamp.ex` |
-| `sources/0` | `:def` | () | `c27faca1` | `lib/mix/tasks/tla.stamp.ex` |
-| `states/0` | `:def` | () | `66871a1f` | `lib/mix/tasks/tla.stamp.ex` |
+| `module_index/0` | `:def` | (roots \\ …) | `1cb8213d` | `lib/mix/tasks/tla.stamp.ex` |
+| `module_index/1` | `:def` | (roots \\ …) | `1cb8213d` | `lib/mix/tasks/tla.stamp.ex` |
+| `roots/0` | `:def` | () | `9e60899b` | `lib/mix/tasks/tla.stamp.ex` |
+| `run/1` | `:def` | (argv) | `4795f1d2` | `lib/mix/tasks/tla.stamp.ex` |
+| `run/2` | `:def` | (argv) | `4795f1d2` | `lib/mix/tasks/tla.stamp.ex` |
+| `sources/0` | `:def` | (roots \\ …) | `67137b6c` | `lib/mix/tasks/tla.stamp.ex` |
+| `sources/1` | `:def` | (roots \\ …) | `67137b6c` | `lib/mix/tasks/tla.stamp.ex` |
+| `states/0` | `:def` | (roots \\ …) | `f0213c28` | `lib/mix/tasks/tla.stamp.ex` |
+| `states/1` | `:def` | (roots \\ …) | `f0213c28` | `lib/mix/tasks/tla.stamp.ex` |
 | `switches/0` | `:def` | () | `db9269b8` | `lib/mix/tasks/tla.stamp.ex` |
 ## Mix.Tasks.Tla.Visualize — 2 items
 
