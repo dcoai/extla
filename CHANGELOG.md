@@ -64,6 +64,14 @@ release it merely follows.
   fires on every module is one a reader learns to skip, which would leave the ones that
   matter unread.
 
+  It is a **message and not a warning**, and the distinction is load-bearing:
+  `concrete_message/2` is an `@optional_callbacks` entry, so a mapping without one is
+  legal and documented — it can still be *checked* as it runs, it just cannot be *driven*.
+  `IO.warn/2` participates in `--warnings-as-errors`, which this project uses and many
+  consumers do, so warning there would turn a documented choice into a build failure. The
+  first version of this did exactly that, and the `compile` job caught it on this
+  repository's own `Undrivable` fixture.
+
   **Constants:** `validate!/3` fell back to `default_constants/1`, which reads `default:`
   options and nothing else, so a spec assigned through
   `config :extla, MySpec, constants: %{…}` was validated against the **empty** assignment
