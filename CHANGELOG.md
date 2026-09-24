@@ -30,6 +30,29 @@ release it merely follows.
 
 ### Fixed
 
+- **Two checks that could not fail** (#295, closes #175). The Agent layer's `cast/3` and
+  `TLA.Invariant.Test`'s `assert_invariants/2`, each proven by #175 by mutating the code and
+  watching the suite stay green, and each now demonstrated red against that mutation.
+
+  **`Agent.cast/3`** is the path D-25 is about — an `Agent`'s checks dispatch at runtime and
+  `:disabled` still costs a call there — and replacing its `check_agent_step!/3` with a
+  plain call left everything green. A cast is asynchronous, so a violation arrives as the
+  agent's **exit**, which is exactly what made the check invisible unless something watches
+  for it; the test now does.
+
+  **`assert_invariants/2` passed for every state** when a module's invariants had all been
+  compiled out by `enabled: false`. `__tla_names__(:invariant)` is then `[]`, the
+  comprehension over it is `[]`, and `[]` means "nothing failed". A project that compiles
+  its invariants out in production and runs this assertion in a release test was asserting
+  nothing, including about the states the invariant existed to reject. It now raises, naming
+  `enabled:` as the usual cause. **`refute_invariant/3` has guarded its equivalent since it
+  was written**, through `__ensure_declared__/2`; the asymmetry between the two was the
+  finding.
+
+  `assert_action_properties/3` had the identical hole and is fixed with it — #175 named only
+  the first, and fixing a mechanism at the site it was found is how it goes on running one
+  door over (#192).
+
 - **The docs build fails on an unresolved reference** (#291, closes #156). The `docs` job ran
   `mix docs` with no `--warnings-as-errors`, so it emitted warnings and **exited 0** — ten
   when #156 was filed, **34** by the time it was implemented. `TLA.DocLinks` cannot see them:

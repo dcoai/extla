@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 383 items** · functions 321 · arities 396 · types 62
+**59 modules · 384 items** · functions 322 · arities 397 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -202,10 +202,11 @@ key whose value is a union of atoms; any other type is shown as written.
 | `initial_state/1` | `:def` | (result) | `d80258d7` | `lib/tla/invariant/runtime.ex` |
 | `initial_statem_state/1` | `:def` | (result) | `2d59b39a` | `lib/tla/invariant/runtime.ex` |
 | `telemetry?/0` | `:def` | () | `31a12d2e` | `lib/tla/invariant/runtime.ex` |
-## TLA.Invariant.Test — 11 items
+## TLA.Invariant.Test — 12 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
+| `__ensure_any__/2` | `:def` | (module, kind) | `c84232e0` | `lib/tla/invariant/test.ex` |
 | `__ensure_declared__/2` | `:def` | (module, name) | `2caffea7` | `lib/tla/invariant/test.ex` |
 | `__ensure_instrumented__/1` | `:def` | (module) | `03a38421` | `lib/tla/invariant/test.ex` |
 | `__failing_invariants__/2` | `:def` | (module, state) | `717681cc` | `lib/tla/invariant/test.ex` |
@@ -213,8 +214,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `__holds__/3` | `:def` | (module, name, state) | `ef81c0fc` | `lib/tla/invariant/test.ex` |
 | `__report__/4` | `:def` | (module, kind, failing, subject) | `4725b588` | `lib/tla/invariant/test.ex` |
 | `__using__/1` | `:defmacro` | (_opts) | `16953adb` | `lib/tla/invariant/test.ex` |
-| `assert_action_properties/3` | `:defmacro` | (module, old_state, new_state) | `286c7ee2` | `lib/tla/invariant/test.ex` |
-| `assert_invariants/2` | `:defmacro` | (module, state) | `06d22a1b` | `lib/tla/invariant/test.ex` |
+| `assert_action_properties/3` | `:defmacro` | (module, old_state, new_state) | `12282159` | `lib/tla/invariant/test.ex` |
+| `assert_invariants/2` | `:defmacro` | (module, state) | `446ee812` | `lib/tla/invariant/test.ex` |
 | `refute_invariant/3` | `:defmacro` | (module, name, state) | `ee22ff06` | `lib/tla/invariant/test.ex` |
 | `valid_states/3` | `:def` | (module, type_invariant_name, base_generator) | `f5725f95` | `lib/tla/invariant/test.ex` |
 ## TLA.Invariant.Violation — 3 items
