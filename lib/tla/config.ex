@@ -51,13 +51,13 @@ defmodule TLA.Config do
     if Code.ensure_loaded?(Mix) and Mix.env() == :prod, do: :disabled, else: :enabled
   end
 
-  @doc """
-  Maximum states to explore during model checking before aborting.
-  Prevents runaway exploration.
-  """
-  def max_states do
-    Application.get_env(:extla, :max_states, 1_000_000)
-  end
+  # `max_states/0` stood here, answering `Application.get_env(:extla, :max_states,
+  # 1_000_000)`. Nothing read it: `TLA.ModelChecker`'s `@defaults` carries its own
+  # `max_states: 1_000_000`, and every caller goes through that. Two copies of one number,
+  # one of which no code consulted — and the defect class is the duplication, so this is
+  # deleted rather than made to agree (#317). `workers/0` below is the shape that works: it
+  # is *derived*, it answers something the machine knows, and the checker deliberately does
+  # NOT take its answer by default (D-27).
 
   @doc """
   Number of workers for parallel state exploration.

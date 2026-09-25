@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 395 items** · functions 333 · arities 413 · types 62
+**59 modules · 393 items** · functions 331 · arities 411 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -58,11 +58,10 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `run/1` | `:def` | (args) | `c264a301` | `lib/mix/tasks/tla.visualize.ex` |
 | `switches/0` | `:def` | () | `db9269b8` | `lib/mix/tasks/tla.visualize.ex` |
-## TLA.Config — 4 items
+## TLA.Config — 3 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `max_states/0` | `:def` | () | `861ed542` | `lib/tla/config.ex` |
 | `mode()` | `:type` | :enabled \| :log_only \| :disabled | `49cbc408` | `lib/tla/config.ex` |
 | `mode/0` | `:defmacro` | () | `3584f0d5` | `lib/tla/config.ex` |
 | `workers/0` | `:def` | () | `a558117f` | `lib/tla/config.ex` |
@@ -196,18 +195,18 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `check_action_properties!/4` | `:def` | (module, names, old_state, new_state) | `1307e38d` | `lib/tla/invariant/runtime.ex` |
-| `check_action_properties!/5` | `:def` | (module, names, old_state, new_state) | `1307e38d` | `lib/tla/invariant/runtime.ex` |
+| `check_action_properties!/4` | `:def` | (module, names, old_state, new_state) | `9b362610` | `lib/tla/invariant/runtime.ex` |
+| `check_action_properties!/5` | `:def` | (module, names, old_state, new_state) | `9b362610` | `lib/tla/invariant/runtime.ex` |
 | `check_agent_state!/2` | `:def` | (module, state) | `4f983c1c` | `lib/tla/invariant/runtime.ex` |
 | `check_agent_step!/3` | `:def` | (module, old_state, new_state) | `03e8c519` | `lib/tla/invariant/runtime.ex` |
 | `check_initial_invariants!/4` | `:def` | (module, names, result, shape) | `c5e2979a` | `lib/tla/invariant/runtime.ex` |
 | `check_initial_invariants!/5` | `:def` | (module, names, result, shape) | `c5e2979a` | `lib/tla/invariant/runtime.ex` |
-| `check_invariants!/3` | `:def` | (module, names, state) | `4e57efa9` | `lib/tla/invariant/runtime.ex` |
-| `check_invariants!/4` | `:def` | (module, names, state) | `4e57efa9` | `lib/tla/invariant/runtime.ex` |
-| `check_postconditions!/5` | `:def` | (module, callback, message, old_state, new_state) | `927688bf` | `lib/tla/invariant/runtime.ex` |
-| `check_postconditions!/6` | `:def` | (module, callback, message, old_state, new_state) | `927688bf` | `lib/tla/invariant/runtime.ex` |
-| `check_preconditions!/4` | `:def` | (module, callback, message, state) | `b5c3d45a` | `lib/tla/invariant/runtime.ex` |
-| `check_preconditions!/5` | `:def` | (module, callback, message, state) | `b5c3d45a` | `lib/tla/invariant/runtime.ex` |
+| `check_invariants!/3` | `:def` | (module, names, state) | `e30c8891` | `lib/tla/invariant/runtime.ex` |
+| `check_invariants!/4` | `:def` | (module, names, state) | `e30c8891` | `lib/tla/invariant/runtime.ex` |
+| `check_postconditions!/5` | `:def` | (module, callback, message, old_state, new_state) | `987aa7ce` | `lib/tla/invariant/runtime.ex` |
+| `check_postconditions!/6` | `:def` | (module, callback, message, old_state, new_state) | `987aa7ce` | `lib/tla/invariant/runtime.ex` |
+| `check_preconditions!/4` | `:def` | (module, callback, message, state) | `d88e0c99` | `lib/tla/invariant/runtime.ex` |
+| `check_preconditions!/5` | `:def` | (module, callback, message, state) | `d88e0c99` | `lib/tla/invariant/runtime.ex` |
 | `extract_state/2` | `:def` | (result, pre_state) | `7ddbd8b1` | `lib/tla/invariant/runtime.ex` |
 | `extract_statem_state/2` | `:def` | (result, pre) | `98d0a560` | `lib/tla/invariant/runtime.ex` |
 | `initial_state/1` | `:def` | (result) | `d80258d7` | `lib/tla/invariant/runtime.ex` |
@@ -300,12 +299,11 @@ key whose value is a union of atoms; any other type is shown as written.
 | `classify_stuck/3` | `:def` | (spec, constants, state) | `22cb7cdb` | `lib/tla/model_checker/safety.ex` |
 | `reject_unmatched!/2` | `:def` | (declarations, names) | `9afa6b2f` | `lib/tla/model_checker/safety.ex` |
 | `selected/2` | `:def` | (declarations, _) | `03002951` | `lib/tla/model_checker/safety.ex` |
-## TLA.Profile — 15 items
+## TLA.Profile — 14 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
 | `calibrate/0` | `:def` | () | `8d4a04e2` | `lib/tla/profile.ex` |
-| `calibration_samples/0` | `:def` | () | `47813756` | `lib/tla/profile.ex` |
 | `clear/1` | `:def` | (profile) | `0618726a` | `lib/tla/profile.ex` |
 | `collect/1` | `:def` | (profile) | `9fbb5a34` | `lib/tla/profile.ex` |
 | `entry()` | `:type` | evaluations, reductions, per_eval, observed, settled | `d94566d5` | `lib/tla/profile.ex` |
@@ -365,7 +363,7 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `config()` | `:type` | traces?, max_steps?, message_generator?, inject_failures?, seed?, concurrency?, init_arg?, timeout?, against_graph? | `594305ca` | `lib/tla/simulation.ex` |
+| `config()` | `:type` | traces?, max_steps?, message_generator?, inject_failures?, failure_rate?, seed?, concurrency?, init_arg?, timeout?, against_graph? | `a8876dbf` | `lib/tla/simulation.ex` |
 | `coverage_report()` | `:type` | actions_hit, states_visited, invariants_checked, actions_covered | `0ebb20be` | `lib/tla/simulation.ex` |
 | `replay/2` | `:def` | (module, messages, config \\ …) | `46bdc611` | `lib/tla/simulation.ex` |
 | `replay/3` | `:def` | (module, messages, config \\ …) | `46bdc611` | `lib/tla/simulation.ex` |

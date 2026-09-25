@@ -575,13 +575,12 @@ defmodule TLA.Config do
     if Code.ensure_loaded?(Mix) and Mix.env() == :prod, do: :disabled, else: :enabled
   end
 
-  @doc """
-  Maximum states to explore during model checking before aborting.
-  Prevents runaway exploration.
-  """
-  def max_states do
-    Application.get_env(:extla, :max_states, 1_000_000)
-  end
+  # There is deliberately no `max_states/0` here. It stood in this block and in `lib/`
+  # until #317, answering a number nothing read: `TLA.ModelChecker`'s own defaults carry
+  # `max_states: 1_000_000` and every caller goes through those, so the repository held two
+  # copies of one number and the configuration copy was dead. `workers/0` below is the
+  # shape that works — it is DERIVED, it answers something only the machine knows, and the
+  # checker deliberately does not take its answer by default (D-27).
 
   @doc """
   Number of workers for parallel state exploration.

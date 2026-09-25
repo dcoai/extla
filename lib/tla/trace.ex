@@ -321,7 +321,11 @@ defmodule TLA.Trace do
     end
   end
 
-  defp from_init(_spec, _constants, _trace), do: :ok
+  # There is deliberately no third clause. `states` is a list on every `%TLA.Trace{}` —
+  # `[]` by default — so the two above are total, and the catch-all that used to sit here
+  # returned `:ok` for a trace it could never be given. A clause that cannot run is a claim
+  # nothing can check; if a malformed trace ever does reach here, the FunctionClauseError
+  # names it, which is more than an `:ok` ever did (#317).
 
   # Zipped rather than indexed, so a trace whose `actions` and `states` disagree in length
   # is caught here as a shape error rather than silently checking the shorter of the two.

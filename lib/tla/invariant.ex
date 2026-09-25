@@ -702,13 +702,24 @@ defmodule TLA.Invariant do
         end
       end
 
+    # Only `post`, `invariant_check` and `property_check` read the post-state, so a module
+    # carrying ONLY preconditions used to get `warning: variable "tla_new_state" is unused`
+    # about code it did not write — and paid an extraction call per transition for a value
+    # nothing downstream wanted, against the zero-cost principle (#317). The emission is
+    # guarded on whether anything needs it, which is the same question
+    # `nothing_to_check?/1` asks one level up.
+    new_state =
+      if post || invariant_check || property_check do
+        quote do: var!(tla_new_state) = unquote(extraction(callback, state))
+      end
+
     quote do
       defoverridable [{unquote(callback), unquote(arity)}]
 
       def unquote(callback)(unquote_splicing(args)) do
         unquote(pre)
         tla_result = super(unquote_splicing(args))
-        var!(tla_new_state) = unquote(extraction(callback, state))
+        unquote(new_state)
         unquote(post)
         unquote(invariant_check)
         unquote(property_check)
