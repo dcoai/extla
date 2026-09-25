@@ -16,6 +16,45 @@ release it merely follows.
 
 ### Changed
 
+- **One implementation of each TLA+ operator, and `01-foundation.md`'s vocabulary reachable
+  from a spec body** (#319, for #183; D-38). `TLA.Set` and `TLA.Function` are specified as
+  the foundation everything else builds on, and a spec body could not reach them:
+  `TLA.Spec.__using__/1` imports only `TLA.Spec.Helpers`, which **re-implemented** four of
+  their operators and exposed none of the rest. An author had to write
+  `TLA.Set.powerset/1` in full, and exactly one spec in the repository did — which is also
+  the only place the gap was visible. The two copies had already drifted, in the direction
+  this project refuses everywhere else (#318): `for_each/2` refused a list **by name**
+  because building a function over a *sequence* deduplicated it silently (#211), while
+  `TLA.Function.construct/2` still did exactly that — **#211's fix had landed in one copy**
+  — and `TLA.Function.domain/1`, being `Map.keys |> MapSet.new`, raised `BadMapError` on a
+  sequence and answered a **`MapSet`** — a struct, therefore a map — **with the struct's own
+  field names**, a wrong answer that looks like an answer, in the module the specification
+  calls the foundation. The duplicates are gone: the foundation holds the implementation and
+  adopts the semantics that were right (`construct/2` refuses a sequence by name; `domain/1`
+  reads one as the function on `1..Len(s)` and refuses a set by name), and `TLA.Spec.Helpers`
+  is a façade of `defdelegate`s that implements **no** operator — only its own thin covers
+  over `MapSet` and `Enum`, which have no counterpart there. The façade also widened, so
+  `powerset`, `cross`, `cross_many`, `distributed_union`, `set_map`, `set_filter`,
+  `for_all?`, `exists?`, `range`, `function_set`, `except` and `record_set` are now callable
+  **unqualified** from an `action`, `init`, `invariant`, `terminal` or `action_property`
+  block. #183 preferred importing the two modules into the spec body directly; that is not
+  available, because `domain/1` and `choose/1,2` exist on both sides and a second import
+  makes every shared name ambiguous at its call site — the collision the proposal asked us
+  to check is real, and it is between the two modules rather than with `Kernel`. `map/2` and
+  `filter/2` arrive as `set_map/2` and `set_filter/2` because an unqualified `map/2` in a
+  spec body reads as `Enum.map/2` to every Elixir programmer. The gate is derived, not
+  written down: `test/tla/spec/operator_agreement_test.exs` reads `lib/tla/spec.ex`'s own
+  `__using__` imports for what is reachable, requires every foundation export to be
+  reachable under its own name or a listed alias, and reads `lib/tla/spec/helpers.ex`'s AST
+  so that an operator *implemented* there rather than delegated fails the build. A seventh
+  differential corpus entry, `test/differential/set_vocabulary/`, is the only one whose
+  subject is the vocabulary rather than an algorithm: it calls the operators the way an
+  author writes them and TLC says whether they mean what TLA+ means (12 states, diameter 5).
+  The Paxos entry's fully-qualified `TLA.Set.powerset/1` is now a plain `powerset/1`.
+  `test/docs/spec_api_test.exs` learned to read `defdelegate` as a head, since the block it
+  gates is now mostly delegations and a reader that skipped them would exempt exactly the
+  block that had just been rewritten.
+
 - **The four declaration kinds agree about a non-boolean, the wrapper stops warning in the
   user's module, and the formatter covers the repository** (#317, closes #182).
   02-dsl-semantics.md §4.2 says "a boolean expression" for invariants, action properties,

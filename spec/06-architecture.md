@@ -59,6 +59,10 @@ System architecture, module dependency graph, and implementation strategy.
                               │   rests on the foundation directly:
                               │   State · Set · Function. NOT on the
                               │   three boxes below (#282).
+                              │   Set and Function are reached through
+                              │   TLA.Spec.Helpers, which a spec body
+                              │   imports and which holds no second
+                              │   implementation of an operator (D-38).
                               │
    What the CHECKER and Layer 1 rest on — reached from the top row, not from the DSL:
 
@@ -82,8 +86,8 @@ System architecture, module dependency graph, and implementation strategy.
 │  TLA.Temporal    — temporal operators (bounded fragment);    │
 │                    fairness asks ModelChecker.enabled_       │
 │                    bindings/3 back up the stack (temporal.ex)│
-│  TLA.Set         — extended set operations                   │
-│  TLA.Function    — TLA+ function operations                  │
+│  TLA.Set         — set operations; THE implementation        │
+│  TLA.Function    — function operations; THE implementation   │
 │  TLA.Config      — COMPILE-time configuration                │
 └──────────────────────────────────────────────────────────────┘
 ```

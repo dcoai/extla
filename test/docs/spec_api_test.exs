@@ -293,10 +293,17 @@ defmodule TLA.SpecApiTest do
     end
   end
 
-  defp head({kind, _, [{:when, _, [inner | _]} | _]}) when kind in [:def, :defmacro],
+  # `defdelegate` reads as a head here for the same reason `API_SURFACE.md` scans one: it
+  # declares a public function. #319 turned `TLA.Spec.Helpers` into a façade over
+  # `TLA.Set`/`TLA.Function`, so most of that module's sketch in `04` is delegations — and
+  # a reader that skipped them would exempt from this gate exactly the block that had just
+  # been rewritten, which is layer 0's objection one kind of node further in.
+  @head_kinds [:def, :defmacro, :defdelegate]
+
+  defp head({kind, _, [{:when, _, [inner | _]} | _]}) when kind in @head_kinds,
     do: head({kind, [], [inner]})
 
-  defp head({kind, _, [{name, _, args} | _]}) when kind in [:def, :defmacro] and is_atom(name),
+  defp head({kind, _, [{name, _, args} | _]}) when kind in @head_kinds and is_atom(name),
     do: {name, length(args || [])}
 
   defp head(_node), do: nil

@@ -1,45 +1,39 @@
 defmodule TLA.Spec.OperatorAgreementTest do
   @moduledoc """
-  Two implementations of the same TLA+ operators ship side by side, and nothing compared
-  them (#318, for #183).
+  There is one implementation of each TLA+ operator, and a spec body can reach all of them
+  (#318, #319, D-38, for #183).
 
-  `TLA.Spec.Helpers` is what a spec body imports — `TLA.Spec.__using__/1` imports it and
-  nothing else from the set-theoretic layer. `TLA.Set` and `TLA.Function` are what
-  `01-foundation.md` §307-403 specifies as the foundation everything else builds on, and
-  `06-architecture.md` §76-78 places there. Four operators are defined in both.
+  ## What this file was, and what it is now
 
-  ## What this file establishes
+  #318 established that two implementations of the same operators shipped side by side and
+  **disagreed**. `TLA.Spec.Helpers.for_each/2` refused a sequence by name — building a
+  function over one deduplicated it silently (#211) — while `TLA.Function.construct/2`
+  still did exactly that. `Helpers.domain/1` read a sequence as the function on `1..Len(s)`
+  that `at/2` applies it as, while `TLA.Function.domain/1` raised `BadMapError` on one and,
+  because a `MapSet` is a struct and therefore a map, answered a **set** with the struct's
+  own field names.
 
-  **They disagree, and on the case the project has already fixed once.**
-  `Helpers.for_each/2` and `TLA.Function.construct/2` are the same operator —
-  `[x \\in S |-> f(x)]` — and both say so in their docs. `for_each/2` refuses a list by
-  name because building a function over a *sequence* deduplicated it silently (#211, with
-  the reason in a comment above the clause). `construct/2` still does exactly that: a
-  three-element sequence becomes a two-element function and nothing says so. The fix landed
-  in one copy.
+  #319 removed the duplicates. The foundation holds the implementation; `TLA.Spec.Helpers`
+  is a façade over it. So the divergences below are pinned the other way up — as the
+  agreement that now holds, on the semantics that won.
 
-  `domain/1` is the second, and it is worse than a raise-versus-answer. `Helpers.domain/1`
-  reads a sequence as the function on `1..Len(s)` that `at/2` applies it as, and refuses
-  anything else by name. `TLA.Function.domain/1` is `Map.keys |> MapSet.new`, so a list
-  raises `BadMapError` — and a `MapSet`, which *is* a struct and therefore a map, is
-  answered with **the struct's own field names**. That is the D-20 defect class exactly: a
-  wrong answer that looks like an answer.
-
-  ## What is derived rather than written down
+  ## What is gated, and all of it is derived
 
   - **What a spec body can reach** is read out of `lib/tla/spec.ex`'s own `__using__`
-    imports, not from a list here. The proposal's inventory was wrong about this in two
-    places, which is the reason it is derived: `union`, `intersection`, `difference`,
-    `subset?` and `size` are reachable, and so is `choose`, which `Helpers` already
-    delegates to `TLA.Set`.
-  - **Which foundation operators are unreachable** is the remainder of that derivation
-    against each module's actual exports, checked against a written list — so an operator
-    added to one module and not the other reddens here instead of quietly joining the gap.
-
-  The agreement properties run over generated inputs, which is the half that outlives this
-  issue: they are what would have caught #211 being fixed in one copy. #319 removes the
-  duplicate implementations, at which point the divergences pinned at the bottom of this
-  file go with them.
+    imports. The proposal's inventory was wrong twice, which is why nothing here is written
+    from a reading of the source.
+  - **Every operator the foundation defines is reachable**, under its own name or a
+    written-down alias. Four are aliased: `for_each/2` and `update/3` are the DSL's own
+    long-standing spellings of `TLA.Function.construct/2` and `except_with/3`, and
+    `TLA.Set.map/2` and `filter/2` are `set_map/2` and `set_filter/2` there, because an
+    unqualified `map/2` in a spec body reads as `Enum.map/2` to everyone.
+  - **The façade holds no second implementation.** `lib/tla/spec/helpers.ex`'s AST is read
+    and every definition classified: the names defined with `def` are exactly the thin
+    `MapSet`/`Enum` wrappers, and every operator the foundation defines arrives by
+    `defdelegate`. A re-implementation reddens here, which is the drift #183 was about.
+  - **The agreement properties stay.** They run over one implementation now, and would be
+    trivial if the façade could not decay — the gate above is what keeps them meaningful,
+    and together they are what would have caught #211 being fixed in one copy.
   """
   use ExUnit.Case, async: true
   use ExUnitProperties
@@ -49,106 +43,65 @@ defmodule TLA.Spec.OperatorAgreementTest do
   alias TLA.Spec.Helpers, as: H
 
   @spec_source Path.expand("../../../lib/tla/spec.ex", __DIR__)
+  @helpers_source Path.expand("../../../lib/tla/spec/helpers.ex", __DIR__)
   @external_resource @spec_source
+  @external_resource @helpers_source
 
-  # One TLA+ operator per row, with the two implementations that claim it. `:verdict` is
-  # the finding: `:agree` is asserted by a property below, `:diverge` is pinned by a test
-  # at the bottom, and the two sets are cross-checked against each other so neither can be
-  # edited alone.
+  # One TLA+ operator per row, with the spec body's spelling and the foundation function it
+  # names. Every row agrees, because every row is one function reached two ways.
   @correspondence [
     %{
       tla: "CHOOSE x \\in S : P(x)",
       operator: :choose,
       spec_body: {H, :choose, 1},
-      foundation: {S, :choose, 1},
-      verdict: :agree,
-      note: "Helpers delegates; the arity-1 head is the default predicate"
+      foundation: {S, :choose, 1}
     },
     %{
       tla: "CHOOSE x \\in S : P(x)",
       operator: :choose,
       spec_body: {H, :choose, 2},
-      foundation: {S, :choose, 2},
-      verdict: :agree,
-      note: "Helpers delegates"
+      foundation: {S, :choose, 2}
     },
     %{
       tla: "DOMAIN f",
       operator: :domain,
       spec_body: {H, :domain, 1},
-      foundation: {F, :domain, 1},
-      verdict: :diverge,
-      note:
-        "a sequence is 1..Len(s) in one and a BadMapError in the other; a set is " <>
-          "refused by one and answered with the struct's fields by the other"
+      foundation: {F, :domain, 1}
     },
     %{
       tla: "[x \\in S |-> f(x)]",
       operator: :for_each,
       spec_body: {H, :for_each, 2},
-      foundation: {F, :construct, 2},
-      verdict: :diverge,
-      note:
-        "#211's fix landed in one copy: a sequence is refused by one and silently " <>
-          "deduplicated by the other"
+      foundation: {F, :construct, 2}
     },
     %{
       tla: "[f EXCEPT ![k] = g(@)]",
       operator: :update,
       spec_body: {H, :update, 3},
-      foundation: {F, :except_with, 3},
-      verdict: :agree,
-      note: "both are Map.update!/3, which is why they agree including on the raise"
+      foundation: {F, :except_with, 3}
     }
   ]
 
-  # Everything each side defines that the other does not. Written down so that adding an
-  # operator to one module without pairing or listing it is red — that is the drift this
-  # proposal is about, arriving one function at a time.
-  @spec_body_only [
-    {:append, 2},
-    {:at, 2},
-    {:at, 3},
-    {:delete, 2},
-    {:difference, 2},
-    {:head, 1},
-    {:intersection, 2},
-    {:is_set, 1},
-    {:keys, 1},
-    {:len, 1},
-    {:member?, 2},
-    {:put, 2},
-    {:seq, 0},
-    {:seq, 1},
-    {:set, 0},
-    {:set, 1},
-    {:size, 1},
-    {:subseq, 3},
-    {:subset?, 2},
-    {:sum, 1},
-    {:sum, 2},
-    {:tail, 1},
-    {:union, 2},
-    {:values, 1}
-  ]
+  # What `TLA.Spec.Helpers` implements itself: one-line covers over `MapSet` and `Enum`
+  # with no counterpart in the foundation. Anything else it defines with `def` is a second
+  # implementation of an operator that already has one — which is what D-38 forbids.
+  @thin_wrappers ~w(append at delete difference head intersection is_set keys len member?
+                    put seq set size subseq subset? sum tail union values)a
 
-  @foundation_only [
-    {S, :cross, 2},
-    {S, :cross_many, 1},
-    {S, :distributed_union, 1},
-    {S, :exists?, 2},
-    {S, :filter, 2},
-    {S, :for_all?, 2},
-    {S, :map, 2},
-    {S, :powerset, 1},
-    {S, :range, 2},
-    {F, :except, 2},
-    {F, :function_set, 2},
-    {F, :record_set, 1}
-  ]
+  # The operators a spec body reaches under another name, and what that name is. Written
+  # down because a silent rename is exactly the drift the rest of this file exists to
+  # catch. `for_each` and `update` are the DSL's own long-standing spellings of
+  # `[x \\in S |-> f(x)]` and `[f EXCEPT ![k] = g(@)]`; `set_map` and `set_filter` say out
+  # loud that they are set operations, because an unqualified `map/2` in a spec body reads
+  # as `Enum.map/2` to everyone.
+  @aliases %{
+    for_each: {F, :construct},
+    update: {F, :except_with},
+    set_map: {S, :map},
+    set_filter: {S, :filter}
+  }
 
-  # Reachable from a spec body, and named in the proposal as absent from one. Both halves
-  # of the correction: the five set operators, and `choose`, which #318 itself got wrong.
+  # Reachable from a spec body, and named by #183 as absent from one.
   @proposal_corrections [:union, :intersection, :difference, :subset?, :size, :choose]
 
   # ── Reading TLA.Spec's own imports ──────────────────────────────────────────
@@ -205,14 +158,49 @@ defmodule TLA.Spec.OperatorAgreementTest do
   end
 
   # `function_exported?/3` does NOT load a module, so on a cold VM it answers `false` for a
-  # module nothing has called yet — a genuinely flaky assertion, and one this file hit on
-  # its second run. Every membership question here goes through `exports/1` instead.
+  # module nothing has called yet — a genuinely flaky assertion, and one #318 hit on its
+  # second run. Every membership question here goes through `exports/1` instead.
   defp exported?(module, name, arity), do: {name, arity} in exports(module)
 
-  # `TLA.Function.domain/1` is `Map.keys/1`, so the type checker warns at a call site
-  # holding a literal list — which is precisely the call this file pins. A spec author's
-  # sequence arrives in a variable, not a literal, so the argument comes through here.
-  defp as_term(value), do: Enum.random([value])
+  # ── Reading the façade's own definitions ────────────────────────────────────
+
+  # Each public definition in `lib/tla/spec/helpers.ex`, as `{:def, name}` or
+  # `{:defdelegate, name, {module, target_name}}`. The AST, not a `grep`: the file
+  # discusses both forms in prose.
+  defp helpers_definitions do
+    {_, definitions} =
+      @helpers_source
+      |> File.read!()
+      |> Code.string_to_quoted!()
+      |> Macro.prewalk([], fn
+        {:def, _, [head | _]} = node, acc ->
+          {node, [{:def, definition_name(head)} | acc]}
+
+        {:defdelegate, _, [head, opts]} = node, acc ->
+          {node, [{:defdelegate, definition_name(head), delegate_target(opts)} | acc]}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    Enum.reverse(definitions)
+  end
+
+  defp definition_name({:when, _, [head | _]}), do: definition_name(head)
+  defp definition_name({name, _, _args}) when is_atom(name), do: name
+
+  defp delegate_target(opts) do
+    {:__aliases__, _, parts} = Keyword.fetch!(opts, :to)
+    {Module.concat(parts), Keyword.get(opts, :as)}
+  end
+
+  defp defined_with_def, do: for({:def, name} <- helpers_definitions(), uniq: true, do: name)
+
+  defp delegations do
+    for {:defdelegate, name, {module, as}} <- helpers_definitions(),
+        into: %{},
+        do: {name, {module, as || name}}
+  end
 
   # ── What a spec body can reach ──────────────────────────────────────────────
 
@@ -229,61 +217,130 @@ defmodule TLA.Spec.OperatorAgreementTest do
       refute TLA.Function in modules
     end
 
+    # Why the façade rather than a second `import` — option 1 in #183. The collision the
+    # proposal asked us to check is real, and it is between the two modules rather than
+    # with `Kernel`: importing either foundation module alongside the façade would make
+    # every one of these names ambiguous at its call site, in every spec.
+    test "importing a foundation module directly would collide with the façade" do
+      helper_names = MapSet.new(exports(TLA.Spec.Helpers))
+
+      collisions =
+        for module <- [S, F],
+            {name, arity} <- exports(module),
+            {name, arity} in helper_names,
+            do: {module, name, arity}
+
+      assert length(collisions) >= 5,
+             "the façade is supposed to cover the foundation; it shares only " <>
+               "#{inspect(collisions)}"
+    end
+
     test "the derivation is not vacuous" do
       assert MapSet.size(reachable()) >= length(exports(TLA.Spec.Helpers))
       assert {:for_each, 2} in reachable()
     end
 
-    # The proposal's inventory named these as absent from a spec body. They are not, and a
-    # wrong inventory is what #183 is about — so the correction is asserted, not just
+    # #183's inventory named these as absent from a spec body. They are not, and a wrong
+    # inventory is what the proposal is about — so the correction is asserted, not merely
     # written on the issue.
-    test "the proposal's inventory was wrong: these are reachable" do
+    test "the proposal's inventory was wrong: these were always reachable" do
       names = reachable_names()
 
       for name <- @proposal_corrections do
-        assert name in names,
-               "#{name} was expected to be reachable from a spec body; the correction " <>
-                 "recorded on #183 and #318 is itself wrong"
+        assert name in names, "#{name} was expected to be reachable from a spec body"
       end
     end
 
-    test "the unreachable foundation operators are exactly the ones written down" do
+    # The acceptance criterion, derived rather than declared: every operator
+    # `01-foundation.md` specifies is now callable unqualified from a spec body.
+    test "every operator the foundation defines is reachable from a spec body" do
       names = reachable_names()
 
-      unreachable = fn module ->
-        module
-        |> exports()
-        |> Enum.map(&elem(&1, 0))
-        |> Enum.uniq()
-        |> Enum.reject(&(&1 in names))
-        |> Enum.sort()
-      end
+      aliased =
+        Map.new(@aliases, fn {spelling, {module, name}} -> {{module, name}, spelling} end)
 
-      # `TLA.Set.choose/1,2` is reachable because Helpers delegates it, and `domain/1` is
-      # reachable by NAME while resolving to the other implementation — which is the
-      # divergence, not a gap in the vocabulary.
-      assert unreachable.(TLA.Set) ==
-               ~w(cross cross_many distributed_union exists? filter for_all? map powerset range)a
+      unreachable =
+        for module <- [S, F],
+            {name, _arity} <- exports(module),
+            name not in names,
+            not Map.has_key?(aliased, {module, name}),
+            uniq: true,
+            do: {module, name}
 
-      assert unreachable.(TLA.Function) ==
-               ~w(construct except except_with function_set record_set)a
+      assert unreachable == [], """
+      #{length(unreachable)} foundation operators are not reachable from a spec body:
+
+        #{Enum.map_join(unreachable, "\n  ", fn {m, n} -> "#{inspect(m)}.#{n}" end)}
+
+      Either delegate it from `TLA.Spec.Helpers`, or add it to `@aliases` with the name a
+      spec body reaches it by. `01-foundation.md` specifies this vocabulary as the
+      foundation everything else builds on; a name only a fully-qualified call can reach is
+      the gap #183 was filed about.
+      """
     end
 
-    test "domain/1 is reachable by name, and the name resolves to the other implementation" do
-      assert {:domain, 1} in reachable()
-      assert exported?(F, :domain, 1)
+    test "the aliased operators are reachable under the names written down" do
+      names = reachable_names()
 
-      # Same name, same arity, same answer on a map — and different answers on everything
-      # else, which is what the pinned divergence at the bottom of this file records.
-      assert H.domain(%{x: 1, y: 2}) == F.domain(%{x: 1, y: 2})
-      refute H.domain([:x, :y]) == MapSet.new([:x, :y])
+      for {spelling, {module, name} = target} <- @aliases do
+        assert spelling in names, "#{spelling} is not reachable from a spec body"
+
+        assert Enum.any?(exports(module), &(elem(&1, 0) == name)),
+               "#{inspect(module)}.#{name} no longer exists"
+
+        assert delegations()[spelling] == target
+      end
     end
   end
 
-  # ── The correspondence table, asserted against both modules ─────────────────
+  # ── The façade holds no second implementation ───────────────────────────────
+
+  describe "TLA.Spec.Helpers as a façade (D-38)" do
+    test "reads as a mixture of both forms, so neither branch below is vacuous" do
+      definitions = helpers_definitions()
+
+      assert length(for({:def, _} <- definitions, do: 1)) > 10
+      assert map_size(delegations()) > 10
+    end
+
+    test "implements only the thin wrappers itself" do
+      assert Enum.sort(defined_with_def()) == Enum.sort(@thin_wrappers)
+    end
+
+    test "and none of those has a counterpart in the foundation" do
+      foundation = for module <- [S, F], {name, _} <- exports(module), uniq: true, do: name
+
+      duplicated = Enum.filter(defined_with_def(), &(&1 in foundation))
+
+      assert duplicated == [], """
+      #{inspect(duplicated)} is implemented in `TLA.Spec.Helpers` AND defined by the
+      foundation. That is the shape #318 measured: `for_each/2` and
+      `TLA.Function.construct/2` disagreed about a sequence for as long as both existed,
+      because #211's fix landed in one copy. Delegate instead.
+      """
+    end
+
+    test "every delegation points at a function that exists" do
+      for {spelling, {module, name}} <- delegations() do
+        arities = for {exported, arity} <- exports(module), exported == name, do: arity
+
+        assert arities != [],
+               "TLA.Spec.Helpers.#{spelling} delegates to #{inspect(module)}.#{name}, " <>
+                 "which is not exported"
+      end
+    end
+
+    test "and every one of them targets the foundation, not a third place" do
+      targets = delegations() |> Map.values() |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
+
+      assert Enum.sort(targets) == Enum.sort([S, F])
+    end
+  end
+
+  # ── The correspondence table, asserted against both spellings ───────────────
 
   describe "the correspondence table" do
-    test "is not empty, and holds one row per implementation pair" do
+    test "is not empty, and holds one row per operator reachable two ways" do
       assert length(@correspondence) == 5
 
       assert @correspondence |> Enum.map(& &1.operator) |> Enum.uniq() |> Enum.sort() ==
@@ -298,36 +355,12 @@ defmodule TLA.Spec.OperatorAgreementTest do
       end
     end
 
-    test "what only the spec body defines is written down" do
-      paired = MapSet.new(@correspondence, fn %{spec_body: {_, n, a}} -> {n, a} end)
-
-      unpaired =
-        TLA.Spec.Helpers |> exports() |> Enum.reject(&(&1 in paired)) |> Enum.sort()
-
-      assert unpaired == Enum.sort(@spec_body_only)
-    end
-
-    test "what only the foundation defines is written down" do
-      paired = MapSet.new(@correspondence, fn %{foundation: {m, n, a}} -> {m, n, a} end)
-
-      unpaired =
-        for module <- [S, F],
-            {name, arity} <- exports(module),
-            {module, name, arity} not in paired,
-            do: {module, name, arity}
-
-      assert Enum.sort(unpaired) == Enum.sort(@foundation_only)
-    end
-
-    test "the rows marked :diverge are exactly the ones pinned below" do
-      diverging =
-        @correspondence
-        |> Enum.filter(&(&1.verdict == :diverge))
-        |> Enum.map(& &1.operator)
-        |> Enum.uniq()
-        |> Enum.sort()
-
-      assert diverging == [:domain, :for_each]
+    test "and the spec body's spelling is a delegation to the foundation's" do
+      for %{spec_body: {_, spelling, _}, foundation: {module, name, _}} <- @correspondence do
+        assert delegations()[spelling] == {module, name},
+               "TLA.Spec.Helpers.#{spelling} is not a delegation to " <>
+                 "#{inspect(module)}.#{name}"
+      end
     end
   end
 
@@ -344,9 +377,16 @@ defmodule TLA.Spec.OperatorAgreementTest do
     end
   end
 
-  property "DOMAIN f agrees on a function — the shape both accept" do
+  property "DOMAIN f agrees on a function" do
     check all(map <- map_of(atom(:alphanumeric), integer())) do
       assert H.domain(map) == F.domain(map)
+    end
+  end
+
+  property "DOMAIN f agrees on a sequence, which is a function on 1..Len(s)" do
+    check all(elements <- list_of(atom(:alphanumeric))) do
+      assert H.domain(elements) == F.domain(elements)
+      assert H.domain(elements) == MapSet.new(1..length(elements)//1)
     end
   end
 
@@ -390,56 +430,54 @@ defmodule TLA.Spec.OperatorAgreementTest do
     assert_raise KeyError, fn -> F.except_with(%{a: 1}, :b, &(&1 + 1)) end
   end
 
-  # ── Where they disagree today. #319 removes one of the two. ─────────────────
+  # ── The semantics that won. #318 pinned these as divergences. ───────────────
 
-  describe "[x \\in S |-> f(x)] — the disagreement #211 fixed in one copy only" do
-    test "the spec body's for_each/2 refuses a sequence, by name" do
-      error = assert_raise ArgumentError, fn -> H.for_each([:a, :a, :b], & &1) end
-      message = Exception.message(error)
+  describe "[x \\in S |-> f(x)] — #211's fix, now in the only copy" do
+    test "refuses a sequence by name, under both spellings" do
+      for build <- [&H.for_each/2, &F.construct/2] do
+        error = assert_raise ArgumentError, fn -> build.([:a, :a, :b], & &1) end
+        message = Exception.message(error)
 
-      assert message =~ "for_each/2 builds a function over a set"
-      assert message =~ "a sequence"
+        assert message =~ "for_each/2 builds a function over a set"
+        assert message =~ "a sequence"
+      end
     end
 
-    test "the foundation's construct/2 deduplicates the same sequence silently" do
+    # What the refusal is for: `construct/2` used to answer a sequence, and the answer had
+    # a different cardinality than its argument, silently.
+    test "rather than deduplicating it silently" do
       sequence = [:a, :a, :b]
       assert length(sequence) == 3
-
-      function = F.construct(sequence, & &1)
-
-      assert function == %{a: :a, b: :b}
-      assert map_size(function) == 2
+      assert map_size(F.construct(MapSet.new(sequence), & &1)) == 2
     end
 
-    # The deeper half: even without duplicates, a sequence is a function on 1..Len(s)
-    # everywhere else in the DSL — `at/2` applies it that way and `Helpers.domain/1` reads
-    # it that way — and `construct/2` builds a function on its ELEMENTS instead.
-    test "construct/2 builds a function on a sequence's elements, not on 1..Len(s)" do
-      assert F.construct([:x, :y], & &1) == %{x: :x, y: :y}
-      assert H.domain([:x, :y]) == MapSet.new([1, 2])
+    test "and refuses a map, which is a function already" do
+      error = assert_raise ArgumentError, fn -> F.construct(%{a: 1}, & &1) end
+      assert Exception.message(error) =~ "a function already"
     end
   end
 
-  describe "DOMAIN f — the second disagreement" do
-    test "a sequence is a function on 1..Len(s) in the spec body and a BadMapError in the foundation" do
+  describe "DOMAIN f — one reading of a sequence" do
+    test "a sequence's domain is 1..Len(s), under both spellings" do
       assert H.domain([:x, :y, :z]) == MapSet.new([1, 2, 3])
-      assert_raise BadMapError, fn -> F.domain(as_term([:x, :y, :z])) end
+      assert F.domain([:x, :y, :z]) == MapSet.new([1, 2, 3])
+      assert H.domain([]) == MapSet.new()
+      assert F.domain([]) == MapSet.new()
     end
 
-    # The D-20 shape: not a raise against an answer, but an answer against a WRONG answer.
-    # `MapSet` is a struct and therefore a map, so `Map.keys/1` reads the struct's own
-    # fields and `domain/1` reports them as the function's domain.
-    test "a set is refused by name in the spec body and answered with the struct's fields" do
+    # The D-20 shape `TLA.Function.domain/1` used to have: not a raise against an answer,
+    # but an answer against a WRONG answer. A `MapSet` is a struct and therefore a map, so
+    # `Map.keys/1` read the struct's own fields and reported them as the function's domain.
+    test "a set is refused by name rather than answered with the struct's fields" do
       set = MapSet.new([1, 2])
 
-      error = assert_raise ArgumentError, fn -> H.domain(set) end
-      assert Exception.message(error) =~ "domain/1 takes a function (a map) or a sequence"
+      for domain <- [&H.domain/1, &F.domain/1] do
+        error = assert_raise ArgumentError, fn -> domain.(set) end
+        message = Exception.message(error)
 
-      answer = F.domain(set)
-
-      assert MapSet.size(answer) > 0, "it does not raise — it answers"
-      refute MapSet.member?(answer, 1), "and the answer is not the set's elements"
-      refute MapSet.member?(answer, 2)
+        assert message =~ "domain/1 takes a function (a map) or a sequence"
+        refute message =~ "__struct__"
+      end
     end
   end
 end

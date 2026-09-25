@@ -1,17 +1,30 @@
 defmodule TLA.Spec.Helpers do
   @moduledoc """
   Functions available inside `action`, `init`, `invariant`, `terminal` and
-  `action_property` blocks.
+  `action_property` blocks. `use TLA.Spec` imports this module whole, so this list
+  **is** a spec body's vocabulary.
 
-  Every one of these is a thin, total, deterministic wrapper over a standard
-  Elixir function. That is the whole design: an action body must be a pure
-  deterministic function of `(pre_state, params)` (`02-dsl-semantics.md` §3), so
-  nothing here may branch the search, read the clock, or depend on anything but
-  its arguments.
+  Two kinds of name live here, and the difference is the point (D-38).
 
+  **Thin wrappers over a standard Elixir function.** `set/1`, `put/2`, `union/2`,
+  `len/1`, `sum/1` and the rest are one-line covers over `MapSet` and `Enum`.
   They exist for readability rather than capability — `len(buffer)` and
   `sum(values(balances))` read as the TLA+ they translate, and a spec author
   writing `MapSet.size/1` directly gets the same result.
+
+  **Delegations to the foundation.** Every set-theoretic and function operator
+  `01-foundation.md` specifies is reachable from a spec body *unqualified*, and
+  every one of them is a `defdelegate` to `TLA.Set` or `TLA.Function`. This
+  module holds no second implementation of any of them. Until #319 it held four,
+  and two had already drifted from their counterparts — `for_each/2` refused a
+  sequence where `TLA.Function.construct/2` deduplicated one, and `domain/1` read
+  a sequence as `1..Len(s)` where `TLA.Function.domain/1` answered a set with the
+  struct's own field names. #318 is the measurement; D-38 is the decision.
+
+  Every one of these is total and deterministic, which is the whole design: an
+  action body must be a pure deterministic function of `(pre_state, params)`
+  (`02-dsl-semantics.md` §3), so nothing here may branch the search, read the
+  clock, or depend on anything but its arguments.
 
   Where a name would silently produce a wrong answer on a missing key, it
   raises instead: `update/3`, `head/1` and `tail/1` all fail loudly, for the
@@ -96,6 +109,46 @@ defmodule TLA.Spec.Helpers do
   @doc "TLA+: `S \\\\subseteq T`."
   def subset?(a, b), do: MapSet.subset?(a, b)
 
+  # ── Set operations, delegated to the foundation ──
+  #
+  # `01-foundation.md` specifies these on `TLA.Set`; D-38 makes them reachable
+  # unqualified from a spec body without a second implementation. A delegation
+  # rather than a re-export because `defdelegate` is a compile-time check that
+  # the target exists — a renamed operator fails here rather than at a user's
+  # first call.
+
+  @doc """
+  TLA+: `SUBSET S` — the power set. Exponential in `|S|`; see `TLA.Set.powerset/1`.
+  """
+  defdelegate powerset(set), to: TLA.Set
+
+  @doc "TLA+: `S1 \\\\X S2` — the Cartesian product."
+  defdelegate cross(s1, s2), to: TLA.Set
+
+  @doc "TLA+: `S1 \\\\X S2 \\\\X ... \\\\X Sn`, over a list of sets."
+  defdelegate cross_many(sets), to: TLA.Set
+
+  @doc "TLA+: `UNION S` — the distributed union of a set of sets."
+  defdelegate distributed_union(set_of_sets), to: TLA.Set
+
+  @doc """
+  TLA+: `{f(x) : x \\\\in S}` — set mapping. The result may be smaller than the
+  input, exactly as in TLA+: a non-injective `f` collapses elements.
+  """
+  defdelegate set_map(set, fun), to: TLA.Set, as: :map
+
+  @doc "TLA+: `{x \\\\in S : P(x)}` — set filtering."
+  defdelegate set_filter(set, predicate), to: TLA.Set, as: :filter
+
+  @doc "TLA+: `\\\\A x \\\\in S : P(x)`. Vacuously true for the empty set."
+  defdelegate for_all?(set, predicate), to: TLA.Set
+
+  @doc "TLA+: `\\\\E x \\\\in S : P(x)`. False for the empty set."
+  defdelegate exists?(set, predicate), to: TLA.Set
+
+  @doc "TLA+: `a..b` as a set. Empty when `a > b`."
+  defdelegate range(a, b), to: TLA.Set
+
   # ── Sequence operations ──
   #
   # A TLA+ sequence is 1-indexed, which is why `subseq/3` subtracts one and
@@ -154,39 +207,40 @@ defmodule TLA.Spec.Helpers do
 
   defp subseq_where(m, n), do: "SubSeq(s, #{inspect(m)}, #{inspect(n)}) — s"
 
-  # ── Function (map) operations ──
+  # ── Function (map) operations, delegated to the foundation ──
 
   @doc """
-  TLA+: `[x \\\\in S |-> f(x)]`.
+  TLA+: `[x \\\\in S |-> f(x)]` — `TLA.Function.construct/2` under the name a spec
+  body uses.
 
       iex> TLA.Spec.Helpers.for_each(MapSet.new([:a, :b]), fn _ -> 0 end)
       %{a: 0, b: 0}
+
+  `S` is a set: a list is a sequence, and building a function over one
+  deduplicated it silently (#211), so it is refused by name.
   """
-  def for_each(domain, f) when is_struct(domain, MapSet) or is_struct(domain, Range),
-    do: Map.new(domain, fn k -> {k, f.(k)} end)
-
-  # TLA+'s `[x \in S |-> …]` ranges over a SET. A list is a sequence here, and building a
-  # function over one deduplicated it silently (#211); a map is already a function. Both
-  # are refused by name, the way `at/2` refuses a term that is neither.
-  def for_each(other, _f) do
-    raise ArgumentError,
-          "for_each/2 builds a function over a set, and #{inspect(other)} is " <>
-            "#{describe_not_a_set(other)}. Pass a MapSet or a range (02-dsl-semantics.md §1.6)."
-  end
-
-  defp describe_not_a_set(list) when is_list(list),
-    do: "a sequence — a function on 1..Len already, whose elements Enum.map/2 can transform"
-
-  defp describe_not_a_set(map) when is_map(map), do: "a function already"
-  defp describe_not_a_set(_other), do: "neither a set nor a range"
+  defdelegate for_each(domain, f), to: TLA.Function, as: :construct
 
   @doc """
-  TLA+: `[f EXCEPT ![k] = g(@)]`.
+  TLA+: `[f EXCEPT ![k] = g(@)]` — `TLA.Function.except_with/3` under the name a
+  spec body uses.
 
   Raises on a key outside the domain — see `TLA.Function` for why extending it
   instead would be worse than failing.
   """
-  def update(map, key, f), do: Map.update!(map, key, f)
+  defdelegate update(map, key, f), to: TLA.Function, as: :except_with
+
+  @doc "TLA+: `[f EXCEPT ![a] = v, ![b] = w]` — several points at once."
+  defdelegate except(f, updates), to: TLA.Function
+
+  @doc """
+  TLA+: `[S -> T]` — the set of all total functions from `S` to `T`.
+  `|T|^|S|` elements; see `TLA.Function.function_set/2`.
+  """
+  defdelegate function_set(domain, range), to: TLA.Function
+
+  @doc "TLA+: `[field1: S1, field2: S2]` — the set of all such records."
+  defdelegate record_set(field_specs), to: TLA.Function
 
   @doc "The values of a function, as a list."
   def values(map), do: Map.values(map)
@@ -198,7 +252,7 @@ defmodule TLA.Spec.Helpers do
   TLA+: `DOMAIN f`, as a set.
 
   A sequence is a function on `1..Len(s)` — that is what `at/2` applies it as — so its
-  domain is that range (#211); this used to raise `BadMapError` on a list `at/2` accepted.
+  domain is that range (#211).
 
       iex> TLA.Spec.Helpers.domain(%{a: 1, b: 2})
       MapSet.new([:a, :b])
@@ -206,14 +260,7 @@ defmodule TLA.Spec.Helpers do
       iex> TLA.Spec.Helpers.domain([:x, :y, :z])
       MapSet.new([1, 2, 3])
   """
-  def domain(map) when is_map(map) and not is_struct(map), do: MapSet.new(Map.keys(map))
-  def domain(seq) when is_list(seq), do: MapSet.new(1..length(seq)//1)
-
-  def domain(other) do
-    raise ArgumentError,
-          "domain/1 takes a function (a map) or a sequence (a list); #{inspect(other)} is " <>
-            "neither (02-dsl-semantics.md §1.6)."
-  end
+  defdelegate domain(f), to: TLA.Function
 
   # ── Arithmetic ──
 

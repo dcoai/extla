@@ -1152,3 +1152,78 @@ attribute, and the compile-time behaviour that makes the last row right is asser
 than described.
 
 See `05-layer3-conformance.md` §`mix tla.stamp`.
+
+---
+
+## D-38 — One implementation of each operator, behind one façade a spec body imports
+
+**Decided.** `TLA.Set` and `TLA.Function` hold the **only** implementation of every
+set-theoretic and function operator. `TLA.Spec.Helpers`, which `use TLA.Spec`
+imports into every spec body, delegates each one to them and implements none of them. It
+keeps its own thin covers over `MapSet` and `Enum` — `set/1`, `put/2`, `union/2`, `len/1`,
+`sum/1` and the rest — because those have no counterpart in the foundation.
+
+The consequence a user sees: **`01-foundation.md`'s vocabulary is callable unqualified from
+a spec body.** Before this, `powerset`, `cross`, `for_all?`, `exists?`, `range`,
+`function_set`, `record_set` and the rest needed a fully-qualified call, and exactly one
+spec in the repository made one.
+
+**Replaced:** two implementations of four operators, side by side, with nothing comparing
+them.
+
+**Why.** They had already drifted, and in the direction the project refuses everywhere
+else (#318):
+
+- `for_each/2` refused a list **by name**, because building a function over a *sequence*
+  deduplicated it silently — that is #211, fixed in one copy. `TLA.Function.construct/2`
+  still did exactly that: a three-element sequence became a two-element function.
+- `Helpers.domain/1` read a sequence as the function on `1..Len(s)` that `at/2` applies it
+  as. `TLA.Function.domain/1` was `Map.keys |> MapSet.new`, so a list raised `BadMapError`
+  — and a `MapSet`, which **is** a struct and therefore a map, was answered with the
+  struct's own field names. A wrong answer that looks like an answer is the failure D-20
+  exists to refuse, and it was sitting in the module `01-foundation.md` calls the
+  foundation.
+
+A test proving two implementations agree would have been the smaller change, and #318 wrote
+one. It is not enough on its own: it holds them in step without saying which is right, and
+the pair above disagreed about the case that matters most precisely because each had been
+edited alone.
+
+**Why a façade and not a second `import`.** #183 preferred importing `TLA.Set` and
+`TLA.Function` into the spec body directly. That is not available: `domain/1`, `choose/1`
+and `choose/2` exist on both sides, so a second import makes every shared name **ambiguous
+at its call site**, in every spec. The collision the proposal asked us to check is real —
+it is between the two modules, not with `Kernel`. Delegating through the module already
+imported gives the same reachability with no collision, and one place to document the
+vocabulary.
+
+**Four operators arrive under another name, and only four.** `for_each/2` and `update/3`
+are the DSL's own long-standing spellings of `construct/2` and `except_with/3`; renaming
+them would break every spec written so far to buy nothing. `set_map/2` and `set_filter/2`
+are `TLA.Set.map/2` and `filter/2`, because an unqualified `map/2` in a spec body reads as
+`Enum.map/2` to every Elixir programmer who opens the file, and a set operation that
+silently returns a different cardinality than its argument is the same defect class as
+#211.
+
+**Cost.** A delegation is a second name for one function, so a reader who greps for
+`powerset` finds two hits. Paid for by `defdelegate` being a compile-time check that the
+target exists — a renamed operator fails when ExTLA compiles rather than at a user's first
+call — and by the gate below, which reads the façade's own AST and fails if any operator is
+implemented there rather than delegated.
+
+**Revisit if:** the DSL gains a way to import a vocabulary without the flat-namespace
+collision, in which case the façade becomes a re-export list rather than a module of
+delegations. The decision that the foundation holds the implementation does not change.
+
+**Recorded and built 2026-09-25 (#319, for #183).**
+
+**Pinned by:** `test/tla/spec/operator_agreement_test.exs` — what a spec body can reach is
+derived from `lib/tla/spec.ex`'s own `__using__` imports; every operator the foundation
+exports must be reachable under its own name or a written-down alias; and
+`lib/tla/spec/helpers.ex`'s AST is read so that a name defined there with `def` rather than
+`defdelegate`, where the foundation defines one too, fails the build.
+`test/differential/set_vocabulary/` checks the vocabulary against TLC, used the way an
+author would use it.
+
+See `01-foundation.md` §The vocabulary a spec body reaches and
+`04-layer2-model-checker.md` §Helper Functions Available in DSL Blocks.

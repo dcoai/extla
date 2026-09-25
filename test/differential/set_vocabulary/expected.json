@@ -1,0 +1,18 @@
+{
+  "generated_by": "bin/tlc-expected",
+  "tla_tools_version": "v1.7.4",
+  "tlc_version": "2.19",
+  "module": "SetVocabulary",
+  "constants": {
+    "Nodes": "{n1, n2, n3}"
+  },
+  "distinct_states": 12,
+  "diameter": 5,
+  "deadlock": false,
+  "invariants": {
+    "TypeOK": "holds",
+    "CommittedNeedsQuorum": "holds",
+    "VotesMatchAcks": "holds"
+  },
+  "properties": {}
+}

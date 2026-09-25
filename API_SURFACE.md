@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 393 items** · functions 331 · arities 411 · types 62
+**59 modules · 405 items** · functions 343 · arities 423 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -113,8 +113,8 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `construct/2` | `:def` | (domain, mapping) | `4aa24c60` | `lib/tla/function.ex` |
-| `domain/1` | `:def` | (f) | `3af14bcf` | `lib/tla/function.ex` |
+| `construct/2` | `:def` | (domain, mapping) | `773b5f75` | `lib/tla/function.ex` |
+| `domain/1` | `:def` | (f) | `c639248d` | `lib/tla/function.ex` |
 | `except/2` | `:def` | (f, updates) | `fe27f97b` | `lib/tla/function.ex` |
 | `except_with/3` | `:def` | (f, key, update_fn) | `d1277250` | `lib/tla/function.ex` |
 | `function_set/2` | `:def` | (domain, range) | `e1c60c3d` | `lib/tla/function.ex` |
@@ -483,7 +483,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `module_version/2` | `:def` | (module) | `98b69862` | `lib/tla/spec/hash.ex` |
 | `scan/1` | `:def` | (source) | `208df4ef` | `lib/tla/spec/hash.ex` |
 | `scan/2` | `:def` | (source) | `208df4ef` | `lib/tla/spec/hash.ex` |
-## TLA.Spec.Helpers — 24 items
+## TLA.Spec.Helpers — 36 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
@@ -492,21 +492,33 @@ key whose value is a union of atoms; any other type is shown as written.
 | `at/3` | `:def` | (collection, key) | `f1a036b0` | `lib/tla/spec/helpers.ex` |
 | `choose/1` | `:defdelegate` | (set, predicate \\ …) | `d26ce1c9` | `lib/tla/spec/helpers.ex` |
 | `choose/2` | `:defdelegate` | (set, predicate \\ …) | `d26ce1c9` | `lib/tla/spec/helpers.ex` |
+| `cross/2` | `:defdelegate` | (s1, s2) | `3084d137` | `lib/tla/spec/helpers.ex` |
+| `cross_many/1` | `:defdelegate` | (sets) | `54c16473` | `lib/tla/spec/helpers.ex` |
 | `delete/2` | `:def` | (set, elem) | `508dd044` | `lib/tla/spec/helpers.ex` |
 | `difference/2` | `:def` | (a, b) | `a4db71cb` | `lib/tla/spec/helpers.ex` |
-| `domain/1` | `:def` | (map) | `60ce7059` | `lib/tla/spec/helpers.ex` |
-| `for_each/2` | `:def` | (domain, f) | `f859997b` | `lib/tla/spec/helpers.ex` |
+| `distributed_union/1` | `:defdelegate` | (set_of_sets) | `ee7af273` | `lib/tla/spec/helpers.ex` |
+| `domain/1` | `:defdelegate` | (f) | `3f9130a5` | `lib/tla/spec/helpers.ex` |
+| `except/2` | `:defdelegate` | (f, updates) | `99ad90bc` | `lib/tla/spec/helpers.ex` |
+| `exists?/2` | `:defdelegate` | (set, predicate) | `d30655fb` | `lib/tla/spec/helpers.ex` |
+| `for_all?/2` | `:defdelegate` | (set, predicate) | `6d0a17c4` | `lib/tla/spec/helpers.ex` |
+| `for_each/2` | `:defdelegate` | (domain, f) | `664adf82` | `lib/tla/spec/helpers.ex` |
+| `function_set/2` | `:defdelegate` | (domain, range) | `66ba65a6` | `lib/tla/spec/helpers.ex` |
 | `head/1` | `:def` | (seq) | `64dc817d` | `lib/tla/spec/helpers.ex` |
 | `intersection/2` | `:def` | (a, b) | `f795c591` | `lib/tla/spec/helpers.ex` |
 | `is_set/1` | `:def` | (term) | `2c448040` | `lib/tla/spec/helpers.ex` |
 | `keys/1` | `:def` | (map) | `deb362db` | `lib/tla/spec/helpers.ex` |
 | `len/1` | `:def` | (seq) | `8cb045f2` | `lib/tla/spec/helpers.ex` |
 | `member?/2` | `:def` | (set, elem) | `43f384e5` | `lib/tla/spec/helpers.ex` |
+| `powerset/1` | `:defdelegate` | (set) | `92c1b192` | `lib/tla/spec/helpers.ex` |
 | `put/2` | `:def` | (set, elem) | `f5eb2839` | `lib/tla/spec/helpers.ex` |
+| `range/2` | `:defdelegate` | (a, b) | `a6681c48` | `lib/tla/spec/helpers.ex` |
+| `record_set/1` | `:defdelegate` | (field_specs) | `1415b465` | `lib/tla/spec/helpers.ex` |
 | `seq/0` | `:def` | () | `1ccdff3c` | `lib/tla/spec/helpers.ex` |
 | `seq/1` | `:def` | () | `1ccdff3c` | `lib/tla/spec/helpers.ex` |
 | `set/0` | `:def` | () | `6260a6ad` | `lib/tla/spec/helpers.ex` |
 | `set/1` | `:def` | () | `6260a6ad` | `lib/tla/spec/helpers.ex` |
+| `set_filter/2` | `:defdelegate` | (set, predicate) | `1731ad3b` | `lib/tla/spec/helpers.ex` |
+| `set_map/2` | `:defdelegate` | (set, fun) | `3092dcdd` | `lib/tla/spec/helpers.ex` |
 | `size/1` | `:def` | (set) | `6c108407` | `lib/tla/spec/helpers.ex` |
 | `subseq/3` | `:def` | (seq, m, n) | `2e7ee656` | `lib/tla/spec/helpers.ex` |
 | `subset?/2` | `:def` | (a, b) | `a4f8df9e` | `lib/tla/spec/helpers.ex` |
@@ -514,7 +526,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `sum/2` | `:def` | (enum) | `b1b6c95e` | `lib/tla/spec/helpers.ex` |
 | `tail/1` | `:def` | (seq) | `52ad735c` | `lib/tla/spec/helpers.ex` |
 | `union/2` | `:def` | (a, b) | `d49d7130` | `lib/tla/spec/helpers.ex` |
-| `update/3` | `:def` | (map, key, f) | `ee95fd70` | `lib/tla/spec/helpers.ex` |
+| `update/3` | `:defdelegate` | (map, key, f) | `ec141e82` | `lib/tla/spec/helpers.ex` |
 | `values/1` | `:def` | (map) | `17f099f6` | `lib/tla/spec/helpers.ex` |
 ## TLA.Spec.Params — 1 items
 

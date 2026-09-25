@@ -278,6 +278,36 @@ answer lives.
 
 ---
 
+## The vocabulary a spec body reaches (D-38)
+
+`TLA.Set` and `TLA.Function` below are the foundation the rest of this document builds
+on, and **every operator in them is callable unqualified from inside an `action`, `init`,
+`invariant`, `terminal` or `action_property` block.** `use TLA.Spec` imports
+`TLA.Spec.Helpers`, which delegates each one of them to the module below; it holds no
+second implementation of any operator (D-38). Four arrive under another name, and only
+those four:
+
+| In a spec body | Here | Why the other name |
+|---|---|---|
+| `for_each/2` | `TLA.Function.construct/2` | the DSL's own spelling, from before this document |
+| `update/3` | `TLA.Function.except_with/3` | the DSL's own spelling |
+| `set_map/2` | `TLA.Set.map/2` | an unqualified `map/2` in a spec body reads as `Enum.map/2` |
+| `set_filter/2` | `TLA.Set.filter/2` | likewise `Enum.filter/2` |
+
+Until #319 only `choose/1,2` was reachable, and the four operators defined on both sides
+had drifted apart — `for_each/2` refused a sequence where `construct/2` deduplicated one,
+and `domain/1` read a sequence where `TLA.Function.domain/1` answered a set with the
+struct's own fields. #318 is the measurement, `test/tla/spec/operator_agreement_test.exs`
+the gate, and `test/differential/set_vocabulary/` a corpus entry that uses the vocabulary
+against TLC the way an author would.
+
+`TLA.Spec.Helpers` also defines a handful of names of its own — `set/1`, `put/2`,
+`union/2`, `len/1`, `sum/1` and the other thin covers over `MapSet` and `Enum`, sketched
+in `04-layer2-model-checker.md`. Those have no counterpart here, which is what makes them
+its own rather than a duplicate.
+
+---
+
 ## Module: `TLA.Set`
 
 Extended set operations matching TLA+ built-in set operators.
@@ -385,6 +415,12 @@ defmodule TLA.Function do
   @doc """
   Construct a function: [x ∈ S ↦ expr(x)]
   TLA+ equivalent: [x \\in S |-> expr]
+
+  S is a SET: a MapSet or a range. A list is a sequence -- a function on
+  1..Len(s) already -- and building a function over one deduplicated it
+  silently (#211); a map is a function already. Both are refused by name.
+  A spec body spells this operator for_each/2, which is the name the
+  message uses.
   """
   def construct(domain, mapping)
 
@@ -402,8 +438,15 @@ defmodule TLA.Function do
   def function_set(domain, range)
 
   @doc """
-  DOMAIN f — the domain of a function.
+  DOMAIN f — the domain of a function, as a set.
   TLA+ equivalent: DOMAIN f
+
+  A sequence is a function on 1..Len(s) -- that is how f[x] applies one --
+  so its domain is that range (#211). Anything else is refused by name.
+  This was Map.keys |> MapSet.new, which raised BadMapError on a sequence
+  and, because a MapSet is a struct and therefore a map, answered a SET
+  with the struct's own field names (#318): a wrong answer that looks like
+  an answer, which is the failure D-20 exists to refuse.
   """
   def domain(f)
 
