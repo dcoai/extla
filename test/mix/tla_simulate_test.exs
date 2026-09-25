@@ -159,4 +159,81 @@ defmodule Mix.Tasks.Tla.SimulateTest do
       end
     end
   end
+
+  # ── --against-graph ─────────────────────────────────────────────────────────
+
+  describe "--against-graph" do
+    @conforming "TLA.Conformance.Counter.Impl.Conforming"
+
+    test "runs the traces asked for and no others" do
+      {output, code} =
+        simulate([@conforming, "--traces", "4", "--steps", "6", "--seed", "9", "--against-graph"])
+
+      assert code == 0
+
+      # It used to run a SECOND suite of `--traces` simulations afterwards, so this said 4
+      # while 8 had run. One suite reports what it did (#180).
+      assert output =~ "4 traces"
+    end
+
+    # Defect 3's second half. `check_against_graph/2` wrote to the shell BEFORE the format
+    # dispatch and could exit before reaching it at all -- an unparseable file plus a
+    # discarded result. With the check inside the one suite there is no earlier writer.
+    test "and --format json emits only JSON" do
+      {output, code} =
+        simulate([
+          @conforming,
+          "--traces",
+          "3",
+          "--steps",
+          "6",
+          "--seed",
+          "9",
+          "--against-graph",
+          "--format",
+          "json"
+        ])
+
+      assert code == 0
+      assert {:ok, decoded} = Jason.decode(output)
+      assert decoded["status"] == "ok"
+      assert decoded["containment"] == nil
+
+      refute output =~ "against-graph:",
+             "the human line from the old second suite is back, before the JSON"
+    end
+
+    # The forwarding defect, at the CLI. `--unrestricted --against-graph` used to audit
+    # containment with the RESTRICTED generator, because the second suite forwarded two of
+    # the five options. There is one suite now, so the generator that runs is the one asked
+    # for -- and on this server the unrestricted generator finds `:not_enabled`, which is
+    # the evidence that it ran at all.
+    test "and --unrestricted beside it uses the unrestricted generator" do
+      {output, code} =
+        simulate([
+          @conforming,
+          "--traces",
+          "6",
+          "--steps",
+          "8",
+          "--seed",
+          "9",
+          "--unrestricted",
+          "--against-graph"
+        ])
+
+      assert code == 1
+      assert output =~ "CONFORMANCE VIOLATION: not_enabled"
+    end
+
+    # The same flags without `--unrestricted`: the restricted generator never offers a
+    # disabled action, so there is no finding. Without this pair, the test above would pass
+    # for a run that ignored `--unrestricted` and happened to fail for another reason.
+    test "and without it the restricted generator finds nothing" do
+      {_output, code} =
+        simulate([@conforming, "--traces", "6", "--steps", "8", "--seed", "9", "--against-graph"])
+
+      assert code == 0
+    end
+  end
 end

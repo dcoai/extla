@@ -35,16 +35,27 @@ defmodule Mix.Tasks.Tla.Simulate do
       --against-graph      Also require every observed state to be a node of the
                            model checker's graph and every step an edge. Off by
                            default: it needs a completed graph, which not every
-                           simulation target has, and it runs traces one at a
-                           time because containment is a question about each
-                           behaviour rather than about the verdict.
+                           simulation target has.
+
+                           The graph is built once and each behaviour is held
+                           against it AS THAT BEHAVIOUR FINISHES, so this runs
+                           the traces you asked for and no others, under the
+                           options you asked for. It used to run a second suite
+                           of `--traces` simulations afterwards that forwarded
+                           two of the five options (#180).
 
   ## Exit codes
 
       0  no finding in the traces that were run
-      1  a conformance violation — the counterexample is printed as a trace
+      1  a conformance violation — the counterexample is printed as a trace —
+         or, under `--against-graph`, a behaviour that left the checker's graph
       2  the server stopped or stopped answering, which is a finding of a different
          kind: nothing about conformance was decided after that point
+
+  The two findings behind `1` are named apart in the verdict line, and they are different
+  answers: a conformance violation is about the implementation, while leaving the graph may
+  be about the SEARCH — `TLA.Conformance`'s `:checker` class is the one finding no other
+  gate in the project can produce.
 
   A green run has checked the traces it drew and nothing else. The coverage line says
   which actions those were, and a run over a generator that never produced an action says
@@ -82,10 +93,6 @@ defmodule Mix.Tasks.Tla.Simulate do
 
     result = Simulation.run(module, config(module, opts))
 
-    if Keyword.get(opts, :against_graph, false) do
-      check_against_graph(module, opts)
-    end
-
     case Keyword.get(opts, :format, "human") do
       "json" -> IO.puts(encode(module, result))
       "human" -> report(module, result)
@@ -118,10 +125,16 @@ defmodule Mix.Tasks.Tla.Simulate do
   # checker's graph, and every step an edge. A step the SPEC permits that the graph lacks
   # is a defect in the search — the one finding no other gate here can produce.
   #
-  # Traces run one at a time under this flag, because `Simulation.run/2` returns a verdict
-  # and not the behaviours, and containment is a question about each behaviour. That is
-  # the cost of the flag, and it is why it is off by default.
-  defp check_against_graph(module, opts) do
+  # This builds the graph and hands it to `TLA.Simulation`, which holds each behaviour
+  # against it as that behaviour finishes. It used to run a SECOND suite of `traces`
+  # simulations afterwards, one at a time, forwarding two of the five options (#180) — so
+  # `--unrestricted --against-graph` audited containment with the RESTRICTED generator while
+  # printing that every state was a node and every step an edge, `--inject-failures` and
+  # `--concurrency` were dropped the same way, the two suites disagreed about the step
+  # default (25 and 20), and `--traces 10000` ran twenty thousand traces.
+  #
+  # One suite cannot diverge from itself, and the seeds it reports are the seeds it ran.
+  defp graph_for!(module, _opts) do
     spec_module = module.__tla_spec_module__()
     spec = TLA.Spec.Compiled.from_module(spec_module)
 
@@ -156,34 +169,7 @@ defmodule Mix.Tasks.Tla.Simulate do
       )
     end
 
-    traces = Keyword.get(opts, :traces, 100)
-    seed = Keyword.get(opts, :seed, :erlang.unique_integer([:positive]))
-
-    finding =
-      Enum.find_value(1..traces, fn i ->
-        {_result, behaviour} =
-          Simulation.run_trace(module, %{
-            max_steps: Keyword.get(opts, :steps, 20),
-            seed: seed + i
-          })
-
-        case TLA.Conformance.against_graph(graph, behaviour, status: result.status) do
-          :ok -> nil
-          found -> {i, found}
-        end
-      end)
-
-    case finding do
-      nil ->
-        Mix.shell().info(
-          "\nagainst-graph: #{traces} traces, every state a node and every step an edge."
-        )
-
-      {i, found} ->
-        Mix.shell().info("\nagainst-graph: trace #{i} (seed #{seed + i}) left the graph.\n")
-        Mix.shell().info(TLA.Conformance.explain(found))
-        exit({:shutdown, 1})
-    end
+    %{graph: graph, status: result.status}
   end
 
   defp config(module, opts) do
@@ -195,6 +181,17 @@ defmodule Mix.Tasks.Tla.Simulate do
     }
     |> put_seed(opts)
     |> put_generator(module, opts)
+    |> put_graph(module, opts)
+  end
+
+  # One config, built once. Every option a trace runs under is in it, so there is no second
+  # place for an option to be forgotten (#180).
+  defp put_graph(config, module, opts) do
+    if Keyword.get(opts, :against_graph, false) do
+      Map.put(config, :against_graph, graph_for!(module, opts))
+    else
+      config
+    end
   end
 
   defp put_seed(config, opts) do
@@ -255,6 +252,11 @@ defmodule Mix.Tasks.Tla.Simulate do
 
   defp verdict(%{status: :error}), do: "THE SERVER DID NOT ANSWER"
 
+  # Its own verdict, because it is a different question from conformance. The class is in
+  # `TLA.Conformance.explain/1`, which `detail` carries: `:checker` means the SEARCH missed
+  # a step the spec permits, and no other gate in the project can produce that.
+  defp verdict(%{status: :left_the_graph}), do: "LEFT THE CHECKER'S GRAPH"
+
   defp percent(fraction), do: "#{round(fraction * 100)}%"
 
   defp actions(hit) when hit == %{}, do: "none"
@@ -274,6 +276,11 @@ defmodule Mix.Tasks.Tla.Simulate do
         seed: result.seed,
         detail: result.detail,
         coverage: result.coverage,
+
+        # The class, not the whole finding: `TLA.Conformance`'s findings carry states, and
+        # a state is `TLA.State.Json`'s business rather than this task's. The class is what
+        # a reader acts on -- `:checker` says the SEARCH missed a step the spec permits.
+        containment: containment_class(result.containment),
         violation:
           result.violation &&
             %{
@@ -288,9 +295,24 @@ defmodule Mix.Tasks.Tla.Simulate do
     )
   end
 
+  # The class, not the whole finding: `TLA.Conformance`'s findings carry states, and a state
+  # is `TLA.State.Json`'s business rather than this task's. The class is what a reader acts
+  # on -- `:checker` says the SEARCH missed a step the spec permits.
+  #
+  # `:nothing_observed` is a bare atom rather than a tagged tuple, because it is a refusal
+  # and not a finding about a state (#187). Both shapes reach here.
+  defp containment_class(nil), do: nil
+  defp containment_class(class) when is_atom(class), do: class
+  defp containment_class({class, _detail}), do: class
+
   defp exit_with(%{status: :ok}), do: :ok
   defp exit_with(%{status: :violation}), do: exit({:shutdown, 1})
   defp exit_with(%{status: :error}), do: exit({:shutdown, 2})
+
+  # `1`, with a violation: both are findings the run made, and the verdict line says which.
+  # It was `1` before this became part of the one suite (#180), and nothing about what it
+  # means has changed.
+  defp exit_with(%{status: :left_the_graph}), do: exit({:shutdown, 1})
 
   @doc false
   # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented

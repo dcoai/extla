@@ -34,7 +34,7 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `run/1` | `:def` | (args) | `10fcf432` | `lib/mix/tasks/tla.simulate.ex` |
+| `run/1` | `:def` | (args) | `e2b64258` | `lib/mix/tasks/tla.simulate.ex` |
 | `switches/0` | `:def` | () | `db9269b8` | `lib/mix/tasks/tla.simulate.ex` |
 ## Mix.Tasks.Tla.Stamp — 8 items
 
@@ -364,11 +364,11 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `config()` | `:type` | traces?, max_steps?, message_generator?, inject_failures?, seed?, concurrency?, init_arg?, timeout? | `e1c03868` | `lib/tla/simulation.ex` |
+| `config()` | `:type` | traces?, max_steps?, message_generator?, inject_failures?, seed?, concurrency?, init_arg?, timeout?, against_graph? | `594305ca` | `lib/tla/simulation.ex` |
 | `coverage_report()` | `:type` | actions_hit, states_visited, invariants_checked, actions_covered | `0ebb20be` | `lib/tla/simulation.ex` |
 | `replay/2` | `:def` | (module, messages, config \\ …) | `46bdc611` | `lib/tla/simulation.ex` |
 | `replay/3` | `:def` | (module, messages, config \\ …) | `46bdc611` | `lib/tla/simulation.ex` |
-| `result()` | `:type` | status: :error \| :ok \| :violation, traces_run, total_steps, violation, detail, duration_ms, seed, restarts, coverage | `55a138c6` | `lib/tla/simulation.ex` |
+| `result()` | `:type` | status: :error \| :left_the_graph \| :ok \| :violation, traces_run, total_steps, violation, containment, detail, duration_ms, seed, restarts, coverage | `4f858caf` | `lib/tla/simulation.ex` |
 | `run/1` | `:def` | (module, config \\ …) | `0be816c4` | `lib/tla/simulation.ex` |
 | `run/2` | `:def` | (module, config \\ …) | `0be816c4` | `lib/tla/simulation.ex` |
 | `run_trace/1` | `:def` | (module, config \\ …) | `b9961ca6` | `lib/tla/simulation.ex` |

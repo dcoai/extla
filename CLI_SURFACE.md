@@ -106,7 +106,7 @@ tasks — are excluded from the package, so they have no specification section b
 | `--traces` | `:switch` | `:integer` | `lib/mix/tasks/tla.simulate.ex` |
 | `--unrestricted` | `:switch` | `:boolean` | `lib/mix/tasks/tla.simulate.ex` |
 | `exit 0` | `:exit` | no finding in the traces that were run | `lib/mix/tasks/tla.simulate.ex` |
-| `exit 1` | `:exit` | a conformance violation — the counterexample is printed as a trace | `lib/mix/tasks/tla.simulate.ex` |
+| `exit 1` | `:exit` | a conformance violation — the counterexample is printed as a trace — or, under `--against-graph`, a behaviour that left the checker's graph | `lib/mix/tasks/tla.simulate.ex` |
 | `exit 2` | `:exit` | the server stopped or stopped answering, which is a finding of a different kind: nothing about conformance was decided after that point | `lib/mix/tasks/tla.simulate.ex` |
 ## `mix tla.stamp` — specified in spec/05-layer3-conformance.md — 2 switches — 2 exit codes
 

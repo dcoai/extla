@@ -52,7 +52,18 @@ defmodule TLA.Simulation do
           optional(:seed) => integer() | nil,
           optional(:concurrency) => pos_integer(),
           optional(:init_arg) => term(),
-          optional(:timeout) => timeout()
+          optional(:timeout) => timeout(),
+
+          # The model checker's graph, to hold each behaviour against as it finishes:
+          # `%{graph: TLA.StateGraph.t(), status: atom()}`, or `nil` to skip the check.
+          #
+          # Given here rather than run as a second suite afterwards (#180). `mix tla.simulate
+          # --against-graph` used to run `traces` MORE simulations, one at a time, forwarding
+          # two of the five options -- so `--unrestricted --against-graph` audited containment
+          # with the RESTRICTED generator while printing that every state was a node, and the
+          # two suites disagreed about the step default and derived their seeds differently.
+          # One suite cannot diverge from itself.
+          optional(:against_graph) => %{graph: term(), status: atom()} | nil
         }
 
   @type coverage_report :: %{
@@ -63,10 +74,16 @@ defmodule TLA.Simulation do
         }
 
   @type result :: %{
-          status: :ok | :violation | :error,
+          status: :ok | :violation | :error | :left_the_graph,
           traces_run: non_neg_integer(),
           total_steps: non_neg_integer(),
           violation: Trace.t() | nil,
+
+          # What `TLA.Conformance.against_graph/3` found, where `against_graph:` was given
+          # and a behaviour left the graph. `nil` otherwise -- including where the option was
+          # not given at all, which is a different fact from "every behaviour was contained"
+          # and is why `status` carries the answer rather than this field's emptiness.
+          containment: TLA.Conformance.finding() | nil,
           detail: String.t() | nil,
           duration_ms: non_neg_integer(),
           seed: integer(),
@@ -80,7 +97,8 @@ defmodule TLA.Simulation do
     inject_failures: false,
     concurrency: 1,
     init_arg: [],
-    timeout: 5_000
+    timeout: 5_000,
+    against_graph: nil
   }
 
   @doc """
@@ -191,7 +209,10 @@ defmodule TLA.Simulation do
         state = %{empty_state() | server: server, states: [abstract(config, server)]}
         state = steps(state, module, config, messages)
         stop(state.server, config.timeout)
-        temporal(state, config)
+
+        state
+        |> temporal(config)
+        |> contained(config)
 
       # `init/1` is allowed to decline. That is not a `MatchError` on `{:ok, pid} =`; it is
       # an outcome, and one worth reporting by name, since a server that will not start
@@ -211,9 +232,35 @@ defmodule TLA.Simulation do
       restarts: 0,
       status: :ok,
       violation: nil,
+      containment: nil,
       detail: nil
     }
   end
+
+  # Cross-layer agreement (#49), asked of the behaviour this trace just produced rather than
+  # of one a second suite produced later (#180): every state the server visited must be a
+  # node of the checker's graph, and every step an edge. A step the SPEC permits that the
+  # graph lacks is a defect in the SEARCH -- the one finding no other gate can produce.
+  #
+  # After `temporal/2`, and only on a trace that is still `:ok`: a behaviour that already
+  # has a conformance finding is not also asked whether it stayed inside the graph, because
+  # the first answer is the one to act on.
+  defp contained(%{status: :ok} = state, %{against_graph: %{graph: graph, status: status}}) do
+    case TLA.Conformance.against_graph(graph, Enum.reverse(state.states), status: status) do
+      :ok ->
+        state
+
+      finding ->
+        %{
+          state
+          | status: :left_the_graph,
+            containment: finding,
+            detail: TLA.Conformance.explain(finding)
+        }
+    end
+  end
+
+  defp contained(state, _config), do: state
 
   defp steps(state, module, config, :generated) do
     Enum.reduce_while(1..config.max_steps, state, fn _step, state ->
@@ -462,6 +509,10 @@ defmodule TLA.Simulation do
       traces_run: length(outcomes),
       total_steps: Enum.sum(Enum.map(outcomes, & &1.steps)),
       violation: failed && failed.violation && trace_of(failed),
+
+      # A behaviour that left the graph produces a trace too, and it is worth as much as a
+      # conformance counterexample: it names the steps that got there.
+      containment: failed && failed.containment,
       detail: failed && failed.detail,
       duration_ms: duration_ms,
       seed: config.seed,

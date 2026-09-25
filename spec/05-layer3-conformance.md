@@ -639,17 +639,43 @@ defmodule TLA.Simulation do
     # How long a single delivery may take before the trace reports that the
     # server stopped answering, which is an `:error` outcome rather than a
     # conformance finding.
-    timeout: timeout()
+    timeout: timeout(),
+
+    # The model checker's graph, to hold each behaviour against AS IT FINISHES:
+    # `%{graph: TLA.StateGraph.t(), status: atom()}`, or nil to skip the check.
+    #
+    # Given here rather than audited by a second suite afterwards.
+    # `mix tla.simulate --against-graph` used to run `traces` MORE simulations,
+    # one at a time, forwarding two of the five options -- so
+    # `--unrestricted --against-graph` audited containment with the RESTRICTED
+    # generator while printing that every state was a node and every step an
+    # edge, and the two suites disagreed about the step default and derived
+    # their seeds differently. One suite cannot diverge from itself.
+    against_graph: %{graph: TLA.StateGraph.t(), status: atom()} | nil
   }
 
   @type result :: %{
     # `:error` is a third outcome: the server stopped, or stopped answering,
     # without a conformance finding. Nothing about conformance was decided after
     # that point, and reporting it as `:ok` would say the traces passed.
-    status: :ok | :violation | :error,
+    #
+    # `:left_the_graph` is a fourth, and only where `against_graph:` was given:
+    # a behaviour visited a state the checker's graph does not hold, or took a
+    # step it does not hold as an edge. It is NOT a conformance finding -- the
+    # implementation may have been right and the SEARCH wrong, which
+    # `TLA.Conformance`'s `:checker` class is for and which no other gate in
+    # the project can produce. Collapsing it into `:violation` would name the
+    # implementation for a defect that may be the checker's.
+    status: :ok | :violation | :error | :left_the_graph,
     traces_run: non_neg_integer(),
     total_steps: non_neg_integer(),
     violation: TLA.Trace.t() | nil,
+
+    # What `TLA.Conformance.against_graph/3` found, where a behaviour left the
+    # graph. `nil` otherwise -- INCLUDING where `against_graph:` was not given,
+    # which is a different fact from "every behaviour was contained", and is
+    # why `status` carries the answer rather than this field's emptiness.
+    containment: TLA.Conformance.finding() | nil,
     detail: String.t() | nil,
     duration_ms: non_neg_integer(),
 
