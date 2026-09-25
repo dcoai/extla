@@ -54,6 +54,16 @@ entries = [
     constants: %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2},
     names: %{}
   },
+  # The only entry whose subject is the VOCABULARY rather than an algorithm (#319, for
+  # #183). Every set-theoretic operator in it is called the way an author writes one --
+  # unqualified, in an action body -- so the oracle is what says `exists?(powerset(s), ...)`
+  # means `\E q \in SUBSET S : ...` and not merely that it returns something.
+  %{
+    name: "set_vocabulary",
+    module: TLA.Differential.SetVocabulary,
+    constants: %{nodes: MapSet.new([:n1, :n2, :n3])},
+    names: %{}
+  },
   %{
     name: "paxos",
     module: TLA.Differential.Paxos,

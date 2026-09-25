@@ -8,6 +8,13 @@ defmodule TLA.Function do
   `[f EXCEPT ![a] = v]` where `a ∉ DOMAIN f` is undefined in TLA+, and quietly
   extending the domain would produce a state that no reachable spec behavior can
   produce — while still being fingerprinted as if it were one.
+
+  This module holds the **only** implementation of each of these operators.
+  `TLA.Spec.Helpers`, which a spec body imports, delegates to it and defines
+  nothing of its own (D-38). Until #319 it carried a second copy, and the two had
+  already drifted: `construct/2` deduplicated a sequence where `for_each/2`
+  refused one, and `domain/1` answered a `MapSet` with the struct's own field
+  names. #318 has the measurement.
   """
 
   @doc """
@@ -15,8 +22,27 @@ defmodule TLA.Function do
 
       iex> TLA.Function.construct(MapSet.new([1, 2]), &(&1 * 10))
       %{1 => 10, 2 => 20}
+
+  `S` is a **set** — a `MapSet` or a range. A list is a *sequence*, which is a
+  function on `1..Len(s)` already, and building a function over one deduplicated
+  it silently (#211); a map is a function already. Both are refused by name, the
+  way `TLA.Spec.Helpers.at/2` refuses a term that is neither. A spec body spells
+  this operator `for_each/2`, which is the name the message uses.
   """
-  def construct(domain, mapping), do: Map.new(domain, &{&1, mapping.(&1)})
+  def construct(domain, mapping) when is_struct(domain, MapSet) or is_struct(domain, Range),
+    do: Map.new(domain, &{&1, mapping.(&1)})
+
+  def construct(other, _mapping) do
+    raise ArgumentError,
+          "for_each/2 builds a function over a set, and #{inspect(other)} is " <>
+            "#{describe_not_a_set(other)}. Pass a MapSet or a range (02-dsl-semantics.md §1.6)."
+  end
+
+  defp describe_not_a_set(list) when is_list(list),
+    do: "a sequence — a function on 1..Len already, whose elements Enum.map/2 can transform"
+
+  defp describe_not_a_set(map) when is_map(map), do: "a function already"
+  defp describe_not_a_set(_other), do: "neither a set nor a range"
 
   @doc """
   Function set: `[S → T]` — all total functions from `S` to `T`.
@@ -39,12 +65,30 @@ defmodule TLA.Function do
   end
 
   @doc """
-  `DOMAIN f` — the domain of a function.
+  `DOMAIN f` — the domain of a function, as a set.
 
       iex> TLA.Function.domain(%{a: 1, b: 2})
       MapSet.new([:a, :b])
+
+  A sequence is a function on `1..Len(s)` — that is what `TLA.Spec.Helpers.at/2`
+  applies it as — so its domain is that range (#211):
+
+      iex> TLA.Function.domain([:x, :y, :z])
+      MapSet.new([1, 2, 3])
+
+  Anything else is refused by name. This was `Map.keys |> MapSet.new`, which
+  raised `BadMapError` on a sequence and — because a `MapSet` is a struct and
+  therefore a map — answered a **set** with the struct's own field names (#318).
+  A wrong answer that looks like an answer is the failure D-20 exists to refuse.
   """
-  def domain(f), do: f |> Map.keys() |> MapSet.new()
+  def domain(f) when is_map(f) and not is_struct(f), do: MapSet.new(Map.keys(f))
+  def domain(seq) when is_list(seq), do: MapSet.new(1..length(seq)//1)
+
+  def domain(other) do
+    raise ArgumentError,
+          "domain/1 takes a function (a map) or a sequence (a list); #{inspect(other)} is " <>
+            "neither (02-dsl-semantics.md §1.6)."
+  end
 
   @doc """
   `EXCEPT` — update a function at specific points:

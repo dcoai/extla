@@ -97,7 +97,7 @@ defmodule TLA.Differential.Paxos do
     let promises = set(Enum.filter(msgs, &(&1.type == :phase_1b and &1.bal == b)))
 
     require Enum.any?(^quorums, fn q ->
-              Enum.any?(TLA.Set.powerset(promises), fn s ->
+              Enum.any?(powerset(promises), fn s ->
                 Enum.all?(q, fn a -> Enum.any?(s, &(&1.acc == a)) end) and
                   (Enum.all?(s, &(&1.mbal == -1)) or
                      Enum.any?(0..(b - 1)//1, fn c ->

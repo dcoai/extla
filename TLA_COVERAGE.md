@@ -32,9 +32,9 @@ No durations, dates, seeds or machine names appear here. A golden is a stable fu
 source; anything varying independently makes it drift against itself on a quiet day.
 
 
-**33 specs · 139 items** · model_checked 92 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 43
+**34 specs · 143 items** · model_checked 96 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 43
 
-**freshness** · fresh 5 · stale 0 · unstamped 134
+**freshness** · fresh 5 · stale 0 · unstamped 138
 
 ## TLA.Conformance.Counter.BuggySpec — 3 items · gap 0 · LOWER BOUNDS (violation)
 
@@ -113,7 +113,7 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `consistency` | `:invariant` | `256af28b` | `:model_checked` | `:unstamped` | not measured | `test/differential/paxos/spec.ex` |
 | `phase_1a` | `:action` | `8ca12cf2` | `:model_checked` | `:unstamped` | enabled in 3921 | `test/differential/paxos/spec.ex` |
 | `phase_1b` | `:action` | `c46a8abd` | `:model_checked` | `:unstamped` | enabled in 1718 | `test/differential/paxos/spec.ex` |
-| `phase_2a` | `:action` | `14495168` | `:model_checked` | `:unstamped` | enabled in 568 | `test/differential/paxos/spec.ex` |
+| `phase_2a` | `:action` | `a9a1ebd5` | `:model_checked` | `:unstamped` | enabled in 568 | `test/differential/paxos/spec.ex` |
 | `phase_2b` | `:action` | `5d6caaf9` | `:model_checked` | `:unstamped` | enabled in 3776 | `test/differential/paxos/spec.ex` |
 ## TLA.Differential.RaftElection — 9 items · gap 0
 
@@ -128,6 +128,14 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `term_bound_exhausted` | `:terminal` | `bbdd1986` | `:model_checked` | `:unstamped` | admitted 655 end states | `test/differential/raft_election/spec.ex` |
 | `timeout` | `:action` | `f79da27f` | `:model_checked` | `:unstamped` | enabled in 7613 | `test/differential/raft_election/spec.ex` |
 | `vote_integrity` | `:invariant` | `c128cefa` | `:model_checked` | `:unstamped` | not measured | `test/differential/raft_election/spec.ex` |
+## TLA.Differential.SetVocabulary — 4 items · gap 0
+
+| Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
+|---|---|---|---|---|---|---|
+| `ack` | `:action` | `b4f0dc1c` | `:model_checked` | `:unstamped` | enabled in 10 | `test/differential/set_vocabulary/spec.ex` |
+| `commit` | `:action` | `32f1fa76` | `:model_checked` | `:unstamped` | enabled in 8 | `test/differential/set_vocabulary/spec.ex` |
+| `committed_needs_quorum` | `:invariant` | `035637ee` | `:model_checked` | `:unstamped` | 4 near-miss | `test/differential/set_vocabulary/spec.ex` |
+| `votes_match_acks` | `:invariant` | `17cf3431` | `:model_checked` | `:unstamped` | not measured | `test/differential/set_vocabulary/spec.ex` |
 ## TLA.Differential.TwoPhaseCommit — 8 items · gap 0
 
 | Item | Kind | Version | Evidence | Fresh | Exercised | Locus |

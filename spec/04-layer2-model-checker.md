@@ -213,6 +213,15 @@ with defined semantics, added to `02-dsl-semantics.md` first.
 defmodule TLA.Spec.Helpers do
   @moduledoc """
   Functions available inside `action`, `init`, and `invariant` blocks.
+  `TLA.Spec.__using__/1` imports this module whole, so this list IS a spec
+  body's vocabulary.
+
+  Two kinds of name live here (D-38). The thin wrappers below are one-line
+  covers over MapSet and Enum, defined here because they have no counterpart
+  in the foundation. Everything under "Delegated to the foundation" is a
+  defdelegate to TLA.Set or TLA.Function: this module holds no second
+  implementation of any operator. Until #319 it held four, and two had
+  already drifted from their counterparts (#318).
   """
 
   # ── Set Operations ──
@@ -250,15 +259,35 @@ defmodule TLA.Spec.Helpers do
   def subseq(seq, m, n)
 
   # ── Function (Map) Operations ──
+  def values(map), do: Map.values(map)
+  def keys(map), do: Map.keys(map)
+
+  # ── Delegated to the foundation (D-38) ──
+  #
+  # One implementation of each operator, and it is 01-foundation.md's. These
+  # heads exist so that 01's vocabulary is reachable from a spec body without
+  # a fully-qualified call; four of them carry the DSL's own spelling rather
+  # than the foundation's, and 01 says which.
+  defdelegate powerset(set), to: TLA.Set
+  defdelegate cross(s1, s2), to: TLA.Set
+  defdelegate cross_many(sets), to: TLA.Set
+  defdelegate distributed_union(set_of_sets), to: TLA.Set
+  defdelegate set_map(set, fun), to: TLA.Set, as: :map
+  defdelegate set_filter(set, predicate), to: TLA.Set, as: :filter
+  defdelegate for_all?(set, predicate), to: TLA.Set
+  defdelegate exists?(set, predicate), to: TLA.Set
+  defdelegate range(a, b), to: TLA.Set
+
   # [x \in S |-> f(x)]: S is a set (a MapSet) or a range. A list is a sequence
   # -- a function on 1..Len already -- and is refused by name rather than
   # deduplicated; a map is a function already.
-  def for_each(domain, f)
-  def update(map, key, f), do: Map.update!(map, key, f)
-  def values(map), do: Map.values(map)
-  def keys(map), do: Map.keys(map)
+  defdelegate for_each(domain, f), to: TLA.Function, as: :construct
+  defdelegate update(map, key, f), to: TLA.Function, as: :except_with
+  defdelegate except(f, updates), to: TLA.Function
+  defdelegate function_set(domain, range), to: TLA.Function
+  defdelegate record_set(field_specs), to: TLA.Function
   # DOMAIN f. A sequence's domain is 1..Len, which is how `f[x]` applies one.
-  def domain(map_or_seq)
+  defdelegate domain(f), to: TLA.Function
 
   # ── Arithmetic ──
   def sum(enum), do: Enum.sum(enum)
@@ -276,7 +305,7 @@ defmodule TLA.Spec.Helpers do
   named for and cannot be implemented: a function returning one element
   cannot produce several successors.
   """
-  def choose(set, predicate \\ fn _ -> true end)
+  defdelegate choose(set, predicate \\ fn _ -> true end), to: TLA.Set
 end
 ```
 
