@@ -49,6 +49,7 @@ defmodule TLA.Simulation do
           optional(:message_generator) => (TLA.State.t() ->
                                              term() | {atom(), map(), term()} | nil),
           optional(:inject_failures) => boolean(),
+          optional(:failure_rate) => float(),
           optional(:seed) => integer() | nil,
           optional(:concurrency) => pos_integer(),
           optional(:init_arg) => term(),
@@ -95,6 +96,11 @@ defmodule TLA.Simulation do
     traces: 100,
     max_steps: 25,
     inject_failures: false,
+    # One step in ten crashes the server, where `inject_failures:` is on. It was written
+    # into `maybe_restart/3` as a literal with no way to reach it (#317), which made the
+    # one number that decides how much of a simulation is recovery the one number a caller
+    # could not set. The default is unchanged.
+    failure_rate: 0.1,
     concurrency: 1,
     init_arg: [],
     timeout: 5_000,
@@ -334,7 +340,7 @@ defmodule TLA.Simulation do
   # in a state its own specification forbids is a finding whatever the spec says about
   # crashing.
   defp maybe_restart(state, module, config) do
-    if config.inject_failures and :rand.uniform() < 0.1 do
+    if config.inject_failures and :rand.uniform() < config.failure_rate do
       # A crash, and a crash runs no `terminate/2`: `:kill` is the point here (#213).
       Process.exit(state.server, :kill)
       restart(state, module, config)

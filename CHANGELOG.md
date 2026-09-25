@@ -16,6 +16,36 @@ release it merely follows.
 
 ### Changed
 
+- **The four declaration kinds agree about a non-boolean, the wrapper stops warning in the
+  user's module, and the formatter covers the repository** (#317, closes #182).
+  02-dsl-semantics.md §4.2 says "a boolean expression" for invariants, action properties,
+  preconditions and postconditions, and notes no difference between them — but the invariant
+  path read the value with `unless` while the condition paths matched `true` and `false`
+  exactly. So a precondition returning `nil` (a `Map.get/2` on a key that is not there is the
+  ordinary way to get one) **killed the server with a `CaseClauseError`** naming a generated
+  function, where the same `nil` from an invariant was reported as a violation of the
+  declaration the user wrote. The `:verbose` paths diverged a third way, treating a *truthy*
+  non-boolean as a violation — so telemetry could change a verdict. All six check paths now
+  share one reading, and it is Elixir's own truthiness. Separately, the wrapper bound
+  `tla_new_state` unconditionally, so a module carrying **only preconditions** got
+  `warning: variable "tla_new_state" is unused` about code it did not write and paid an
+  extraction call per transition against the zero-cost principle; the binding is now guarded
+  on whether anything downstream reads it, and
+  `test/tla/declaration_shapes_test.exs` compiles **all sixteen** declaration combinations,
+  because the defect lived in exactly one of them and a test of one combination is what let
+  it. `.formatter.exs` covered `{bench,config,lib,test}` while `bin/`, `ledger/` and
+  `scripts/` held real Elixir — the CHANGELOG guard, the surface-drift ledger and its six Mix
+  tasks — and one of those files was **unformatted while the `format` job passed**; the
+  inputs are widened and `test/docs/formatter_inputs_test.exs` holds them to the set
+  `git ls-files` reports. Dead code goes with it: `TLA.Config.max_states/0`, which nothing
+  read and which duplicated `TLA.ModelChecker`'s own default (two copies of one number is the
+  defect class, so it is deleted rather than synchronised — and `spec/01-foundation.md` says
+  why); `TLA.Profile.calibration_samples/0`, a published function with no caller and no test;
+  and an unreachable third clause of the private `from_init/3` in `TLA.Trace`. The
+  ten-percent failure-injection probability was a literal inside the injector with no way to
+  reach it, and is now `failure_rate:`, defaulting to `0.1` and pinned by agreement against
+  an explicit `0.1` under a fixed seed.
+
 - **A run releases what it allocated: the graph's ETS tables, and the replay's server**
   (#316, for #182). An ETS table is owned by a *process* and is not reachable from a term, so
   discarding a `TLA.StateGraph` freed nothing. `TLA.ModelChecker.run/2` discards the graph and

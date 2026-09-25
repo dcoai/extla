@@ -27,16 +27,19 @@ defmodule TLA.ConfigTest do
     end
   end
 
-  describe "max_states/0" do
-    test "defaults to one million" do
-      assert TLA.Config.max_states() == 1_000_000
-    end
+  describe "max_states" do
+    # `TLA.Config.max_states/0` was deleted at #317. It answered a number nothing read —
+    # `TLA.ModelChecker` carries its own `max_states: 1_000_000` and every caller goes
+    # through that — so the repository held two copies of one number, one of them dead.
+    # This is what remains of its two tests: the one fact worth pinning is that the number
+    # now lives in exactly one place.
+    test "is the checker's own default, and only the checker's" do
+      refute function_exported?(TLA.Config, :max_states, 0)
 
-    test "reads application config" do
-      Application.put_env(:extla, :max_states, 42)
-      on_exit(fn -> Application.delete_env(:extla, :max_states) end)
+      assert TLA.ModelChecker.run(TLA.TestSpecs.Cube, %{max_states: 1}).status ==
+               :max_states_reached
 
-      assert TLA.Config.max_states() == 42
+      refute TLA.ModelChecker.run(TLA.TestSpecs.Cube, %{}).status == :max_states_reached
     end
   end
 

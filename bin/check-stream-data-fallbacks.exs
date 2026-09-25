@@ -43,7 +43,8 @@ defmodule Check do
     checks = [
       {"name itself", String.contains?(message, label)},
       {"name the dependency", String.contains?(message, "stream_data")},
-      {"give the dep line", String.contains?(message, ~s({:stream_data, "~> 1.0", only: [:dev, :test]}))}
+      {"give the dep line",
+       String.contains?(message, ~s({:stream_data, "~> 1.0", only: [:dev, :test]}))}
     ]
 
     case for({what, false} <- checks, do: what) do
@@ -51,7 +52,9 @@ defmodule Check do
         IO.puts("  ok  #{label}")
 
       missing ->
-        die("#{label} raised, but its message does not #{Enum.join(missing, ", nor ")}:\n    #{message}")
+        die(
+          "#{label} raised, but its message does not #{Enum.join(missing, ", nor ")}:\n    #{message}"
+        )
     end
   end
 

@@ -119,6 +119,36 @@ defmodule TLA.ConformanceSimulationTest do
       assert result.status == :ok
       assert result.restarts > 0
     end
+
+    # The rate was `:rand.uniform() < 0.1` in the injector, with no way to reach it (#317).
+    # It decides how much of a simulation is recovery rather than progress, which is a
+    # question about what is being tested and so belongs to the caller.
+    #
+    # The default is pinned by agreement rather than by reading it: the same seed makes the
+    # run deterministic, so `inject_failures: true` alone must produce exactly what
+    # `failure_rate: 0.1` produces — and must NOT produce what another rate does, or the
+    # first assertion would hold whatever the default was.
+    test "at a rate the caller can set, defaulting to one step in ten" do
+      config = %{traces: 5, max_steps: 20, seed: 317, inject_failures: true}
+      default = Simulation.run(Impl.Conforming, config)
+
+      assert default.restarts == restarts(config, 0.1)
+      refute default.restarts == restarts(config, 1.0)
+
+      assert restarts(config, 0.0) == 0
+      assert restarts(config, 1.0) > restarts(config, 0.1)
+    end
+
+    test "and a rate of zero is not the same as not injecting at all — it is the same result" do
+      config = %{traces: 5, max_steps: 20, seed: 317}
+
+      assert restarts(Map.put(config, :inject_failures, true), 0.0) ==
+               Simulation.run(Impl.Conforming, config).restarts
+    end
+  end
+
+  defp restarts(config, rate) do
+    Simulation.run(Impl.Conforming, Map.put(config, :failure_rate, rate)).restarts
   end
 
   # #206. Each server was started linked, unlinked at once, and stopped only on the normal

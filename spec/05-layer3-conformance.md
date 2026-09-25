@@ -626,6 +626,12 @@ defmodule TLA.Simulation do
     # Whether to inject failures (kill/restart processes)
     inject_failures: boolean(),
 
+    # How often one is injected, where `inject_failures:` is on: the probability
+    # that a given step crashes the server first. Default 0.1. It decides how
+    # much of a simulation is recovery rather than progress, so it is a setting
+    # and not a constant in the injector.
+    failure_rate: float(),
+
     # Random seed for reproducibility
     seed: integer() | nil,
 

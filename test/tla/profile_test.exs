@@ -632,6 +632,23 @@ defmodule TLA.ProfileTest do
       assert Profile.calibrate()[2] <= 3
       assert Profile.calibrate()[3] <= 3
     end
+
+    # `calibrate/0` carries a comment saying it is public so a test can assert the constant
+    # is stable — the two tests above are that test. `calibration_samples/0` stood beside it
+    # with no such claim, no caller anywhere, and no assertion: a published function whose
+    # only effect was a row in `API_SURFACE.md`. #317 deleted it rather than inventing a use.
+    test "and the accessor nothing called is gone, with nothing left calling it" do
+      refute function_exported?(Profile, :calibration_samples, 0)
+
+      # This file names it in the assertion itself, so it is the one exclusion.
+      callers =
+        for path <- Path.wildcard("{lib,test,bench,ledger,bin,scripts}/**/*.{ex,exs}"),
+            Path.expand(path) != __ENV__.file,
+            File.read!(path) =~ "calibration_samples(",
+            do: path
+
+      assert callers == []
+    end
   end
 
   describe "the rendered report" do

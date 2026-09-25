@@ -419,12 +419,12 @@ defmodule TLA.Profile do
   # whole subtraction rests on. Not part of the API.
   def calibrate, do: %{2 => read_cost(&noop2/0, &noop2x2/0), 3 => read_cost(&noop3/0, &noop3x2/0)}
 
-  @doc false
-  def calibration_samples,
-    do: %{
-      two: {floor_of(&noop2/0), floor_of(&noop2x2/0)},
-      three: {floor_of(&noop3/0), floor_of(&noop3x2/0)}
-    }
+  # `calibration_samples/0` stood here, returning the four raw floors behind `calibrate/0`.
+  # Nothing called it and nothing asserted on it, in `lib/`, `test/` or `bench/` — so it was
+  # a published function whose only effect was to appear in `API_SURFACE.md` (#317). The
+  # property it would have supported is the one `calibrate/0` is public FOR, and that one is
+  # tested: `TLA.ProfileTest` §calibration asserts the constant is stable across five calls
+  # and bounded, which is what the subtraction in `finalize/2` rests on.
 
   defp read_cost(once, twice), do: max(2 * floor_of(once) - floor_of(twice), 0)
 

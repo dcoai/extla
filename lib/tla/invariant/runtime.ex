@@ -35,7 +35,7 @@ defmodule TLA.Invariant.Runtime do
   """
   def check_invariants!(module, names, state) do
     Enum.each(names, fn name ->
-      unless module.__tla_invariant__(name, state) do
+      unless_ok(module.__tla_invariant__(name, state), fn ->
         report(module, %Violation{
           type: :invariant,
           name: name,
@@ -43,7 +43,7 @@ defmodule TLA.Invariant.Runtime do
           message: module.__tla_describe__(:invariant, name),
           state: state
         })
-      end
+      end)
     end)
   end
 
@@ -71,7 +71,7 @@ defmodule TLA.Invariant.Runtime do
   """
   def check_action_properties!(module, names, old_state, new_state) do
     Enum.each(names, fn name ->
-      unless module.__tla_action_property__(name, old_state, new_state) do
+      unless_ok(module.__tla_action_property__(name, old_state, new_state), fn ->
         report(module, %Violation{
           type: :action_property,
           name: name,
@@ -80,7 +80,7 @@ defmodule TLA.Invariant.Runtime do
           state: new_state,
           old_state: old_state
         })
-      end
+      end)
     end)
   end
 
@@ -118,18 +118,17 @@ defmodule TLA.Invariant.Runtime do
         :no_match ->
           :ok
 
-        true ->
-          :ok
-
-        false ->
-          report(module, %Violation{
-            type: :precondition,
-            name: callback,
-            module: module,
-            message: description,
-            state: state,
-            args: message
-          })
+        held ->
+          unless_ok(held, fn ->
+            report(module, %Violation{
+              type: :precondition,
+              name: callback,
+              module: module,
+              message: description,
+              state: state,
+              args: message
+            })
+          end)
       end
     end)
   end
@@ -148,18 +147,20 @@ defmodule TLA.Invariant.Runtime do
       case measured(:precondition, module, callback, fn ->
              module.__tla_precondition__(index, message, state)
            end) do
-        false ->
-          report(module, %Violation{
-            type: :precondition,
-            name: callback,
-            module: module,
-            message: description,
-            state: state,
-            args: message
-          })
-
-        _matched_or_not ->
+        :no_match ->
           :ok
+
+        held ->
+          unless_ok(held, fn ->
+            report(module, %Violation{
+              type: :precondition,
+              name: callback,
+              module: module,
+              message: description,
+              state: state,
+              args: message
+            })
+          end)
       end
     end)
   end
@@ -173,19 +174,18 @@ defmodule TLA.Invariant.Runtime do
         :no_match ->
           :ok
 
-        true ->
-          :ok
-
-        false ->
-          report(module, %Violation{
-            type: :postcondition,
-            name: callback,
-            module: module,
-            message: description,
-            state: new_state,
-            old_state: old_state,
-            args: message
-          })
+        held ->
+          unless_ok(held, fn ->
+            report(module, %Violation{
+              type: :postcondition,
+              name: callback,
+              module: module,
+              message: description,
+              state: new_state,
+              old_state: old_state,
+              args: message
+            })
+          end)
       end
     end)
   end
@@ -199,19 +199,21 @@ defmodule TLA.Invariant.Runtime do
       case measured(:postcondition, module, callback, fn ->
              module.__tla_postcondition__(index, message, old_state, new_state)
            end) do
-        false ->
-          report(module, %Violation{
-            type: :postcondition,
-            name: callback,
-            module: module,
-            message: description,
-            state: new_state,
-            old_state: old_state,
-            args: message
-          })
-
-        _matched_or_not ->
+        :no_match ->
           :ok
+
+        held ->
+          unless_ok(held, fn ->
+            report(module, %Violation{
+              type: :postcondition,
+              name: callback,
+              module: module,
+              message: description,
+              state: new_state,
+              old_state: old_state,
+              args: message
+            })
+          end)
       end
     end)
   end
@@ -415,8 +417,27 @@ defmodule TLA.Invariant.Runtime do
     end
   end
 
-  defp unless_ok(true, _report), do: :ok
-  defp unless_ok(_held, report), do: report.()
+  # One reading of a predicate's result, shared by all six check paths (#317).
+  #
+  # **Elixir's own truthiness**, which is what the INVARIANT path always did (`unless`). The
+  # condition paths matched `true` and `false` exactly, so a precondition returning `nil` —
+  # `Map.get/2` on a key that is not there is the ordinary way to get one — killed the server
+  # with a `CaseClauseError` naming a generated function, while the same `nil` returned by an
+  # invariant was reported as a violation of the declaration the user wrote. The
+  # specification says "a boolean expression" for both and notes no difference between them
+  # (02-dsl-semantics.md §4.2), so this was one path diverging from the other silently
+  # rather than a documented choice.
+  #
+  # The `:verbose` paths diverged a second way, in the opposite direction: this used to
+  # report unless the value was exactly `true`, so a truthy non-boolean held under the
+  # default and was a violation under `config :extla, telemetry: :verbose`. Telemetry may
+  # not change a verdict.
+  #
+  # `:no_match` never reaches here. It is the generated clause's way of saying "this
+  # declaration is not about this message", which only preconditions and postconditions can
+  # produce, and their callers answer it before asking this — so a predicate that genuinely
+  # returns the atom `:no_match` is still read as truthy rather than as a non-answer.
+  defp unless_ok(held, report), do: if(held, do: :ok, else: report.())
 
   defp report(module, violation) do
     emit([:extla, violation.type, :violated], %{
