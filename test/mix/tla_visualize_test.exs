@@ -42,6 +42,24 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     end
   end
 
+  # The refusal goes to stderr, where an error belongs, so the stdout helper above cannot
+  # see it. Returns what was written there, with the exit code.
+  defp visualize_err(args) do
+    parent = self()
+
+    stderr =
+      capture_io(:stderr, fn ->
+        {_out, code} = visualize(args)
+        send(parent, {:exit_code, code})
+      end)
+
+    receive do
+      {:exit_code, code} -> {stderr, code}
+    after
+      0 -> flunk("the task neither exited nor returned")
+    end
+  end
+
   describe "rendering" do
     test "writes DOT to stdout, and exits 0" do
       {output, code} = visualize(["TLA.TestSpecs.WithDefaults"])
@@ -121,14 +139,28 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
       end
     end
 
-    test "a graph past --max-states, naming the count it really has" do
-      error =
-        assert_raise Mix.Error, fn ->
-          visualize(["TLA.TestSpecs.WithDefaults", "--max-states", "1"])
-        end
+    # This asserted `"4 states"` until #312 — the count of the whole state space, which the
+    # task could only know because it searched the whole thing in order to draw none of it.
+    # `--max-states` bounds the search now, so the number in the message is where the search
+    # stopped and the message says so instead of offering it as a census.
+    test "a graph past --max-states, which says the count is not a census" do
+      {stderr, code} = visualize_err(["TLA.TestSpecs.WithDefaults", "--max-states", "1"])
 
-      assert Exception.message(error) =~ "4 states"
-      assert Exception.message(error) =~ "the limit is 1"
+      assert code == 2, "a graph too big to draw is not exit 1; that means a violation"
+      assert stderr =~ "the limit is 1"
+      assert stderr =~ "MORE THAN 1"
+      assert stderr =~ "not a census"
+    end
+
+    # The other side of it: a search that finished under the limit knows exactly how many
+    # states there are, and the refusal cannot fire at all — so nothing is ever drawn from a
+    # search that stopped early.
+    test "and a spec that fits is drawn in full, with no note" do
+      {output, code} = visualize(["TLA.TestSpecs.WithDefaults", "--max-states", "50"])
+
+      assert code == 0
+      assert output =~ "digraph"
+      refute output =~ "MORE THAN"
     end
 
     test "a module that is not a spec" do
@@ -152,6 +184,48 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
       message = Exception.message(error)
       assert message =~ "no assignment for :max"
       assert message =~ "config :extla"
+    end
+  end
+
+  # ── the flag reaches the search ─────────────────────────────────────────────
+
+  describe "--max-states bounds the search, not only the rendering" do
+    # The defect, in the form that makes it measurable rather than inferred. `Cube` has 8
+    # states; bounded at 3 the search must stop having seen fewer than all of them, which
+    # `TLA.ModelChecker` reports as `:max_states_reached`. Before #312 the flag was read
+    # AFTER `explore/2` and the search ran to the checker's million-state default.
+    test "so a bounded run stops rather than exploring past the limit" do
+      {result, graph} = bounded(TLA.TestSpecs.Cube, 3)
+
+      assert result.status == :max_states_reached
+      assert graph.state_count < 8
+    end
+
+    test "and an unbounded run over the same spec finds all eight" do
+      {result, graph} = bounded(TLA.TestSpecs.Cube, 50)
+
+      assert result.status == :ok
+      assert graph.state_count == 8
+    end
+
+    # The two together are the whole claim: the flag changes what the SEARCH does, and the
+    # count in the refusal is therefore a fact about the search rather than about the spec.
+    # Asserted through the task, so it is the task's config that is under test.
+    test "and the task refuses without ever drawing a truncated graph" do
+      {stderr, code} = visualize_err(["TLA.TestSpecs.Cube", "--max-states", "3"])
+
+      assert code == 2
+      refute stderr =~ "digraph"
+      assert stderr =~ "MORE THAN 3"
+    end
+
+    defp bounded(module, max_states) do
+      TLA.ModelChecker.explore(module, %{
+        constants: %{},
+        liveness_graph: true,
+        check_deadlock: false,
+        max_states: max_states
+      })
     end
   end
 end

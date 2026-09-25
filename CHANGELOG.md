@@ -150,6 +150,35 @@ release it merely follows.
 
 ### Fixed
 
+- **`mix tla.visualize --max-states` bounds the search, and a partial picture is never drawn**
+  (#312, for #180). The flag was read **after** `explore/2` and gated rendering only, so the
+  search ran to the checker's own million-state default — exploring up to a million states in
+  order to draw none of them, and, where that default was *reached*, drawing a truncated
+  graph with **no note and exit 0**, as though it were the whole state space.
+
+  It bounds the search now, and means here what it means in `mix tla.check`: **how many
+  states to explore**, and therefore at most how many to draw. That removes the truncated
+  render by construction rather than by adding a note — past the limit there is nothing to
+  draw, so a graph that *is* drawn is one the search finished.
+
+  **The refusal exits 2**, not `Mix.raise`'s 1. `1` here already means "the spec has a
+  violation", and a graph too big to draw is not a finding about the spec; `2` is
+  `mix tla.check`'s code for a run that did not see the whole state space, which is exactly
+  what this is.
+
+  **The cost is stated rather than hidden.** The moduledoc promised the refusal "names the
+  real count", and a bounded search cannot know it — so the message says **more than N**.
+  That promise was already unkeepable: the number it printed on a truncated run was the
+  truncated one. Measured, including the overshoot the message must not present as a census:
+
+      limit=500      status=:max_states_reached  states=502   refuses
+      limit=1000000  status=:ok                  states=1000  refuses
+
+  Both rows refuse, which is why the truncated-render case disappears. The existing test
+  asserted `"4 states"` — the size of the whole state space, knowable only because the task
+  searched all of it to draw none of it — and now asserts that the number is not offered as
+  a census.
+
 - **`mix tla.stamp --restamp` handles two stale mappings in one file, and reports a mapping
   it cannot read rather than dropping it** (#310, for #173).
 

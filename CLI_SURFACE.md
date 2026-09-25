@@ -10,7 +10,7 @@ no section says so instead of going unlisted — the list of tasks is the direct
 hand-kept set. Tasks outside `lib/` — this project's ledger tooling and its test-support
 tasks — are excluded from the package, so they have no specification section by design.
 
-**13 tasks · 44 switches** · shipped 6 · specified 6 · exit codes 17
+**13 tasks · 44 switches** · shipped 6 · specified 6 · exit codes 18
 
 ## `mix tla.api_surface` — ledger tooling, not packaged — 2 switches — NO EXIT-CODE TABLE
 
@@ -116,7 +116,7 @@ tasks — are excluded from the package, so they have no specification section b
 | `--restamp` | `:switch` | `:boolean` | `lib/mix/tasks/tla.stamp.ex` |
 | `exit 0` | `:exit` | every stamp is verified by something, or `--check` was not given | `lib/mix/tasks/tla.stamp.ex` |
 | `exit 1` | `:exit` | with `--check`: a stamp is stale, or its spec's source is not on disk, so nothing verifies it. Without `--check` the report is a report | `lib/mix/tasks/tla.stamp.ex` |
-## `mix tla.visualize` — specified in spec/05-layer3-conformance.md — 3 switches — 2 exit codes
+## `mix tla.visualize` — specified in spec/05-layer3-conformance.md — 3 switches — 3 exit codes
 
 | Item | Kind | Detail | Locus |
 |---|---|---|---|
@@ -125,3 +125,4 @@ tasks — are excluded from the package, so they have no specification section b
 | `--output` | `:switch` | `:string` | `lib/mix/tasks/tla.visualize.ex` |
 | `exit 0` | `:exit` | the graph was written | `lib/mix/tasks/tla.visualize.ex` |
 | `exit 1` | `:exit` | the spec has a violation; the graph was still written, with the counterexample emphasised, and it covers only what the search reached | `lib/mix/tasks/tla.visualize.ex` |
+| `exit 2` | `:exit` | more states than `--max-states`, so nothing was drawn | `lib/mix/tasks/tla.visualize.ex` |
