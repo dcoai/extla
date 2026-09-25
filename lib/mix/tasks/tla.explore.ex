@@ -176,22 +176,21 @@ defmodule Mix.Tasks.Tla.Explore do
   # the state and is the normal case: the trace is being explored *because* something in it is
   # wrong, so `TLA.Trace.explore/3` reports it in the cell at the state it happened in.
   #
-  # A **compile** error — a misspelled variable, a function that does not exist — does not
-  # depend on the state at all, so leaving it to the table means the same typo reported once
-  # per state, in cells reading `cannot compile file (errors have been logged)`, with the
-  # message that would have helped logged separately to stderr. So it is caught here, once,
-  # against one state, and raised with the diagnostic and the names actually in scope.
-  # `Code.with_diagnostics/1` is what keeps that message rather than letting the compiler
-  # print it past the table.
+  # A **deterministic** error — a misspelled variable, a remote call to a function that does
+  # not exist — does not depend on the state at all, so leaving it to the table means the same
+  # typo reported once per state, in cells reading `cannot compile file (errors have been
+  # logged)`, with the message that would have helped logged separately to stderr. So it is
+  # caught here, once, against one state, and raised with the diagnostic and the names actually
+  # in scope. `Code.with_diagnostics/1` is what keeps that message rather than letting the
+  # compiler print it past the table.
+  #
+  # `UndefinedFunctionError` is in that second class and used to be left to the first: a
+  # `CompileError` was refused once and `Enum.no_such_thing(count)` — the comment above says a
+  # function that does not exist is exactly what the probe is for — filled a cell per state
+  # anyway, because an undefined REMOTE call is a runtime error and only an undefined LOCAL one
+  # is a compile error (#315).
   defp compiles!(evaluator, text, state) do
-    {outcome, diagnostics} =
-      Code.with_diagnostics(fn ->
-        try do
-          {:ok, evaluator.(state)}
-        rescue
-          error -> {:raised, error}
-        end
-      end)
+    {outcome, diagnostics} = Code.with_diagnostics(fn -> attempt(evaluator, state) end)
 
     case outcome do
       {:raised, %CompileError{}} ->
@@ -200,13 +199,44 @@ defmodule Mix.Tasks.Tla.Explore do
 
         #{diagnostics |> Enum.map_join("\n", &("    " <> &1.message)) |> String.trim_trailing()}
 
-        In scope: #{state |> Map.keys() |> Enum.sort() |> Enum.map_join(", ", &to_string/1)}, \
-        and `state`, the whole map.\
+        In scope: #{in_scope(state)}, and `state`, the whole map.\
         """)
 
-      _runtime_or_fine ->
+      {:raised, %UndefinedFunctionError{} = error} ->
+        Mix.raise("""
+        --expr #{inspect(text)} calls a function that does not exist:
+
+        #{indent(Exception.message(error))}
+
+        That does not depend on the state, so it is refused once rather than reported in \
+        every cell.
+
+        In scope: #{in_scope(state)}, and `state`, the whole map.\
+        """)
+
+      _state_dependent_or_fine ->
         :ok
     end
+  end
+
+  defp in_scope(state),
+    do: state |> Map.keys() |> Enum.sort() |> Enum.map_join(", ", &to_string/1)
+
+  defp indent(message),
+    do:
+      message
+      |> String.split("\n")
+      |> Enum.map_join("\n", &("    " <> &1))
+      |> String.trim_trailing()
+
+  # PERMITTED RESCUE. Scoped to the one call it wraps, and it decides nothing: it hands the
+  # exception back as data so `compiles!/3` can sort the deterministic failures from the
+  # state-dependent ones. A state-dependent one is returned to the caller untouched and is
+  # raised again, at its own state, by `TLA.Trace.explore/3`.
+  defp attempt(evaluator, state) do
+    {:ok, evaluator.(state)}
+  rescue
+    error -> {:raised, error}
   end
 
   @doc false

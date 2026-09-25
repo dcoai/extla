@@ -84,6 +84,32 @@ defmodule TLA.Conformance.Counter.Mutants do
     def abstract_action(:reset), do: {:reset, %{}}
   end
 
+  defmodule PartialHelper do
+    @moduledoc """
+    Total — it *has* the catch-all — but the helper that catch-all calls is not. Not a
+    mutant of the mapping so much as a mutant of the diagnosis: the totality probe used to
+    be scoped to the whole of the private `total!/1` in `TLA.Refinement`, so a
+    `FunctionClauseError` from anywhere beneath it came back as "`abstract_action/1` is not
+    total; add `def abstract_action(_), do: :unmapped`" — advice to add a clause this
+    mapping already has, about a partial helper the message never named (#315).
+    """
+    use TLA.Refinement
+
+    def abstract(%{value: v, status: s}), do: %{count: v, status: s}
+
+    def abstract_action(:increment), do: {:increment, %{}}
+    def abstract_action(:done), do: {:done, %{}}
+    def abstract_action(:reset), do: {:reset, %{}}
+    def abstract_action(other), do: classify(other)
+
+    def concrete_message(:increment, _params), do: :increment
+    def concrete_message(:done, _params), do: :done
+    def concrete_message(:reset, _params), do: :reset
+
+    # The fault: no clause for anything else, the probe included.
+    defp classify(:ignored), do: :unmapped
+  end
+
   defmodule WrongWayRound do
     @moduledoc """
     `concrete_message/2` and `abstract_action/1` disagree: the message for `increment`
