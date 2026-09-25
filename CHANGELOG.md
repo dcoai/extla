@@ -30,6 +30,41 @@ release it merely follows.
 
 ### Added
 
+- **`mix tla.stamp --check` exits 1 on a stamp nothing verifies — and there is deliberately
+  no CI job for it** (#311, closes #173). The task exited 0 whatever it found, so it could
+  never gate, while its own documentation calls a stale stamp a compile error and the task
+  "part of the layer's surface, not a convenience".
+
+  `--check` asks one question of each mapping: **is this stamp verified by something?**
+
+  | status | verified by | `--check` |
+  |---|---|---|
+  | `:fresh` | this task | 0 |
+  | `:stale` | this task — and it is **wrong** | **1** |
+  | `:unstamped` | nothing to verify; the mechanism is opt-in | 0 |
+  | `:unverifiable`, spec source not on disk | nothing | **1** |
+  | `:unverifiable`, `spec:` not a literal alias | **the compiler** | 0 |
+
+  **The last row is the finding, and it reverses what #173 assumed.** A `spec:` given as
+  `@an_attribute` cannot be resolved by a task that reads source without compiling — but
+  `use TLA.GenServer` has the attribute's *value* at expansion, so the compile-time check
+  verifies that stamp completely. Measured: `attribute spec, stale stamp:
+  {:raised, TLA.Spec.CompileError}`. Failing a build on it would be a false finding about a
+  mapping that is fully checked, and a false finding is how a check gets turned off.
+
+  **No CI job**, which is the other half of the answer #173 expected a yes to. A stale stamp
+  is *already* a compile error and a spec with no source on disk *already* emits a compile
+  warning, so on any project compiling with `--warnings-as-errors` both arrive from the
+  `compile` job, earlier and with a better message. A job here would be a second way to
+  learn the same thing and a second place to keep in step.
+
+  So the flag serves the workflow the compiler **cannot**: the project does not compile, and
+  a script wants the list of mappings to re-read rather than one error at a time — which is
+  the situation this task reads source for. It is a flag and not the default because a
+  *report* that exits non-zero by default breaks every script that runs it for the numbers.
+
+  D-37 records all of it; `CLI_SURFACE.md` loses its "NO EXIT-CODE TABLE" note.
+
 - **`mix tla.stamp` is exercised end to end, over a tree with all four statuses** (#308, for
   #173). It is the only code in the project that rewrites files under `lib/`, and it was the
   least covered thing in it: **replacing `run/1`'s entire body with a raise left the full

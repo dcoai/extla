@@ -10,7 +10,7 @@ no section says so instead of going unlisted — the list of tasks is the direct
 hand-kept set. Tasks outside `lib/` — this project's ledger tooling and its test-support
 tasks — are excluded from the package, so they have no specification section by design.
 
-**13 tasks · 43 switches** · shipped 6 · specified 6 · exit codes 15
+**13 tasks · 44 switches** · shipped 6 · specified 6 · exit codes 17
 
 ## `mix tla.api_surface` — ledger tooling, not packaged — 2 switches — NO EXIT-CODE TABLE
 
@@ -108,11 +108,14 @@ tasks — are excluded from the package, so they have no specification section b
 | `exit 0` | `:exit` | no finding in the traces that were run | `lib/mix/tasks/tla.simulate.ex` |
 | `exit 1` | `:exit` | a conformance violation — the counterexample is printed as a trace | `lib/mix/tasks/tla.simulate.ex` |
 | `exit 2` | `:exit` | the server stopped or stopped answering, which is a finding of a different kind: nothing about conformance was decided after that point | `lib/mix/tasks/tla.simulate.ex` |
-## `mix tla.stamp` — specified in spec/05-layer3-conformance.md — 1 switches — NO EXIT-CODE TABLE
+## `mix tla.stamp` — specified in spec/05-layer3-conformance.md — 2 switches — 2 exit codes
 
 | Item | Kind | Detail | Locus |
 |---|---|---|---|
+| `--check` | `:switch` | `:boolean` | `lib/mix/tasks/tla.stamp.ex` |
 | `--restamp` | `:switch` | `:boolean` | `lib/mix/tasks/tla.stamp.ex` |
+| `exit 0` | `:exit` | every stamp is verified by something, or `--check` was not given | `lib/mix/tasks/tla.stamp.ex` |
+| `exit 1` | `:exit` | with `--check`: a stamp is stale, or its spec's source is not on disk, so nothing verifies it. Without `--check` the report is a report | `lib/mix/tasks/tla.stamp.ex` |
 ## `mix tla.visualize` — specified in spec/05-layer3-conformance.md — 3 switches — 2 exit codes
 
 | Item | Kind | Detail | Locus |

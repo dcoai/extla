@@ -5,6 +5,7 @@ defmodule Mix.Tasks.Tla.Stamp do
   Report the state of every `spec_version:` stamp, and update the stale ones.
 
       mix tla.stamp             # report every mapping's stamp
+      mix tla.stamp --check     # report, and exit 1 if a stamp is unverified
       mix tla.stamp --restamp   # rewrite stale stamps in source
 
   ## It reads source, and that is not an implementation detail
@@ -25,13 +26,55 @@ defmodule Mix.Tasks.Tla.Stamp do
   than no stamp, because it manufactures assurance.
 
   Run it after the review, never instead of it.
+
+  ## What `--check` fails on, and why it is not a CI job
+
+  One question: **is this stamp verified by something?**
+
+      :fresh                              yes, by this task
+      :stale                              no -- it is checked, and it is WRONG
+      :unstamped                          there is no stamp; the mechanism is opt-in
+      :unverifiable, spec not on disk     no. Nothing verifies it
+      :unverifiable, spec: not an alias   yes, by the COMPILER
+
+  `--check` exits **1** on the two that answer no, and 0 on the rest.
+
+  The last row is the one worth stating, because it looks like a finding and is not. A
+  `spec:` given as `@an_attribute` cannot be resolved by a task that reads source without
+  compiling — but `use TLA.GenServer` has the attribute's *value* at expansion, so the
+  compile-time check verifies that stamp completely. Measured: a mapping with an attribute
+  `spec:` and a wrong stamp raises `TLA.Spec.CompileError` exactly as a literal one does.
+  Failing a build on it would be a false finding about a mapping that is fully checked.
+
+  **And there is deliberately no CI job for this task.** A stale stamp is already a compile
+  error, and a spec whose source is not on disk already emits a compile warning — so on any
+  project whose CI compiles with `--warnings-as-errors`, both failures arrive from the
+  `compile` job, earlier and with better messages. A job here would add a second way to
+  learn the same thing and two places to keep in step (D-37).
+
+  `--check` is for the workflow the compiler cannot serve: the project **does not compile**,
+  and a script wants the list of mappings to re-read rather than one error at a time. That
+  is the situation this task was built for, and the exit code is what lets a script act on
+  it.
+
+  ## Exit codes
+
+      0  every stamp is verified by something, or `--check` was not given
+      1  with `--check`: a stamp is stale, or its spec's source is not on disk,
+         so nothing verifies it. Without `--check` the report is a report
   """
 
   use Mix.Task
 
   alias TLA.Spec.Hash
 
-  @switches [restamp: :boolean]
+  @switches [check: :boolean, restamp: :boolean]
+
+  # A stamp that is wrong, or that nothing verifies. See the moduledoc; D-37 has the
+  # reasoning, including why `:unstamped` and an attribute `spec:` are not here.
+  defp unverified?(%{status: :stale}), do: true
+  defp unverified?(%{status: :unverifiable, reason: :spec_source_not_found}), do: true
+  defp unverified?(_state), do: false
 
   @impl Mix.Task
   def run(argv), do: run(argv, roots())
@@ -46,7 +89,27 @@ defmodule Mix.Tasks.Tla.Stamp do
     {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
     stamps = states(roots)
 
-    if opts[:restamp], do: restamp(stamps), else: report(stamps)
+    if opts[:restamp] do
+      restamp(stamps)
+    else
+      report(stamps)
+      if opts[:check], do: check(stamps), else: :ok
+    end
+  end
+
+  defp check(stamps) do
+    case Enum.filter(stamps, &unverified?/1) do
+      [] ->
+        :ok
+
+      unverified ->
+        Mix.shell().info(
+          "\n#{length(unverified)} stamp(s) are not verified by anything: " <>
+            "#{unverified |> Enum.map_join(", ", &inspect(&1.module))}."
+        )
+
+        exit({:shutdown, 1})
+    end
   end
 
   @doc """
