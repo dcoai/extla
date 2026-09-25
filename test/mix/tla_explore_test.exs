@@ -59,6 +59,8 @@ defmodule Mix.Tasks.Tla.ExploreTest do
   defp message({:error, {%Mix.Error{message: message}, _stacktrace}}), do: message
   defp message(other), do: flunk("expected a Mix.raise, got: #{inspect(other)}")
 
+  defp occurrences(text, needle), do: length(String.split(text, needle)) - 1
+
   describe "the round trip" do
     test "explores what mix tla.check --format json wrote, without re-running the checker",
          %{tmp: tmp} do
@@ -177,6 +179,34 @@ defmodule Mix.Tasks.Tla.ExploreTest do
       assert message =~ ~s(--expr "vlaue" does not compile)
       assert message =~ "undefined variable"
       assert message =~ "In scope: count, status"
+    end
+
+    # An undefined REMOTE call is a runtime error, not a compile error, so it used to slip
+    # past the probe above and be reported once per state — the very outcome the probe's own
+    # comment says it exists to prevent (#315). "Once" is the claim, so it is counted.
+    test "a call to a function that does not exist is refused once, not once per state",
+         %{path: path} do
+      expression = "boom: Enum.no_such_thing(count)"
+      {output, code} = task(Explore, [@spec_module, "--trace", path, "--expr", expression])
+
+      message = message(code)
+      assert message =~ ~s(--expr #{inspect(expression)} calls a function that does not exist)
+      assert message =~ "Enum.no_such_thing/1 is undefined or private"
+      assert message =~ "In scope: count, status"
+
+      assert occurrences(output <> message, "is undefined or private") == 1
+      refute output =~ "⚠"
+    end
+
+    # And the narrowing did not swallow the case the per-state table exists for: an error
+    # that depends on the state still fills cells rather than ending the run.
+    test "an error that depends on the state still fills cells after the narrowing",
+         %{path: path} do
+      {output, code} =
+        task(Explore, [@spec_module, "--trace", path, "--expr", "bad: count.missing"])
+
+      assert code == 0
+      assert occurrences(output, "expected a map") > 1
     end
 
     test "several expressions in one flag are refused", %{path: path} do

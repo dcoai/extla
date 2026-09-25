@@ -267,29 +267,51 @@ defmodule TLA.Refinement do
   @probe {:__tla_refinement_probe__, :no_clause_should_match_this}
 
   defp total!(refinement) do
-    case refinement.abstract_action(@probe) do
-      :unmapped ->
+    case probe(refinement) do
+      {:ok, :unmapped} ->
         :ok
 
-      other ->
+      :no_clause ->
+        raise Error,
+          message:
+            "#{inspect(refinement)}.abstract_action/1 is not total: it raised on a " <>
+              "term it had no clause for. Add `def abstract_action(_), do: " <>
+              ":unmapped`. Without it the first unanticipated message crashes inside " <>
+              "a callback wrapper instead of being reported as a message the spec " <>
+              "does not model."
+
+      {:ok, other} ->
         raise Error,
           message:
             "#{inspect(refinement)}.abstract_action/1 mapped a probe term to " <>
               "#{inspect(other)}. A catch-all clause must return `:unmapped`, which is " <>
               "the claim that the message does not move the abstract state."
     end
+  end
+
+  # PERMITTED RESCUE. Scoped to the probed call, and to the one failure the probe asks
+  # about: a `FunctionClauseError` whose TOP stack frame is this mapping's own
+  # `abstract_action/1`, called with the probe itself. Anything else leaves by `reraise`,
+  # which is indistinguishable from never having caught it.
+  #
+  # It used to be scoped to `total!/1` instead, so a `FunctionClauseError` raised by ANY
+  # helper the mapping's catch-all calls came back as "your mapping has no catch-all" —
+  # advice to add a clause the user had already added, about a partial helper the message
+  # never named (#315). The stack frame is what tells the two apart, and `rescue` cannot
+  # pattern-match on one, so the discrimination is a `case` over `__STACKTRACE__`.
+  #
+  # A monitored probe process was considered and rejected: a crashing process emits an
+  # error report of its own, so the mapping's clearest diagnostic would arrive underneath
+  # a crash dump about the probe.
+  defp probe(refinement) do
+    {:ok, refinement.abstract_action(@probe)}
   rescue
-    FunctionClauseError ->
-      reraise Error,
-              [
-                message:
-                  "#{inspect(refinement)}.abstract_action/1 is not total: it raised on a " <>
-                    "term it had no clause for. Add `def abstract_action(_), do: " <>
-                    ":unmapped`. Without it the first unanticipated message crashes inside " <>
-                    "a callback wrapper instead of being reported as a message the spec " <>
-                    "does not model."
-              ],
-              __STACKTRACE__
+    error in FunctionClauseError ->
+      case __STACKTRACE__ do
+        [{^refinement, :abstract_action, [@probe], _location} | _rest] -> :no_clause
+        [{^refinement, :abstract_action, 1, _location} | _rest] -> :no_clause
+        _raised_elsewhere -> reraise error, __STACKTRACE__
+      end
   end
 
   # The route a delivery names is not part of the message, so it is stripped before the

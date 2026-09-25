@@ -42,6 +42,7 @@ say which.
 | `MissingVariable` | maps `count`, forgets `status` | `abstract!/3`, at runtime | `missing: [:status]` |
 | `ExtraVariable` | maps a key the spec never declared | `abstract!/3`, at runtime | `extra: [:max]` |
 | `NotTotal` | no catch-all `abstract_action/1` clause | `validate!/3`, by probe | "is not total" |
+| `PartialHelper` | has the catch-all; the helper it calls is partial | `validate!/3`, by probe | the helper's own `FunctionClauseError`, *not* "is not total" |
 | `WrongWayRound` | `concrete_message/2` and `abstract_action/1` do not compose | `validate!/3` | "does not round-trip increment" |
 | `ActionNeverNamed` | no message produces `reset` | `validate!/3` | "names no message for [:reset]" |
 | `NoAbstractAction` | not a refinement mapping at all | `validate!/3` | "does not define abstract_action/1" |

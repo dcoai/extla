@@ -119,10 +119,14 @@ defmodule TLA.Trace.Explore do
     {rows, Enum.reverse(warnings)}
   end
 
-  # The rescue is scoped to this one call and turns the exception into an attributed
-  # message, which is the same shape the three other rescues in the project take
-  # (`mix/tasks/tla.check.ex`, `refinement.ex`, `spec/dsl.ex`). A `throw` or an `exit` is
-  # left alone: neither is something a predicate over a state does on purpose.
+  # PERMITTED RESCUE. Scoped to this one call over a user-supplied lambda, and the exception
+  # is data ABOUT THE USER'S EXPRESSION rather than about the library: it is preserved whole,
+  # attributed to the state it happened at, and surfaced as a marked cell plus a warning. The
+  # expression that blew up is usually the one asserting the very invariant this
+  # counterexample violates, so raising here would lose the table the user asked for. A
+  # `throw` or an `exit` is left alone: neither is something a predicate over a state does on
+  # purpose. Reviewed and kept at #315; the inventory gate in
+  # `test/docs/rescue_inventory_test.exs` names it.
   defp evaluate_at(fun, state) do
     {:ok, fun.(state)}
   rescue

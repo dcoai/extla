@@ -65,6 +65,21 @@ defmodule TLA.ConformanceTest do
       assert Exception.message(error) =~ "def abstract_action(_), do: :unmapped"
     end
 
+    # The complement of the one above, and the reason the probe's rescue was narrowed
+    # (#315). The probe was scoped to the whole of `total!/1`, so a `FunctionClauseError`
+    # from any helper beneath it was read as the mapping's own missing catch-all — the one
+    # thing this mapping demonstrably does not lack. It now leaves by `reraise`, naming the
+    # helper, which is where the bug actually is.
+    test "a mapping whose own helper is partial is reported as that, not as a missing catch-all" do
+      error =
+        assert_raise FunctionClauseError, fn ->
+          R.validate!(Mutants.PartialHelper, Spec, @constants)
+        end
+
+      assert Exception.message(error) =~ "Mutants.PartialHelper.classify/1"
+      refute Exception.message(error) =~ "is not total"
+    end
+
     test "a mapping whose two directions disagree is caught by the round trip" do
       error =
         assert_raise R.Error, fn -> R.validate!(Mutants.WrongWayRound, Spec, @constants) end

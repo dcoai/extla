@@ -108,11 +108,30 @@ defmodule Mix.Tasks.Tla.Check do
   defp check(module, opts) do
     spec = Spec.Compiled.from_module(module)
     config = config(spec, opts)
-    result = ModelChecker.run(spec, config)
-    warnings = result.warnings ++ symmetry_note(spec, config) ++ workers_note(spec, config)
-    {module, %{result | warnings: warnings}}
+
+    case run(spec, config) do
+      {:ok, result} ->
+        warnings = result.warnings ++ symmetry_note(spec, config) ++ workers_note(spec, config)
+        {module, %{result | warnings: warnings}}
+
+      {:unsound_symmetry, error} ->
+        {module, {:unsound_symmetry, error}}
+    end
+  end
+
+  # PERMITTED RESCUE. Scoped to the one call that raises it and to the one exception it
+  # raises: `--verify-symmetry` reports its verdict by raising, and a task reports by exit
+  # code, so exactly one exception is converted into exactly one status that `report/1`,
+  # `result_json/1` and `exit_with/2` all already carry. Nothing is swallowed — the
+  # message travels with the status and is printed.
+  #
+  # It used to sit on `check/2`, whose body also builds the config and the warnings, so a
+  # second future raise site inside any of those would have been silently reclassified as
+  # an unsound symmetry declaration (#315). This body is the one call.
+  defp run(spec, config) do
+    {:ok, ModelChecker.run(spec, config)}
   rescue
-    error in TLA.Symmetry.UnsoundError -> {module, {:unsound_symmetry, error}}
+    error in TLA.Symmetry.UnsoundError -> {:unsound_symmetry, error}
   end
 
   defp config(spec, opts) do

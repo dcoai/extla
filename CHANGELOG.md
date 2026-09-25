@@ -16,6 +16,27 @@ release it merely follows.
 
 ### Changed
 
+- **The four `rescue` sites in `lib/` are reviewed one at a time, and the two that hid a
+  failure are narrowed** (#315, for #182). CLAUDE.md forbids `try/catch/rescue`, but a count
+  is the wrong reading of the rule: a rescue scoped to a *function* rather than a *call*
+  reports any failure underneath it as the one it was written for, which is not a swallowed
+  error but a **confident wrong diagnosis**. `TLA.Refinement`'s totality probe was scoped to
+  the whole of its enclosing function, so a `FunctionClauseError` raised by a *helper* the
+  mapping's catch-all called came back as "`abstract_action/1` is not total — add
+  `def abstract_action(_), do: :unmapped`", advice to add a clause the mapping already had,
+  about a partial helper the message never named. It now reads one stack frame to tell the
+  probed call's own failure from any other and re-raises every other untouched. `mix
+  tla.explore` refused an undefined *local* name once and let an undefined *remote* call —
+  `Enum.no_such_thing(count)` — fill a cell per state, the exact outcome the probe's own
+  comment says it exists to prevent; a deterministic failure is now refused once, like a
+  `CompileError`. The two that stay stay for a stated reason — for both, the exception is
+  data about the **user's own input**, so a blanket removal would have made the trace
+  explorer worse than it was — and `mix tla.check`'s is scoped to the single call that
+  raises rather than to a body that also builds the config. `test/docs/rescue_inventory_test.exs`
+  is the recurrence guard: it names every permitted site, requires a `# PERMITTED RESCUE`
+  comment beside each, and fails a rescue that covers more than one call — which is the
+  defect itself, gated rather than remembered.
+
 - **The decision log is reopened, and every decision is pinned to a test** (#275, for #176).
   `spec/08-decisions.md`'s last edit was 2026-08-31; **fifteen decisions were made in the
   three weeks after it**, in commit messages and moduledocs where nobody looking for the
