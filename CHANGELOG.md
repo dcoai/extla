@@ -150,6 +150,38 @@ release it merely follows.
 
 ### Fixed
 
+- **`--against-graph` is one suite, under the options it was given** (#313, for #180). It
+  ran the full simulation and then **another `--traces` simulations**, one at a time — so
+  `mix tla.simulate X --traces 10000 --against-graph` ran twenty thousand traces.
+
+  Worse than the cost: the second suite forwarded **two of the five** options. So
+  `--unrestricted --against-graph` audited containment with the **restricted** generator
+  while printing that every state was a node and every step an edge; `--inject-failures` and
+  `--concurrency` were dropped the same way; the two suites disagreed about the step default
+  (25 and 20); and their seeds were derived differently, so *"trace 7 (seed 8)"* named a
+  trace the reported seed does not produce at index 7.
+
+  **The graph is built once and handed to `TLA.Simulation` as `against_graph:`**, which
+  holds each behaviour against it as that behaviour finishes — beside the temporal check,
+  which is the other per-trace question. That is the proposal's second option, and it is the
+  larger change it predicted: forwarding, the step default and the seed derivation are not
+  three fixes but one, because **one suite cannot diverge from itself**.
+
+  Leaving the graph is its own outcome, `:left_the_graph`, and **not** a conformance
+  violation: the implementation may have been right and the *search* wrong, which
+  `TLA.Conformance`'s `:checker` class is for and which no other gate in the project can
+  produce. Collapsing it into `:violation` would name the implementation for a defect that
+  may be the checker's.
+
+  It also settles defect 3's second half at no extra cost: the old check wrote to the shell
+  **before** the format dispatch and could exit before reaching it, so `--format json`
+  produced an unparseable file and a discarded result. With the check inside the one suite
+  there is no earlier writer, and the finding's class travels in the JSON.
+
+  The tests assert on the **config a trace runs under**, never on the report — the old
+  second suite printed "every state a node and every step an edge" while using the wrong
+  generator, so the output was exactly what could not be trusted.
+
 - **`mix tla.visualize --max-states` bounds the search, and a partial picture is never drawn**
   (#312, for #180). The flag was read **after** `explore/2` and gated rendering only, so the
   search ran to the checker's own million-state default — exploring up to a million states in
