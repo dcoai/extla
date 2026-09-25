@@ -140,7 +140,7 @@ defmodule Mix.Tasks.Tla.Check do
       profile: Keyword.get(opts, :profile, false)
     }
     |> maybe_put(:max_states, opts[:max_states])
-    |> maybe_put(:fingerprint_bits, opts[:fingerprint_bits])
+    |> maybe_put(:fingerprint_bits, fingerprint_bits(opts))
     |> maybe_symmetry(symmetry, Keyword.get(opts, :verify_symmetry, false))
   end
 
@@ -150,6 +150,30 @@ defmodule Mix.Tasks.Tla.Check do
     case Keyword.get(opts, :workers, 1) do
       n when is_integer(n) and n > 0 -> n
       n -> Mix.raise("--workers must be a positive integer, got: #{inspect(n)}")
+    end
+  end
+
+  # The same treatment, for the same reason (#180). `--fingerprint-bits 7` was passed
+  # through and raised an `ArgumentError` from inside `TLA.Fingerprint`, MID-SEARCH, with a
+  # stack trace through the checker — a typo in a flag reported as though the library had
+  # failed, after the run had already begun. The widths are `TLA.Fingerprint`'s to decide,
+  # so they are asked for rather than restated here.
+  defp fingerprint_bits(opts) do
+    case Keyword.get(opts, :fingerprint_bits) do
+      nil ->
+        nil
+
+      bits ->
+        widths = TLA.Fingerprint.permitted_bits()
+
+        if bits in widths do
+          bits
+        else
+          Mix.raise(
+            "--fingerprint-bits must be one of #{Enum.join(widths, ", ")}, " <>
+              "got: #{inspect(bits)}"
+          )
+        end
     end
   end
 

@@ -150,6 +150,33 @@ release it merely follows.
 
 ### Fixed
 
+- **`--fingerprint-bits` is refused at the flag, and the two outcomes nothing exercised are
+  gated** (#314, closes #180).
+
+  `--fingerprint-bits 7` was passed straight through and raised an `ArgumentError` from
+  inside `TLA.Fingerprint`, **mid-search**, with a stack trace through the checker — a typo
+  in a flag reported as though the library had failed, after the run had begun.
+  `--workers` was already refused at the flag; this is the same treatment, and the widths
+  are **asked of `TLA.Fingerprint`** rather than restated, so a width added there cannot
+  leave the flag refusing it. Neither flag's refusal had a test; both do now.
+
+  **The other two items were not what they were filed as, and the difference is the point.**
+  #180 called `mix tla.simulate`'s exit 2 "produced by nothing" and the "server did not
+  answer" path "entirely dead, reachable by nothing". Measured before writing anything:
+
+      TLA.Simulation.run(SlowServer, %{timeout: 200})
+      #=> {:error, "no reply within 200ms"}
+
+  Both were **reachable and untested** — a coverage gap, not dead code. The code was right
+  and nothing held it to that. So nothing was deleted and nothing was added to make them
+  reachable; they are gated, by two routes each, with the measurement recorded beside them.
+
+  The task-level exit-2 test goes through an `init/1` that declines rather than through the
+  timeout, because `mix tla.simulate` has no `--timeout` switch and a task-level timeout
+  test would wait the default five seconds per step. Adding a flag to make a test convenient
+  is surface this issue did not ask for; the timeout path is gated at the library level,
+  where it runs in 200ms.
+
 - **`--against-graph` is one suite, under the options it was given** (#313, for #180). It
   ran the full simulation and then **another `--traces` simulations**, one at a time — so
   `mix tla.simulate X --traces 10000 --against-graph` ran twenty thousand traces.

@@ -236,4 +236,96 @@ defmodule Mix.Tasks.Tla.SimulateTest do
       assert code == 0
     end
   end
+
+  # ── exit 2, and the path behind it ──────────────────────────────────────────
+
+  describe "the server that does not answer" do
+    @moduletag :capture_log
+
+    # #180 called this path "entirely dead" and "produced by nothing". It is neither
+    # unreachable nor produced by nothing — it was **untested**, which is a different fault
+    # and the one fixed here. Measured before writing the test:
+    #
+    #     TLA.Simulation.run(SlowServer, %{timeout: 200})
+    #     #=> {:error, "no reply within 200ms"}
+    #
+    # So the code was right and nothing held it to that. Both halves are gated now.
+    defmodule Slow do
+      use GenServer
+
+      use TLA.GenServer,
+        spec: TLA.Conformance.Counter.Spec,
+        refinement: TLA.Conformance.Counter.Refinement
+
+      def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+      @impl true
+      def init(_opts), do: {:ok, %{value: 0, status: :ready}}
+
+      # Never answers. Every other callback is the conforming one, so the only thing this
+      # server does wrong is take too long.
+      @impl true
+      def handle_call(:increment, _from, state) do
+        Process.sleep(:infinity)
+        {:reply, :ok, state}
+      end
+
+      def handle_call(:done, _from, state), do: {:reply, :ok, %{state | status: :ready}}
+      def handle_call(:reset, _from, state), do: {:reply, :ok, %{state | value: 0}}
+    end
+
+    defmodule Declines do
+      use GenServer
+
+      use TLA.GenServer,
+        spec: TLA.Conformance.Counter.Spec,
+        refinement: TLA.Conformance.Counter.Refinement
+
+      def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
+
+      @impl true
+      def init(_opts), do: :ignore
+    end
+
+    test "reaches the timeout path, which says how long it waited" do
+      result =
+        TLA.Simulation.run(Slow, %{traces: 2, max_steps: 5, seed: 1, timeout: 200})
+
+      assert result.status == :error
+      assert result.detail == "no reply within 200ms"
+    end
+
+    # The documented exit code, produced. It is NOT 1: nothing about conformance was
+    # decided after the server stopped answering, and reporting it as a violation would
+    # name the implementation for a finding the run never made.
+    #
+    # Through `init/1` declining rather than through the timeout: the task has no
+    # `--timeout` switch, so a task-level timeout test would wait the default five seconds
+    # per step. Adding a flag to make a test convenient is surface this issue did not ask
+    # for; the timeout path is gated above, where it can be driven in 200ms.
+    test "and an init/1 that declines exits 2, which the moduledoc documents" do
+      {output, code} = simulate([inspect(Declines), "--traces", "2", "--seed", "1"])
+
+      assert code == 2
+      assert output =~ "THE SERVER DID NOT ANSWER"
+      assert output =~ "nothing was checked"
+    end
+
+    # Anti-vacuity: the same flags against a server that starts exit 0, so the test above
+    # fails on the server rather than on the flags.
+    test "whereas a server that starts exits 0" do
+      {_output, code} =
+        simulate([
+          "TLA.Conformance.Counter.Impl.Conforming",
+          "--traces",
+          "2",
+          "--steps",
+          "5",
+          "--seed",
+          "1"
+        ])
+
+      assert code == 0
+    end
+  end
 end

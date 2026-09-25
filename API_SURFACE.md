@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 393 items** · functions 331 · arities 411 · types 62
+**59 modules · 394 items** · functions 332 · arities 412 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -98,7 +98,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `warn_unless_clean/1` | `:def` | (coverage, opts \\ …) | `f8af7aa0` | `lib/tla/coverage.ex` |
 | `warn_unless_clean/2` | `:def` | (coverage, opts \\ …) | `f8af7aa0` | `lib/tla/coverage.ex` |
 | `warnings/1` | `:def` | (coverage) | `1005d356` | `lib/tla/coverage.ex` |
-## TLA.Fingerprint — 5 items
+## TLA.Fingerprint — 6 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
@@ -108,6 +108,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `compute/2` | `:def` | (state, opts \\ …) | `a0aa5d76` | `lib/tla/fingerprint.ex` |
 | `of_encoding/1` | `:def` | (encoding, opts \\ …) | `bba0fa73` | `lib/tla/fingerprint.ex` |
 | `of_encoding/2` | `:def` | (encoding, opts \\ …) | `bba0fa73` | `lib/tla/fingerprint.ex` |
+| `permitted_bits/0` | `:def` | () | `7d25a8f3` | `lib/tla/fingerprint.ex` |
 | `t()` | `:type` | <<_::64>> \| <<_::128>> | `7b13d798` | `lib/tla/fingerprint.ex` |
 ## TLA.Function — 6 items
 
