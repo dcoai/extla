@@ -1499,9 +1499,31 @@ defmodule Mix.Tasks.Tla.Visualize do
   ## Options
 
       --output       Write here instead of to stdout.
-      --max-states   Refuse past this many states, naming the true count
-                     (default: 500).
+      --max-states   How many states to explore, and therefore at most how many
+                     to draw (default: 500). Past it the task refuses and draws
+                     nothing.
       --format       dot, and only dot.
+
+  ## Exit codes
+
+      0  the graph was written
+      1  the spec has a violation; the graph was still written, with the
+         counterexample emphasised, and it covers only what the search reached
+      2  more states than `--max-states`, so nothing was drawn
+
+  `2` is `mix tla.check`'s code for a run that did not see the whole state
+  space, and it is separate from `1` because "too big to draw" and "the design
+  is wrong" are different answers that used to share a number.
+
+  `--max-states` means here what it means in `mix tla.check`: how many states to
+  explore. Exploring past a limit the task will refuse to DRAW is work thrown
+  away -- it used to run to the checker's own million-state default in order to
+  render none of them, and where that default was reached it drew a truncated
+  graph with no note and exited 0.
+
+  The cost is stated rather than hidden: a bounded search cannot name the size of
+  the state space, so the refusal says MORE THAN N rather than a number it does
+  not have. The count it used to print in that case was the truncated one.
   """
   use Mix.Task
 
