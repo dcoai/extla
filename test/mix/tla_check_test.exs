@@ -276,4 +276,48 @@ defmodule Mix.Tasks.Tla.CheckTest do
       end
     end
   end
+
+  # ── flags that take a number ────────────────────────────────────────────────
+
+  describe "a numeric flag with a value the checker cannot use" do
+    # `--fingerprint-bits 7` used to be passed straight through and raise an `ArgumentError`
+    # from inside `TLA.Fingerprint`, MID-SEARCH, with a stack trace through the checker — a
+    # typo in a flag reported as though the library had failed, after the run had begun
+    # (#180). `--workers` was already refused at the flag; this is the same treatment.
+    test "is refused at the flag, not from inside the search" do
+      assert_raise Mix.Error, ~r/--fingerprint-bits must be one of 64, 128, got: 7/, fn ->
+        check(["TLA.TestSpecs.WithDefaults", "--fingerprint-bits", "7"])
+      end
+    end
+
+    test "and --workers is refused the same way" do
+      assert_raise Mix.Error, ~r/--workers must be a positive integer, got: 0/, fn ->
+        check(["TLA.TestSpecs.WithDefaults", "--workers", "0"])
+      end
+    end
+
+    # Anti-vacuity: the permitted widths still work, so the guard is refusing the wrong
+    # values rather than all of them.
+    test "but a permitted width runs" do
+      for bits <- TLA.Fingerprint.permitted_bits() do
+        {output, code} =
+          check(["TLA.TestSpecs.WithDefaults", "--fingerprint-bits", to_string(bits)])
+
+        assert code == 0
+        assert output =~ "— verified"
+      end
+    end
+
+    # The list is asked for rather than restated, so a width added to `TLA.Fingerprint`
+    # cannot leave the flag refusing it.
+    test "and the flag's list is the one the fingerprint enforces" do
+      source =
+        Path.expand("../..", __DIR__)
+        |> Path.join("lib/mix/tasks/tla.check.ex")
+        |> File.read!()
+
+      assert source =~ "TLA.Fingerprint.permitted_bits()"
+      refute source =~ "@fingerprint_widths"
+    end
+  end
 end

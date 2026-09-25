@@ -17,6 +17,15 @@ defmodule TLA.Fingerprint do
   @permitted_bits [64, 128]
 
   @doc """
+  The widths a fingerprint may be computed at.
+
+  Asked for rather than restated by callers (#180). `mix tla.check --fingerprint-bits`
+  validates its flag against this, so a second list cannot fall out of step with the one
+  `compute/2` actually enforces.
+  """
+  def permitted_bits, do: @permitted_bits
+
+  @doc """
   Canonical binary encoding of a state.
 
   Uses `:erlang.term_to_binary/2` with the `:deterministic` option, which fixes map
