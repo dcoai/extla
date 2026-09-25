@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 394 items** · functions 332 · arities 412 · types 62
+**59 modules · 395 items** · functions 333 · arities 413 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -264,8 +264,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `explore/1` | `:def` | (spec, config \\ …) | `cf202624` | `lib/tla/model_checker.ex` |
 | `explore/2` | `:def` | (spec, config \\ …) | `cf202624` | `lib/tla/model_checker.ex` |
 | `result()` | `:type` | status: :constrained \| :deadlock \| :max_states_reached \| :ok \| :violation, states_found, distinct_states, transitions, diameter, deadlock, duration_ms, violation, coverage, profile, warnings, fingerprint_bits, collision_estimate | `9c37ddd0` | `lib/tla/model_checker.ex` |
-| `run/1` | `:def` | (spec, config \\ …) | `62f53c0e` | `lib/tla/model_checker.ex` |
-| `run/2` | `:def` | (spec, config \\ …) | `62f53c0e` | `lib/tla/model_checker.ex` |
+| `run/1` | `:def` | (spec, config \\ …) | `d37154b4` | `lib/tla/model_checker.ex` |
+| `run/2` | `:def` | (spec, config \\ …) | `d37154b4` | `lib/tla/model_checker.ex` |
 | `steps/3` | `:def` | (spec, constants, state) | `7ecddc6e` | `lib/tla/model_checker.ex` |
 | `successors/3` | `:def` | (spec, _, state) | `e2fd3910` | `lib/tla/model_checker.ex` |
 ## TLA.ModelChecker.Liveness — 3 items
@@ -595,13 +595,14 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `decode!/1` | `:def` | (data) | `980695a8` | `lib/tla/state/json.ex` |
 | `encode/1` | `:def` | (term) | `b25b6ed2` | `lib/tla/state/json.ex` |
-## TLA.StateGraph — 24 items
+## TLA.StateGraph — 25 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
 | `add_edges/4` | `:def` | (graph, id, edges, enabled) | `121e79bf` | `lib/tla/state_graph.ex` |
 | `add_state/5` | `:def` | (graph, state, parent, action, params) | `d7ce4f48` | `lib/tla/state_graph.ex` |
 | `count_transition/1` | `:def` | (graph) | `c635fc3f` | `lib/tla/state_graph.ex` |
+| `delete/1` | `:def` | (graph) | `9d188776` | `lib/tla/state_graph.ex` |
 | `depth/2` | `:def` | (graph, id) | `7def25e0` | `lib/tla/state_graph.ex` |
 | `edge()` | `:type` | {action :: atom(), params :: map(), successor :: state_id()} | `7b0c93e5` | `lib/tla/state_graph.ex` |
 | `enabled?/3` | `:def` | (graph, id, index) | `ab5a2df2` | `lib/tla/state_graph.ex` |

@@ -169,13 +169,47 @@ defmodule TLA.Replay do
       opts: opts
     }
 
-    {result, _server} =
+    {result, server} =
       Enum.reduce_while(steps, {ok(0), server(module, opts)}, fn {{action, binding, want}, step},
                                                                  {acc, server} ->
         step(ctx, server, acc, {action, binding, want, step})
       end)
 
+    stop_owned(opts, server, timeout)
+
     finish(result)
+  end
+
+  # `TLA.Simulation` stops the server it started; this did not, so a replay left a live
+  # `GenServer` behind — one per call, for the lifetime of the caller. The two modules are
+  # the same shape and only one cleaned up (#316).
+  #
+  # Only a server this module started. A caller-supplied `:server` is not ours to stop,
+  # which is the same ownership line `restart/5` draws when it refuses to reproduce a
+  # `:restart` step against a borrowed server.
+  defp stop_owned(opts, server, timeout) do
+    if Keyword.has_key?(opts, :server), do: :ok, else: stop(server, timeout)
+  end
+
+  # Stopped the way a supervisor stops a child, as `TLA.Simulation` does (#213): a
+  # `:shutdown` exit so a server that traps it runs its `terminate/2`, a bounded wait so a
+  # `terminate/2` that hangs does not hang the replay, and a kill after that. A server that
+  # has already stopped — which is how a `:not_followed` replay usually ends — makes the
+  # monitor fire at once with `:noproc`, so this costs nothing on that path.
+  defp stop(server, timeout) do
+    ref = Process.monitor(server)
+    Process.exit(server, :shutdown)
+
+    receive do
+      {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+    after
+      timeout ->
+        Process.exit(server, :kill)
+
+        receive do
+          {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+        end
+    end
   end
 
   # Not every entry in a trace's `actions` is an action of the spec. `TLA.Simulation` writes

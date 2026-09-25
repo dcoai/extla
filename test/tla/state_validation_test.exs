@@ -53,8 +53,16 @@ defmodule TLA.StateValidationTest do
   end
 
   describe "how often validation runs" do
+    # `explore/2` and not `run/2`, since #316: `run/2` now searches in a process of its own
+    # so that the process's exit releases the graph's ETS tables, which puts the validations
+    # one level below the pid this test traces. `explore/2` is the same search in the
+    # caller — it is what `run/2` calls — so it is the one that can be counted, and it is
+    # also the one whose graph the caller owns, hence the release below.
     test "once per distinct state, not once per transition" do
-      {result, validations} = counting_validations(fn -> ModelChecker.run(Cube, %{}) end)
+      {{result, graph}, validations} =
+        counting_validations(fn -> ModelChecker.explore(Cube, %{}) end)
+
+      on_exit(fn -> TLA.StateGraph.delete(graph) end)
 
       # A 3-cube is small enough to state both numbers and shaped so that they differ:
       # 8 distinct states, 12 transitions. That gap is the whole of this change —
