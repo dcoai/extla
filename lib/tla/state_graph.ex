@@ -246,6 +246,30 @@ defmodule TLA.StateGraph do
   end
 
   @doc """
+  Release the graph's two ETS tables.
+
+  For a caller that holds a graph longer than the process that built it: an ETS table is
+  owned by a process, not reachable from a term, so dropping the last reference to a graph
+  frees nothing. `TLA.ModelChecker.explore/2` hands the graph — and this obligation — to
+  its caller; `run/2` discards the graph and searches in a process of its own so that the
+  process's exit does this (#316).
+
+  Returns `:ok`, and is a no-op on a graph whose tables are already gone, so a caller that
+  releases twice, or that releases a graph its owner has already taken down with it, is
+  not punished for being careful.
+  """
+  def delete(%__MODULE__{} = graph) do
+    Enum.each([graph.nodes, graph.fingerprints], &delete_table/1)
+  end
+
+  defp delete_table(table) do
+    # `:ets.info/2` rather than a rescue: "is this table still there" is a question with an
+    # answer, and asking it is not the same as catching the failure of not having asked.
+    if :ets.info(table, :size) != :undefined, do: :ets.delete(table)
+    :ok
+  end
+
+  @doc """
   Register a state by fingerprint, returning its id and whether it is new. The
   state itself is not retained.
 

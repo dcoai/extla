@@ -16,6 +16,29 @@ release it merely follows.
 
 ### Changed
 
+- **A run releases what it allocated: the graph's ETS tables, and the replay's server**
+  (#316, for #182). An ETS table is owned by a *process* and is not reachable from a term, so
+  discarding a `TLA.StateGraph` freed nothing. `TLA.ModelChecker.run/2` discards the graph and
+  left both tables holding one record per distinct state for the **calling process's**
+  lifetime — twenty runs, forty tables. It was invisible under ExUnit, where every test is its
+  own process and a process's exit takes its tables with it, and it accumulated exactly where
+  processes are long-lived: `mix tla.check A B C`, `TLA.Spec.Test`, the ledger's corpus pass.
+  `run/2` now searches in a process of its own, so the tables are created there and the
+  child's exit is what frees them — on the normal path and **on a raise**, with no `try/after`
+  and no delete to forget at a call site. The exception is re-raised in the caller with the
+  stack it was raised on, so nothing is swallowed; the cost is one crash report on stderr from
+  the isolated process before the diagnosis, which is the same trade `TLA.Ledger` already
+  makes. `explore/2` keeps its tables, because the graph *is* its return value, and now says
+  so where it is returned — the specification already promised "the caller owns the graph, and
+  its ETS tables with it: `run/2` is this with the graph dropped, and it releases them", which
+  was true of no code. `TLA.StateGraph.delete/1` is the release that contract needs, and is a
+  no-op on a graph already gone. `TLA.Replay` likewise left a live `GenServer` per replay
+  where `TLA.Simulation` — the same shape one door over — stops its own; it now stops the
+  server it started, the way a supervisor stops a child, and leaves a caller-supplied
+  `:server` alone. Counted, not reasoned about: `test/tla/resource_lifetime_test.exs`
+  measures the graph's own tables by name and the servers by `$initial_call`, and reproduces
+  both numbers — forty and twenty — against the unfixed code.
+
 - **The four `rescue` sites in `lib/` are reviewed one at a time, and the two that hid a
   failure are narrowed** (#315, for #182). CLAUDE.md forbids `try/catch/rescue`, but a count
   is the wrong reading of the rule: a rescue scoped to a *function* rather than a *call*

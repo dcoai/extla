@@ -128,11 +128,59 @@ defmodule TLA.ModelChecker do
   Run the model checker on a spec module.
 
       TLA.ModelChecker.run(Specs.Counter, %{constants: %{max: 3}})
+
+  Returns the verdict and **keeps nothing**. `explore/2` builds the graph in two ETS
+  tables, and an ETS table is owned by a process rather than reachable from a term, so
+  discarding the graph does not free them — they hold one record per distinct state for as
+  long as the calling process lives. Twenty `run/2` calls left forty tables behind (#316).
+
+  So the search happens in a process of its own and the verdict is copied back. The tables
+  are created there, which makes the child's exit the thing that frees them — on the normal
+  path and on a raise alike, with no `try/after` and no delete to forget at a call site.
+  An exception is re-raised in the caller with the stack it was raised on, so nothing is
+  swallowed; this is the same isolate-and-observe shape as `TLA.Ledger`'s own check.
+
+  It is invisible under ExUnit, where every test is its own process. It accumulates in
+  `mix tla.check A B C`, in `TLA.Spec.Test`, and in any long-lived caller.
   """
   def run(spec, config \\ %{}) do
-    {result, _graph} = explore(spec, config)
-    result
+    parent = self()
+
+    {pid, ref} =
+      spawn_monitor(fn ->
+        {result, _graph} = explore(spec, config)
+        send(parent, {:tla_run, self(), result})
+      end)
+
+    receive do
+      {:tla_run, ^pid, result} ->
+        Process.demonitor(ref, [:flush])
+        result
+
+      {:DOWN, ^ref, :process, ^pid, reason} ->
+        propagate(reason)
+    end
   end
+
+  # The search is isolated for the tables' sake, not to contain failures, so a failure has
+  # to arrive at the caller as the failure it was. A raise leaves a monitored process as
+  # `{reason, stacktrace}`, and `:erlang.raise/3` puts both back — which is what keeps
+  # `mix tla.check`'s `rescue error in TLA.Symmetry.UnsoundError` matching, and what keeps
+  # the stack pointing at the spec rather than at this line.
+  defp propagate({reason, stacktrace}) when is_list(stacktrace) do
+    if stacktrace?(stacktrace),
+      do: :erlang.raise(:error, reason, stacktrace),
+      else: exit({reason, stacktrace})
+  end
+
+  defp propagate(reason), do: exit(reason)
+
+  # An `exit({term, list})` is not a raise, and telling them apart is what the entries look
+  # like: `{module, function, arity_or_args, location}`, or the 3-tuple form for a fun.
+  defp stacktrace?([]), do: false
+
+  defp stacktrace?(entries),
+    do: Enum.all?(entries, &(is_tuple(&1) and tuple_size(&1) in 3..4))
 
   @doc """
   Run only safety checking. In Phase 1 this is what `run/2` does; the separate
@@ -142,6 +190,15 @@ defmodule TLA.ModelChecker do
 
   @doc """
   Run the model checker and return the full state graph, for inspection.
+
+  **The caller owns the returned graph.** It is backed by two ETS tables created in the
+  calling process, and they live until that process exits — which is the point: the graph
+  is the return value, and releasing it here would hand back a term whose contents are
+  gone. `run/2`, which discards the graph, is where the release belongs, and it does it by
+  searching in a process of its own.
+
+  A caller that keeps a graph beyond one short-lived process should say when it is done
+  with it: `TLA.StateGraph.delete/1`.
   """
   def explore(spec, config \\ %{})
 
