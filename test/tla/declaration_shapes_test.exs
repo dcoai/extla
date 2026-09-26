@@ -162,10 +162,15 @@ defmodule TLA.DeclarationShapesTest do
   # `Code.with_diagnostics/1` rather than `capture_io(:stderr, …)`: a warning is a
   # diagnostic, and reading it as one keeps this from depending on where the compiler
   # happens to print.
+  #
+  # No `Code.put_compiler_option(:ignore_module_conflict, true)` here, though this used to
+  # set one. It is a compiler-global — set anywhere, read everywhere — and this file is
+  # `async: true`, so it suppressed module-conflict warnings across every test running
+  # beside it (#322). It was also never needed: `unique/1` names every module after a fresh
+  # `System.unique_integer/1`, so nothing here is ever a redefinition.
   defp warnings_of(code) do
     {_result, diagnostics} =
       Code.with_diagnostics(fn ->
-        Code.put_compiler_option(:ignore_module_conflict, true)
         Code.compile_string(code)
       end)
 
