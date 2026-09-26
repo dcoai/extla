@@ -11,7 +11,7 @@ break it. The full table, keyed by kind, is
 semantics. (This repository generates `DIAGNOSTICS.md` from the raise sites and holds §7's
 table to it, but that golden is not part of the package — the specification is.)
 
-## The eight things that look like Elixir and are not
+## The nine things that look like Elixir and are not
 
 ### 1. Assignment is a next-state relation, not a rebinding
 
@@ -128,6 +128,27 @@ rather than passing for every state.
 | `mix tla.replay` | replay a counterexample against real code |
 | `mix tla.visualize` | the state graph as DOT |
 | `mix tla.stamp` | record which spec version a refinement mapping was read against |
+
+### 9. The set vocabulary is in scope, and two operators are renamed
+
+All of TLA+'s set theory is callable **unqualified** inside a spec block — `powerset`,
+`cross`, `cross_many`, `distributed_union`, `for_all?`, `exists?`, `range`, `choose`,
+`for_each`, `update`, `except`, `domain`, `function_set`, `record_set`, plus `union`,
+`intersection`, `difference`, `subset?`, `member?`, `size` and the sequence operators. There
+is nothing to import and nothing to qualify: `TLA.Set` and `TLA.Function` hold the one
+implementation of each, and the helper module every spec imports delegates to them (D-38).
+
+**Two are renamed, and only two.** `{f(x) : x \in S}` is `set_map/2` and `{x \in S : P(x)}`
+is `set_filter/2`, not `map/2` and `filter/2` — an unqualified `map(xs, f)` in a spec block
+reads as `Enum.map/2` to every Elixir programmer, and these return a **set**, possibly a
+smaller one, since a non-injective function collapses elements exactly as in TLA+.
+
+**`for_each/2` takes a set, not a sequence.** `[x \in S |-> e]` ranges over a set. A list is
+a *sequence* — a function on `1..Len(s)` already — and building a function over one would
+silently deduplicate it, so it raises `ArgumentError` by name instead of answering. Pass a
+`MapSet` or a range. For the same reason `domain/1` of a sequence is its **indices**,
+`MapSet.new(1..Len(s))`, not its elements; `domain/1` of a set is refused, because a set is
+neither a function nor a sequence.
 
 ## Writing a refinement mapping: a bare term is a call
 

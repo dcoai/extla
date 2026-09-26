@@ -91,6 +91,122 @@ are exactly the clients and whose values have type `t` — a TLA+ function — a
 exploration; it is checked as an invariant, and [Invariants](03-invariants.md) says what that
 means.
 
+## Operations on sets and functions
+
+`type: set(t)` says a variable **is** a set. This says what you can do with one.
+
+All of TLA+'s set theory is in scope inside a spec block, unqualified. It is `TLA.Set` and
+`TLA.Function`, which [§Foundation](../../spec/01-foundation.md) specifies, reached through the
+helper module every spec imports — and that module holds no second implementation of any of
+them ([D-38](../../spec/08-decisions.md)).
+
+| TLA+ | In a spec block |
+|---|---|
+| `{}`, `{a, b, c}` | `set()`, `set([a, b, c])` |
+| `e \in S` | `member?(s, e)` |
+| `S \cup T`, `S \cap T`, `S \ T` | `union(s, t)`, `intersection(s, t)`, `difference(s, t)` |
+| `S \cup {e}`, `S \ {e}` | `put(s, e)`, `delete(s, e)` |
+| `S \subseteq T` | `subset?(s, t)` |
+| `Cardinality(S)` | `size(s)` |
+| `SUBSET S` | `powerset(s)` |
+| `UNION S` | `distributed_union(s)` |
+| `S \X T` | `cross(s, t)` |
+| `S1 \X … \X Sn` | `cross_many([s1, s2, s3])` |
+| `\A x \in S : P(x)` | `for_all?(s, fn x -> … end)` |
+| `\E x \in S : P(x)` | `exists?(s, fn x -> … end)` |
+| `{f(x) : x \in S}` | `set_map(s, fn x -> … end)` |
+| `{x \in S : P(x)}` | `set_filter(s, fn x -> … end)` |
+| `CHOOSE x \in S : P(x)` | `choose(s, fn x -> … end)` |
+| `a..b` as a set | `range(a, b)` |
+| `[x \in S \|-> e]` | `for_each(s, fn x -> … end)` |
+| `[f EXCEPT ![k] = v]` | `update(f, k, fn _ -> v end)` |
+| `[f EXCEPT ![a] = v, ![b] = w]` | `except(f, a: v, b: w)` |
+| `DOMAIN f` | `domain(f)` |
+| `[S -> T]` | `function_set(s, t)` |
+| `[a: S, b: T]` | `record_set(a: s, b: t)` |
+
+Two names differ from the module they come from, and only two: `set_map/2` and `set_filter/2`
+are `TLA.Set.map/2` and `TLA.Set.filter/2`, because an unqualified `map(xs, f)` in a spec block
+reads as `Enum.map/2` to every Elixir programmer who opens the file, and these return a **set**
+— possibly a smaller one, since a non-injective function collapses elements, exactly as in TLA+.
+
+Here is a spec that uses them. A node acknowledges once; the value commits when some quorum has
+acknowledged. The guard says *"there exists a subset of the nodes which is a majority and all of
+whose members have acknowledged"* — `\E q \in SUBSET Nodes : Cardinality(q) * 2 > Cardinality(Nodes) /\ q \subseteq acked`,
+one clause at a time:
+
+<!-- tla:spec -->
+```elixir
+defmodule Tutorial.Quorum do
+  use TLA.Spec
+
+  constant :nodes, default: set([:n1, :n2, :n3])
+
+  variable :acked,     type: set(^nodes)
+  variable :votes,     type: [^nodes ~> 0..1]
+  variable :committed, type: [true, false]
+
+  init do
+    acked     = set()
+    votes     = for_each(^nodes, fn _ -> 0 end)
+    committed = false
+  end
+
+  action :ack, params: [n: ^nodes] do
+    require not member?(acked, n)
+
+    acked = union(acked, set([n]))
+    votes = update(votes, n, fn _ -> 1 end)
+  end
+
+  action :commit do
+    require exists?(powerset(^nodes), fn q ->
+              size(q) * 2 > size(^nodes) and subset?(q, acked)
+            end)
+
+    committed = true
+  end
+
+  invariant :committed_needs_quorum do
+    not committed or size(acked) * 2 > size(^nodes)
+  end
+
+  invariant :votes_match_acks do
+    for_all?(^nodes, fn n -> member?(acked, n) == (votes[n] == 1) end)
+  end
+end
+```
+
+<!-- tla:check module=Tutorial.Quorum expect=ok states=12 depth=5 -->
+```
+mix tla.check Tutorial.Quorum
+✓ verified · 12 distinct states · depth 5
+```
+
+`committed_needs_quorum` states the same fact as `commit`'s guard the *other* way — by
+cardinality rather than by quantifying over subsets. Writing a property twice in two forms and
+letting the checker reconcile them is a good habit: if the two ever disagree, one of them is
+what you meant.
+
+This same model is the differential corpus entry `set_vocabulary`, where TLC checks it and the
+two must agree on the state count — so these operators are held to what TLA+ *means* by them,
+not only to what they return.
+
+### Two traps
+
+**`for_each/2` takes a set, not a sequence.** `[x \in S |-> e]` ranges over a set, and a list is
+a *sequence* — a function on `1..Len(s)` already. Building a function over one would silently
+deduplicate it, so it is refused by name instead:
+
+<!-- tla:run expect=raise match="builds a function over a set" -->
+```elixir
+TLA.Spec.Helpers.for_each([:alice, :alice, :bob], fn c -> c end)
+```
+
+**`domain/1` of a sequence is `1..Len(s)`, not its elements.** A sequence *is* a function on
+its indices — that is how `s[i]` applies one — so `domain([:a, :b, :c])` is
+`MapSet.new([1, 2, 3])`. A set is neither a function nor a sequence and is refused by name.
+
 ## Nondeterminism is `params:`, and only `params:`
 
 `action :request, params: [c: ^clients]` is three actions, one per client, and the checker tries
