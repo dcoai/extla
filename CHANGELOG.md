@@ -16,6 +16,29 @@ release it merely follows.
 
 ### Changed
 
+- **The guides teach set operations wherever they teach set types** (#320, closes #183).
+  `type: set(t)` told a reader that a variable can *be* a set, and nothing told them how to
+  take a union of one: neither `TLA.Set` nor `TLA.Function` was named anywhere in `guides/`,
+  `README.md` or `usage-rules.md` — only in `spec/`. So the whole of TLA+'s set theory was
+  reachable from a spec body after #319 and invisible to the reader who needed it, and
+  anything past a map-keyed lock — a queue, a quorum, a set of messages in flight — had
+  nothing to reach for and no signal that it existed. `guides/tutorial/02-dsl.md`, the page
+  that introduces `type:`, gains §Operations on sets and functions: the whole vocabulary as a
+  TLA+-to-DSL table, a worked spec (`Tutorial.Quorum` — a node acknowledges once, the value
+  commits when some subset of the nodes is a majority and has all acknowledged) compiled and
+  checked by the guide harness at **12 states, depth 5**, and the two traps, one of them a
+  block asserted to raise. That spec is the same model as the `set_vocabulary` corpus entry,
+  so what the page teaches is held to TLC and not only to ExTLA. `usage-rules.md` gains a
+  ninth rule carrying the traps #319 left: the vocabulary needs no qualification, `set_map/2`
+  and `set_filter/2` are renamed because an unqualified `map/2` in a spec block reads as
+  `Enum.map/2`, `for_each/2` refuses a sequence by name, and `domain/1` of a sequence is its
+  indices. The gate is `test/docs/set_operations_taught_test.exs`, and both its halves are
+  found rather than named: the page, by the type form it introduces; the operators it must
+  teach, from `lib/tla/spec/helpers.ex`'s own `defdelegate`s — so an operator added to the
+  vocabulary and not taught is red, which is how a page drifts back into types-only one
+  function at a time. It also fails on an operator the page names that a spec body cannot
+  call.
+
 - **One implementation of each TLA+ operator, and `01-foundation.md`'s vocabulary reachable
   from a spec body** (#319, for #183; D-38). `TLA.Set` and `TLA.Function` are specified as
   the foundation everything else builds on, and a spec body could not reach them:
