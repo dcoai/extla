@@ -14,6 +14,33 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Fixed
+
+- **A refinement mapping missing a `concrete_message/2` clause is named, not crashed on**
+  (#321, closes #299). `TLA.Refinement.validate!/3` answered "does this mapping name every
+  action the spec declares" by *calling* `concrete_message/2` for each one, so a mapping
+  with no clause for an action raised `FunctionClauseError` from inside the validator —
+  where the contract is a `TLA.Refinement.Error` with a sentence naming the action, which is
+  precisely what that rule exists to report. It is a **list comparison** now: `use
+  TLA.Refinement` installs an `@on_definition` hook recording the first argument of every
+  clause, and the spec's actions are compared against the record. Two consequences beyond
+  the crash. The clause half of the rule needs no binding, so it is decided even for an
+  action with params and no constant values — the shape of a published example, where the
+  probe used to skip the action and a missing clause validated clean. And the three shapes
+  stay distinct where the crash had collapsed them into two: defining **none** is legal and
+  reported as an undecided rule, defining **all** passes, defining **some** is the finding
+  and it names the actions it does not cover. A clause whose first argument is a *variable*
+  covers everything and is read that way — reading it as covering nothing would report a
+  complete mapping as incomplete, which is worse than the crash. `abstract_action/1`'s
+  totality probe was deliberately **not** copied: its domain is any message a server might
+  receive, so a probe is the only instrument; `concrete_message/2`'s domain is the spec's
+  actions, which `validate!/3` is holding (`spec/08-decisions.md` D-39). A mapping that
+  declares `@behaviour TLA.Refinement` by hand has no record and the rule is named in the
+  deferred list for it rather than claimed. New corpus mutant
+  `TLA.Conformance.Counter.Mutants.NoClauseForAction`, one door over from
+  `ActionNeverNamed`, which names an action *wrongly* rather than not at all — which is why
+  the suite had never exercised this.
+
 ### Changed
 
 - **The guides teach set operations wherever they teach set types** (#320, closes #183).

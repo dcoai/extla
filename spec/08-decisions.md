@@ -1227,3 +1227,77 @@ author would use it.
 
 See `01-foundation.md` §The vocabulary a spec body reaches and
 `04-layer2-model-checker.md` §Helper Functions Available in DSL Blocks.
+
+---
+
+## D-39 — Totality over a bounded domain is a list comparison, not a probe
+
+**Decided.** Whether `concrete_message/2` covers every action the spec declares is answered
+by **comparing two lists**: the spec's actions, against the first argument of every clause,
+recorded as the mapping compiles by an `@on_definition` hook that `use TLA.Refinement`
+installs. `TLA.Refinement.validate!/3` never calls the callback to find out.
+
+**Replaced:** calling `concrete_message(action, params)` for each action and reading what
+came back. A mapping with **no clause** for one of them therefore raised
+`FunctionClauseError` from inside the validator, where the contract is a
+`TLA.Refinement.Error` with a sentence naming the action — which is exactly what that rule
+exists to report (#299).
+
+**Why not the precedent one function up.** `abstract_action/1`'s totality *is* established
+by a probe, and the obvious move was to make the two symmetric. It is the wrong analogy,
+for a reason that decides the general case:
+
+| | `abstract_action/1` | `concrete_message/2` |
+|---|---|---|
+| domain | any message a server might receive | the spec's actions |
+| size | unbounded | known, and in `validate!/3`'s hand |
+| how to ask | a probe term no clause can have anticipated | read the clauses, compare the lists |
+
+A probe over an unbounded domain is the only instrument available, and its limits are why
+that one is documented as "a probe, not a proof". Over an **enumerable** domain a probe is
+strictly worse than the comparison: it decides nothing the comparison does not, it needs a
+binding the comparison does not, and it gets its answer by running user code that may raise
+for reasons of its own.
+
+The binding is not a detail. The private `sample_params/3` yields nothing for an action with params
+where the constants have no value — the ordinary shape of a published example (D-35) — so
+the probe **skipped** those actions, and a missing clause for one of them validated clean.
+The comparison decides them all.
+
+**And not `try/rescue` at the call site**, which was the other option on the table.
+CLAUDE.md forbids it, and here it is also undecidable: a `FunctionClauseError` raised
+*because the mapping has no clause* is indistinguishable at the call site from one raised
+*inside a clause that does exist* — which is #315's defect verbatim, one function over, and
+the reason the private `total!/1`'s rescue had to be narrowed to a single stack frame.
+
+**A variable first argument reads as total.** `def concrete_message(action, params)` covers
+every action, and the hook can see that its first argument is not a literal atom. Anything
+that is not a literal atom — a variable, a match, a guarded variable — is recorded as
+covering everything. A hook that read a variable as covering nothing would report a
+**complete** mapping as incomplete, and a false finding about correct code is worse than
+the crash this replaced. The cost is the other direction: `def concrete_message(action, _)
+when action in [:a, :b]` reads as total and its gap is left to the round-trip probe. That
+is the right way round for a rule whose failure mode is an author being told their correct
+mapping is wrong.
+
+**Three shapes stay distinct**, which the crash had collapsed into two. Defining **none** is
+legal — `@optional_callbacks [concrete_message: 2]`, the shape `Counter.Impl.Undrivable`
+rests on — and is reported as an undecided rule rather than a fault. Defining **all**
+passes. Defining **some** is the finding, and it names the actions it does not cover.
+
+**Cost.** The record only exists where the mapping `use`d the module. One that writes
+`@behaviour TLA.Refinement` by hand has nothing to compare against, and rule 5 is named in
+the deferred list for it rather than claimed — the same answer the two runtime rules get,
+for the same reason.
+
+**Recorded and built 2026-09-26 (#321, for #299).**
+
+**Pinned by:** `test/conformance/param_mapping_test.exs` — a mapping missing a clause is an
+error naming the action, including for an action with no binding to probe with; one whose
+only clause has a variable first argument validates as total; one defining none still
+validates and says the rule went unchecked; and a hand-declared behaviour is named as
+unrecorded. `test/conformance/conformance_test.exs` holds the corpus mutant
+`Counter.Mutants.NoClauseForAction`, one door over from `ActionNeverNamed`, which names an
+action wrongly rather than not at all.
+
+See `05-layer3-conformance.md` §`TLA.Refinement`.

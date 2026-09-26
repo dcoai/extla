@@ -391,11 +391,33 @@ defmodule TLA.Refinement do
 
   @optional_callbacks [concrete_message: 2]
 
+  @doc """
+  Declare the behaviour, and record which actions `concrete_message/2` covers.
+
+  The record is what makes rule 5 below a **list comparison** rather than a probe
+  (`08-decisions.md` D-39). `@on_definition` — the mechanism Layers 1 and 3 already
+  use — sees the first argument of every `concrete_message/2` clause as the module
+  compiles; a literal atom covers that action, and anything else, a variable most
+  of all, covers every action. A mapping that declares `@behaviour TLA.Refinement`
+  by hand has no record, and `validate!/2` names rule 5 as undecided for it rather
+  than claiming it.
+  """
   defmacro __using__(_opts) do
     quote do
       @behaviour TLA.Refinement
+
+      Module.register_attribute(__MODULE__, :tla_concrete_message_clauses, accumulate: true)
+
+      @on_definition TLA.Refinement
+      @before_compile TLA.Refinement
     end
   end
+
+  @doc false
+  def __on_definition__(env, kind, name, args, guards, body)
+
+  @doc false
+  defmacro __before_compile__(env)
 
   @doc """
   Verify that a refinement mapping is well-formed.
@@ -419,6 +441,20 @@ defmodule TLA.Refinement do
      **Only where `concrete_message/2` is defined** — it is optional, and without
      it there is nothing to enumerate the actions with, so this rule is deferred
      and coverage reports the absence instead.
+
+     The rule has two halves and they are established differently. Whether
+     `concrete_message/2` has a **clause** for an action is a list comparison
+     against the clauses `use TLA.Refinement` recorded as the module compiled, so
+     it needs no binding and is decided for every action the spec declares.
+     Whether the message that clause **produces** maps back is the probe, and that
+     half needs one. Answering the first half by calling the callback is what
+     raised `FunctionClauseError` from inside this validator, on the mapping shape
+     most likely to be written by hand (#299, `08-decisions.md` D-39).
+
+     Three shapes, and they stay distinct: a mapping defining **no**
+     `concrete_message/2` is legal and the rule is reported as undecided for it;
+     one defining **all** passes; one defining **some** is the finding, naming the
+     actions it does not cover.
 
   **A probe, not a proof:**
 
@@ -446,8 +482,9 @@ defmodule TLA.Refinement do
   said a mapping that does not cover the spec's variables "fails the build",
   which was true of neither.
 
-  **Rules 4 and 5 need a binding to probe with, and an action with params has
-  none where the constants have no values.** A published example declares
+  **Rule 4, and rule 5's round-trip half, need a binding to probe with, and an
+  action with params has none where the constants have no values.** A published
+  example declares
   `constant :processes` without a `default:` — the assignment belongs to a run —
   so at the point this runs there is no initial state to draw a binding from.
   Those actions are **not probed**, and are named in the returned list of rules

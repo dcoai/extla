@@ -156,8 +156,12 @@ defmodule MyApp.LockServer do
       do: {:release_lock, %{p: pid, r: resource}}
     def abstract_action(_), do: :unmapped
 
-    def concrete_message(:request_lock, %{p: p, r: r}), do: {:lock, p, r}
-    def concrete_message(:release_lock, %{p: p, r: r}), do: {:unlock, p, r}
+    # No `concrete_message/2`, and the note below the implementation says why: two of
+    # the spec's four actions have no message in this server, so the mapping cannot
+    # drive it from the spec. The callback is optional for exactly this, and defining
+    # it for the two that DO have a message would be the one shape `validate!/3`
+    # refuses (08-decisions.md D-39). `05-layer3-conformance.md`'s own mapping, whose
+    # implementation takes a message per action, is where the callback is shown.
   end
 
   def init(resources) do
@@ -216,6 +220,20 @@ end
 > change is a design decision. The point is that **the earlier design could not see the
 > question** — the invariants all hold in the implementation's post-state, so the old
 > Layer 3 reported conformance.
+>
+> The same collapse is why the mapping defines **no** `concrete_message/2`. `acquire_lock`
+> and `return_to_idle` are steps this server takes *inside* a `{:lock, …}` or `{:unlock, …}`
+> callback, so no message causes them and no honest clause can name one. A mapping that
+> named the other two and stopped is the one shape `validate!/3` refuses — an action it
+> can never produce is dead in this implementation, which is a finding rather than a gap
+> (`08-decisions.md` D-39). Declining the optional callback is the honest position while
+> the design decision above is open: this server can be **checked** as it runs, which is
+> what the `:diverged` above is, and it cannot be **driven** from the spec.
+>
+> That this mapping named two of four actions went unsaid until #321. The rule was
+> answered by probing `concrete_message/2` with a sample binding, and `processes` and
+> `resources` have no `default:` — the assignment belongs to a run — so there was no
+> binding to probe with and the two unnamed actions were never reached.
 
 ### Tests (All Layers)
 
