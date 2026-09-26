@@ -150,6 +150,31 @@ defmodule TLA.Conformance.Counter.Mutants do
     def concrete_message(:reset, _params), do: :nothing_maps_to_this
   end
 
+  defmodule NoClauseForAction do
+    @moduledoc """
+    `concrete_message/2` has no clause for `reset` **at all** — where `ActionNeverNamed`,
+    one door over, has a clause that returns a message nothing maps back.
+
+    The two were collapsed into one, and only the second was ever exercised: `validate!/3`
+    answered "does this mapping name every action" by calling the callback for each one, so
+    the missing-clause shape raised `FunctionClauseError` from inside the validator rather
+    than the error naming the action (#299). That is the likelier of the two mistakes for
+    someone writing a mapping by hand, and the corpus had no entry for it.
+    """
+    use TLA.Refinement
+
+    def abstract(%{value: v, status: s}), do: %{count: v, status: s}
+
+    def abstract_action(:increment), do: {:increment, %{}}
+    def abstract_action(:done), do: {:done, %{}}
+    def abstract_action(:reset), do: {:reset, %{}}
+    def abstract_action(_), do: :unmapped
+
+    # The fault: two of the spec's three actions.
+    def concrete_message(:increment, _params), do: :increment
+    def concrete_message(:done, _params), do: :done
+  end
+
   defmodule NoAbstractAction do
     @moduledoc """
     A mapping with no `abstract_action/1` at all — the shape an earlier draft of §05 made

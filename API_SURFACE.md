@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 405 items** · functions 343 · arities 423 · types 62
+**59 modules · 407 items** · functions 345 · arities 425 · types 62
 
 ## Mix.Tasks.Tla.Check — 3 items
 
@@ -326,14 +326,16 @@ key whose value is a union of atoms; any other type is shown as written.
 | `action_sequences/3` | `:def` | (spec, constants, max_length \\ …) | `a6449182` | `lib/tla/property_test.ex` |
 | `init_states/2` | `:def` | (spec, constants) | `2e3eb256` | `lib/tla/property_test.ex` |
 | `initial_states/2` | `:def` | (spec, constants) | `ad67db2e` | `lib/tla/property_test.ex` |
-## TLA.Refinement — 3 items
+## TLA.Refinement — 5 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `__using__/1` | `:defmacro` | (_opts) | `902e722d` | `lib/tla/refinement.ex` |
+| `__before_compile__/1` | `:defmacro` | (env) | `cecc50f3` | `lib/tla/refinement.ex` |
+| `__on_definition__/6` | `:def` | (env, _, _, _, _guards, _body) | `11a9bcdc` | `lib/tla/refinement.ex` |
+| `__using__/1` | `:defmacro` | (_opts) | `b64dc9a4` | `lib/tla/refinement.ex` |
 | `abstract!/3` | `:def` | (refinement, spec, concrete) | `f59064ba` | `lib/tla/refinement.ex` |
-| `validate!/2` | `:def` | (refinement, spec, constants \\ …) | `9aae41a6` | `lib/tla/refinement.ex` |
-| `validate!/3` | `:def` | (refinement, spec, constants \\ …) | `9aae41a6` | `lib/tla/refinement.ex` |
+| `validate!/2` | `:def` | (refinement, spec, constants \\ …) | `72252eb4` | `lib/tla/refinement.ex` |
+| `validate!/3` | `:def` | (refinement, spec, constants \\ …) | `72252eb4` | `lib/tla/refinement.ex` |
 ## TLA.Replay — 4 items
 
 | Item | Kind | Shape | Version | Locus |

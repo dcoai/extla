@@ -96,6 +96,18 @@ defmodule TLA.ConformanceTest do
       assert Exception.message(error) =~ "dead in this implementation"
     end
 
+    # The mutant one door over, and the one the corpus lacked: `ActionNeverNamed` names
+    # `reset` WRONGLY, this one does not name it at all. Until #321 the second raised
+    # `FunctionClauseError` from inside `validate!/3`, because the rule was answered by
+    # calling the callback rather than by reading which actions its clauses cover (#299).
+    test "an action with no clause at all is named, rather than crashed on" do
+      error =
+        assert_raise R.Error, fn -> R.validate!(Mutants.NoClauseForAction, Spec, @constants) end
+
+      assert Exception.message(error) =~ "has no clause for [:reset]"
+      assert Exception.message(error) =~ "a mapping that defines none is legal"
+    end
+
     test "a module that is not a refinement mapping at all is refused" do
       error =
         assert_raise R.Error, fn -> R.validate!(Mutants.NoAbstractAction, Spec, @constants) end

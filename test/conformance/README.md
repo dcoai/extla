@@ -30,7 +30,7 @@ example in the docs does not behave the way the docs say, that is the bug worth 
 
 | Entry | Source | Mapping mutants | Step mutants |
 |---|---|---|---|
-| `counter` | Example 4 | ✅ 6 | ✅ 3 |
+| `counter` | Example 4 | ✅ 7 | ✅ 3 |
 
 ## `counter` — the mapping mutants
 
@@ -45,6 +45,7 @@ say which.
 | `PartialHelper` | has the catch-all; the helper it calls is partial | `validate!/3`, by probe | the helper's own `FunctionClauseError`, *not* "is not total" |
 | `WrongWayRound` | `concrete_message/2` and `abstract_action/1` do not compose | `validate!/3` | "does not round-trip increment" |
 | `ActionNeverNamed` | no message produces `reset` | `validate!/3` | "names no message for [:reset]" |
+| `NoClauseForAction` | `concrete_message/2` has no clause for `reset` at all | `validate!/3`, from the clauses `@on_definition` recorded | "has no clause for [:reset]" |
 | `NoAbstractAction` | not a refinement mapping at all | `validate!/3` | "does not define abstract_action/1" |
 
 The last one deliberately does not `use TLA.Refinement`: with the behaviour declared the

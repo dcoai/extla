@@ -40,6 +40,19 @@ defmodule TLA.Refinement do
     exists to enumerate them with. Elsewhere it is left to `TLA.Coverage`'s account of
     what a run actually exercised, which is where "this action never happened" belongs.
 
+  That last rule has two halves, and they are established by different means. Whether
+  `concrete_message/2` has a **clause** for an action is a list comparison: `use
+  TLA.Refinement` installs an `@on_definition` hook — the mechanism Layers 1 and 3 already
+  use — that records the first argument of every clause, and the actions the spec declares
+  are compared against that record. Whether the message a clause **produces** maps back is
+  a probe, and needs a binding. So an action with no binding at compile time is still
+  checked for having a clause, and only the round-trip half of the rule is deferred.
+
+  A clause whose first argument is a variable covers every action and is read that way. And
+  `concrete_message/2` is optional: a mapping that defines **none** is legal and reported as
+  such, one that defines **all** passes, and one that defines **some** is the finding
+  (`08-decisions.md` D-39).
+
   Left to runtime, because there is no concrete state at compile time to map:
 
   - `abstract/1` returns exactly the spec's variables, and
@@ -82,6 +95,55 @@ defmodule TLA.Refinement do
   defmacro __using__(_opts) do
     quote do
       @behaviour TLA.Refinement
+
+      Module.register_attribute(__MODULE__, :tla_concrete_message_clauses, accumulate: true)
+
+      @on_definition TLA.Refinement
+      @before_compile TLA.Refinement
+    end
+  end
+
+  @doc false
+  # Which actions `concrete_message/2` has a clause for, recorded as the module compiles.
+  #
+  # A literal atom in the first argument position covers that one action. ANYTHING ELSE —
+  # a variable, a match, a guarded variable — covers every action, and is recorded as
+  # `:variable` so it reads as total (D-39). A hook that read `def concrete_message(action,
+  # params)` as covering nothing would report a complete mapping as incomplete, which is a
+  # false finding about correct code and worse than the crash it was added to replace.
+  #
+  # Tagged rather than bare, because a spec may declare an action named `:variable` and an
+  # untagged record could not tell the two apart.
+  def __on_definition__(env, :def, :concrete_message, [action, _params], _guards, _body) do
+    Module.put_attribute(env.module, :tla_concrete_message_clauses, clause_covers(action))
+    :ok
+  end
+
+  def __on_definition__(_env, _kind, _name, _args, _guards, _body), do: :ok
+
+  # The quoted first argument, as the hook receives it. An atom pattern quotes to itself;
+  # a variable quotes to a three-element tuple, and every other pattern to a call.
+  defp clause_covers(action) when is_atom(action), do: {:action, action}
+  defp clause_covers(_pattern), do: :variable
+
+  @doc false
+  defmacro __before_compile__(env) do
+    covers =
+      env.module
+      |> Module.get_attribute(:tla_concrete_message_clauses, [])
+      |> coverage()
+
+    quote do
+      @doc false
+      def __tla_concrete_message_actions__, do: unquote(Macro.escape(covers))
+    end
+  end
+
+  defp coverage(clauses) do
+    if :variable in clauses do
+      :any
+    else
+      clauses |> Enum.map(fn {:action, name} -> name end) |> Enum.uniq() |> Enum.sort()
     end
   end
 
@@ -116,11 +178,13 @@ defmodule TLA.Refinement do
     ]
 
     if function_exported?(refinement, :concrete_message, 2) do
+      covers = concrete_message_coverage(refinement)
+
       # Named first: "no message produces this action" is a more useful thing to be told
       # than "this action does not round-trip", and it is the same fault.
-      names_every_action!(refinement, spec, constants)
+      names_every_action!(refinement, spec, constants, covers)
       round_trips!(refinement, spec, constants)
-      {:ok, deferred ++ unprobed(spec, constants)}
+      {:ok, deferred ++ unrecorded(refinement, covers) ++ unprobed(spec, constants)}
     else
       {:ok,
        deferred ++
@@ -362,7 +426,53 @@ defmodule TLA.Refinement do
     :ok
   end
 
-  defp names_every_action!(refinement, spec, constants) do
+  # What the `@on_definition` hook recorded, or `:unrecorded` for a module that declared
+  # `@behaviour TLA.Refinement` by hand instead of `use`-ing it — there is no record to ask,
+  # and `unrecorded/2` says so rather than letting the rule read as decided.
+  defp concrete_message_coverage(refinement) do
+    if function_exported?(refinement, :__tla_concrete_message_actions__, 0),
+      do: refinement.__tla_concrete_message_actions__(),
+      else: :unrecorded
+  end
+
+  defp covers?(:any, _name), do: true
+  defp covers?(:unrecorded, _name), do: true
+  defp covers?(names, name), do: name in names
+
+  defp unrecorded(refinement, :unrecorded) do
+    [
+      {:for_this_mapping,
+       "every spec action has a `concrete_message/2` clause — #{inspect(refinement)} " <>
+         "declares the behaviour without `use TLA.Refinement`, so its clauses were not " <>
+         "recorded as it compiled and there is nothing to compare the spec's actions " <>
+         "against"}
+    ]
+  end
+
+  defp unrecorded(_refinement, _covers), do: []
+
+  defp names_every_action!(refinement, spec, constants, covers) do
+    # A LIST COMPARISON, and deliberately not a probe (D-39). `concrete_message/2`'s domain
+    # is the spec's actions, which this call is holding; asking whether a clause exists needs
+    # no binding, so this half of the rule is decided even for an action `sample_params/3`
+    # cannot bind. Calling to find out is what raised `FunctionClauseError` from inside the
+    # validator, where the contract is an `Error` naming the action (#299).
+    case for action <- spec.actions, not covers?(covers, action.name), do: action.name do
+      [] ->
+        :ok
+
+      missing ->
+        raise Error,
+          message:
+            "#{inspect(refinement)}.concrete_message/2 has no clause for " <>
+              "#{inspect(Enum.sort(missing))}. The callback is how an action is driven, so " <>
+              "one it does not cover can be neither replayed nor simulated. Add the clause " <>
+              "— or, if this mapping is not meant to drive the implementation at all, " <>
+              "remove `concrete_message/2` entirely: a mapping that defines none is legal, " <>
+              "and coverage reports the actions instead. Defining some and not others is " <>
+              "the one shape that is neither."
+    end
+
     unnamed =
       for action <- spec.actions,
           params <- Enum.take(sample_params(spec, action, constants), 1),

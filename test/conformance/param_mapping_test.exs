@@ -134,6 +134,160 @@ defmodule TLA.Conformance.ParamMappingTest do
     end
   end
 
+  # #299, built at #321. `names_every_action!/4` used to answer "does this mapping name
+  # every action" by CALLING `concrete_message/2` for each one, so a mapping with no clause
+  # for an action raised `FunctionClauseError` from inside `validate!/3` — where the
+  # contract is a `Refinement.Error` with a sentence naming the action, which is precisely
+  # what that rule exists to report.
+  #
+  # It is a list comparison now: `use TLA.Refinement` records the first argument of every
+  # clause with `@on_definition`, and the spec's actions are compared against the record
+  # (D-39). The suite had never exercised the case — every fixture in `test/conformance/`
+  # has a clause for every action, and `Counter.Mutants.ActionNeverNamed` names an action
+  # *wrongly* rather than not at all.
+  describe "the three shapes a `concrete_message/2` can have" do
+    defmodule NoClauseForDropAll do
+      @moduledoc false
+      use TLA.Refinement
+
+      def abstract(%{locks: locks}), do: %{held: locks}
+
+      def abstract_action({:grab, r}), do: {:grab, %{r: r}}
+      def abstract_action(:drop_all), do: {:drop_all, %{}}
+      def abstract_action(_other), do: :unmapped
+
+      # The fault, and the whole of it: `abstract_action/1` names both actions and this
+      # names one. `drop_all` takes no params, so `%{}` is a real binding for it and the
+      # old probe reached it — and raised.
+      def concrete_message(:grab, %{r: r}), do: {:grab, r}
+    end
+
+    defmodule NoClauseForGrab do
+      @moduledoc false
+      use TLA.Refinement
+
+      def abstract(%{locks: locks}), do: %{held: locks}
+
+      def abstract_action({:grab, r}), do: {:grab, %{r: r}}
+      def abstract_action(:drop_all), do: {:drop_all, %{}}
+      def abstract_action(_other), do: :unmapped
+
+      # The other half: `grab` takes params, so with `resources` unassigned there is no
+      # binding to probe it with and the old check skipped it entirely — a missing clause
+      # that validated clean.
+      def concrete_message(:drop_all, _params), do: :drop_all
+    end
+
+    defmodule ByName do
+      @moduledoc false
+      use TLA.Refinement
+
+      def abstract(%{locks: locks}), do: %{held: locks}
+
+      def abstract_action({:grab, r}), do: {:grab, %{r: r}}
+      def abstract_action(:drop_all), do: {:drop_all, %{}}
+      def abstract_action(_other), do: :unmapped
+
+      # ONE clause, and its first argument is a VARIABLE, so it covers every action the
+      # spec declares. The hook can see that it is not a literal atom, and a hook that read
+      # it as covering nothing would turn a complete mapping into an incomplete one — a
+      # false finding about correct code, which is worse than the crash it replaced.
+      def concrete_message(action, params), do: message(action, params)
+
+      defp message(:grab, %{r: r}), do: {:grab, r}
+      defp message(:drop_all, _params), do: :drop_all
+    end
+
+    defmodule NoConcreteMessage do
+      @moduledoc false
+      use TLA.Refinement
+
+      def abstract(%{locks: locks}), do: %{held: locks}
+
+      def abstract_action({:grab, r}), do: {:grab, %{r: r}}
+      def abstract_action(:drop_all), do: {:drop_all, %{}}
+      def abstract_action(_other), do: :unmapped
+    end
+
+    test "defines some: the action it does not cover is named, not crashed on" do
+      error =
+        assert_raise Refinement.Error, fn ->
+          Refinement.validate!(NoClauseForDropAll, Spec, %{resources: MapSet.new([:r1, :r2])})
+        end
+
+      assert Exception.message(error) =~ "has no clause for [:drop_all]"
+      assert Exception.message(error) =~ "neither replayed nor simulated"
+    end
+
+    # A clause either exists or it does not, and answering that needs no binding — which is
+    # the argument for a list comparison over a probe. Before this, `grab` was unprobeable
+    # here and therefore unchecked, so the mapping validated and the gap surfaced at the
+    # first `TLA.Replay`.
+    test "and an action with no binding to probe with is checked all the same" do
+      error = assert_raise Refinement.Error, fn -> Refinement.validate!(NoClauseForGrab, Spec) end
+
+      assert Exception.message(error) =~ "has no clause for [:grab]"
+    end
+
+    test "defines all, through one clause with a variable first argument: total" do
+      assert {:ok, _deferred} = Refinement.validate!(ByName, Spec)
+
+      {:ok, deferred} = Refinement.validate!(ByName, Spec, %{resources: MapSet.new([:r1, :r2])})
+
+      refute Enum.any?(deferred, &match?({:for_this_mapping, _rule}, &1)),
+             "a variable first argument covers every action, so nothing about this " <>
+               "mapping is undecided: #{inspect(deferred)}"
+    end
+
+    # The case that must not regress. `concrete_message/2` is an `@optional_callbacks`
+    # entry: a mapping that defines NONE is legal — it can be checked as it runs, it just
+    # cannot be driven — and is reported as such rather than refused. Defining some and not
+    # others is the one shape that is neither.
+    test "defines none: still legal, and still reported rather than refused" do
+      assert {:ok, deferred} = Refinement.validate!(NoConcreteMessage, Spec)
+
+      assert Enum.any?(deferred, fn
+               {:for_this_mapping, rule} ->
+                 rule =~ "no `concrete_message/2` to enumerate them with"
+
+               _always ->
+                 false
+             end),
+             "nothing in #{inspect(deferred)} says the rule went unchecked for this mapping"
+    end
+  end
+
+  describe "a mapping that declares the behaviour without `use`" do
+    defmodule Handwritten do
+      @moduledoc false
+      # No `use`, so no `@on_definition` and no record of which actions the clauses cover.
+      @behaviour TLA.Refinement
+
+      def abstract(%{locks: locks}), do: %{held: locks}
+
+      def abstract_action({:grab, r}), do: {:grab, %{r: r}}
+      def abstract_action(:drop_all), do: {:drop_all, %{}}
+      def abstract_action(_other), do: :unmapped
+
+      def concrete_message(:grab, %{r: r}), do: {:grab, r}
+      def concrete_message(:drop_all, _params), do: :drop_all
+    end
+
+    # There is nothing to compare the spec's actions against, and saying so is the honest
+    # outcome — the same argument the deferred list rests on everywhere else. Reporting the
+    # rule as decided would be a claim drawn from an absent record.
+    test "validates, and names the rule it could not decide about it" do
+      {:ok, deferred} =
+        Refinement.validate!(Handwritten, Spec, %{resources: MapSet.new([:r1, :r2])})
+
+      assert Enum.any?(deferred, fn
+               {:for_this_mapping, rule} -> rule =~ "without `use TLA.Refinement`"
+               _always -> false
+             end),
+             "nothing in #{inspect(deferred)} says the clauses were never recorded"
+    end
+  end
+
   describe "constants that come only from application config" do
     # `validate!/3` resolved constants with `default_constants/1` — the reader that sees
     # `default:` options and nothing else — so a spec assigned through
