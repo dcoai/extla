@@ -12,8 +12,20 @@ defmodule Mix.Tasks.Tla.CoverageTest do
   task recomputes the whole ledger first — a model check of all 31 specs, about 53 seconds — and
   none of that is what is under test here. The real golden is never touched: every path below is
   a `tmp_dir`.
+
+  ## Why `async: false` (#322)
+
+  The setup swaps `Mix.shell/1`, and `Mix.shell/1` is process-independent: while this file ran
+  `async: true`, every concurrent test reading shell output saw nothing, and failed somewhere
+  unrelated with a message about its own subject. `on_exit` restores the shell, which bounds
+  the window and does not remove it. The flake was found from #308 and gated at #322, which
+  added `{Mix, :shell}` to `TLA.AsyncIsolationTest`'s `@global`.
+
+  The shell stays `Mix.Shell.Process` rather than the `Mix.Shell.IO` its siblings pin, because
+  these assertions read the messages it sends. Sync is what makes that safe: ExUnit runs
+  `async: false` modules one at a time, with no async module still running.
   """
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   @moduletag :tmp_dir
 

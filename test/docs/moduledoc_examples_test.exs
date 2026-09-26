@@ -118,17 +118,26 @@ defmodule TLA.ModuledocExamplesTest do
   end
 
   # In its own process, observing the exit — the shape `TLA.GuideCheck.isolated/1` and
-  # `TLA.Ledger.check/2` both use, and for the same two reasons. A `rescue` would hide a bug
-  # in this gate among the failures it is reporting (CLAUDE.md forbids it outright), and
-  # compiling a module that already exists needs `:ignore_module_conflict`, which is a
-  # compiler-global setting that has no business being switched on in the test process.
+  # `TLA.Ledger.check/2` both use. A `rescue` would hide a bug in this gate among the
+  # failures it is reporting, and CLAUDE.md forbids it outright.
+  #
+  # The spawn buys isolation of the *caller*, and nothing more. This used to set
+  # `Code.put_compiler_option(:ignore_module_conflict, true)` inside the child, under a
+  # comment of mine claiming that kept a compiler-global out of the test process. It did
+  # not — measured, the parent reads the child's write straight back, and this file is
+  # `async: true`, so the whole suite ran with module-conflict warnings suppressed for as
+  # long as it took to compile the examples (#322).
+  #
+  # The option was only ever there for noise: two examples may define the same module name,
+  # and redefinition *warns*, it does not fail. `Code.with_diagnostics/1` collects those
+  # warnings instead of printing them, and its handler is scoped to this process — which is
+  # the behaviour that was wanted, reached without the global.
   defp compile(code, where) do
     parent = self()
 
     {_pid, ref} =
       spawn_monitor(fn ->
-        Code.put_compiler_option(:ignore_module_conflict, true)
-        Code.compile_string(code, where)
+        Code.with_diagnostics(fn -> Code.compile_string(code, where) end)
         send(parent, {:compiled, self()})
       end)
 
