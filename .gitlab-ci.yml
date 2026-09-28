@@ -88,6 +88,19 @@
 # 0` -- `surfex` from the store, the dev-only `ex_doc` tree correctly left alone. If a job
 # ever compiles a dependency it should not have, the summary line says which and why; read it
 # before reaching for a cache.
+#
+# A DEPDEP BUMP THAT CHANGES THE SCHEMA CAN COST ONE COLD PIPELINE. v0.7.0 (#329) keys objects
+# on Mix's own converge and the full toolchain (depdep schema v3), so every object path moved,
+# and depdep warns the first run refills the store. Here it did not: the bump's own pipeline
+# read `pulled 6, missing 1` -- objects already under v3 keys for this toolchain -- and posted
+# `saved ~10.3s`, the first saving extla ever reported. Objects pushed from v0.7.0 on carry
+# their compile time, which is what `depdep.saved` and `depdep.compile_carried` report from.
+# A long run right after such a bump is that refill, not a regression.
+#
+# The one miss was `telemetry`: restored, then rebuilt because Mix called the build outdated,
+# while `--push` read `already stored 7, uploaded 0` -- so the stale object stays and every run
+# rebuilds it (~1.5s). That is depdep's to fix (dco-tek/depdep#110, where #329 added this
+# evidence); a `rebuilt 1` on the summary line is that, not this project.
 
 stages:
   - check

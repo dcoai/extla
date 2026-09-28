@@ -43,6 +43,17 @@ release it merely follows.
 
 ### Changed
 
+- **CI restores dependencies with depdep v0.7.0** (#329, for #328). The store already worked
+  for this project — a 100% hit rate over three days — and could not show it: objects pushed
+  before v0.7.0 carry no compile time, so a hit had nothing to post as `depdep.saved`. v0.7.0
+  pushes the compile time with each object and posts `depdep.compile_carried` for every hit
+  that carries one. Its keys come from Mix's own converge (schema v3) and fingerprint the full
+  toolchain, so every object path changes — yet the bump's own pipeline was warm, not the
+  cold refill depdep warns of: `pulled 6, missing 1`, and `saved ~10.3s`, the first saving
+  extla has reported. The one miss, `telemetry`, is restored and then rebuilt as outdated on
+  every run, and `--push` does not replace it; that is dco-tek/depdep#110. The CI line is
+  unchanged — it already ran `--compile-deps`.
+
 - **The guides teach set operations wherever they teach set types** (#320, closes #183).
   `type: set(t)` told a reader that a variable can *be* a set, and nothing told them how to
   take a union of one: neither `TLA.Set` nor `TLA.Function` was named anywhere in `guides/`,
