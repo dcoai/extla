@@ -161,7 +161,7 @@ defmodule ExTLA.MixProject do
       # (c)'s objection that consumers would inherit a documentation framework.
       {:surfex,
        git: "git@gitlab.conet.yarina.org:dco-tek/surfex.git",
-       tag: "v0.1.0",
+       tag: "v0.4.0",
        only: [:dev, :test],
        runtime: false},
       {:jason, "~> 1.4", optional: true},

@@ -20,7 +20,7 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `ex_doc` | `:dev_test` | ~> 0.31 · only: dev · runtime: false | `mix.exs` |
 | `jason` | `:optional` | ~> 1.4 · only: all · optional | `mix.exs` |
 | `stream_data` | `:dev_test` | ~> 1.0 · only: dev, test | `mix.exs` |
-| `surfex` | `:dev_test` | git: git@gitlab.conet.yarina.org:dco-tek/surfex.git tag: v0.1.0 · only: dev, test · runtime: false | `mix.exs` |
+| `surfex` | `:dev_test` | git: git@gitlab.conet.yarina.org:dco-tek/surfex.git tag: v0.4.0 · only: dev, test · runtime: false | `mix.exs` |
 | `telemetry` | `:optional` | ~> 1.0 · only: all · optional | `mix.exs` |
 ## Modules — and whether `files:` ships them
 
