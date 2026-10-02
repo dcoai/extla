@@ -159,11 +159,9 @@ defmodule ExTLA.MixProject do
       # `only: [:dev, :test]` is load-bearing, not hygiene: dev/test deps are NOT transitive,
       # so nothing here reaches anyone who depends on ExTLA. That is what answers #1 section
       # (c)'s objection that consumers would inherit a documentation framework.
-      {:surfex,
-       git: "git@gitlab.conet.yarina.org:dco-tek/surfex.git",
-       tag: "v0.4.0",
-       only: [:dev, :test],
-       runtime: false},
+      #
+      # From Hex since #333; it was a GitLab git dependency before, and the only one.
+      {:surfex, "~> 0.5.16", only: [:dev, :test], runtime: false},
       {:jason, "~> 1.4", optional: true},
       # Layer 1's violation events. Optional for the same reason jason is: a consumer
       # who attaches no handler should not be made to carry it, and whether it was
