@@ -43,6 +43,10 @@ release it merely follows.
 
 ### Changed
 
+- **surfex `~> 0.5.24`** (#335, for #334), up from 0.5.16. Upstream changed only its usage
+  rules: `usage-rules.md` is one short agent page pointing to `mix surfex.info`. What ExTLA
+  calls is unchanged; `PACKAGE_SURFACE.md` moves only in surfex's own row.
+
 - **surfex comes from Hex, `~> 0.5.16`** (#333, for #332), not the GitLab git tag v0.4.0.
   It was the only git dependency, so CI's `git config insteadOf` rewrite onto the job token
   (#71) — and with it extla's place on `dco-tek/surfex`'s job-token allowlist — has nothing
