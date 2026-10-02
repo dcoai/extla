@@ -141,34 +141,21 @@ default:
     # found`. procfs is always there, and `|| true` so a diagnostic can never be what breaks a
     # build.
     - (head -3 /proc/meminfo; cat /proc/loadavg; nproc) 2>/dev/null || true
-    # `surfex` is declared with a `git@host:` URL, which is what a developer needs: this
-    # instance authenticates people by ssh key, and `mix deps.get` over https on a
-    # workstation fails with `could not read Username`. But git has no built-in ssh -- an
-    # scp-style URL makes git exec an `ssh` binary, which this slim image does not carry.
-    # So CI maps that spelling onto the job-token URL, rather than `mix.exs` changing to
-    # suit CI (#70, #71).
-    #
-    # The credential is `CI_JOB_TOKEN`: per-job and ephemeral, so nothing long-lived is
-    # stored. It resolves only because `dco-tek/extla` is on `dco-tek/surfex`'s inbound
-    # job-token allowlist, which is per-project and is NOT inherited from the group. If
-    # this starts failing with "HTTP Basic: Access denied", check that allowlist before
-    # touching anything here -- the message reads like a credential problem and is not one.
-    #
-    # `--add` on the second line is load-bearing. `insteadOf` is a multi-valued key and
-    # plain `git config` REPLACES a value rather than appending, so without it the second
-    # line silently deletes the first. Only the `git@` rewrite is needed today, since
-    # `surfex` is the one git dependency -- the pair is taken as `extc` wrote it because
-    # the hazard is invisible until a second git dependency is added, and then costs an
-    # afternoon.
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/".insteadOf "https://${CI_SERVER_HOST}/"
-    - git config --global --add url."https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/".insteadOf "git@${CI_SERVER_HOST}:"
+    # No `git config insteadOf` here any more (#333). It mapped `surfex`'s `git@host:` URL
+    # onto a `CI_JOB_TOKEN` URL (#70, #71), and surfex was the only git dependency; it now
+    # comes from Hex. A git dependency added later brings that back -- commit 7e16bd3 (#71)
+    # has the pair of lines and why the second needs `--add`, plus the per-project job-token
+    # allowlist it depends on. depdep's own fetch builds its token URL in
+    # scripts/depdep.exs and never relied on the rewrite.
     - mix local.hex --force
     - mix local.rebar --force
     # One line does three things, in an order that matters (#245, depdep v0.4.0): restore
     # compiled dependencies from the shared depdep store, run `mix deps.get` to fetch only
     # what the store did not have, then decide again over the units the first pass could
-    # not key -- `surfex` is a git dependency, and a git lock entry records no dependency
-    # list, so nothing above it can be keyed until the source is on disk. Restoring BEFORE
+    # not key -- a git dependency's lock entry records no dependency list, so nothing above
+    # it can be keyed until the source is on disk. No dependency is git since #333 (surfex
+    # was the one), so today that second pass finds nothing left; it stays because it is
+    # what keeps a future git dependency restorable. Restoring BEFORE
     # fetching is load-bearing: source fetched first carries fresh mtimes and Mix rebuilds
     # everything the store just restored. `--compile-deps` compiles exactly the misses, so
     # the `mix compile` in each job finds every dependency up to date.

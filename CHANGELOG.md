@@ -43,6 +43,15 @@ release it merely follows.
 
 ### Changed
 
+- **surfex comes from Hex, `~> 0.5.16`** (#333, for #332), not the GitLab git tag v0.4.0.
+  It was the only git dependency, so CI's `git config insteadOf` rewrite onto the job token
+  (#71) — and with it extla's place on `dco-tek/surfex`'s job-token allowlist — has nothing
+  left to do and is gone, and depdep keys every dependency in its first pass. What ExTLA
+  calls is unchanged: five goldens regenerate byte-identical, and `PACKAGE_SURFACE.md`
+  moves only in surfex's own row. 0.5.16 also carries surfex's adoption work (a trust
+  baseline, evidence checked across CI jobs, renamed tests keeping their records), which a
+  relation-log pilot would build on; nothing here adopts it yet.
+
 - **surfex is pinned at v0.4.0** (#330, for #327), up from v0.1.0. What ExTLA calls —
   `Surfex.Golden.render/1`/`stat/2` and `Surfex.SourceScan`'s `definition_hash/1`,
   `defmodules/1`, `lib_sources/1` and `project_root/1` — is unchanged across the three
