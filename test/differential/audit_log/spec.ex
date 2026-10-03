@@ -1,10 +1,10 @@
-defmodule TLA.Differential.AuditLog do
+defmodule ExTLA.Differential.AuditLog do
   @moduledoc """
   `AuditLog.tla`, in the ExTLA DSL — the corpus's first entry with an
   `action_property` TLC actually checks (#114).
 
   Every other entry compares invariants and temporal properties. This one exists
-  because `action_property` is a first-class declaration — `TLA.Spec.Hash`'s own
+  because `action_property` is a first-class declaration — `ExTLA.Spec.Hash`'s own
   `@kinds` lists it — whose counterexample TLC had never been asked about, which
   is how #112 lived for as long as the feature did.
 
@@ -15,7 +15,7 @@ defmodule TLA.Differential.AuditLog do
   That difference in length is the only thing distinguishing the two answers, and
   a second variable would erase it by making the post-state distinct from `init`.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :max_entries, default: 2
 

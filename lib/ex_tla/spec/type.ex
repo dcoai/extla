@@ -1,0 +1,532 @@
+defmodule ExTLA.Spec.Type do
+  @moduledoc """
+  The `type:` annotation grammar of `02-dsl-semantics.md` §1.5.
+
+  Type expressions are a small language of their own, distinct from the block
+  DSL, and they are **stored quoted**: nearly every useful type mentions a
+  constant (`0..^max_val`, `[^servers ~> :set]`) that has no value when the
+  module compiles (D-19). This module checks the shape at compile time so an
+  ill-formed type is a diagnostic rather than a crash halfway through a
+  model-checking run; resolution against the constant assignments happens later,
+  in the checker, where the implicit `:type_ok` invariant is evaluated.
+
+  | Form | Meaning |
+  |---|---|
+  | `:atom`, `0`, `"s"` | Exactly that literal |
+  | `[:a, :b]` | One of the listed literals |
+  | `a..b` | An integer in the range; either bound may be `^const`, and either may be negative |
+  | `a..b//step` | Every `step`th integer from `a` up to `b` — `0..10//2` is 0, 2, …, 10 |
+  | `^name` | Any element of the constant (which must be a set) |
+  | `t1 \\| t2` | Union — a value of either type |
+  | `{t1, t2, …}` | A tuple of that arity, element-wise |
+  | `[dom ~> rng]` | A map whose keys are exactly `dom` and whose values are in `rng` |
+  | `%{k: t, …}` | A record: a map with exactly these keys, each value of its type |
+  | `:set`, `:seq` | Any `MapSet` / any list, elements unconstrained |
+  | `set(t)`, `seq(t)` | A `MapSet` / list whose every element is of type `t` |
+  | `:int`, `:nat` | Any integer / any non-negative integer |
+  """
+
+  alias ExTLA.Spec.CompileError
+
+  @doc """
+  Check that `type` is in the §1.5 grammar. Returns the expression unchanged —
+  it is stored quoted — or raises `ExTLA.Spec.CompileError`.
+
+  `constants` is the set of declared constant names; a `^name` naming something
+  else is reported here rather than at check time.
+  """
+  def validate!(type, constants, opts) do
+    check!(type, constants, opts)
+    type
+  end
+
+  # `:set` / `:seq` shadow the literal atoms of the same name. Saying so is
+  # cheaper than a variable whose type silently means something else.
+  defp check!(atom, _constants, _opts) when is_atom(atom) and atom not in [true, false, nil],
+    do: :ok
+
+  defp check!(literal, _constants, _opts)
+       when is_integer(literal) or is_binary(literal) or is_boolean(literal),
+       do: :ok
+
+  # `^name` — any element of a constant set.
+  defp check!({:^, meta, [{name, _, ctx}]}, constants, opts)
+       when is_atom(name) and is_atom(ctx) do
+    unless MapSet.member?(constants, name) do
+      bad!(
+        :type_names_undeclared_constant,
+        opts,
+        meta,
+        "the type refers to ^#{name}, which is not a declared constant",
+        hint: "Add `constant :#{name}` above this variable declaration."
+      )
+    end
+
+    :ok
+  end
+
+  # `t1 | t2` — union.
+  defp check!({:|, _meta, [left, right]}, constants, opts) do
+    check!(left, constants, opts)
+    check!(right, constants, opts)
+  end
+
+  # `a..b` and `a..b//step` — an integer range. A bound may be `^const` or negative.
+  defp check!({:.., _meta, [lo, hi]}, constants, opts) do
+    check_bound!(lo, constants, opts)
+    check_bound!(hi, constants, opts)
+  end
+
+  # `a..b//step` — the step is honoured (#196). `params:` evaluates the same literal as
+  # Elixir does and always honoured it; `type:` used to drop it to a plain range, so `x = 1`
+  # passed `type: 0..10//2` and two consumers of one syntax disagreed. A step of zero is
+  # refused here, the way an ill-formed bound is: Elixir refuses it too, one layer down and
+  # with a message about `Range.new/3` rather than about the type.
+  defp check!({:..//, meta, [lo, hi, step]}, constants, opts) do
+    check_bound!(lo, constants, opts)
+    check_bound!(hi, constants, opts)
+    check_bound!(step, constants, opts)
+
+    if step == 0 do
+      bad!(:type_range_step_zero, opts, meta, "a range step of 0 is not a range",
+        hint:
+          "Write `a..b` for step 1, or `a..b//n` with a non-zero `n` " <>
+            "(02-dsl-semantics.md §1.5)."
+      )
+    end
+
+    :ok
+  end
+
+  # `{t1, t2, ...}` — a tuple, element-wise. Two-element tuples are their own AST
+  # node in Elixir, which is why they are matched separately.
+  defp check!({a, b}, constants, opts) do
+    check!(a, constants, opts)
+    check!(b, constants, opts)
+  end
+
+  defp check!({:{}, _meta, elements}, constants, opts) when is_list(elements) do
+    Enum.each(elements, &check!(&1, constants, opts))
+  end
+
+  # `[dom ~> rng]` — a function (map). A one-element list whose element is `~>`.
+  defp check!([{:~>, _meta, [dom, rng]}], constants, opts) do
+    check!(dom, constants, opts)
+    check!(rng, constants, opts)
+  end
+
+  # `set(t)` / `seq(t)` — a collection whose elements are all of type `t`. A call
+  # form rather than `{:set, t}`, which would collide with the tuple type: that
+  # is already a legal tuple of the literal atom `:set` and a `t`. Bare `:set`
+  # keeps its meaning of "any MapSet".
+  defp check!({collection, _meta, [element]}, constants, opts) when collection in [:set, :seq] do
+    check!(element, constants, opts)
+  end
+
+  defp check!({collection, meta, args}, _constants, opts)
+       when collection in [:set, :seq] and is_list(args) do
+    bad!(
+      :collection_type_arity,
+      opts,
+      meta,
+      "#{collection}/#{length(args)} takes exactly one element type",
+      hint:
+        "Write `#{collection}(t)` for a #{collection} of `t`s, or bare `:#{collection}` " <>
+          "for one whose elements are unconstrained."
+    )
+  end
+
+  # `%{k: t, …}` — a record. TLA+ writes the same thing as a record set,
+  # `[type : {"Prepared"}, rm : RM]`, and a message set is the reason it is here:
+  # without it, `set(t)` has nothing useful to say about a set of records.
+  defp check!({:%{}, meta, pairs}, constants, opts) when is_list(pairs) do
+    Enum.each(pairs, fn
+      {key, type} when is_atom(key) or is_binary(key) or is_integer(key) ->
+        check!(type, constants, opts)
+
+      other ->
+        bad!(
+          :record_type_key_not_literal,
+          opts,
+          meta,
+          "a record type's keys must be literals, got: #{Macro.to_string(other)}",
+          hint: "Write `%{type: :prepared, rm: ^rms}` — each key literal, each value a type."
+        )
+    end)
+  end
+
+  # `[:a, :b]` — one of the listed literals.
+  defp check!(list, constants, opts) when is_list(list) do
+    Enum.each(list, fn element ->
+      unless literal?(element) do
+        bad!(
+          :list_type_element_not_literal,
+          opts,
+          nil,
+          "a list type may only list literals, got: #{Macro.to_string(element)}",
+          hint:
+            "`[:a, :b]` means \"one of these literals\". For a map type write " <>
+              "`[domain ~> range]`; for a union of richer types write `t1 | t2`."
+        )
+      end
+
+      check!(element, constants, opts)
+    end)
+  end
+
+  defp check!(other, _constants, opts) do
+    bad!(:ill_formed_type, opts, meta_of(other), "ill-formed type: #{Macro.to_string(other)}",
+      hint: """
+      The type grammar (02-dsl-semantics.md §1.5) is:
+
+          :atom | 0 | "s"       a literal
+          [:a, :b]              one of the listed literals
+          a..b                  an integer range; a bound may be ^const or negative
+          a..b//step            every step-th integer from a up to b
+          ^name                 any element of a constant set
+          t1 | t2               union
+          {t1, t2}              a tuple, element-wise
+          [dom ~> rng]          a map with keys exactly dom and values in rng
+          %{k: t, ...}          a record: exactly these keys, each of its type
+          :set | :seq           any MapSet / any list
+          set(t) | seq(t)       a MapSet / list whose elements are all `t`\
+      """
+    )
+  end
+
+  defp check_bound!({:^, _, [{name, _, ctx}]} = pinned, constants, opts)
+       when is_atom(name) and is_atom(ctx),
+       do: check!(pinned, constants, opts)
+
+  defp check_bound!(bound, _constants, _opts) when is_integer(bound), do: :ok
+
+  # `-1` is not an integer literal in the AST: Elixir parses it as unary minus
+  # applied to 1. A range whose low bound is negative is ordinary enough --
+  # Paxos's `maxBal` is `-1` until the acceptor promises something -- that
+  # rejecting it would be rejecting the type the spec actually has.
+  defp check_bound!({:-, _meta, [bound]}, constants, opts),
+    do: check_bound!(bound, constants, opts)
+
+  # Arithmetic over bounds, resolved with the constants at check time. A bound
+  # one short of a constant is what a sequence of numbered items has --
+  # `seq: 0..(^max_items - 1)` -- and writing it any other way would mean typing
+  # the variable weaker than the spec means it.
+  defp check_bound!({op, _meta, [left, right]}, constants, opts)
+       when op in [:+, :-, :*, :div] do
+    check_bound!(left, constants, opts)
+    check_bound!(right, constants, opts)
+  end
+
+  defp check_bound!(other, _constants, opts) do
+    bad!(
+      :type_range_bound,
+      opts,
+      meta_of(other),
+      "a range bound must be an integer or ^constant, got: " <>
+        Macro.to_string(other)
+    )
+  end
+
+  defp literal?(term) when is_atom(term) or is_integer(term) or is_binary(term), do: true
+  defp literal?(_), do: false
+
+  defp meta_of({_, meta, _}) when is_list(meta), do: meta
+  defp meta_of(_), do: nil
+
+  defp bad!(kind, opts, meta, problem, extra \\ []) do
+    CompileError.raise!(
+      module: Keyword.fetch!(opts, :module),
+      declaration: Keyword.fetch!(opts, :declaration),
+      line: line_of(meta) || Keyword.get(opts, :line),
+      problem: problem,
+      hint: Keyword.get(extra, :hint),
+      kind: kind
+    )
+  end
+
+  defp line_of(meta) when is_list(meta), do: Keyword.get(meta, :line)
+  defp line_of(_), do: nil
+
+  # ── Resolution ──────────────────────────────────────────────────────────────
+
+  @typedoc """
+  A type expression with its constants substituted, ready to test values against.
+  """
+  @type resolved ::
+          {:literal, term()}
+          | {:one_of, [term()]}
+          | {:range, integer(), integer()}
+          # `a..b//step`, step honoured: the members are lo, lo + step, ... within the bounds.
+          | {:range, integer(), integer(), integer()}
+          | {:element_of, MapSet.t()}
+          | {:union, [resolved()]}
+          | {:tuple, [resolved()]}
+          | {:function, MapSet.t(), resolved()}
+          | {:record, %{term() => resolved()}}
+          | {:set_of, resolved()}
+          | {:seq_of, resolved()}
+          | :set
+          | :seq
+          | :int
+          | :nat
+
+  @doc """
+  Resolve a stored type expression against the constant assignments.
+
+  This happens at model-check time, not at compile time, because nearly every
+  useful type mentions a constant that has no value until a run assigns one
+  (D-19). `where` names the variable, for the error message.
+  """
+  def resolve!(type, constants, where)
+
+  def resolve!(:set, _constants, _where), do: :set
+  def resolve!(:seq, _constants, _where), do: :seq
+  def resolve!(:int, _constants, _where), do: :int
+  def resolve!(:nat, _constants, _where), do: :nat
+
+  def resolve!(literal, _constants, _where)
+      when is_atom(literal) or is_integer(literal) or is_binary(literal),
+      do: {:literal, literal}
+
+  def resolve!({:^, _, [{name, _, ctx}]}, constants, where) when is_atom(ctx) do
+    case Map.fetch(constants, name) do
+      {:ok, %MapSet{} = set} ->
+        {:element_of, set}
+
+      {:ok, enumerable} when is_list(enumerable) ->
+        {:element_of, MapSet.new(enumerable)}
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "the type of #{inspect(where)} says `^#{name}`, which means \"any element of " <>
+                "the constant\" -- but #{name} was assigned #{inspect(other)}, which is not a " <>
+                "set (02-dsl-semantics.md §1.5)."
+
+      :error ->
+        raise ArgumentError,
+              "the type of #{inspect(where)} refers to ^#{name}, which this run did not assign."
+    end
+  end
+
+  def resolve!({:|, _, [left, right]}, constants, where) do
+    {:union, [resolve!(left, constants, where), resolve!(right, constants, where)]}
+  end
+
+  def resolve!({:.., _, [lo, hi]}, constants, where),
+    do: {:range, bound!(lo, constants, where), bound!(hi, constants, where)}
+
+  def resolve!({:..//, _, [lo, hi, step]}, constants, where),
+    do:
+      {:range, bound!(lo, constants, where), bound!(hi, constants, where),
+       bound!(step, constants, where)}
+
+  def resolve!({a, b}, constants, where),
+    do: {:tuple, [resolve!(a, constants, where), resolve!(b, constants, where)]}
+
+  def resolve!({:{}, _, elements}, constants, where) when is_list(elements),
+    do: {:tuple, Enum.map(elements, &resolve!(&1, constants, where))}
+
+  def resolve!([{:~>, _, [domain, range]}], constants, where) do
+    {:function, domain_values!(resolve!(domain, constants, where), where),
+     resolve!(range, constants, where)}
+  end
+
+  def resolve!({:set, _, [element]}, constants, where),
+    do: {:set_of, resolve!(element, constants, where)}
+
+  def resolve!({:seq, _, [element]}, constants, where),
+    do: {:seq_of, resolve!(element, constants, where)}
+
+  def resolve!({:%{}, _, pairs}, constants, where) when is_list(pairs) do
+    {:record, Map.new(pairs, fn {key, type} -> {key, resolve!(type, constants, where)} end)}
+  end
+
+  # Every element was checked to be a literal at compile time, so the list IS the
+  # set of permitted values. Note that `[:set]` therefore means the literal atom
+  # `:set`, while a bare `:set` means any MapSet — inside a list there is nothing
+  # for the special form to be ambiguous with.
+  def resolve!(list, _constants, _where) when is_list(list), do: {:one_of, list}
+
+  # The domain of a function type has to denote a SET of keys, because the check
+  # is "the map's keys are exactly this" -- not "each key is of this type". A
+  # map missing a key its domain declares is the failure that matters: TLA+
+  # functions are total, and a partial one is what an action that forgot to
+  # extend it produces.
+  defp domain_values!({:element_of, set}, _where), do: set
+  defp domain_values!({:one_of, values}, _where), do: MapSet.new(values)
+  defp domain_values!({:literal, value}, _where), do: MapSet.new([value])
+  defp domain_values!({:range, lo, hi}, _where), do: MapSet.new(lo..hi//1)
+  defp domain_values!({:range, lo, hi, step}, _where), do: MapSet.new(lo..hi//step)
+
+  defp domain_values!(other, where) do
+    raise ArgumentError,
+          "the type of #{inspect(where)} uses #{inspect(other)} as a function domain, but a " <>
+            "domain has to denote a set of keys -- a constant, a literal list, or a range " <>
+            "(02-dsl-semantics.md §1.5)."
+  end
+
+  defp bound!({:^, _, [{name, _, ctx}]}, constants, where) when is_atom(ctx) do
+    case Map.fetch(constants, name) do
+      {:ok, bound} when is_integer(bound) ->
+        bound
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "the type of #{inspect(where)} uses ^#{name} as a range bound, but #{name} was " <>
+                "assigned #{inspect(other)}, which is not an integer."
+
+      :error ->
+        raise ArgumentError,
+              "the type of #{inspect(where)} refers to ^#{name}, which this run did not assign."
+    end
+  end
+
+  defp bound!(bound, _constants, _where) when is_integer(bound), do: bound
+
+  defp bound!({:-, _meta, [bound]}, constants, where), do: -bound!(bound, constants, where)
+
+  defp bound!({:+, _, [l, r]}, c, w), do: bound!(l, c, w) + bound!(r, c, w)
+  defp bound!({:-, _, [l, r]}, c, w), do: bound!(l, c, w) - bound!(r, c, w)
+  defp bound!({:*, _, [l, r]}, c, w), do: bound!(l, c, w) * bound!(r, c, w)
+  defp bound!({:div, _, [l, r]}, c, w), do: div(bound!(l, c, w), bound!(r, c, w))
+
+  @doc """
+  Whether a value inhabits a resolved type.
+  """
+  def member?({:literal, literal}, value), do: value === literal
+  def member?({:one_of, literals}, value), do: Enum.any?(literals, &(&1 === value))
+
+  def member?({:range, lo, hi}, value),
+    do: is_integer(value) and value >= lo and value <= hi
+
+  # `Enum.member?/2` on a stepped range is exact -- the value must be lo + k * step for some
+  # k with the result inside the bounds -- and honours a negative step.
+  def member?({:range, lo, hi, step}, value),
+    do: is_integer(value) and Enum.member?(lo..hi//step, value)
+
+  def member?({:element_of, set}, value), do: MapSet.member?(set, value)
+  def member?({:union, types}, value), do: Enum.any?(types, &member?(&1, value))
+
+  def member?({:tuple, types}, value) do
+    is_tuple(value) and tuple_size(value) == length(types) and
+      value |> Tuple.to_list() |> Enum.zip(types) |> Enum.all?(fn {v, t} -> member?(t, v) end)
+  end
+
+  def member?({:function, domain, range}, value) do
+    is_map(value) and not is_struct(value) and
+      MapSet.new(Map.keys(value)) == domain and
+      Enum.all?(Map.values(value), &member?(range, &1))
+  end
+
+  def member?({:set_of, element}, value),
+    do: is_struct(value, MapSet) and Enum.all?(value, &member?(element, &1))
+
+  def member?({:seq_of, element}, value),
+    do: is_list(value) and Enum.all?(value, &member?(element, &1))
+
+  # A record's keys are exactly those declared, for the same reason a function's
+  # domain is exactly its declared domain: a message with a field the spec never
+  # gave it is the shape error this type exists to catch.
+  def member?({:record, fields}, value) do
+    is_map(value) and not is_struct(value) and
+      map_size(value) == map_size(fields) and
+      Enum.all?(fields, fn {key, type} ->
+        case Map.fetch(value, key) do
+          {:ok, field} -> member?(type, field)
+          :error -> false
+        end
+      end)
+  end
+
+  def member?(:set, value), do: is_struct(value, MapSet)
+  def member?(:seq, value), do: is_list(value)
+  def member?(:int, value), do: is_integer(value)
+  def member?(:nat, value), do: is_integer(value) and value >= 0
+
+  @doc """
+  The typed variables of a spec, resolved against this run's constants.
+
+  Resolution happens once per run rather than once per state: the constants do
+  not change, and the state space is where the work is.
+  """
+  def resolved_variables(spec, constants) do
+    for %{name: name, type: type} <- spec.variables, type != nil do
+      {name, resolve!(type, constants, name)}
+    end
+  end
+
+  @doc """
+  Check a state against the resolved variable types.
+
+  Types are checked as an invariant rather than used to prune, so a state outside
+  its type is a reported violation and not a silently narrower search (D-19).
+  """
+  def check_state(resolved, state) do
+    Enum.find_value(resolved, :ok, fn {name, type} ->
+      value = Map.fetch!(state, name)
+      if member?(type, value), do: nil, else: {:violation, name, type, value}
+    end)
+  end
+
+  @doc """
+  The implicit `:type_ok` invariant for a run, or `nil` when no variable is typed.
+
+  It is checked in every reachable state, which is why a coverage report lists a
+  `type_ok` the spec never declared.
+  """
+  def invariant(spec, constants) do
+    case resolved_variables(spec, constants) do
+      [] ->
+        nil
+
+      resolved ->
+        %{
+          name: :type_ok,
+          description: "every variable holds a value of its declared type",
+          predicate: fn _constants, state -> check_state(resolved, state) == :ok end
+        }
+    end
+  end
+
+  @doc """
+  Explain a `:type_ok` violation: which variable, what it holds, what it declared.
+  """
+  def explain(spec, constants, state) do
+    case spec |> resolved_variables(constants) |> check_state(state) do
+      {:violation, name, type, value} ->
+        "#{name} = #{inspect(value)}, which is not #{describe(type)}"
+
+      :ok ->
+        "no variable is outside its declared type"
+    end
+  end
+
+  @doc """
+  Render a resolved type for a violation message.
+  """
+  def describe({:literal, literal}), do: inspect(literal)
+  def describe({:one_of, literals}), do: Enum.map_join(literals, " | ", &inspect/1)
+  def describe({:range, lo, hi}), do: "#{lo}..#{hi}"
+  def describe({:range, lo, hi, step}), do: "#{lo}..#{hi}//#{step}"
+  def describe({:element_of, set}), do: "an element of #{inspect(set)}"
+  def describe({:union, types}), do: Enum.map_join(types, " | ", &describe/1)
+  def describe({:tuple, types}), do: "{" <> Enum.map_join(types, ", ", &describe/1) <> "}"
+
+  def describe({:function, domain, range}),
+    do: "a map with keys #{inspect(MapSet.to_list(domain))} and values in #{describe(range)}"
+
+  def describe({:set_of, element}), do: "a MapSet of #{describe(element)}"
+  def describe({:seq_of, element}), do: "a list of #{describe(element)}"
+
+  def describe({:record, fields}) do
+    "%{" <>
+      (fields
+       |> Enum.sort_by(fn {key, _} -> key end)
+       |> Enum.map_join(", ", fn {key, type} -> "#{key}: #{describe(type)}" end)) <> "}"
+  end
+
+  def describe(:set), do: "a MapSet"
+  def describe(:seq), do: "a list"
+  def describe(:int), do: "an integer"
+  def describe(:nat), do: "a non-negative integer"
+end

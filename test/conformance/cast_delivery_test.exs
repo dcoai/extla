@@ -1,10 +1,10 @@
-defmodule TLA.CastDeliveryTest do
+defmodule ExTLA.CastDeliveryTest do
   @moduledoc """
   An action the server takes by cast is drivable, not merely checkable (#306, closes #172).
 
   ## The gap this closes
 
-  `TLA.GenServer.Driver` sent `{:"$gen_call", …}` unconditionally, and it is the sole
+  `ExTLA.GenServer.Driver` sent `{:"$gen_call", …}` unconditionally, and it is the sole
   delivery path for both Layer 3 drivers. **`spec/05-layer3-conformance.md`'s own canonical
   refinement maps `:complete_transfer` and `:reset` to `handle_cast/2` clauses.** Delivered
   as a call those reach `handle_call/3`, which has no matching clause: the server dies and
@@ -29,9 +29,9 @@ defmodule TLA.CastDeliveryTest do
 
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.{CastRefinement, Impl, Refinement, Spec}
-  alias TLA.GenServer.Driver
-  alias TLA.{ModelChecker, Replay, Simulation, Trace}
+  alias ExTLA.Conformance.Counter.{CastRefinement, Impl, Refinement, Spec}
+  alias ExTLA.GenServer.Driver
+  alias ExTLA.{ModelChecker, Replay, Simulation, Trace}
 
   defp start(module) do
     {:ok, pid} = module.start_link()
@@ -122,7 +122,7 @@ defmodule TLA.CastDeliveryTest do
 
       # Anti-vacuity, and it is the assertion that matters: a run that only ever drew
       # `increment` would pass without ever sending a cast. `actions_hit` is the census
-      # `TLA.Coverage` keeps of what actually ran.
+      # `ExTLA.Coverage` keeps of what actually ran.
       assert Map.has_key?(result.coverage.actions_hit, :done),
              "seed 11 never drew `done`, so this asserts nothing about the cast path: " <>
                inspect(result.coverage.actions_hit)
@@ -175,7 +175,7 @@ defmodule TLA.CastDeliveryTest do
       # `validate!/3` raises on a finding and returns the rules it could not decide, so
       # "did not raise" is the assertion — and the deferred list is asserted too, since a
       # rule quietly moving into it would be the same defect wearing a different coat.
-      assert {:ok, deferred} = TLA.Refinement.validate!(CastRefinement, Spec, %{max_val: 5})
+      assert {:ok, deferred} = ExTLA.Refinement.validate!(CastRefinement, Spec, %{max_val: 5})
 
       # Exactly the two every mapping defers — both need a concrete state, which a compile
       # does not have. Nothing about naming an action is among them.

@@ -8,7 +8,7 @@ is free or not; any waiting client may take a free lock.
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.Lock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob, :carol])
 
@@ -64,7 +64,7 @@ than a variable that happens not to exist:
 <!-- tla:compile_error match="referenced without `^`" -->
 ```elixir
 defmodule Tutorial.Unpinned do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :limit, default: 3
   variable :n, type: 0..3
@@ -95,8 +95,8 @@ means.
 
 `type: set(t)` says a variable **is** a set. This says what you can do with one.
 
-All of TLA+'s set theory is in scope inside a spec block, unqualified. It is `TLA.Set` and
-`TLA.Function`, which [§Foundation](../../spec/01-foundation.md) specifies, reached through the
+All of TLA+'s set theory is in scope inside a spec block, unqualified. It is `ExTLA.Set` and
+`ExTLA.Function`, which [§Foundation](../../spec/01-foundation.md) specifies, reached through the
 helper module every spec imports — and that module holds no second implementation of any of
 them ([D-38](../../spec/08-decisions.md)).
 
@@ -126,7 +126,7 @@ them ([D-38](../../spec/08-decisions.md)).
 | `[a: S, b: T]` | `record_set(a: s, b: t)` |
 
 Two names differ from the module they come from, and only two: `set_map/2` and `set_filter/2`
-are `TLA.Set.map/2` and `TLA.Set.filter/2`, because an unqualified `map(xs, f)` in a spec block
+are `ExTLA.Set.map/2` and `ExTLA.Set.filter/2`, because an unqualified `map(xs, f)` in a spec block
 reads as `Enum.map/2` to every Elixir programmer who opens the file, and these return a **set**
 — possibly a smaller one, since a non-injective function collapses elements, exactly as in TLA+.
 
@@ -138,7 +138,7 @@ one clause at a time:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.Quorum do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :nodes, default: set([:n1, :n2, :n3])
 
@@ -200,7 +200,7 @@ deduplicate it, so it is refused by name instead:
 
 <!-- tla:run expect=raise match="builds a function over a set" -->
 ```elixir
-TLA.Spec.Helpers.for_each([:alice, :alice, :bob], fn c -> c end)
+ExTLA.Spec.Helpers.for_each([:alice, :alice, :bob], fn c -> c end)
 ```
 
 **`domain/1` of a sequence is `1..Len(s)`, not its elements.** A sequence *is* a function on
@@ -228,7 +228,7 @@ cannot be assigned twice — that is two equations about one value, not a last w
 <!-- tla:compile_error match="assigned 2 times" -->
 ```elixir
 defmodule Tutorial.Twice do
-  use TLA.Spec
+  use ExTLA.Spec
 
   variable :n, type: 0..3
 
@@ -248,7 +248,7 @@ And every name on the left of `=` must be a declared variable — the compiler w
 <!-- tla:compile_error match="undeclared variable" -->
 ```elixir
 defmodule Tutorial.Undeclared do
-  use TLA.Spec
+  use ExTLA.Spec
 
   variable :n, type: 0..3
 

@@ -1,4 +1,4 @@
-defmodule TLA.GraphAudit do
+defmodule ExTLA.GraphAudit do
   @moduledoc """
   Re-evaluate what the search recorded, against what the spec admits (#48).
 
@@ -47,7 +47,7 @@ defmodule TLA.GraphAudit do
   that closed a survivor no other gate could see.
   """
 
-  alias TLA.{ModelChecker, Spec, StateGraph}
+  alias ExTLA.{ModelChecker, Spec, StateGraph}
 
   @doc """
   Audit a completed graph: recorded out-edges against admitted successors, and stuck
@@ -65,7 +65,7 @@ defmodule TLA.GraphAudit do
   def audit(spec, constants, graph) do
     unless StateGraph.liveness?(graph) do
       raise ArgumentError,
-            "TLA.GraphAudit.audit/3 needs the edge table. Build the graph with " <>
+            "ExTLA.GraphAudit.audit/3 needs the edge table. Build the graph with " <>
               "`liveness_graph: true`; parent pointers are a spanning tree and there is " <>
               "nothing in them to audit."
     end
@@ -85,7 +85,7 @@ defmodule TLA.GraphAudit do
   *negated* invariant and evaluate it independently. Written that way the check could not
   fail, and a check that cannot fail is worse than none.
 
-  What makes the partition real is the **third bucket**. `TLA.ModelChecker.Safety` reads a
+  What makes the partition real is the **third bucket**. `ExTLA.ModelChecker.Safety` reads a
   predicate's result with `if` (`safety.ex:28`), so it is truthiness rather than a boolean
   that decides a verdict:
 
@@ -101,7 +101,7 @@ defmodule TLA.GraphAudit do
   It also catches a predicate that **raises** on a reachable state, which today surfaces
   from inside the search rather than as a finding about the invariant.
   """
-  @spec invariant_partition(map(), [map()], MapSet.t(TLA.State.t())) :: :ok | {:error, String.t()}
+  @spec invariant_partition(map(), [map()], MapSet.t(ExTLA.State.t())) :: :ok | {:error, String.t()}
   def invariant_partition(constants, invariants, states) do
     total = MapSet.size(states)
 
@@ -153,7 +153,7 @@ defmodule TLA.GraphAudit do
   5.40x on top.
 
   There is no mode, and no flag, because none is needed. The states come from
-  `TLA.BoundedSearch`, which finds them without the checker's help, and the fingerprint is
+  `ExTLA.BoundedSearch`, which finds them without the checker's help, and the fingerprint is
   observed through `StateGraph.id_of/2`: **two distinct states that collide are handed the
   same id.** So the check is made entirely from outside, `lib/` is untouched, and "the
   default path is unchanged" is a fact about the diff rather than a benchmark result.
@@ -164,7 +164,7 @@ defmodule TLA.GraphAudit do
   is meant to collapse (§Symmetry). The claim only means something without one, so this
   refuses rather than reporting the reduction as a defect.
   """
-  @spec fingerprint_injectivity(StateGraph.t(), MapSet.t(TLA.State.t())) ::
+  @spec fingerprint_injectivity(StateGraph.t(), MapSet.t(ExTLA.State.t())) ::
           :ok | {:error, String.t()}
   def fingerprint_injectivity(graph, states) do
     if graph.symmetry not in [nil, []] do
@@ -193,11 +193,11 @@ defmodule TLA.GraphAudit do
   end
 
   @doc """
-  Every reachable state, found without the checker's help. See `TLA.BoundedSearch`.
+  Every reachable state, found without the checker's help. See `ExTLA.BoundedSearch`.
   """
-  @spec reachable(Spec.Compiled.t(), map()) :: MapSet.t(TLA.State.t())
+  @spec reachable(Spec.Compiled.t(), map()) :: MapSet.t(ExTLA.State.t())
   def reachable(spec, constants) do
-    TLA.BoundedSearch.reachable_within(spec, constants, :infinity)
+    ExTLA.BoundedSearch.reachable_within(spec, constants, :infinity)
   end
 
   defp walk(_spec, _constants, _graph, [], _seen), do: :ok

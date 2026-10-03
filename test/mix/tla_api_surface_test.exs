@@ -4,7 +4,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
   paths are exercised here for the reason `tla_coverage_test.exs` gives: a gate whose failure
   branches no test has run is one that has only ever been seen succeeding.
 
-  The check is `TLA.Surface.check!/4`, shared with `tla.coverage` so there is one definition
+  The check is `ExTLA.Surface.check!/4`, shared with `tla.coverage` so there is one definition
   of "drifted" (#270); its three outcomes are asserted once, here, against a `tmp_dir`. The
   real golden is never touched.
   """
@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
 
   @moduletag :tmp_dir
 
-  describe "TLA.Surface.check!/4" do
+  describe "ExTLA.Surface.check!/4" do
     # This asserts that a match does not raise, and nothing about what is printed.
     #
     # `Mix.shell/1` is VM-global. `tla_coverage_test.exs` sets it to `Mix.Shell.Process` for
@@ -22,12 +22,12 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
     # both failed only under the full suite, which is the worst way to learn it.
     #
     # The success message has one owner — `tla_coverage_test.exs`, over the same shared
-    # `TLA.Surface.check!/4` — and one owner is what a global permits.
+    # `ExTLA.Surface.check!/4` — and one owner is what a global permits.
     test "passes when the file matches what was rendered", %{tmp_dir: tmp} do
       path = Path.join(tmp, "API_SURFACE.md")
       File.write!(path, "identical")
 
-      assert TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical") == :ok
+      assert ExTLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical") == :ok
     end
 
     test "raises on drift, naming the golden and how to regenerate it", %{tmp_dir: tmp} do
@@ -36,7 +36,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
 
       error =
         assert_raise Mix.Error, fn ->
-          TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "what the source says")
+          ExTLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "what the source says")
         end
 
       assert error.message =~ "API_SURFACE.md has drifted"
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
 
       error =
         assert_raise Mix.Error, fn ->
-          TLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "anything")
+          ExTLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "anything")
         end
 
       assert error.message =~ "API_SURFACE.md is missing"
@@ -70,7 +70,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
       # `--check` refuses a difference. `mix tla.mutants` has a `--check` of its own and no
       # `--write`, and it is not a golden — the pair is what identifies one.
       checkers =
-        for task <- TLA.CliSurface.run(),
+        for task <- ExTLA.CliSurface.run(),
             {:check, :boolean} in task.switches,
             {:write, :boolean} in task.switches,
             do: task.task

@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Tla.ApiSurface do
 
   use Mix.Task
 
-  alias TLA.ApiSurface
+  alias ExTLA.ApiSurface
 
   @golden "API_SURFACE.md"
   @switches [write: :boolean, check: :boolean]
@@ -40,7 +40,7 @@ defmodule Mix.Tasks.Tla.ApiSurface do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        TLA.Surface.check!(@golden, "tla.api_surface", path, rendered)
+        ExTLA.Surface.check!(@golden, "tla.api_surface", path, rendered)
 
       true ->
         Mix.shell().info(rendered)
@@ -48,7 +48,7 @@ defmodule Mix.Tasks.Tla.ApiSurface do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest` / `CLI_SURFACE.md`, which hold a task's switches and its
+  # Exposed for `ExTLA.SpecOptionsTest` / `CLI_SURFACE.md`, which hold a task's switches and its
   # documentation to each other.
   def switches, do: @switches
 end

@@ -1,11 +1,11 @@
-defmodule TLA.SetOperationsTaughtTest do
+defmodule ExTLA.SetOperationsTaughtTest do
   @moduledoc """
   The guides teach set **operations** wherever they teach set **types** (#320, for #183).
 
   ## The gap this closes
 
   `type: set(t)` told a reader that a variable can *be* a set. Nothing told them how to take
-  a union of one. Neither `TLA.Set` nor `TLA.Function` was named anywhere in `guides/`,
+  a union of one. Neither `ExTLA.Set` nor `ExTLA.Function` was named anywhere in `guides/`,
   `README.md` or `usage-rules.md` — only in `spec/` — so the whole of TLA+'s set theory was
   reachable from a spec body (#319) and invisible to the reader who needed it. Anything past
   a map-keyed lock — a queue, a quorum, a set of messages in flight — had nothing to reach
@@ -18,17 +18,17 @@ defmodule TLA.SetOperationsTaughtTest do
      it introduces, the operations by the calls in its prose.
 
   2. **It names every operator a spec body reaches for sets and functions.** That list is
-     derived from `lib/tla/spec/helpers.ex`'s own `defdelegate`s — the façade D-38 describes
+     derived from `lib/ex_tla/spec/helpers.ex`'s own `defdelegate`s — the façade D-38 describes
      — so an operator added to the vocabulary and not taught reddens here. This is the half
      that keeps the page from drifting back into types-only one function at a time.
 
-  The blocks themselves are not this file's business: `TLA.GuideCheck` compiles them and
+  The blocks themselves are not this file's business: `ExTLA.GuideCheck` compiles them and
   asserts their verdicts, and an unannotated block is already red under #156's rule.
   """
   use ExUnit.Case, async: true
 
   @root Path.expand("../..", __DIR__)
-  @helpers Path.join(@root, "lib/tla/spec/helpers.ex")
+  @helpers Path.join(@root, "lib/ex_tla/spec/helpers.ex")
   @external_resource @helpers
 
   # The type form whose page this is about. `02-dsl-semantics.md` §1.5 is the normative
@@ -56,7 +56,7 @@ defmodule TLA.SetOperationsTaughtTest do
     body
   end
 
-  # Every operator `TLA.Spec.Helpers` delegates to the foundation — the vocabulary D-38 made
+  # Every operator `ExTLA.Spec.Helpers` delegates to the foundation — the vocabulary D-38 made
   # reachable from a spec body, read from the façade's own AST rather than written here.
   defp delegated_operators do
     {_, names} =
@@ -116,7 +116,7 @@ defmodule TLA.SetOperationsTaughtTest do
 
       That is the shape #183 was filed about: a reader learns a variable can BE a set and
       leaves without an operation to perform on one. A table row is a claim; the operation
-      has to appear in a block `TLA.GuideCheck` compiles and asserts a verdict for, or the
+      has to appear in a block `ExTLA.GuideCheck` compiles and asserts a verdict for, or the
       page can teach an operation that stopped working.
       """
     end
@@ -135,7 +135,7 @@ defmodule TLA.SetOperationsTaughtTest do
 
         #{Enum.map_join(untaught, ", ", &to_string/1)}
 
-      `TLA.Spec.Helpers` delegates each of these to `TLA.Set` or `TLA.Function` (D-38), so a
+      `ExTLA.Spec.Helpers` delegates each of these to `ExTLA.Set` or `ExTLA.Function` (D-38), so a
       spec author can call it unqualified — and will not, having never been told it exists.
       Add it to the table in §Operations on sets and functions.
       """
@@ -143,7 +143,7 @@ defmodule TLA.SetOperationsTaughtTest do
 
     test "and every operator it names is one a spec body can actually call" do
       [path] = pages_introducing_set_types()
-      reachable = MapSet.new(TLA.Spec.Helpers.__info__(:functions), &elem(&1, 0))
+      reachable = MapSet.new(ExTLA.Spec.Helpers.__info__(:functions), &elem(&1, 0))
 
       # Names on the page that are neither a helper nor ordinary Elixir. The second list is
       # short on purpose: a page that drifts into teaching `Enum` as the DSL's vocabulary is
@@ -158,7 +158,7 @@ defmodule TLA.SetOperationsTaughtTest do
 
       assert invented == [], """
       #{path} names #{inspect(invented)} as callable from a spec block, and
-      `TLA.Spec.Helpers` does not export it. A reader gets `UndefinedFunctionError` on the
+      `ExTLA.Spec.Helpers` does not export it. A reader gets `UndefinedFunctionError` on the
       first call.
       """
     end

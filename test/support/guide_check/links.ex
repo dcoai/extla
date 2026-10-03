@@ -1,4 +1,4 @@
-defmodule TLA.GuideCheck.Links do
+defmodule ExTLA.GuideCheck.Links do
   @moduledoc """
   Every relative link in a guide resolves — the file exists, and the anchor is a heading it has
   (#98, #99).
@@ -111,16 +111,16 @@ defmodule TLA.GuideCheck.Links do
   part of the slug; it does not need stripping, because a backtick collapses into the same `-`
   run as the space beside it, and stripping `_` made this check reject a link that works.
 
-      iex> TLA.GuideCheck.Links.slug("1.5 Type annotations")
+      iex> ExTLA.GuideCheck.Links.slug("1.5 Type annotations")
       "1-5-type-annotations"
 
-      iex> TLA.GuideCheck.Links.slug("4. `action_property` uses `old` and `new`")
+      iex> ExTLA.GuideCheck.Links.slug("4. `action_property` uses `old` and `new`")
       "4-action_property-uses-old-and-new"
 
-      iex> TLA.GuideCheck.Links.slug("5.1 The supported temporal fragment is bounded — say so")
+      iex> ExTLA.GuideCheck.Links.slug("5.1 The supported temporal fragment is bounded — say so")
       "5-1-the-supported-temporal-fragment-is-bounded-say-so"
 
-      iex> TLA.GuideCheck.Links.slug("1.6 `f[x]` is function application, and it is strict")
+      iex> ExTLA.GuideCheck.Links.slug("1.6 `f[x]` is function application, and it is strict")
       "1-6-f-x-is-function-application-and-it-is-strict"
   """
   def slug(heading) do

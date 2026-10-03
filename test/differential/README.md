@@ -67,14 +67,14 @@ shape of the lasso is left out of `expected.json`.
 for a lasso it is the wrong way. What the corpus does instead needs no oracle at all,
 because a counterexample is a claim about the *spec* and the spec is right here:
 
-- **`TLA.Trace.validate/3`** — every counterexample the corpus produces, safety and
+- **`ExTLA.Trace.validate/3`** — every counterexample the corpus produces, safety and
   liveness alike, is checked to be a behaviour the spec admits: it starts at a state an
   `init` block produces, every step names an action enabled there *with that binding*, and
   every step's post-state is what that action's transition actually returns. Before this
   existed, a counterexample with real states, real actions and a fabricated pairing between
   them passed every gate the project had.
-- **`TLA.TemporalCheck`** — the property is evaluated over the behaviour directly, with
-  `TLA.Temporal`'s operators, which share no code with `TLA.ModelChecker.Liveness`. A
+- **`ExTLA.TemporalCheck`** — the property is evaluated over the behaviour directly, with
+  `ExTLA.Temporal`'s operators, which share no code with `ExTLA.ModelChecker.Liveness`. A
   lasso the checker calls a counterexample must come back `:violated`, and its cycle must
   satisfy every fairness constraint the spec declares — otherwise the checker has handed
   back a behaviour the spec's own assumptions forbid.
@@ -178,9 +178,9 @@ copies from declared `type: [^resources ~> :set]` where the checker had been giv
 `set(^processes)`. Two files agreeing by discipline is what discipline spends first.
 
 What the generator changes, and why neither is drift: the module name (`Specs.X` on the
-page, `TLA.Differential.X` here, because this is a test tree) and `default:` on the
+page, `ExTLA.Differential.X` here, because this is a test tree) and `default:` on the
 constants (the page shows what a reader writes — the assignment belongs to a run — while
-`TLA.Ledger` needs one to resolve the spec at all). `TLA.Examples` holds those defaults
+`ExTLA.Ledger` needs one to resolve the spec at all). `ExTLA.Examples` holds those defaults
 to the constants this corpus passes TLC's side, so the ledger and the oracle cannot end
 up checking two different models.
 

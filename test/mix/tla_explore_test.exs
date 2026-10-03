@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Tla.ExploreTest do
 
   alias Mix.Tasks.Tla.{Check, Explore}
 
-  @spec_module "TLA.Conformance.Counter.BuggySpec"
+  @spec_module "ExTLA.Conformance.Counter.BuggySpec"
 
   setup do
     Mix.shell(Mix.Shell.IO)
@@ -223,7 +223,7 @@ defmodule Mix.Tasks.Tla.ExploreTest do
   end
 
   describe "--changed-only" do
-    test "reaches the option on TLA.Trace.explore/3", %{tmp: tmp} do
+    test "reaches the option on ExTLA.Trace.explore/3", %{tmp: tmp} do
       path = counterexample_file(tmp)
       args = [@spec_module, "--trace", path, "--expr", "steady: 1", "--expr", "moving: count"]
 
@@ -241,14 +241,14 @@ defmodule Mix.Tasks.Tla.ExploreTest do
       path = counterexample_file(tmp)
       {_output, code} = task(Explore, ["--trace", path, "--expr", "count"])
 
-      assert message(code) =~ "name the TLA.Spec module"
+      assert message(code) =~ "name the ExTLA.Spec module"
     end
 
     test "a module that is not a spec", %{tmp: tmp} do
       path = counterexample_file(tmp)
       {_output, code} = task(Explore, ["Enum", "--trace", path, "--expr", "count"])
 
-      assert message(code) =~ "does not `use TLA.Spec`"
+      assert message(code) =~ "does not `use ExTLA.Spec`"
     end
 
     test "no --trace" do
@@ -277,9 +277,9 @@ defmodule Mix.Tasks.Tla.ExploreTest do
       path = counterexample_file(tmp)
 
       {_output, code} =
-        task(Explore, ["TLA.Conformance.Counter.Spec", "--trace", path, "--expr", "count"])
+        task(Explore, ["ExTLA.Conformance.Counter.Spec", "--trace", path, "--expr", "count"])
 
-      assert message(code) =~ "has no result for TLA.Conformance.Counter.Spec"
+      assert message(code) =~ "has no result for ExTLA.Conformance.Counter.Spec"
     end
   end
 end

@@ -1,4 +1,4 @@
-defmodule TLA.TestServers do
+defmodule ExTLA.TestServers do
   @moduledoc """
   GenServers used across the Layer 1 tests. They live here rather than inline so they
   compile once, and so a compile error in one is reported against a file.
@@ -7,7 +7,7 @@ defmodule TLA.TestServers do
   defmodule Account do
     @moduledoc "Every Layer 1 declaration at once, on a deliberately breakable server."
     use GenServer
-    use TLA.Invariant
+    use ExTLA.Invariant
 
     invariant :never_negative, desc: "an account may not go below zero" do
       state.balance >= 0
@@ -106,7 +106,7 @@ defmodule TLA.TestServers do
   defmodule Quiet do
     @moduledoc "A server with no declarations at all: the hook must emit no wrapper."
     use GenServer
-    use TLA.Invariant
+    use ExTLA.Invariant
 
     def init(state), do: {:ok, state}
     def handle_call(:ping, _from, state), do: {:reply, :pong, state}
@@ -119,7 +119,7 @@ defmodule TLA.TestServers do
     state reports a violation of a predicate that was given nothing to be about.
     """
     use GenServer
-    use TLA.Invariant
+    use ExTLA.Invariant
 
     invariant :has_balance, desc: "a started account has a balance" do
       is_integer(state.balance)
@@ -141,7 +141,7 @@ defmodule TLA.TestServers do
     action property, and in what `init/1` produces.
     """
     @behaviour :gen_statem
-    use TLA.Invariant
+    use ExTLA.Invariant
 
     invariant :valid_state, desc: "one of three colours, and the count never goes backwards" do
       {name, data} = state
@@ -206,7 +206,7 @@ defmodule TLA.TestServers do
     the test that `@before_compile` emits predicates for a module with no callbacks at
     all.
     """
-    use TLA.Invariant
+    use ExTLA.Invariant
 
     invariant :never_negative, desc: "a counter may not go below zero" do
       state.count >= 0

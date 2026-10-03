@@ -1,10 +1,10 @@
-defmodule TLA.ConformanceStepTest do
+defmodule ExTLA.ConformanceStepTest do
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.Impl
-  alias TLA.Conformance.Counter.{Refinement, Spec}
-  alias TLA.GenServer.Runtime
-  alias TLA.GenServer.Violation
+  alias ExTLA.Conformance.Counter.Impl
+  alias ExTLA.Conformance.Counter.{Refinement, Spec}
+  alias ExTLA.GenServer.Runtime
+  alias ExTLA.GenServer.Violation
 
   # A conformance failure raises inside the server, which reaches the caller as an exit.
   # The call is made from a monitored process so the failure arrives as a message rather
@@ -54,7 +54,7 @@ defmodule TLA.ConformanceStepTest do
       # Four states until #168, because the initial one was recorded twice — this test
       # asserted the duplicate and so agreed with the defect. Two `:increment`/`:done`
       # calls are two steps, and two steps have three states. The opening self-step was a
-      # transition that never happened, which `TLA.Conformance.against_graph/3` classifies
+      # transition that never happened, which `ExTLA.Conformance.against_graph/3` classifies
       # as FORBIDDEN unless the spec carries a self-loop at its initial state — see the
       # `against_graph/3` test below, which is the case that could not pass before.
       assert Runtime.get_trace(server) == %{
@@ -154,7 +154,7 @@ defmodule TLA.ConformanceStepTest do
           })
         end
 
-      assert Exception.message(error) =~ "which TLA.Conformance.Counter.Spec does not declare"
+      assert Exception.message(error) =~ "which ExTLA.Conformance.Counter.Spec does not declare"
       assert Exception.message(error) =~ ":increment"
     end
 
@@ -176,26 +176,26 @@ defmodule TLA.ConformanceStepTest do
   describe "the mapping is validated when the module compiles" do
     test "a mapping that does not name every action fails the build" do
       source = """
-      defmodule TLA.ConformanceStepTest.Unbuildable do
+      defmodule ExTLA.ConformanceStepTest.Unbuildable do
         use GenServer
-        use TLA.GenServer,
-          spec: TLA.Conformance.Counter.Spec,
-          refinement: TLA.Conformance.Counter.Mutants.ActionNeverNamed
+        use ExTLA.GenServer,
+          spec: ExTLA.Conformance.Counter.Spec,
+          refinement: ExTLA.Conformance.Counter.Mutants.ActionNeverNamed
 
         def init(_), do: {:ok, %{value: 0, status: :ready}}
         def handle_call(:increment, _from, state), do: {:reply, :ok, state}
       end
       """
 
-      error = assert_raise TLA.Refinement.Error, fn -> Code.compile_string(source) end
+      error = assert_raise ExTLA.Refinement.Error, fn -> Code.compile_string(source) end
       assert Exception.message(error) =~ "names no message for"
     end
   end
 
   describe "validate!/3's deferred rules are checked on every mapping instead" do
     test "a mapping that returns the wrong variables fails at the transition" do
-      assert_raise TLA.Refinement.Error, fn ->
-        Runtime.abstract!(Spec, TLA.Conformance.Counter.Mutants.MissingVariable, %{
+      assert_raise ExTLA.Refinement.Error, fn ->
+        Runtime.abstract!(Spec, ExTLA.Conformance.Counter.Mutants.MissingVariable, %{
           value: 1,
           status: :ready
         })
@@ -212,20 +212,20 @@ defmodule TLA.ConformanceStepTest do
   describe "a server whose author wrote no init/1" do
     # #300 fixed this for Layer 1 and left Layer 3, where it is UNCONDITIONAL —
     # `init_wrapper/1` wraps `init/1` for every mapping rather than only where an invariant
-    # applies. So `TLA.GenServer`'s own front-page example still did not compile after the
+    # applies. So `ExTLA.GenServer`'s own front-page example still did not compile after the
     # work item that was supposed to close it, and #301's moduledoc gate is what found that.
     #
     # Kept here as well as there because this is the behaviour; the gate is the reader's
     # copy of it.
-    test "compiles under use TLA.GenServer" do
+    test "compiles under use ExTLA.GenServer" do
       assert [{_module, _binary} | _] =
                Code.compile_string("""
                defmodule NoInitLayerThree do
                  use GenServer
 
-                 use TLA.GenServer,
-                   spec: TLA.Conformance.Counter.Spec,
-                   refinement: TLA.Conformance.Counter.Refinement
+                 use ExTLA.GenServer,
+                   spec: ExTLA.Conformance.Counter.Spec,
+                   refinement: ExTLA.Conformance.Counter.Refinement
 
                  def handle_call(:increment, _from, s), do: {:reply, :ok, %{s | value: s.value + 1}}
                end
@@ -233,7 +233,7 @@ defmodule TLA.ConformanceStepTest do
     end
   end
 
-  describe "what use TLA.GenServer says about rules it could not decide" do
+  describe "what use ExTLA.GenServer says about rules it could not decide" do
     # `validate!/3`'s moduledoc argues that "a validator that claims a check it cannot
     # perform is worse than one that states its limits", and the statement of limits was
     # thrown away at the only call site: `{:ok, _deferred} = …` (#169). A user whose mapping
@@ -243,12 +243,12 @@ defmodule TLA.ConformanceStepTest do
     defmodule <NAME> do
       use GenServer
 
-      use TLA.GenServer,
-        spec: TLA.Conformance.Counter.Spec,
+      use ExTLA.GenServer,
+        spec: ExTLA.Conformance.Counter.Spec,
         refinement: <NAME>.Mapping
 
       defmodule Mapping do
-        use TLA.Refinement
+        use ExTLA.Refinement
 
         def abstract(%{value: v, status: s}), do: %{count: v, status: s}
         def abstract_action(:increment), do: {:increment, %{}}
@@ -300,7 +300,7 @@ defmodule TLA.ConformanceStepTest do
 
   describe "Refinement.validate!/3 is not weakened by the layer above it" do
     test "the conforming mapping still validates against the spec" do
-      assert {:ok, deferred} = TLA.Refinement.validate!(Refinement, Spec)
+      assert {:ok, deferred} = ExTLA.Refinement.validate!(Refinement, Spec)
       assert length(deferred) == 2
     end
   end

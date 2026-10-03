@@ -1,10 +1,10 @@
-defmodule TLA.DocLinks do
+defmodule ExTLA.DocLinks do
   @moduledoc """
   Every internal link in the **built** documentation resolves (#102, #103).
 
   ## Why a second link gate
 
-  `TLA.GuideCheck.Links` checks the links the guides *write*, in markdown, against markdown. This
+  `ExTLA.GuideCheck.Links` checks the links the guides *write*, in markdown, against markdown. This
   one checks the site ExDoc *publishes*. The two are not the same surface, and the gap between
   them is where #102 lived: ExDoc emits the sidebar's home link itself, pointing at
   `readme.html`, and no build produced that file — `README.md` and `spec/README.md` both derived

@@ -11,34 +11,34 @@ Code.require_file("test/differential/distributed_lock/spec.ex")
 Code.require_file("test/differential/raft_election/spec.ex")
 
 entries = [
-  {TLA.Differential.DistributedLock,
+  {ExTLA.Differential.DistributedLock,
    %{processes: MapSet.new([:p1, :p2]), resources: MapSet.new([:r1, :r2])}, [:processes]},
-  {TLA.Differential.DistributedLock,
+  {ExTLA.Differential.DistributedLock,
    %{processes: MapSet.new([:p1, :p2]), resources: MapSet.new([:r1, :r2])},
    [:processes, :resources]},
-  {TLA.Differential.DistributedLock,
+  {ExTLA.Differential.DistributedLock,
    %{processes: MapSet.new([:p1, :p2, :p3]), resources: MapSet.new([:r1, :r2])},
    [:processes, :resources]},
-  {TLA.Differential.RaftElection, %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2},
+  {ExTLA.Differential.RaftElection, %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2},
    [:servers]}
 ]
 
 best_of_three = fn module, config ->
-  TLA.ModelChecker.run(module, config)
+  ExTLA.ModelChecker.run(module, config)
 
-  Enum.min(for _ <- 1..3, do: elem(:timer.tc(fn -> TLA.ModelChecker.run(module, config) end), 0))
+  Enum.min(for _ <- 1..3, do: elem(:timer.tc(fn -> ExTLA.ModelChecker.run(module, config) end), 0))
 end
 
 for {module, constants, names} <- entries do
   base = %{constants: constants, invariants: [], action_properties: []}
   reduced = Map.put(base, :symmetry, names)
 
-  full = TLA.ModelChecker.run(module, base)
-  small = TLA.ModelChecker.run(module, reduced)
+  full = ExTLA.ModelChecker.run(module, base)
+  small = ExTLA.ModelChecker.run(module, reduced)
 
   off = best_of_three.(module, base)
   on = best_of_three.(module, reduced)
-  permutations = length(TLA.Symmetry.mappings(constants, names))
+  permutations = length(ExTLA.Symmetry.mappings(constants, names))
 
   IO.puts("""
   #{inspect(module)} symmetry: #{inspect(names)}  (#{permutations} permutations per state)

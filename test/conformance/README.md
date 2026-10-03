@@ -34,7 +34,7 @@ example in the docs does not behave the way the docs say, that is the bug worth 
 
 ## `counter` — the mapping mutants
 
-Each is wrong in exactly one way, and `TLA.Refinement.validate!/3` or `abstract!/3` must
+Each is wrong in exactly one way, and `ExTLA.Refinement.validate!/3` or `abstract!/3` must
 say which.
 
 | Mutant | Fault | Caught by | Reported as |
@@ -48,7 +48,7 @@ say which.
 | `NoClauseForAction` | `concrete_message/2` has no clause for `reset` at all | `validate!/3`, from the clauses `@on_definition` recorded | "has no clause for [:reset]" |
 | `NoAbstractAction` | not a refinement mapping at all | `validate!/3` | "does not define abstract_action/1" |
 
-The last one deliberately does not `use TLA.Refinement`: with the behaviour declared the
+The last one deliberately does not `use ExTLA.Refinement`: with the behaviour declared the
 compiler already warns, so what is left to catch is a module handed to `refinement:`
 without ever claiming to be one.
 
@@ -56,7 +56,7 @@ without ever claiming to be one.
 
 Written down before the checker existed, for the reason the TLC oracle landed before the
 model checker: an answer with nothing to compare it against is a claim. Each is now
-checked by `TLA.GenServer.Runtime.check_step!/5` through a running server, in
+checked by `ExTLA.GenServer.Runtime.check_step!/5` through a running server, in
 `step_test.exs`.
 
 | Mutant | Fault | Must be reported as |
@@ -111,8 +111,8 @@ spec's own `params:`, which is where nondeterminism lives.
 |---|---|
 | 100 random traces against `Conforming` | `:ok`, 100% of the spec's actions covered |
 | the same seed, twice | the same walk, state for state |
-| 5 traces against `CollapsesTwoSteps` | `:violation`, and the finding is a `TLA.Trace` |
-| that trace, handed to `TLA.Replay.counterexample/3` | `:diverged` again, on the same server |
+| 5 traces against `CollapsesTwoSteps` | `:violation`, and the finding is a `ExTLA.Trace` |
+| that trace, handed to `ExTLA.Replay.counterexample/3` | `:diverged` again, on the same server |
 | `Conforming` under the UNRESTRICTED generator | `:not_enabled` — see below |
 | failure injection over 20 traces | `:ok`, with restarts, each landing in a legal state |
 
@@ -131,7 +131,7 @@ value says which:
   checked on every mapping by `abstract!/3` instead.
 - every mapped value is a permitted state term (`02-dsl-semantics.md` §6) — same reason.
 - every spec action is named by some clause — decidable only where `concrete_message/2`
-  exists to enumerate them with. Without it, `TLA.Coverage` reports the action as never
+  exists to enumerate them with. Without it, `ExTLA.Coverage` reports the action as never
   exercised, which is where that belongs.
 
 Purity of `abstract/1` is not checked at all. An earlier draft of §05 said it was; it is

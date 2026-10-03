@@ -1,6 +1,6 @@
 # The `stream_data` fallbacks, executed (#89, #90).
 #
-# `TLA.PropertyTest` and `TLA.Invariant.Test` gate their generator functions behind
+# `ExTLA.PropertyTest` and `ExTLA.Invariant.Test` gate their generator functions behind
 # `if Code.ensure_loaded?(StreamData)`, with an `else` branch that defines the same functions to
 # raise a helpful ArgumentError rather than be undefined. That branch is compiled ONLY where
 # `stream_data` is absent -- which is how the library builds as a dependency, and never how the
@@ -72,14 +72,14 @@ else
   System.halt(1)
 end
 
-Check.raises!("TLA.PropertyTest.init_states/2", fn -> TLA.PropertyTest.init_states(nil, nil) end)
+Check.raises!("ExTLA.PropertyTest.init_states/2", fn -> ExTLA.PropertyTest.init_states(nil, nil) end)
 
-Check.raises!("TLA.PropertyTest.action_sequences/3", fn ->
-  TLA.PropertyTest.action_sequences(nil, nil)
+Check.raises!("ExTLA.PropertyTest.action_sequences/3", fn ->
+  ExTLA.PropertyTest.action_sequences(nil, nil)
 end)
 
-Check.raises!("TLA.Invariant.Test.valid_states/3", fn ->
-  TLA.Invariant.Test.valid_states(nil, nil, nil)
+Check.raises!("ExTLA.Invariant.Test.valid_states/3", fn ->
+  ExTLA.Invariant.Test.valid_states(nil, nil, nil)
 end)
 
 IO.puts("all three fallbacks raise, and say how to fix it")

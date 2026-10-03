@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Tla.Simulate do
-  @shortdoc "Run random traces of a TLA.GenServer against its spec"
+  @shortdoc "Run random traces of a ExTLA.GenServer against its spec"
 
   @moduledoc """
-  Run random traces of a `TLA.GenServer` module against the specification it refines.
+  Run random traces of a `ExTLA.GenServer` module against the specification it refines.
 
   ## Usage
 
@@ -54,7 +54,7 @@ defmodule Mix.Tasks.Tla.Simulate do
 
   The two findings behind `1` are named apart in the verdict line, and they are different
   answers: a conformance violation is about the implementation, while leaving the graph may
-  be about the SEARCH — `TLA.Conformance`'s `:checker` class is the one finding no other
+  be about the SEARCH — `ExTLA.Conformance`'s `:checker` class is the one finding no other
   gate in the project can produce.
 
   A green run has checked the traces it drew and nothing else. The coverage line says
@@ -64,8 +64,8 @@ defmodule Mix.Tasks.Tla.Simulate do
 
   use Mix.Task
 
-  alias TLA.{Simulation, Trace}
-  alias TLA.Simulation.Generator
+  alias ExTLA.{Simulation, Trace}
+  alias ExTLA.Simulation.Generator
 
   @switches [
     traces: :integer,
@@ -87,7 +87,7 @@ defmodule Mix.Tasks.Tla.Simulate do
     module =
       case names do
         [name] -> resolve!(name)
-        [] -> Mix.raise("name the TLA.GenServer module to simulate.")
+        [] -> Mix.raise("name the ExTLA.GenServer module to simulate.")
         many -> Mix.raise("one module at a time; got #{Enum.join(many, ", ")}.")
       end
 
@@ -111,7 +111,7 @@ defmodule Mix.Tasks.Tla.Simulate do
 
       not function_exported?(module, :__tla_spec_module__, 0) ->
         Mix.raise(
-          "#{inspect(module)} does not `use TLA.GenServer`, so there is no specification " <>
+          "#{inspect(module)} does not `use ExTLA.GenServer`, so there is no specification " <>
             "to simulate it against. (A module compiled under `config :extla, mode: " <>
             ":disabled` also carries nothing — see 05-layer3-conformance.md.)"
         )
@@ -125,7 +125,7 @@ defmodule Mix.Tasks.Tla.Simulate do
   # checker's graph, and every step an edge. A step the SPEC permits that the graph lacks
   # is a defect in the search — the one finding no other gate here can produce.
   #
-  # This builds the graph and hands it to `TLA.Simulation`, which holds each behaviour
+  # This builds the graph and hands it to `ExTLA.Simulation`, which holds each behaviour
   # against it as that behaviour finishes. It used to run a SECOND suite of `traces`
   # simulations afterwards, one at a time, forwarding two of the five options (#180) — so
   # `--unrestricted --against-graph` audited containment with the RESTRICTED generator while
@@ -136,10 +136,10 @@ defmodule Mix.Tasks.Tla.Simulate do
   # One suite cannot diverge from itself, and the seeds it reports are the seeds it ran.
   defp graph_for!(module, _opts) do
     spec_module = module.__tla_spec_module__()
-    spec = TLA.Spec.Compiled.from_module(spec_module)
+    spec = ExTLA.Spec.Compiled.from_module(spec_module)
 
     constants =
-      case TLA.Spec.Compiled.resolve_constants(spec) do
+      case ExTLA.Spec.Compiled.resolve_constants(spec) do
         {:ok, constants} ->
           constants
 
@@ -153,7 +153,7 @@ defmodule Mix.Tasks.Tla.Simulate do
       end
 
     {result, graph} =
-      TLA.ModelChecker.explore(spec_module, %{
+      ExTLA.ModelChecker.explore(spec_module, %{
         constants: constants,
         liveness_graph: true,
         invariants: [],
@@ -207,7 +207,7 @@ defmodule Mix.Tasks.Tla.Simulate do
       refinement = module.__tla_refinement__()
 
       {:ok, constants} =
-        spec |> TLA.Spec.Compiled.from_module() |> TLA.Spec.Compiled.resolve_constants()
+        spec |> ExTLA.Spec.Compiled.from_module() |> ExTLA.Spec.Compiled.resolve_constants()
 
       Map.put(config, :message_generator, Generator.from_spec(spec, refinement, constants))
     else
@@ -253,7 +253,7 @@ defmodule Mix.Tasks.Tla.Simulate do
   defp verdict(%{status: :error}), do: "THE SERVER DID NOT ANSWER"
 
   # Its own verdict, because it is a different question from conformance. The class is in
-  # `TLA.Conformance.explain/1`, which `detail` carries: `:checker` means the SEARCH missed
+  # `ExTLA.Conformance.explain/1`, which `detail` carries: `:checker` means the SEARCH missed
   # a step the spec permits, and no other gate in the project can produce that.
   defp verdict(%{status: :left_the_graph}), do: "LEFT THE CHECKER'S GRAPH"
 
@@ -277,8 +277,8 @@ defmodule Mix.Tasks.Tla.Simulate do
         detail: result.detail,
         coverage: result.coverage,
 
-        # The class, not the whole finding: `TLA.Conformance`'s findings carry states, and
-        # a state is `TLA.State.Json`'s business rather than this task's. The class is what
+        # The class, not the whole finding: `ExTLA.Conformance`'s findings carry states, and
+        # a state is `ExTLA.State.Json`'s business rather than this task's. The class is what
         # a reader acts on -- `:checker` says the SEARCH missed a step the spec permits.
         containment: containment_class(result.containment),
         violation:
@@ -295,8 +295,8 @@ defmodule Mix.Tasks.Tla.Simulate do
     )
   end
 
-  # The class, not the whole finding: `TLA.Conformance`'s findings carry states, and a state
-  # is `TLA.State.Json`'s business rather than this task's. The class is what a reader acts
+  # The class, not the whole finding: `ExTLA.Conformance`'s findings carry states, and a state
+  # is `ExTLA.State.Json`'s business rather than this task's. The class is what a reader acts
   # on -- `:checker` says the SEARCH missed a step the spec permits.
   #
   # `:nothing_observed` is a bare atom rather than a tagged tuple, because it is a refusal
@@ -315,7 +315,7 @@ defmodule Mix.Tasks.Tla.Simulate do
   defp exit_with(%{status: :left_the_graph}), do: exit({:shutdown, 1})
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
   # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches

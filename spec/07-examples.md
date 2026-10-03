@@ -18,7 +18,7 @@ considered settled. A construct no example needs is a construct the DSL does not
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.DistributedLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :processes
   constant :resources
@@ -125,12 +125,12 @@ end
 ```elixir
 defmodule MyApp.LockServer do
   use GenServer
-  use TLA.GenServer,
+  use ExTLA.GenServer,
     spec: Specs.DistributedLock,
     refinement: __MODULE__.Refinement
 
   defmodule Refinement do
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(state) do
       %{
@@ -149,7 +149,7 @@ defmodule MyApp.LockServer do
     # params and compares its post-state to the implementation's. They are fully
     # bound here because the message carries them; a mapping may leave a param
     # unbound when the implementation resolves the choice itself, and the check
-    # then searches for a binding (05-layer3-conformance.md §TLA.GenServer.Runtime).
+    # then searches for a binding (05-layer3-conformance.md §ExTLA.GenServer.Runtime).
     def abstract_action({:lock, pid, resource}),
       do: {:request_lock, %{p: pid, r: resource}}
     def abstract_action({:unlock, pid, resource}),
@@ -241,7 +241,7 @@ end
 ```elixir
 defmodule MyApp.LockServerTest do
   use ExUnit.Case
-  import TLA.Spec.Test
+  import ExTLA.Spec.Test
 
   # Layer 2: model check the spec
   test "lock spec satisfies mutual exclusion" do
@@ -266,7 +266,7 @@ defmodule MyApp.LockServerTest do
 
   # Layer 3: simulation against the real server
   test "lock server conforms to spec under random workload" do
-    result = TLA.Simulation.run(MyApp.LockServer, %{
+    result = ExTLA.Simulation.run(MyApp.LockServer, %{
       traces: 1000,
       max_steps: 50,
       constants: %{processes: MapSet.new([:p1, :p2, :p3]), resources: MapSet.new([:r1])},
@@ -280,12 +280,12 @@ defmodule MyApp.LockServerTest do
 
   # Layer 3: replay a counterexample from the checker against the real server
   test "counterexample reproduces against the implementation" do
-    {result, _graph} = TLA.ModelChecker.explore(Specs.DistributedLock, %{
+    {result, _graph} = ExTLA.ModelChecker.explore(Specs.DistributedLock, %{
       constants: %{processes: MapSet.new([:p1, :p2]), resources: MapSet.new([:r1])}
     })
 
     if result.violation do
-      replay = TLA.Replay.counterexample(MyApp.LockServer, result.violation)
+      replay = ExTLA.Replay.counterexample(MyApp.LockServer, result.violation)
       assert replay.status == :violation,
              "the spec permits a behavior the implementation does not — one is wrong"
     end
@@ -306,7 +306,7 @@ network".
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.RaftElection do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :servers
   constant :max_term
@@ -504,7 +504,7 @@ Two notes on this spec:
   compile-time error rather than a subtle capture.
 - `^max_term` is a **model bound**, not part of Raft. The coverage report will show
   `timeout` becoming disabled once every server reaches it; that is the bound working,
-  not a bug, and it is why `bounded_by` appears in `TLA.Coverage`.
+  not a bug, and it is why `bounded_by` appears in `ExTLA.Coverage`.
 - `eventually_elect_leader` is **violated** in this bounded model: a split vote at
   `^max_term` ends in the `term_bound_exhausted` terminal state with no leader. The
   counterexample is the bound, not Raft — the real protocol times out again. TLC's Raft
@@ -523,7 +523,7 @@ Two notes on this spec:
 ```elixir
 defmodule Specs.RaftElectionTest do
   use ExUnit.Case
-  import TLA.Spec.Test
+  import ExTLA.Spec.Test
 
   @constants %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2}
 
@@ -539,7 +539,7 @@ defmodule Specs.RaftElectionTest do
 
   test "leader election is refuted by the term bound, and only by it" do
     result =
-      TLA.ModelChecker.run(Specs.RaftElection, %{constants: @constants, check_liveness: true})
+      ExTLA.ModelChecker.run(Specs.RaftElection, %{constants: @constants, check_liveness: true})
 
     assert result.status == :violation
     assert result.violation.type == :liveness
@@ -566,7 +566,7 @@ A classic concurrency problem exercising every property type.
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.BoundedBuffer do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :producers
   constant :consumers
@@ -706,7 +706,7 @@ end
 ```elixir
 defmodule Specs.BoundedBufferTest do
   use ExUnit.Case
-  import TLA.Spec.Test
+  import ExTLA.Spec.Test
 
   describe "safety properties" do
     test "2 producers, 2 consumers, buffer size 3" do
@@ -766,7 +766,7 @@ exactly what Layer 3's step check buys.
 ```elixir
 # ── Layer 2: Specification ──
 defmodule Specs.Counter do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :max_val
 
@@ -810,12 +810,12 @@ end
 # ── Layers 1 + 3: Implementation with conformance ──
 defmodule MyApp.Counter do
   use GenServer
-  use TLA.GenServer,
+  use ExTLA.GenServer,
     spec: Specs.Counter,
     refinement: __MODULE__.Refinement
 
   defmodule Refinement do
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -863,7 +863,7 @@ The first `handle_call(:increment, …)` clause produces the abstract post-state
 `%{count: 1, status: :incrementing}`. So:
 
 ```
-** (TLA.Conformance.Error) step diverged from spec
+** (ExTLA.Conformance.Error) step diverged from spec
 
   module:  MyApp.Counter
   action:  increment  (params: %{})
@@ -890,14 +890,14 @@ takes a shortcut the design did not sanction.
 # ── Tests ──
 defmodule MyApp.CounterTest do
   use ExUnit.Case
-  import TLA.Spec.Test
+  import ExTLA.Spec.Test
 
   test "spec is correct" do
     assert_spec Specs.Counter, %{constants: %{max_val: 5}, check_liveness: true}
   end
 
   test "implementation conforms to spec" do
-    result = TLA.Simulation.run(MyApp.Counter, %{
+    result = ExTLA.Simulation.run(MyApp.Counter, %{
       traces: 500,
       max_steps: 20,
       constants: %{max_val: 10},

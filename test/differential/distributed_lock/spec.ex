@@ -3,7 +3,7 @@
 # Regenerate with `mix tla.examples --write`; the `surface-drift` job fails on a
 # difference. The specification is the page's fence: editing this file is editing a
 # copy, which is the drift D-21 introduced and #280 closed.
-defmodule TLA.Differential.DistributedLock do
+defmodule ExTLA.Differential.DistributedLock do
   @moduledoc """
   `DistributedLock.tla`, in the ExTLA DSL — generated from `spec/07-examples.md` Example
   1, so "verbatim" holds by construction rather than by discipline.
@@ -11,7 +11,7 @@ defmodule TLA.Differential.DistributedLock do
   What this entry adds over the others is in `test/differential/README.md`. What it
   *specifies* is the page, and only the page.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :processes, default: MapSet.new([:p1, :p2])
   constant :resources, default: MapSet.new([:r1, :r2])

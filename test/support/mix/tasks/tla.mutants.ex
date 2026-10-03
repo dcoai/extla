@@ -36,8 +36,8 @@ defmodule Mix.Tasks.Tla.Mutants do
 
   use Mix.Task
 
-  alias TLA.Mutation
-  alias TLA.Mutation.Catalogue
+  alias ExTLA.Mutation
+  alias ExTLA.Mutation.Catalogue
 
   @artifact "test/mutation/survivors.json"
   @switches [check: :boolean, only: :string, timeout: :integer]

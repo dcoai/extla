@@ -1,0 +1,579 @@
+defmodule ExTLA.Simulation do
+  @moduledoc """
+  Random walks over the real implementation, checked against the spec at every step.
+
+  Where Layer 2 explores every reachable state of the *specification*, this runs the
+  *implementation* through random message sequences and checks each transition with the
+  same refinement check the runtime wrapper uses. What that catches, and the model checker
+  cannot:
+
+  - a refinement mapping that is wrong in a state no test happened to reach;
+  - an implementation bug the abstract model does not contain, because the model does not
+    contain the implementation;
+  - a temporal property that no finite behaviour of the real code satisfies.
+
+  ## The default generator only offers actions the spec enables
+
+  `ExTLA.Simulation.Generator.enabled_only/3`, not `from_spec/3`. The unrestricted generator
+  asks a different question — *does the implementation refuse what the spec forbids in
+  this state* — and most servers are not written to. A `handle_call(:done, …)` clause with
+  no guard of its own accepts `:done` in a state where the spec's `done` is disabled, and
+  the step check reports `:not_enabled`, correctly: it is a true finding about the pair.
+  It is also a finding about nearly every server ever written, so hunting it is opt-in.
+
+  Pass `message_generator: ExTLA.Simulation.Generator.from_spec(spec, refinement, constants)`
+  to ask that question deliberately.
+
+  ## What a simulation is not
+
+  It is sampling, not proof. A run that finds nothing has checked the traces it drew, and
+  `coverage` says which actions those were — a green result over a generator that never
+  produced `reset` says nothing about `reset`. `05-layer3-conformance.md` §Conformance
+  Checking Modes puts exhaustive checking and simulation side by side for this reason.
+
+  ## The counterexample it produces is a `ExTLA.Trace`
+
+  So a simulation failure can be handed straight back to `ExTLA.Replay.counterexample/3`,
+  formatted with `ExTLA.Trace.format/1`, or read the same way a model-checker counterexample
+  is. A finding that arrives in a different shape from the model checker's would be a
+  second thing to learn for no reason.
+  """
+
+  alias ExTLA.GenServer.{Driver, Runtime}
+  alias ExTLA.{Spec, Trace}
+  alias ExTLA.Simulation.Generator
+
+  @type config :: %{
+          optional(:traces) => pos_integer(),
+          optional(:max_steps) => pos_integer(),
+          optional(:message_generator) => (ExTLA.State.t() ->
+                                             term() | {atom(), map(), term()} | nil),
+          optional(:inject_failures) => boolean(),
+          optional(:failure_rate) => float(),
+          optional(:seed) => integer() | nil,
+          optional(:concurrency) => pos_integer(),
+          optional(:init_arg) => term(),
+          optional(:timeout) => timeout(),
+
+          # The model checker's graph, to hold each behaviour against as it finishes:
+          # `%{graph: ExTLA.StateGraph.t(), status: atom()}`, or `nil` to skip the check.
+          #
+          # Given here rather than run as a second suite afterwards (#180). `mix tla.simulate
+          # --against-graph` used to run `traces` MORE simulations, one at a time, forwarding
+          # two of the five options -- so `--unrestricted --against-graph` audited containment
+          # with the RESTRICTED generator while printing that every state was a node, and the
+          # two suites disagreed about the step default and derived their seeds differently.
+          # One suite cannot diverge from itself.
+          optional(:against_graph) => %{graph: term(), status: atom()} | nil
+        }
+
+  @type coverage_report :: %{
+          actions_hit: %{atom() => non_neg_integer()},
+          states_visited: non_neg_integer(),
+          invariants_checked: non_neg_integer(),
+          actions_covered: float()
+        }
+
+  @type result :: %{
+          status: :ok | :violation | :error | :left_the_graph,
+          traces_run: non_neg_integer(),
+          total_steps: non_neg_integer(),
+          violation: Trace.t() | nil,
+
+          # What `ExTLA.Conformance.against_graph/3` found, where `against_graph:` was given
+          # and a behaviour left the graph. `nil` otherwise -- including where the option was
+          # not given at all, which is a different fact from "every behaviour was contained"
+          # and is why `status` carries the answer rather than this field's emptiness.
+          containment: ExTLA.Conformance.finding() | nil,
+          detail: String.t() | nil,
+          duration_ms: non_neg_integer(),
+          seed: integer(),
+          restarts: non_neg_integer(),
+          coverage: coverage_report()
+        }
+
+  @defaults %{
+    traces: 100,
+    max_steps: 25,
+    inject_failures: false,
+    # One step in ten crashes the server, where `inject_failures:` is on. It was written
+    # into `maybe_restart/3` as a literal with no way to reach it (#317), which made the
+    # one number that decides how much of a simulation is recovery the one number a caller
+    # could not set. The default is unchanged.
+    failure_rate: 0.1,
+    concurrency: 1,
+    init_arg: [],
+    timeout: 5_000,
+    against_graph: nil
+  }
+
+  @doc """
+  Run `config.traces` random traces against `module`, stopping at the first finding.
+
+      ExTLA.Simulation.run(MyApp.TransferServer, %{traces: 1000, max_steps: 50, seed: 42})
+
+  The seed is always in the result, generated when none was given: a random run that finds
+  something and cannot be run again has found nothing anybody can act on.
+  """
+  def run(module, config \\ %{}) do
+    config = configure(module, config)
+    started = System.monotonic_time(:millisecond)
+
+    # Stops at the first finding, as documented (#213): the stream is consumed with a halt,
+    # which `Task.async_stream/3` honours by shutting down the tasks still in flight. It
+    # used to run every trace and report the first failure among them, so `traces_run`
+    # counts the traces that ran, not the traces asked for.
+    outcomes =
+      1..config.traces
+      |> Task.async_stream(&one_trace(module, config, &1),
+        max_concurrency: config.concurrency,
+        timeout: :infinity,
+        ordered: true
+      )
+      |> Enum.reduce_while([], fn {:ok, outcome}, acc ->
+        if outcome.status == :ok, do: {:cont, [outcome | acc]}, else: {:halt, [outcome | acc]}
+      end)
+      |> Enum.reverse()
+
+    summarize(outcomes, config, System.monotonic_time(:millisecond) - started)
+  end
+
+  @doc """
+  One trace, with the abstract behaviour it produced.
+
+  The behaviour is returned whether or not anything was found, which is what makes this
+  the debugging entry point: a run that passed and a run that failed are read the same
+  way.
+  """
+  def run_trace(module, config \\ %{}) do
+    config = configure(module, Map.put(config, :traces, 1))
+    started = System.monotonic_time(:millisecond)
+    outcome = one_trace(module, config, 1)
+
+    {summarize([outcome], config, System.monotonic_time(:millisecond) - started),
+     Enum.reverse(outcome.states)}
+  end
+
+  @doc """
+  Drive `module` through an explicit list of concrete messages.
+
+  The reproduction path for a failing simulation whose messages are known, and the way to
+  write a scenario by hand. `ExTLA.Replay.counterexample/3` is the other direction: from
+  *abstract* actions through `concrete_message/2`.
+  """
+  def replay(module, messages, config \\ %{}) do
+    config = configure(module, Map.put(config, :traces, 1))
+    started = System.monotonic_time(:millisecond)
+
+    generator = fn _state -> nil end
+    outcome = drive(module, %{config | message_generator: generator}, messages)
+
+    summarize([outcome], config, System.monotonic_time(:millisecond) - started)
+  end
+
+  # ── One trace ───────────────────────────────────────────────────────────────
+
+  defp one_trace(module, config, index) do
+    drive(module, config, :generated, fn -> seed_for(config.seed, index) end)
+  end
+
+  # One trace, in a process that OWNS its server (#206). The server is started linked and
+  # stays linked, and the process traps exits. Two things follow, and together they are the
+  # whole of the lifetime guarantee:
+  #
+  #   * If anything in the trace raises — a message generator, a refinement mapping, a
+  #     `:sys.get_state` on a server that stopped — this process ends abnormally and the
+  #     link takes the server with it. The first version unlinked the server right after
+  #     starting it and stopped it only on the normal return, so a generator that raised
+  #     once left every started server alive: eight `Impl.Conforming` processes after one
+  #     failed run.
+  #   * If the server crashes — a conformance violation raises inside it — the exit arrives
+  #     here as an `{:EXIT, _, _}` message rather than as a kill, and the trace goes on to
+  #     report it. The driver's monitor is still what turns the crash into
+  #     an outcome; the EXIT message is left in the mailbox of a process about to end.
+  #
+  # A `Task` rather than trapping exits in the caller: `run_trace/2` and `replay/3` are called
+  # from user code, and flipping a caller's `trap_exit` would be a side effect no function
+  # named "run a trace" should have. The caller is linked to the task the way `run/2`'s
+  # `Task.async_stream` already links its workers, so a crash reaches the caller as it did.
+  #
+  # `prepare` runs inside the owning process before the trace: the per-trace seed goes there,
+  # because `:rand` state is per process and the generator draws from it in this one.
+  defp drive(module, config, messages, prepare \\ fn -> :ok end) do
+    fn ->
+      Process.flag(:trap_exit, true)
+      prepare.()
+      owned_drive(module, config, messages)
+    end
+    |> Task.async()
+    |> Task.await(:infinity)
+  end
+
+  defp owned_drive(module, config, messages) do
+    case start(module, config) do
+      {:ok, server} ->
+        state = %{empty_state() | server: server, states: [abstract(config, server)]}
+        state = steps(state, module, config, messages)
+        stop(state.server, config.timeout)
+
+        state
+        |> temporal(config)
+        |> contained(config)
+
+      # `init/1` is allowed to decline. That is not a `MatchError` on `{:ok, pid} =`; it is
+      # an outcome, and one worth reporting by name, since a server that will not start
+      # under the simulation's `init_arg` has not been checked against anything.
+      {:declined, detail} ->
+        %{empty_state() | status: :error, detail: detail}
+    end
+  end
+
+  defp empty_state do
+    %{
+      server: nil,
+      states: [],
+      actions: [],
+      bindings: [],
+      steps: 0,
+      restarts: 0,
+      status: :ok,
+      violation: nil,
+      containment: nil,
+      detail: nil
+    }
+  end
+
+  # Cross-layer agreement (#49), asked of the behaviour this trace just produced rather than
+  # of one a second suite produced later (#180): every state the server visited must be a
+  # node of the checker's graph, and every step an edge. A step the SPEC permits that the
+  # graph lacks is a defect in the SEARCH -- the one finding no other gate can produce.
+  #
+  # After `temporal/2`, and only on a trace that is still `:ok`: a behaviour that already
+  # has a conformance finding is not also asked whether it stayed inside the graph, because
+  # the first answer is the one to act on.
+  defp contained(%{status: :ok} = state, %{against_graph: %{graph: graph, status: status}}) do
+    case ExTLA.Conformance.against_graph(graph, Enum.reverse(state.states), status: status) do
+      :ok ->
+        state
+
+      finding ->
+        %{
+          state
+          | status: :left_the_graph,
+            containment: finding,
+            detail: ExTLA.Conformance.explain(finding)
+        }
+    end
+  end
+
+  defp contained(state, _config), do: state
+
+  defp steps(state, module, config, :generated) do
+    Enum.reduce_while(1..config.max_steps, state, fn _step, state ->
+      case config.message_generator.(hd(state.states)) do
+        nil -> {:halt, state}
+        generated -> {:cont, step(state, module, config, generated)} |> continue?()
+      end
+    end)
+  end
+
+  defp steps(state, module, config, messages) when is_list(messages) do
+    Enum.reduce_while(messages, state, fn message, state ->
+      {:cont, step(state, module, config, {nil, %{}, message})} |> continue?()
+    end)
+  end
+
+  defp continue?({:cont, %{status: :ok} = state}), do: {:cont, state}
+  defp continue?({:cont, state}), do: {:halt, state}
+
+  defp step(state, module, config, generated) do
+    {action, binding, message} = normalize(generated)
+
+    # `deliver/3` and not `call/3`: `message` is whatever `concrete_message/2` returned, and
+    # under D-36 that may name its route -- `{:cast, msg}` for an action the server takes in
+    # `handle_cast/2`. A bare term is still a call.
+    case Driver.deliver(state.server, message, config.timeout) do
+      {:ok, _reply} ->
+        state
+        |> record(action, binding, abstract(config, state.server))
+        |> maybe_restart(module, config)
+
+      {:violation, violation} ->
+        %{
+          state
+          | status: :violation,
+            violation: violation,
+            actions: [action || :unmapped | state.actions],
+            bindings: [binding || %{} | state.bindings],
+            states: [violation.post || hd(state.states) | state.states],
+            steps: state.steps + 1
+        }
+
+      {:stopped, reason} ->
+        %{state | status: :error, detail: "the server stopped with #{inspect(reason)}"}
+
+      {:timeout, ms} ->
+        %{state | status: :error, detail: "no reply within #{ms}ms"}
+    end
+  end
+
+  # A bare message is what `05-layer3-conformance.md` typed `message_generator` as. The
+  # generator here returns the action and binding beside it, because a counterexample
+  # naming its actions is worth more than one that is only a list of messages — and a
+  # user-supplied generator keeps working either way.
+  defp normalize({action, binding, message}), do: {action, binding, message}
+  defp normalize(message), do: {nil, %{}, message}
+
+  defp record(state, action, binding, abstract) do
+    %{
+      state
+      | states: [abstract | state.states],
+        actions: [action || :unmapped | state.actions],
+        bindings: [binding || %{} | state.bindings],
+        steps: state.steps + 1
+    }
+  end
+
+  # A crash is not a step of the specification — nothing in the DSL models one — so a
+  # restart is not checked as a transition. What IS checked is where recovery lands: the
+  # spec's invariants must hold of the recovered abstract state. A server that comes back
+  # in a state its own specification forbids is a finding whatever the spec says about
+  # crashing.
+  defp maybe_restart(state, module, config) do
+    if config.inject_failures and :rand.uniform() < config.failure_rate do
+      # A crash, and a crash runs no `terminate/2`: `:kill` is the point here (#213).
+      Process.exit(state.server, :kill)
+      restart(state, module, config)
+    else
+      state
+    end
+  end
+
+  defp restart(state, module, config) do
+    case start(module, config) do
+      {:declined, detail} ->
+        %{state | server: nil, status: :error, detail: "on restart, " <> detail}
+
+      {:ok, server} ->
+        recovered = abstract(config, server)
+        recovery(state, server, recovered, Runtime.check_spec_invariants(config.spec, recovered))
+    end
+  end
+
+  # Both branches record the same STEP — a `:restart` from the pre-crash state to where
+  # recovery landed — and differ only in the verdict about it. The success branch used to
+  # push the state alone (#168), which is one more state than actions and therefore not a
+  # behaviour: `Trace.to_diffs/1` refuses that shape by name and `format/1` rendered it
+  # anyway, marking the wrong state `[VIOLATION]` (#204, #260). It had to be the success
+  # branch, because a run that ends in a violation stops and a run that recovers goes on to
+  # take more steps against `hd(state.states)`.
+  #
+  # `:restart` is not an action of the spec and is excluded from the action census
+  # (`coverage/2`); what it records is that the behaviour moved, which is true.
+  defp recovery(state, server, recovered, verdict) do
+    recorded = %{
+      state
+      | server: server,
+        restarts: state.restarts + 1,
+        states: [recovered | state.states],
+        actions: [:restart | state.actions],
+        bindings: [%{} | state.bindings]
+    }
+
+    case verdict do
+      :ok -> recorded
+      {:violation, violation} -> %{recorded | status: :violation, violation: violation}
+    end
+  end
+
+  # A finite behaviour can refute `always(P)` and satisfy `eventually(P)` and can do
+  # neither the other way round, so only `:violated` is a finding here — `:inconclusive` is
+  # the honest answer for a property this trace could not settle, not a failure.
+  defp temporal(%{status: :ok} = state, config) do
+    # `dropped: 0` is a claim, and it is true here: a simulation keeps every state it
+    # generated, so this behaviour begins where the run began. The trace buffer of a
+    # long-lived GenServer does not, which is why the count travels with the states at all
+    # (#278).
+    behavior = %{states: Enum.reverse(state.states), dropped: 0}
+
+    case Enum.find(
+           Runtime.check_temporal_properties(config.spec, behavior),
+           &(elem(&1, 1) == :violated)
+         ) do
+      nil ->
+        state
+
+      {name, :violated} ->
+        %{
+          state
+          | status: :violation,
+            violation: %{
+              kind: :temporal,
+              name: name,
+              post: List.last(behavior.states),
+              detail: "the temporal property #{inspect(name)} is violated by this behaviour"
+            }
+        }
+    end
+  end
+
+  defp temporal(state, _config), do: state
+
+  # ── Setup and summary ───────────────────────────────────────────────────────
+
+  defp configure(module, config) do
+    spec = module.__tla_spec_module__()
+    refinement = module.__tla_refinement__()
+    # The server under test resolves its constants from application config, in
+    # `ExTLA.GenServer.Runtime.context/1`; a generator built on any other assignment would
+    # drive it against a different specification. So there is no `constants:` option here
+    # (#213) — the one place both sides read is the one place they can agree.
+    if Map.has_key?(config, :constants) do
+      raise ArgumentError,
+            "ExTLA.Simulation takes no `constants:` — the server under test resolves its " <>
+              "constants from `config :extla, #{inspect(spec)}, constants: %{…}`, and the " <>
+              "generator has to use the same ones. Configure them there."
+    end
+
+    constants = constants!(spec)
+
+    @defaults
+    |> Map.merge(config)
+    |> Map.merge(%{
+      spec: spec,
+      refinement: refinement,
+      constants: constants,
+      seed: Map.get(config, :seed) || :erlang.unique_integer([:positive]),
+      message_generator:
+        Map.get_lazy(config, :message_generator, fn ->
+          Generator.enabled_only(spec, refinement, constants)
+        end)
+    })
+  end
+
+  defp constants!(spec_module) do
+    {:ok, constants} =
+      spec_module |> Spec.Compiled.from_module() |> Spec.Compiled.resolve_constants()
+
+    constants
+  end
+
+  # One seed per trace, derived from the run's seed and the trace's index, so that trace
+  # 37 of a 1000-trace run can be re-run on its own.
+  defp seed_for(seed, index), do: :rand.seed(:exsss, {seed, index, seed + index})
+
+  # Linked, and it stays linked: see `drive/3`.
+  defp start(module, config) do
+    case GenServer.start_link(module, config.init_arg) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      :ignore ->
+        {:declined,
+         "#{inspect(module)}.init/1 returned :ignore for init_arg #{inspect(config.init_arg)}, " <>
+           "so no server started and nothing was checked."}
+
+      {:error, reason} ->
+        {:declined,
+         "#{inspect(module)}.init/1 failed for init_arg #{inspect(config.init_arg)}: " <>
+           "#{inspect(reason)}. No server started and nothing was checked."}
+    end
+  end
+
+  # Stopped the way a supervisor stops a child (#213): `exit(:shutdown)`, so a server that
+  # traps exits runs its `terminate/2`, and a bounded wait for the `:DOWN` — a `terminate/2`
+  # that hangs must not hang the simulation — after which it is killed. A server that does
+  # not trap exits dies at the `:shutdown` at once, as it would under its supervisor. This
+  # used to be a bare `:kill`, which skipped `terminate/2` for every server.
+  defp stop(nil, _timeout), do: :ok
+
+  defp stop(server, timeout) do
+    ref = Process.monitor(server)
+    Process.exit(server, :shutdown)
+
+    receive do
+      {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+    after
+      timeout ->
+        Process.exit(server, :kill)
+
+        receive do
+          {:DOWN, ^ref, :process, ^server, _reason} -> :ok
+        end
+    end
+  end
+
+  defp abstract(config, server) do
+    Runtime.abstract!(config.spec, config.refinement, :sys.get_state(server))
+  end
+
+  defp summarize(outcomes, config, duration_ms) do
+    failed = Enum.find(outcomes, &(&1.status != :ok))
+
+    %{
+      status: (failed && failed.status) || :ok,
+      traces_run: length(outcomes),
+      total_steps: Enum.sum(Enum.map(outcomes, & &1.steps)),
+      violation: failed && failed.violation && trace_of(failed),
+
+      # A behaviour that left the graph produces a trace too, and it is worth as much as a
+      # conformance counterexample: it names the steps that got there.
+      containment: failed && failed.containment,
+      detail: failed && failed.detail,
+      duration_ms: duration_ms,
+      seed: config.seed,
+      restarts: Enum.sum(Enum.map(outcomes, & &1.restarts)),
+      coverage: coverage(outcomes, config)
+    }
+  end
+
+  # The finding, in the shape the model checker reports one in: a `ExTLA.Trace` that
+  # `ExTLA.Replay.counterexample/3` can drive and `ExTLA.Trace.format/1` can print.
+  defp trace_of(outcome) do
+    %Trace{
+      type: :safety,
+      property: violation_property(outcome.violation),
+      message: violation_message(outcome.violation),
+      states: Enum.reverse(outcome.states),
+      actions: Enum.reverse(outcome.actions),
+      bindings: Enum.reverse(outcome.bindings),
+      length: length(outcome.states)
+    }
+    |> Trace.well_formed!("ExTLA.Simulation")
+  end
+
+  # What a reader wants in the trace's header. An invariant or an action property has a
+  # name and that name IS the finding; a diverged or not-enabled step has no name, and its
+  # kind is what distinguishes it from the other four.
+  defp violation_property(%{name: name}) when not is_nil(name), do: name
+  defp violation_property(%{kind: kind}), do: kind
+
+  # The struct clause first: a `%Violation{}` carries a `detail` of its own, and matching
+  # on that key would report a fragment of the message as the whole of it.
+  defp violation_message(%ExTLA.GenServer.Violation{} = violation), do: Exception.message(violation)
+  defp violation_message(%{detail: detail}) when is_binary(detail), do: detail
+
+  # `branches_covered` in §05 had no definition anywhere in the project — nothing else
+  # names a branch. `actions_covered` is the fraction of the spec's actions a run
+  # exercised at least once, which is the number the report was reaching for and one that
+  # can be computed from what happened.
+  defp coverage(outcomes, config) do
+    hit =
+      outcomes
+      |> Enum.flat_map(& &1.actions)
+      |> Enum.reject(&(&1 in [:unmapped, :restart]))
+      |> Enum.frequencies()
+
+    spec = Spec.Compiled.from_module(config.spec)
+    states = outcomes |> Enum.flat_map(& &1.states) |> Enum.uniq() |> length()
+    declared = length(spec.actions)
+
+    %{
+      actions_hit: hit,
+      states_visited: states,
+      invariants_checked:
+        Enum.sum(Enum.map(outcomes, &length(&1.states))) * length(spec.invariants),
+      actions_covered: if(declared == 0, do: 0.0, else: map_size(hit) / declared)
+    }
+  end
+end

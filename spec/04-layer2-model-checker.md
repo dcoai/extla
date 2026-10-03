@@ -8,12 +8,12 @@ A TLA+-style specification language embedded in Elixir, with an exhaustive state
 
 Layer 2 provides:
 
-1. **`TLA.Spec`** — a DSL for defining state machines: variables, initial states,
+1. **`ExTLA.Spec`** — a DSL for defining state machines: variables, initial states,
    actions, invariants, and temporal properties
-2. **`TLA.ModelChecker`** — an exhaustive BFS state explorer that verifies specs
+2. **`ExTLA.ModelChecker`** — an exhaustive BFS state explorer that verifies specs
    against all reachable states
-3. **`TLA.Trace`** — counterexample trace generation when violations are found
-4. **`TLA.Coverage`** — what the run actually exercised, and what it did not
+3. **`ExTLA.Trace`** — counterexample trace generation when violations are found
+4. **`ExTLA.Coverage`** — what the run actually exercised, and what it did not
 
 This is the Elixir equivalent of writing a `.tla` file and running TLC.
 
@@ -37,7 +37,7 @@ The three rules from that file that shape everything here:
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Spec do
+defmodule ExTLA.Spec do
   # Registered in the macro BODY, not inside the quote, and the DSL macros
   # likewise call Module.put_attribute/3 in their bodies rather than emitting
   # `@tla_...`. Elixir expands an entire defmodule body before evaluating any of
@@ -51,10 +51,10 @@ defmodule TLA.Spec do
     end
 
     quote do
-      import TLA.Spec.DSL
-      import TLA.Spec.Helpers
+      import ExTLA.Spec.DSL
+      import ExTLA.Spec.Helpers
 
-      @before_compile TLA.Spec
+      @before_compile ExTLA.Spec
     end
   end
 end
@@ -68,7 +68,7 @@ pop `:do`, so both call forms work.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Spec.DSL do
+defmodule ExTLA.Spec.DSL do
   @moduledoc """
   The macros that form the specification DSL.
   """
@@ -210,16 +210,16 @@ with defined semantics, added to `02-dsl-semantics.md` first.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Spec.Helpers do
+defmodule ExTLA.Spec.Helpers do
   @moduledoc """
   Functions available inside `action`, `init`, and `invariant` blocks.
-  `TLA.Spec.__using__/1` imports this module whole, so this list IS a spec
+  `ExTLA.Spec.__using__/1` imports this module whole, so this list IS a spec
   body's vocabulary.
 
   Two kinds of name live here (D-38). The thin wrappers below are one-line
   covers over MapSet and Enum, defined here because they have no counterpart
   in the foundation. Everything under "Delegated to the foundation" is a
-  defdelegate to TLA.Set or TLA.Function: this module holds no second
+  defdelegate to ExTLA.Set or ExTLA.Function: this module holds no second
   implementation of any operator. Until #319 it held four, and two had
   already drifted from their counterparts (#318).
   """
@@ -249,7 +249,7 @@ defmodule TLA.Spec.Helpers do
   SubSeq(s, m, n): elements m through n inclusive, 1-indexed, with TLC's
   domain rule. `n < m` is `[]` whatever the bounds are (`SubSeq(<<>>, 2, 0)`
   is `<<>>`). Otherwise both m and n must lie in 1..Len(s); one outside
-  raises `TLA.Spec.DomainError` naming the index and the length, exactly
+  raises `ExTLA.Spec.DomainError` naming the index and the length, exactly
   as `f[x]` does for the same off-by-one (D-20). No index wraps: an earlier
   draft wrote this as `Enum.slice(seq, m - 1, n - m + 1)`, which has
   Elixir's index semantics — a zero start wrapped to the end, a negative
@@ -268,26 +268,26 @@ defmodule TLA.Spec.Helpers do
   # heads exist so that 01's vocabulary is reachable from a spec body without
   # a fully-qualified call; four of them carry the DSL's own spelling rather
   # than the foundation's, and 01 says which.
-  defdelegate powerset(set), to: TLA.Set
-  defdelegate cross(s1, s2), to: TLA.Set
-  defdelegate cross_many(sets), to: TLA.Set
-  defdelegate distributed_union(set_of_sets), to: TLA.Set
-  defdelegate set_map(set, fun), to: TLA.Set, as: :map
-  defdelegate set_filter(set, predicate), to: TLA.Set, as: :filter
-  defdelegate for_all?(set, predicate), to: TLA.Set
-  defdelegate exists?(set, predicate), to: TLA.Set
-  defdelegate range(a, b), to: TLA.Set
+  defdelegate powerset(set), to: ExTLA.Set
+  defdelegate cross(s1, s2), to: ExTLA.Set
+  defdelegate cross_many(sets), to: ExTLA.Set
+  defdelegate distributed_union(set_of_sets), to: ExTLA.Set
+  defdelegate set_map(set, fun), to: ExTLA.Set, as: :map
+  defdelegate set_filter(set, predicate), to: ExTLA.Set, as: :filter
+  defdelegate for_all?(set, predicate), to: ExTLA.Set
+  defdelegate exists?(set, predicate), to: ExTLA.Set
+  defdelegate range(a, b), to: ExTLA.Set
 
   # [x \in S |-> f(x)]: S is a set (a MapSet) or a range. A list is a sequence
   # -- a function on 1..Len already -- and is refused by name rather than
   # deduplicated; a map is a function already.
-  defdelegate for_each(domain, f), to: TLA.Function, as: :construct
-  defdelegate update(map, key, f), to: TLA.Function, as: :except_with
-  defdelegate except(f, updates), to: TLA.Function
-  defdelegate function_set(domain, range), to: TLA.Function
-  defdelegate record_set(field_specs), to: TLA.Function
+  defdelegate for_each(domain, f), to: ExTLA.Function, as: :construct
+  defdelegate update(map, key, f), to: ExTLA.Function, as: :except_with
+  defdelegate except(f, updates), to: ExTLA.Function
+  defdelegate function_set(domain, range), to: ExTLA.Function
+  defdelegate record_set(field_specs), to: ExTLA.Function
   # DOMAIN f. A sequence's domain is 1..Len, which is how `f[x]` applies one.
-  defdelegate domain(f), to: TLA.Function
+  defdelegate domain(f), to: ExTLA.Function
 
   # ── Arithmetic ──
   def sum(enum), do: Enum.sum(enum)
@@ -305,21 +305,21 @@ defmodule TLA.Spec.Helpers do
   named for and cannot be implemented: a function returning one element
   cannot produce several successors.
   """
-  defdelegate choose(set, predicate \\ fn _ -> true end), to: TLA.Set
+  defdelegate choose(set, predicate \\ fn _ -> true end), to: ExTLA.Set
 end
 ```
 
 ---
 
-## Module: `TLA.Spec.Compiled`
+## Module: `ExTLA.Spec.Compiled`
 
 The `@before_compile` hook transforms DSL declarations into a compiled specification data structure:
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Spec.Compiled do
+defmodule ExTLA.Spec.Compiled do
   @moduledoc """
-  The compiled representation of a TLA.Spec module.
+  The compiled representation of a ExTLA.Spec module.
   This is what the model checker operates on.
   """
 
@@ -336,7 +336,7 @@ defmodule TLA.Spec.Compiled do
     fairness: [fairness_def()]
   }
 
-  @type terminal_def :: %{name: atom(), predicate: (constants(), TLA.State.t() -> boolean())}
+  @type terminal_def :: %{name: atom(), predicate: (constants(), ExTLA.State.t() -> boolean())}
 
   # `per: []` is whole-action fairness. `per: [:p]` is one constraint per binding
   # of `p`, expanded once the constants are known (02-dsl-semantics.md §5.2).
@@ -372,7 +372,7 @@ defmodule TLA.Spec.Compiled do
   # never changes.
   @type constants :: map()
 
-  @type init_fn :: (constants() -> TLA.State.t())
+  @type init_fn :: (constants() -> ExTLA.State.t())
 
   @type action_def :: %{
     name: atom(),
@@ -385,7 +385,7 @@ defmodule TLA.Spec.Compiled do
     # returning the set to draw from — so a later param can be constrained by an
     # earlier one, and nondeterminism has exactly one home
     # (02-dsl-semantics.md §3).
-    params: [{atom(), (constants(), TLA.State.t(), map() -> Enumerable.t())}],
+    params: [{atom(), (constants(), ExTLA.State.t(), map() -> Enumerable.t())}],
 
     # Where each param's set comes from. Recorded because §5.2's per-binding
     # fairness may only quantify over a constant- or literal-drawn param, and
@@ -393,29 +393,29 @@ defmodule TLA.Spec.Compiled do
     # without it.
     param_sources: [{atom(), :constant | :literal | :state}],
 
-    guard: (constants(), TLA.State.t(), params :: map() -> boolean()),
+    guard: (constants(), ExTLA.State.t(), params :: map() -> boolean()),
 
     # Pure and deterministic in (pre_state, params). This is the property the
     # checker, symmetry canonicalization and Layer 3's refinement check all
     # depend on; nothing in an action body may violate it.
-    transition: (constants(), TLA.State.t(), params :: map() -> TLA.State.t())
+    transition: (constants(), ExTLA.State.t(), params :: map() -> ExTLA.State.t())
   }
 
   @type invariant_def :: %{
     name: atom(),
     description: String.t(),
-    predicate: (constants(), TLA.State.t() -> boolean()),
+    predicate: (constants(), ExTLA.State.t() -> boolean()),
 
     # The near-miss probe, derived from a top-level `or` in the invariant's own
     # body (§Coverage and Vacuity) — nil where none can be derived, which is
     # honest rather than absent. The whole near-miss column runs on this.
-    near_miss: (constants(), TLA.State.t() -> boolean()) | nil
+    near_miss: (constants(), ExTLA.State.t() -> boolean()) | nil
   }
 
   @type action_property_def :: %{
     name: atom(),
     description: String.t(),
-    predicate: (constants(), old :: TLA.State.t(), new :: TLA.State.t() -> boolean())
+    predicate: (constants(), old :: ExTLA.State.t(), new :: ExTLA.State.t() -> boolean())
   }
 
   # A FUNCTION of the constants, not a value: a `for_all` ranges over a constant
@@ -439,7 +439,7 @@ defmodule TLA.Spec.Compiled do
     {:always, temporal_formula()}
     | {:eventually, temporal_formula()}
     | {:leads_to, predicate(), predicate()}
-    | {:predicate, (TLA.State.t() -> boolean())}
+    | {:predicate, (ExTLA.State.t() -> boolean())}
     # ∀ over a constant: the set is resolved at check time, the body instantiated
     # once per element, and each instance checked independently.
     | {:for_all, (constants() -> Enumerable.t()), (term() -> temporal_formula())}
@@ -453,7 +453,7 @@ end
 
 ---
 
-## Module: `TLA.ModelChecker`
+## Module: `ExTLA.ModelChecker`
 
 The core model checking engine. Performs breadth-first exhaustive exploration of the state space.
 
@@ -461,7 +461,7 @@ The core model checking engine. Performs breadth-first exhaustive exploration of
 
 ```
                     ┌──────────────┐
-                    │  TLA.Spec    │
+                    │  ExTLA.Spec    │
                     │  (compiled)  │
                     └──────┬───────┘
                            │
@@ -480,7 +480,7 @@ The core model checking engine. Performs breadth-first exhaustive exploration of
               └────────────┼────────────┘
                            │
                     ┌──────▼───────┐
-                    │  TLA.Trace   │
+                    │  ExTLA.Trace   │
                     │  (if error)  │
                     └──────────────┘
 ```
@@ -489,9 +489,9 @@ The core model checking engine. Performs breadth-first exhaustive exploration of
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.ModelChecker do
+defmodule ExTLA.ModelChecker do
   @moduledoc """
-  Exhaustive state-space model checker for TLA.Spec modules.
+  Exhaustive state-space model checker for ExTLA.Spec modules.
   Analogous to TLC for TLA+.
   """
 
@@ -506,12 +506,12 @@ defmodule TLA.ModelChecker do
     # other workers had in flight (tens of states, measured) rather than a whole
     # BFS level (thousands).
     max_states: pos_integer(),         # state limit (default: 1_000_000)
-    # Implemented: `TLA.ModelChecker.Parallel`, level-synchronous BFS over N
+    # Implemented: `ExTLA.ModelChecker.Parallel`, level-synchronous BFS over N
     # workers sharing one ETS graph. Refused together with `check_liveness:`,
     # for the reason D-22 refuses `symmetry:` with it. The default is 1 rather
     # than `System.schedulers_online()` until the per-worker coverage
     # accumulators merge -- a run should not become parallel, and its coverage
-    # report become partial, because the machine has cores. `TLA.Config.workers/0`
+    # report become partial, because the machine has cores. `ExTLA.Config.workers/0`
     # derives the machine's answer for a caller who asks for it.
     workers: pos_integer(),            # parallel workers (default: 1)
     check_deadlock: boolean(),         # report a successor-less state that no `terminal`
@@ -522,7 +522,7 @@ defmodule TLA.ModelChecker do
     check_liveness: boolean(),         # check temporal properties (default: false)
     symmetry: [atom()] | nil,          # symmetric CONSTANT names (see §Symmetry)
     verify_symmetry: boolean(),        # also run unreduced and compare (see §Symmetry)
-    state_constraint: (TLA.State.t() -> boolean()) | nil, # see §State constraints
+    state_constraint: (ExTLA.State.t() -> boolean()) | nil, # see §State constraints
     fingerprint_bits: 64 | 128,        # state identity width (default: 64)
 
     # Build the liveness graph -- the edge table and the ENABLED bits -- without
@@ -546,7 +546,7 @@ end
 
 #### The CLI infers `check_liveness`; the API does not
 
-`TLA.ModelChecker.run/2` defaults it to `false`. `mix tla.check` sets it to `true` when the
+`ExTLA.ModelChecker.run/2` defaults it to `false`. `mix tla.check` sets it to `true` when the
 spec declares a `temporal` **and** none of the three exclusions applies: `--safety-only`,
 a `symmetry:` declaration (D-22), or `workers:` above one (D-27).
 
@@ -555,7 +555,7 @@ liveness is what the author meant; a library caller is asking for exactly what t
 and silently building and retaining a whole state graph for them is not that.
 
 It is worth stating because the transition between the two is where a verdict goes missing.
-`TLA.Spec.Test.assert_spec/2` passes its config straight through, so a property that
+`ExTLA.Spec.Test.assert_spec/2` passes its config straight through, so a property that
 `mix tla.check` checks is **not** checked by the same spec under `assert_spec` unless the
 config says so. A suite can be green over a temporal property nothing evaluated.
 
@@ -572,7 +572,7 @@ it was not deprived of a check it never asked for.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.ModelChecker do
+defmodule ExTLA.ModelChecker do
   @type result :: %{
     # `:deadlock` rather than `:error`: a reachable state with no successors that
     # no `terminal` admits is a finding about the SPEC, and the run that found it
@@ -593,16 +593,16 @@ defmodule TLA.ModelChecker do
     # the status reports the violation.
     deadlock: boolean(),
     duration_ms: non_neg_integer(),
-    violation: TLA.Trace.t() | nil,
+    violation: ExTLA.Trace.t() | nil,
     warnings: [String.t()],
 
     # What the run actually exercised (see §Coverage and Vacuity).
-    coverage: TLA.Coverage.t(),
+    coverage: ExTLA.Coverage.t(),
 
     # Per-declaration cost in reductions, or nil when `profile:` was not asked
     # for — the closures are wrapped only then, so an unprofiled run calls
-    # exactly the functions `TLA.Spec.Compiled` holds.
-    profile: TLA.Profile.t() | nil,
+    # exactly the functions `ExTLA.Spec.Compiled` holds.
+    profile: ExTLA.Profile.t() | nil,
 
     # Soundness margin: expected states lost to fingerprint collisions at the
     # configured width, by the birthday bound. Reported, never assumed.
@@ -615,7 +615,7 @@ defmodule TLA.ModelChecker do
 
   ## Example
 
-      TLA.ModelChecker.run(Specs.TransferProtocol, %{
+      ExTLA.ModelChecker.run(Specs.TransferProtocol, %{
         constants: %{
           accounts: MapSet.new([:alice, :bob, :carol]),
           max_balance: 5
@@ -643,7 +643,7 @@ defmodule TLA.ModelChecker do
   Useful for visualization and debugging.
   """
   @doc """
-  Run the checker and return `{result(), TLA.StateGraph.t()}`.
+  Run the checker and return `{result(), ExTLA.StateGraph.t()}`.
 
   The caller owns the graph, and its ETS tables with it: `run/2` is this with the
   graph dropped, and it releases them.
@@ -656,7 +656,7 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.StateGraph do
+defmodule ExTLA.StateGraph do
   @moduledoc """
   The state graph built during model checking. Nodes are states, edges are
   labeled transitions.
@@ -673,7 +673,7 @@ defmodule TLA.StateGraph do
   walked back to an initial state through the parent pointers and the states
   are REGENERATED by replaying the recorded actions forward from Init.
 
-  An earlier draft stored `states: %{state_id => TLA.State.t()}` for the whole
+  An earlier draft stored `states: %{state_id => ExTLA.State.t()}` for the whole
   run. At the 10M-state target and roughly 1KB per state that is about 10GB of
   RAM, which puts the checker out of reach of the machines people actually
   have. The record above is on the order of 64 bytes regardless of how large a
@@ -702,7 +702,7 @@ defmodule TLA.StateGraph do
   The edge table is what Tarjan runs over. The enabled bits are what fairness
   needs: WF/SF are conditions on `ENABLED A` at each state of a cycle, which is
   a function of the state — and the state is discarded. Recording the bits
-  while the state is materialized (`TLA.Temporal.enabled?/4`) costs one guard
+  while the state is materialized (`ExTLA.Temporal.enabled?/4`) costs one guard
   evaluation per fairness constraint per state and keeps the states out of
   memory. This is TLC's split too: safety on fingerprints alone, liveness on a
   second graph paid for only when asked for.
@@ -745,17 +745,17 @@ defmodule TLA.StateGraph do
     # Replay needs these: the graph retains no states (D-5), so regenerating one
     # means running `init` and then each recorded action, which cannot be done
     # from the identifiers alone.
-    spec: TLA.Spec.Compiled.t(),
+    spec: ExTLA.Spec.Compiled.t(),
     constants: map(),
 
     # The width a state is fingerprinted at, and the permutations it is
     # canonicalized under before that — present when `symmetry:` was declared,
     # nil otherwise. Two symmetric states are one state exactly when this is set.
     fingerprint_bits: 64 | 128,
-    symmetry: [TLA.Symmetry.mapping()] | nil,
+    symmetry: [ExTLA.Symmetry.mapping()] | nil,
 
     nodes: %{state_id() => node_record()},        # ETS-backed; see 06-architecture.md
-    fingerprints: %{TLA.Fingerprint.t() => state_id()},
+    fingerprints: %{ExTLA.Fingerprint.t() => state_id()},
 
     # The longest `depth` any node carries: what `result().diameter` reports and
     # what the differential corpus compares against TLC.
@@ -774,7 +774,7 @@ defmodule TLA.StateGraph do
     # Present only when built with check_liveness: true; nil otherwise.
     edges: %{state_id() => [edge()]} | nil,
     enabled: %{state_id() => bitstring()} | nil,
-    fairness_index: [{TLA.Spec.Compiled.fairness_def(), binding :: map()}] | nil
+    fairness_index: [{ExTLA.Spec.Compiled.fairness_def(), binding :: map()}] | nil
   }
 
   @doc """
@@ -798,7 +798,7 @@ defmodule TLA.StateGraph do
 
   @doc """
   The action path from an initial state to the target, walked through parent
-  pointers. `TLA.Trace` replays this to regenerate the states themselves.
+  pointers. `ExTLA.Trace` replays this to regenerate the states themselves.
   """
   def path_to(graph, target)
 
@@ -845,7 +845,7 @@ tractable and not for exactly the specs ExTLA is for.
 
 The mechanism: before fingerprinting, the state is put in a **canonical form** by
 choosing the permutation of each symmetric set that minimizes the state's canonical
-binary encoding (`TLA.Fingerprint.canonical/1`). Two symmetric states then share a
+binary encoding (`ExTLA.Fingerprint.canonical/1`). Two symmetric states then share a
 fingerprint by construction.
 
 **What it costs.** Canonicalization tries every permutation: *n*! encodings per
@@ -893,11 +893,11 @@ it pays off (`00-prior-art.md`).
 
 ---
 
-## Module: `TLA.ModelChecker.Safety`
+## Module: `ExTLA.ModelChecker.Safety`
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.ModelChecker.Safety do
+defmodule ExTLA.ModelChecker.Safety do
   @moduledoc """
   Safety property checking: invariants and action properties.
   Checked incrementally during state exploration.
@@ -936,11 +936,11 @@ end
 
 ---
 
-## Module: `TLA.ModelChecker.Liveness`
+## Module: `ExTLA.ModelChecker.Liveness`
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.ModelChecker.Liveness do
+defmodule ExTLA.ModelChecker.Liveness do
   @moduledoc """
   Temporal property checking over the liveness graph.
 
@@ -976,7 +976,7 @@ defmodule TLA.ModelChecker.Liveness do
   """
 
   @typedoc "The first violation in declaration order, with the lasso that refutes it."
-  @type verdict :: :ok | {:violation, atom(), TLA.Trace.lasso()}
+  @type verdict :: :ok | {:violation, atom(), ExTLA.Trace.lasso()}
 
   @doc """
   Check a spec's temporal properties against a completed liveness graph.
@@ -1016,7 +1016,7 @@ rather than arriving with a run already underway.
 
 This paragraph used to acknowledge the opposite: the grammar was recursive, it admitted
 `always(eventually(always(p)))`, and the refusal was an `ArgumentError` raised from
-`TLA.ModelChecker.Liveness` when the search reached the formula. That refusal is *kept*,
+`ExTLA.ModelChecker.Liveness` when the search reached the formula. That refusal is *kept*,
 and rewritten as an internal invariant — it now says a shape reaching the checker is a
 bug in ExTLA rather than a mistake in the specification, because after #277 that is what
 it means. Evaluating a deeper nesting as though it were something simpler remains the one
@@ -1033,7 +1033,7 @@ counterexample to a property the spec's own assumptions never allowed to fail.
 
 ---
 
-## Coverage and Vacuity — `TLA.Coverage`
+## Coverage and Vacuity — `ExTLA.Coverage`
 
 A green check mark is only as good as what was behind it. Three ways a run can
 report success while having verified almost nothing:
@@ -1045,7 +1045,7 @@ report success while having verified almost nothing:
   any reachable state is trivially true and says nothing about `Q`. Under a
   quantifier this is asked per **instance** — `Enum.all?(^xs, fn x -> … end)` is
   one probe pair per `x`, nested quantifiers one per `[x, y]` — and the instances
-  are the liveness checker's own (`TLA.Spec.Compiled.temporal_instances/2`), so
+  are the liveness checker's own (`ExTLA.Spec.Compiled.temporal_instances/2`), so
   the two cannot disagree about what an instance is. Coverage once rebuilt them
   with a walk of its own that kept only the innermost binding, and a nested
   quantifier's outer instances collapsed onto the last one: an outer instance
@@ -1060,7 +1060,7 @@ verdict and a claim.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Coverage do
+defmodule ExTLA.Coverage do
   @moduledoc """
   What a model-checking run exercised. Computed from the completed state graph;
   no additional exploration.
@@ -1211,16 +1211,16 @@ verified, and it verified a system with no cancellation in it.
 
 ---
 
-## Per-declaration cost — `TLA.Profile`
+## Per-declaration cost — `ExTLA.Profile`
 
-`TLA.Coverage` answers how often the checker asked a declaration. `TLA.Profile` answers what the
+`ExTLA.Coverage` answers how often the checker asked a declaration. `ExTLA.Profile` answers what the
 answer cost, which is the half a spec author can act on: "invariant checking is 3.2%" is a fact
 about the checker, and "`quorum_agrees` costs 2,400 reductions each of 58,359 times" is a fact
 about the spec in front of them.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Profile do
+defmodule ExTLA.Profile do
   @moduledoc """
   What each of *your* declarations cost, measured in reductions.
 
@@ -1251,7 +1251,7 @@ defmodule TLA.Profile do
   @doc """
   Wrap a compiled spec's closures so each call is counted and measured.
 
-  No macro work and no recompilation: the closures `TLA.Spec.Compiled` already holds are
+  No macro work and no recompilation: the closures `ExTLA.Spec.Compiled` already holds are
   wrapped, which is why an unprofiled run pays nothing at all.
   """
   def instrument(spec)
@@ -1268,7 +1268,7 @@ end
 ```
 
 Enabled by `profile: true` (`mix tla.check --profile`) and **off by default**: `instrument/1`
-wraps the closures `TLA.Spec.Compiled` already holds, so no macro work and no recompilation is
+wraps the closures `ExTLA.Spec.Compiled` already holds, so no macro work and no recompilation is
 involved, and an unprofiled run calls the functions the compiled spec holds and pays nothing.
 
 ### The unit is reductions, and that is the point
@@ -1311,7 +1311,7 @@ fixed workload spread **100.3% in wall time and not at all in reductions**.
 Reductions are per-process, so a profiled parallel run sums one contribution per worker rather
 than reporting whichever process happened to be asked. Each `expand_batch` runs in its own task,
 starts from a zeroed accumulator with its dictionary cleared, and reads its own counts out before
-the process ends; the private `merge/2` in `TLA.ModelChecker.Parallel` sums them beside `TLA.Coverage.merge/2`.
+the process ends; the private `merge/2` in `ExTLA.ModelChecker.Parallel` sums them beside `ExTLA.Coverage.merge/2`.
 The coordinator's own contribution — seeding the initial states and checking their invariants —
 is merged in at the end, so a single-worker run and an eight-worker run travel one code path.
 
@@ -1377,20 +1377,20 @@ Instrumentation calibrated at 1/1 reductions per evaluation (arity 2/3) and subt
 ```
 
 Sub-expression attribution — cost per source location *inside* a declaration, as TLC reports it —
-is **deferred**. It needs a compile-time source transform in `TLA.Spec.Block`, since the AST is
+is **deferred**. It needs a compile-time source transform in `ExTLA.Spec.Block`, since the AST is
 gone by runtime by design (D-5), and it needs a granularity argument nobody has had yet. It also
 optimises the wrong tenth: on a large model the declarations together are well under a fifth of
 the run.
 
 ---
 
-## Module: `TLA.Trace`
+## Module: `ExTLA.Trace`
 
 Counterexample trace generation.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Trace do
+defmodule ExTLA.Trace do
   @moduledoc """
   When the model checker finds a violation, it produces a trace:
   the shortest sequence of states from Init to the violating state.
@@ -1403,7 +1403,7 @@ defmodule TLA.Trace do
     type: :safety | :liveness | :deadlock,
     property: atom(),
     message: String.t(),
-    states: [TLA.State.t()],
+    states: [ExTLA.State.t()],
     actions: [atom()],               # action taken at each step
 
     # The parameter binding of each action, one per action. Without it a reader
@@ -1429,7 +1429,7 @@ defmodule TLA.Trace do
 
   # A lasso is BUILT BY THE LIVENESS CHECKER, not by a public function here.
   #
-  # `TLA.ModelChecker.Liveness` has the witness — which property, which instance
+  # `ExTLA.ModelChecker.Liveness` has the witness — which property, which instance
   # binding, which cycle, and the steps that reach it — and a lasso whose prefix
   # is a `Trace` and whose cycle is another is assembled there from
   # `replay/4` and `from/4` below. A `generate_lasso(graph, scc)` here would have
@@ -1468,7 +1468,7 @@ state:
 
 <!-- tla:skip reason=a call shown on its own, gated by trace_explore_test -->
 ```elixir
-TLA.Trace.explore(trace,
+ExTLA.Trace.explore(trace,
   waiting: &length(&1.waiting),
   holder:  & &1.holder,
   quorum?: &(map_size(&1.votes) * 2 > 3)
@@ -1495,7 +1495,7 @@ TLA.Trace.explore(trace,
 
 TLA+ answers the same question with the Toolbox's **Trace Explorer**, which lists the
 expressions, generates a spec in which they are extra definitions, re-runs TLC and shows
-the result in an Eclipse panel. **None of that apparatus is needed here.** A `TLA.State.t()`
+the result in an Eclipse panel. **None of that apparatus is needed here.** A `ExTLA.State.t()`
 is a plain map and an arbitrary expression over one is an anonymous function, so what needs
 spec regeneration and a checker re-run in TLA+ is `Enum.map/2` over `states`. It is
 terminal-native for the same reason `to_dot/2` emits DOT rather than HTML (§Deferred): the
@@ -1556,13 +1556,13 @@ State 3 [VIOLATION]:
 
 ---
 
-## Module: `TLA.ModelChecker.Parallel`
+## Module: `ExTLA.ModelChecker.Parallel`
 
 Parallel state exploration using BEAM concurrency.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.ModelChecker.Parallel do
+defmodule ExTLA.ModelChecker.Parallel do
   @moduledoc """
   Distributes state exploration across multiple BEAM processes.
   Uses a shared ETS table for the state graph and a coordinator-managed
@@ -1604,7 +1604,7 @@ end
 ```elixir
 defmodule Mix.Tasks.Tla.Check do
   @moduledoc """
-  Run model checking on TLA.Spec modules.
+  Run model checking on ExTLA.Spec modules.
 
   ## Usage
 
@@ -1636,7 +1636,7 @@ defmodule Mix.Tasks.Tla.Check do
   resolver every path shares -- the task, `mix tla.simulate`, Layer 3
   conformance, the ledger -- so none of them can drop a name the others refuse.
   The `default:` form is the one that needs no second file, and
-  `TLA.ModelChecker.run/2` ignores it entirely -- a test that passes its own
+  `ExTLA.ModelChecker.run/2` ignores it entirely -- a test that passes its own
   constants is unaffected by what the task would have used.
 
   ## Options affecting the VERDICT
@@ -1658,7 +1658,7 @@ defmodule Mix.Tasks.Tla.Check do
       --max-states         State limit for the run. Exceeding it is `status:
                            :max_states_reached` and exit 2, never a verdict.
       --workers            Explore on N processes (default 1;
-                           `TLA.ModelChecker.Parallel`). Refused together with
+                           `ExTLA.ModelChecker.Parallel`). Refused together with
                            liveness, so a spec that declares a `temporal` has its
                            safety checked in parallel and is told the temporal
                            properties were not.
@@ -1666,10 +1666,10 @@ defmodule Mix.Tasks.Tla.Check do
                            check needs. Liveness is otherwise checked whenever
                            the spec declares a `temporal`.
       --profile            Report what each of the spec's own declarations cost,
-                           in reductions (`TLA.Profile`). Off by default, and the
+                           in reductions (`ExTLA.Profile`). Off by default, and the
                            closures are wrapped only when it is asked for, so an
                            unprofiled run calls exactly the functions
-                           `TLA.Spec.Compiled` holds.
+                           `ExTLA.Spec.Compiled` holds.
       --format             human (default) or json. The JSON shape is
                            §The JSON result schema.
 
@@ -1698,15 +1698,15 @@ report and counterexample, so editors and the reporting tooling read structured
 data rather than parsing the human rendering.
 
 **The counterexample in it round-trips.** States and bindings are written by
-`TLA.State.Json`, whose encoding names every term §6 permits — atoms, binaries,
+`ExTLA.State.Json`, whose encoding names every term §6 permits — atoms, binaries,
 tuples, maps with non-string keys, `MapSet`s and structs all have JSON of their
 own, and a binary that is not valid UTF-8 travels as base64 under a `"b64"` tag,
-since a JSON string cannot carry it. What `TLA.State.validate!/1` admits and what
+since a JSON string cannot carry it. What `ExTLA.State.validate!/1` admits and what
 this encodes are the same set, by construction: a violation the search found must
 never be lost to its own serialisation. An earlier version wrote them with `inspect/1`, which a person can read and
 a machine cannot parse back, and `05-layer3-conformance.md`'s pipeline runs this
 output straight into `mix tla.replay --trace`. The human rendering is
-`TLA.Trace.format/1` and is unchanged.
+`ExTLA.Trace.format/1` and is unchanged.
 
 #### The JSON result schema
 
@@ -1769,7 +1769,7 @@ under machine load, accumulated totals spread by up to 47.8% between identical r
 declaration's floor came back a single value, and a floor's residual error is a fixed couple of
 reductions rather than a proportion. `observed` is what the counter actually
 accumulated, kept beside it so the gap stays inspectable — a predicate whose cost genuinely
-varies with the state is the one case a floor cannot see, and `TLA.Profile` flags such a row
+varies with the state is the one case a floor cannot see, and `ExTLA.Profile` flags such a row
 rather than averaging it away.
 
 Four rules the schema keeps, each of which a consumer depends on:
@@ -1782,7 +1782,7 @@ Four rules the schema keeps, each of which a consumer depends on:
    a module, and the order is stable so two runs diff cleanly.
 3. **Every entry carries every key, and absent is `null` — never `0`.** A zero
    near-miss count is a finding; not having measured near-misses is not, and
-   `TLA.Coverage` already distinguishes them. Defaulting `null` to `0` on the way
+   `ExTLA.Coverage` already distinguishes them. Defaulting `null` to `0` on the way
    out would erase the distinction at exactly the boundary that cannot recover
    it. `status: "unsound_symmetry"` fills `message` and leaves the measurements
    `null` for the same reason.
@@ -1824,7 +1824,7 @@ mix tla.explore Specs.DistributedLock --trace counterexample.json \
 
 `--trace` takes the versioned envelope, a single trace object lifted out of it, or a lasso.
 
-**The module argument is load-bearing.** `TLA.Trace.from_json!/1` resolves the trace's atoms
+**The module argument is load-bearing.** `ExTLA.Trace.from_json!/1` resolves the trace's atoms
 with `String.to_existing_atom/1`, so the spec has to be loaded before its counterexample can
 be decoded; a trace from another spec fails naming the atom that did not resolve rather than
 decoding into something else. `mix tla.replay` takes one for the same reason.
@@ -1839,7 +1839,7 @@ row; without a label the expression's own text is the label. The label is recogn
 unlabelled expression rather than a row called `state.pc[`.
 
 **A compile error and a runtime error are not the same finding.** A runtime error depends on
-the state and belongs in the cell at the state it happened in, which is `TLA.Trace.explore/3`'s
+the state and belongs in the cell at the state it happened in, which is `ExTLA.Trace.explore/3`'s
 job. A misspelled variable does not depend on the state at all, so the task checks that each
 expression compiles once, against one state, and refuses with the diagnostic and the names
 actually in scope — rather than the same typo reported once per state in cells reading
@@ -1880,7 +1880,7 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Spec.Test do
+defmodule ExTLA.Spec.Test do
   @moduledoc """
   ExUnit helpers for model checking in tests.
   """
@@ -1893,22 +1893,22 @@ defmodule TLA.Spec.Test do
     Default `false`.
   - `strict_coverage: true` — fail on a never-enabled action or a vacuous
     property. Default `false` (they are reported, not fatal). Those two only,
-    and only on a run that reached every state: see `TLA.Coverage.strict_failures/1`.
+    and only on a run that reached every state: see `ExTLA.Coverage.strict_failures/1`.
   """
   defmacro assert_spec(spec_module, config) do
     quote do
-      result = TLA.ModelChecker.run(unquote(spec_module), unquote(config))
+      result = ExTLA.ModelChecker.run(unquote(spec_module), unquote(config))
 
       case result.status do
         :ok ->
-          TLA.Coverage.warn_unless_clean(result.coverage, unquote(config))
+          ExTLA.Coverage.warn_unless_clean(result.coverage, unquote(config))
           :ok
 
         :violation ->
           flunk("""
           Model checking violation in #{inspect(unquote(spec_module))}:
 
-          #{TLA.Trace.format(result.violation)}
+          #{ExTLA.Trace.format(result.violation)}
           """)
 
         status when status in [:max_states_reached, :constrained] ->
@@ -1932,7 +1932,7 @@ end
 # Usage in tests:
 defmodule Specs.TransferProtocolTest do
   use ExUnit.Case
-  import TLA.Spec.Test
+  import ExTLA.Spec.Test
 
   @tag timeout: 60_000
   test "transfer protocol satisfies all properties" do

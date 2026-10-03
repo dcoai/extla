@@ -73,7 +73,7 @@ client may give up — and make the mistake that is easiest to make:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.CancelLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob, :carol])
 
@@ -166,7 +166,7 @@ property is evaluated on every step the checker takes:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.AuditedLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob])
 
@@ -271,15 +271,15 @@ maps over three servers, and the question you actually have — *when did the qu
 form*, *how many acceptors had promised by state 12* — is a **function of the state**.
 Answering it from the dumps means reading nineteen blocks and doing arithmetic by hand.
 
-So ask the function instead. `TLA.Trace.explore/3` takes your own expressions, one row each,
+So ask the function instead. `ExTLA.Trace.explore/3` takes your own expressions, one row each,
 and evaluates them at every state:
 
 <!-- tla:run expect=ok -->
 ```elixir
-result = TLA.ModelChecker.run(Tutorial.AuditedLock, %{constants: %{clients: MapSet.new([:alice, :bob])}})
+result = ExTLA.ModelChecker.run(Tutorial.AuditedLock, %{constants: %{clients: MapSet.new([:alice, :bob])}})
 trace = result.violation
 
-TLA.Trace.explore(trace,
+ExTLA.Trace.explore(trace,
   holder: & &1.holder,
   logged: &length(&1.log),
   held?: &(&1.holder != :none)
@@ -354,7 +354,7 @@ Here is the same lock, made one-shot: each client may take it once and is then `
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.OneShotLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob])
 
@@ -432,7 +432,7 @@ if that state is what success looks like, you have found a missing declaration r
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.OneShotLockDone do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob])
 
@@ -500,7 +500,7 @@ The declaration is a claim, and like any claim it can be wider than you meant. S
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.OneShotLockLoose do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob])
 

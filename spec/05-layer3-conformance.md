@@ -1,6 +1,6 @@
 # Layer 3: Specification-to-Implementation Conformance Bridge
 
-Connects TLA.Spec specifications to actual GenServer implementations, enabling automated verification that code conforms to its formal model.
+Connects ExTLA.Spec specifications to actual GenServer implementations, enabling automated verification that code conforms to its formal model.
 
 ---
 
@@ -11,16 +11,16 @@ its TLA+ specification says it should?"**
 
 It provides:
 
-1. **`TLA.GenServer`** — a macro that links a GenServer to a `TLA.Spec` and checks every
+1. **`ExTLA.GenServer`** — a macro that links a GenServer to a `ExTLA.Spec` and checks every
    transition the implementation makes against the spec
-2. **`TLA.Refinement`** — the refinement mapping: the formal bridge between abstract spec
+2. **`ExTLA.Refinement`** — the refinement mapping: the formal bridge between abstract spec
    states and concrete implementation states
-3. **`TLA.Simulation`** — random-walk simulation that runs the real GenServer through
+3. **`ExTLA.Simulation`** — random-walk simulation that runs the real GenServer through
    randomized scenarios and checks conformance
-4. **`TLA.Replay`** — drives the real GenServer through a spec-level behavior: a
+4. **`ExTLA.Replay`** — drives the real GenServer through a spec-level behavior: a
    model-checker counterexample, or a captured production trace
-5. **`TLA.PropertyTest`** — generation of property-based tests from specifications
-6. **`TLA.Supervisor.Spec`** — specification of supervision trees and fault tolerance
+5. **`ExTLA.PropertyTest`** — generation of property-based tests from specifications
+6. **`ExTLA.Supervisor.Spec`** — specification of supervision trees and fault tolerance
 
 ---
 
@@ -55,7 +55,7 @@ comparison per callback — cheaper than evaluating the invariants beside it.
 
 ---
 
-## Module: `TLA.GenServer`
+## Module: `ExTLA.GenServer`
 
 ### Usage
 
@@ -63,7 +63,7 @@ comparison per callback — cheaper than evaluating the invariants beside it.
 ```elixir
 defmodule MyApp.TransferServer do
   use GenServer
-  use TLA.GenServer,
+  use ExTLA.GenServer,
     spec: Specs.TransferProtocol,
     refinement: __MODULE__.Refinement
 
@@ -73,7 +73,7 @@ defmodule MyApp.TransferServer do
   # "mean" in terms of the actual implementation state.
 
   defmodule Refinement do
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     @doc """
     Map concrete state → abstract state.
@@ -112,7 +112,7 @@ defmodule MyApp.TransferServer do
     # `pending`, and the implementation resolves that choice itself (it pops
     # its own queue), so `t` is not recoverable from the message.
     # `check_step!/5` searches the unbound params for a binding that reproduces
-    # the post-state (§`TLA.GenServer.Runtime`).
+    # the post-state (§`ExTLA.GenServer.Runtime`).
     def abstract_action(:process_next),
       do: {:complete_transfer, %{}}
     def abstract_action(:fail),
@@ -128,7 +128,7 @@ defmodule MyApp.TransferServer do
     @doc """
     Map abstract action + params → the concrete message that causes it.
     The inverse of `abstract_action/1`. This is what lets a model-checker
-    counterexample be replayed against the running server (`TLA.Replay`).
+    counterexample be replayed against the running server (`ExTLA.Replay`).
     """
     def concrete_message(:begin_transfer, %{from: f, to: t, amount: a}),
       do: {:transfer, f, t, a}
@@ -187,11 +187,11 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.GenServer do
+defmodule ExTLA.GenServer do
   @moduledoc """
-  Bridges a GenServer implementation to a TLA.Spec specification.
+  Bridges a GenServer implementation to a ExTLA.Spec specification.
 
-  When `use TLA.GenServer` is applied, each callback is wrapped (via
+  When `use ExTLA.GenServer` is applied, each callback is wrapped (via
   `defoverridable`/`super`, like Layer 1) so that every transition:
 
   1. maps the pre- and post-state through the refinement mapping;
@@ -212,7 +212,7 @@ defmodule TLA.GenServer do
   producing misleading passes at runtime — where `concrete_message/2` exists to
   enumerate them with. Covering the spec's **variables** cannot be decided
   without a concrete state to map, so it is checked on every mapping at runtime
-  instead, and `use TLA.GenServer` prints at compile time which rules were left
+  instead, and `use ExTLA.GenServer` prints at compile time which rules were left
   undecided for this mapping. See `validate!/2`'s own documentation for the
   division; this sentence claimed both for the build until #169.
   """
@@ -222,12 +222,12 @@ defmodule TLA.GenServer do
     refinement_module = Keyword.fetch!(opts, :refinement)
 
     quote do
-      use TLA.Invariant  # Layer 1 is built-in
+      use ExTLA.Invariant  # Layer 1 is built-in
 
       @tla_spec unquote(spec_module)
       @tla_refinement unquote(refinement_module)
 
-      @before_compile TLA.GenServer
+      @before_compile ExTLA.GenServer
     end
   end
 end
@@ -242,7 +242,7 @@ they were declared in the server. Dropped rather than carried.
 
 Like Layer 1, the wrapper is emitted with `defoverridable` and `super/1` rather than by
 renaming the original callback (`03-layer1-invariants.md` §Compile-Time Transformation),
-and nothing at all is emitted when `TLA.Config.mode/0` resolves to `:disabled`.
+and nothing at all is emitted when `ExTLA.Config.mode/0` resolves to `:disabled`.
 
 <!-- tla:skip reason=the code the wrapper emits, shown for the reader; what it emits is asserted by conformance step_test -->
 ```elixir
@@ -252,7 +252,7 @@ def handle_call(msg, from, state) do
   pre_abstract = @tla_refinement.abstract(state)
 
   result = super(msg, from, state)
-  post_concrete = TLA.Invariant.Runtime.extract_state(result, state)
+  post_concrete = ExTLA.Invariant.Runtime.extract_state(result, state)
   post_abstract = @tla_refinement.abstract(post_concrete)
 
   # THE REFINEMENT CHECK. `abstract_action/1` names the spec action this message
@@ -260,13 +260,13 @@ def handle_call(msg, from, state) do
   # what makes the layer a conformance check rather than an invariant check on a
   # projection.
   # The dispatch is a call rather than a `case` HERE -- see below.
-  TLA.GenServer.Runtime.check_transition!(
+  ExTLA.GenServer.Runtime.check_transition!(
     @tla_spec, @tla_refinement, msg, pre_abstract, post_abstract
   )
 
-  TLA.GenServer.Runtime.check_spec_invariants!(@tla_spec, post_abstract)
-  TLA.GenServer.Runtime.check_action_properties!(@tla_spec, pre_abstract, post_abstract)
-  TLA.GenServer.Runtime.record_transition!(@tla_spec, msg, pre_abstract, post_abstract)
+  ExTLA.GenServer.Runtime.check_spec_invariants!(@tla_spec, post_abstract)
+  ExTLA.GenServer.Runtime.check_action_properties!(@tla_spec, pre_abstract, post_abstract)
+  ExTLA.GenServer.Runtime.record_transition!(@tla_spec, msg, pre_abstract, post_abstract)
 
   result
 end
@@ -301,11 +301,11 @@ layer.
 
 ---
 
-## Module: `TLA.Refinement`
+## Module: `ExTLA.Refinement`
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Refinement do
+defmodule ExTLA.Refinement do
   @moduledoc """
   Defines the formal relationship between an abstract specification and a
   concrete implementation.
@@ -319,7 +319,7 @@ defmodule TLA.Refinement do
   """
 
   @doc "Concrete state -> abstract state. Must be pure."
-  @callback abstract(concrete_state :: map()) :: TLA.State.t()
+  @callback abstract(concrete_state :: map()) :: ExTLA.State.t()
 
   @doc """
   Concrete message -> the spec action it is meant to be, or `:unmapped`.
@@ -335,8 +335,8 @@ defmodule TLA.Refinement do
   Abstract action + params -> a concrete message that should cause it.
 
   The inverse of `abstract_action/1`, and what lets a spec-level behavior drive
-  the real implementation: `TLA.Replay` uses it to run a model-checker
-  counterexample against the running GenServer, and `TLA.PropertyTest` uses it
+  the real implementation: `ExTLA.Replay` uses it to run a model-checker
+  counterexample against the running GenServer, and `ExTLA.PropertyTest` uses it
   to turn generated action sequences into messages.
 
   Optional. Without it the implementation can still be CHECKED as it runs, but
@@ -373,7 +373,7 @@ defmodule TLA.Refinement do
   system message through the same mailbox, so it is ordered BEHIND the cast that
   was just sent: when its reply arrives, the cast has been handled.
 
-  It costs **no additional round-trip**. `TLA.Replay` and `TLA.Simulation` each
+  It costs **no additional round-trip**. `ExTLA.Replay` and `ExTLA.Simulation` each
   already call `:sys.get_state/1` after every step, to map the post-state through
   `abstract/1`; for a cast that same call becomes the completion signal as well.
 
@@ -398,18 +398,18 @@ defmodule TLA.Refinement do
   (`08-decisions.md` D-39). `@on_definition` — the mechanism Layers 1 and 3 already
   use — sees the first argument of every `concrete_message/2` clause as the module
   compiles; a literal atom covers that action, and anything else, a variable most
-  of all, covers every action. A mapping that declares `@behaviour TLA.Refinement`
+  of all, covers every action. A mapping that declares `@behaviour ExTLA.Refinement`
   by hand has no record, and `validate!/2` names rule 5 as undecided for it rather
   than claiming it.
   """
   defmacro __using__(_opts) do
     quote do
-      @behaviour TLA.Refinement
+      @behaviour ExTLA.Refinement
 
       Module.register_attribute(__MODULE__, :tla_concrete_message_clauses, accumulate: true)
 
-      @on_definition TLA.Refinement
-      @before_compile TLA.Refinement
+      @on_definition ExTLA.Refinement
+      @before_compile ExTLA.Refinement
     end
   end
 
@@ -425,7 +425,7 @@ defmodule TLA.Refinement do
   Five rules, and **they are not all decided here.** A compile has no concrete
   state and no run, so two of the five are deferred to runtime and a third is a
   probe rather than an exhaustive check. `validate!/2` returns the ones it could
-  not decide, and `use TLA.GenServer` prints those that went undecided for this
+  not decide, and `use ExTLA.GenServer` prints those that went undecided for this
   mapping in particular (#169). Saying which is which is the point: a validator
   that claims a check it cannot perform is worse than one that states its limits.
 
@@ -437,14 +437,14 @@ defmodule TLA.Refinement do
      implementation can have anticipated.
   5. Every spec action is named by at least one `abstract_action/1` clause.
      An action the mapping can never produce is dead in this implementation, and
-     is reported the way `TLA.Coverage` reports a never-enabled action.
+     is reported the way `ExTLA.Coverage` reports a never-enabled action.
      **Only where `concrete_message/2` is defined** — it is optional, and without
      it there is nothing to enumerate the actions with, so this rule is deferred
      and coverage reports the absence instead.
 
      The rule has two halves and they are established differently. Whether
      `concrete_message/2` has a **clause** for an action is a list comparison
-     against the clauses `use TLA.Refinement` recorded as the module compiled, so
+     against the clauses `use ExTLA.Refinement` recorded as the module compiled, so
      it needs no binding and is decided for every action the spec declares.
      Whether the message that clause **produces** maps back is the probe, and that
      half needs one. Answering the first half by calling the callback is what
@@ -511,20 +511,20 @@ end
 
 ---
 
-## Module: `TLA.Replay`
+## Module: `ExTLA.Replay`
 
-Drives the real GenServer through a **spec-level** behavior. Where `TLA.Simulation`
-generates random messages and checks what happens, `TLA.Replay` starts from a sequence
+Drives the real GenServer through a **spec-level** behavior. Where `ExTLA.Simulation`
+generates random messages and checks what happens, `ExTLA.Replay` starts from a sequence
 of abstract actions and makes the implementation follow it.
 
 Two sources of such a sequence, and both matter:
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Replay do
+defmodule ExTLA.Replay do
   @moduledoc """
   Run a spec-level behavior against a real implementation, via
-  `TLA.Refinement.concrete_message/2`.
+  `ExTLA.Refinement.concrete_message/2`.
   """
 
   @doc """
@@ -582,7 +582,7 @@ defmodule TLA.Replay do
     } | nil,
 
     # The steps that were NOT driven, oldest first. A trace's actions are not all
-    # actions of the spec: `TLA.Simulation` writes `:unmapped` for a message the
+    # actions of the spec: `ExTLA.Simulation` writes `:unmapped` for a message the
     # mapping does not model, and there is no message to send for one -- the trace
     # records abstract actions, not the concrete messages that produced them. Such
     # a step is skipped and its post-state still checked, and it is LISTED here,
@@ -599,9 +599,9 @@ end
 
 ### Every check has a reporting form beside its raising one
 
-`TLA.GenServer.Runtime` gains `check_transition/5`, `check_step/5`, `check_stuttering/3`,
+`ExTLA.GenServer.Runtime` gains `check_transition/5`, `check_step/5`, `check_stuttering/3`,
 `check_spec_invariants/2` and `check_action_properties/3`, each returning
-`:ok | {:violation, TLA.GenServer.Violation.t()}`; the `!` forms raise what they return.
+`:ok | {:violation, ExTLA.GenServer.Violation.t()}`; the `!` forms raise what they return.
 
 A replay reports **which step** failed and goes on being a value. That cannot be built out
 of the exception the wrapper raises without catching it, and the pair is the honest shape
@@ -618,20 +618,20 @@ trace's, and a mismatch is `:not_followed` with both states in the detail.
 
 ### Replaying a lasso
 
-`counterexample/3` accepts a `TLA.Trace.lasso()` and replays the prefix followed by **one
+`counterexample/3` accepts a `ExTLA.Trace.lasso()` and replays the prefix followed by **one
 pass** of the cycle. A lasso describes a behaviour that repeats forever; one pass is what
 can be executed, and the liveness claim it stands for is not something a finite run can
 reproduce.
 
 ---
 
-## Module: `TLA.Simulation`
+## Module: `ExTLA.Simulation`
 
 Random-walk simulation of GenServer processes to check conformance over realistic execution traces.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Simulation do
+defmodule ExTLA.Simulation do
   @moduledoc """
   Runs the actual GenServer through randomized scenarios, recording
   the abstract behavior trace, and checking it against the spec's
@@ -658,7 +658,7 @@ defmodule TLA.Simulation do
     # would drive it against a different specification. Passing one is refused.
 
     # How to generate random messages
-    message_generator: (TLA.State.t() -> term()),
+    message_generator: (ExTLA.State.t() -> term()),
 
     # Whether to inject failures (kill/restart processes)
     inject_failures: boolean(),
@@ -685,7 +685,7 @@ defmodule TLA.Simulation do
     timeout: timeout(),
 
     # The model checker's graph, to hold each behaviour against AS IT FINISHES:
-    # `%{graph: TLA.StateGraph.t(), status: atom()}`, or nil to skip the check.
+    # `%{graph: ExTLA.StateGraph.t(), status: atom()}`, or nil to skip the check.
     #
     # Given here rather than audited by a second suite afterwards.
     # `mix tla.simulate --against-graph` used to run `traces` MORE simulations,
@@ -694,7 +694,7 @@ defmodule TLA.Simulation do
     # generator while printing that every state was a node and every step an
     # edge, and the two suites disagreed about the step default and derived
     # their seeds differently. One suite cannot diverge from itself.
-    against_graph: %{graph: TLA.StateGraph.t(), status: atom()} | nil
+    against_graph: %{graph: ExTLA.StateGraph.t(), status: atom()} | nil
   }
 
   @type result :: %{
@@ -706,19 +706,19 @@ defmodule TLA.Simulation do
     # a behaviour visited a state the checker's graph does not hold, or took a
     # step it does not hold as an edge. It is NOT a conformance finding -- the
     # implementation may have been right and the SEARCH wrong, which
-    # `TLA.Conformance`'s `:checker` class is for and which no other gate in
+    # `ExTLA.Conformance`'s `:checker` class is for and which no other gate in
     # the project can produce. Collapsing it into `:violation` would name the
     # implementation for a defect that may be the checker's.
     status: :ok | :violation | :error | :left_the_graph,
     traces_run: non_neg_integer(),
     total_steps: non_neg_integer(),
-    violation: TLA.Trace.t() | nil,
+    violation: ExTLA.Trace.t() | nil,
 
-    # What `TLA.Conformance.against_graph/3` found, where a behaviour left the
+    # What `ExTLA.Conformance.against_graph/3` found, where a behaviour left the
     # graph. `nil` otherwise -- INCLUDING where `against_graph:` was not given,
     # which is a different fact from "every behaviour was contained", and is
     # why `status` carries the answer rather than this field's emptiness.
-    containment: TLA.Conformance.finding() | nil,
+    containment: ExTLA.Conformance.finding() | nil,
     detail: String.t() | nil,
     duration_ms: non_neg_integer(),
 
@@ -744,11 +744,11 @@ defmodule TLA.Simulation do
   }
 
   @doc """
-  Run simulation against a TLA.GenServer module.
+  Run simulation against a ExTLA.GenServer module.
 
   ## Example
 
-      TLA.Simulation.run(MyApp.TransferServer, %{
+      ExTLA.Simulation.run(MyApp.TransferServer, %{
         traces: 1000,
         max_steps: 50,
         constants: %{accounts: [:alice, :bob], max_balance: 100},
@@ -789,9 +789,9 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Simulation.Generator do
+defmodule ExTLA.Simulation.Generator do
   @moduledoc """
-  Automatically generates random messages from a TLA.Spec's action definitions.
+  Automatically generates random messages from a ExTLA.Spec's action definitions.
   The spec's action params define the domain of possible messages.
   """
 
@@ -829,15 +829,15 @@ end
 
 ---
 
-## Module: `TLA.PropertyTest`
+## Module: `ExTLA.PropertyTest`
 
 Automatic generation of property-based tests from specifications.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.PropertyTest do
+defmodule ExTLA.PropertyTest do
   @moduledoc """
-  Generates StreamData-based property tests from TLA.Spec definitions.
+  Generates StreamData-based property tests from ExTLA.Spec definitions.
   Bridges the gap between formal specs and Elixir's property testing ecosystem.
   """
 
@@ -857,13 +857,13 @@ defmodule TLA.PropertyTest do
   # Both are compiled behind `Code.ensure_loaded?(StreamData)`. `stream_data` is a
   # dev/test-only dependency of ExTLA (§06 §Dependencies keeps runtime dependencies at
   # zero), so a consumer who wants generators declares it themselves, and the functions
-  # have a body only where it is loaded. This is the shape `TLA.Invariant.Test` already
+  # have a body only where it is loaded. This is the shape `ExTLA.Invariant.Test` already
   # uses for `valid_states/3`.
   #
-  # The choices in a sequence come from `TLA.ModelChecker.enabled_steps/3` — the checker's
+  # The choices in a sequence come from `ExTLA.ModelChecker.enabled_steps/3` — the checker's
   # own enumeration, the one the differential corpus compares against TLC — rather than
   # from a second implementation of what may happen next. Note the deliberate difference
-  # from `TLA.Simulation.Generator`, which takes a refinement and returns a concrete
+  # from `ExTLA.Simulation.Generator`, which takes a refinement and returns a concrete
   # message: a sequence of actions is spec-level, and the mapping belongs in the
   # consumer's own test body, as the example below shows.
 
@@ -895,7 +895,7 @@ defmodule MyApp.TransferServerPropertyTest do
   property "transfer server conforms to spec under random action sequences" do
     constants = %{accounts: [:alice, :bob], max_balance: 10}
 
-    check all actions <- TLA.PropertyTest.action_sequences(
+    check all actions <- ExTLA.PropertyTest.action_sequences(
                            Specs.TransferProtocol, constants, 30
                          ),
               max_runs: 500 do
@@ -910,8 +910,8 @@ defmodule MyApp.TransferServerPropertyTest do
         GenServer.call(pid, msg)
 
         abstract_state = MyApp.TransferServer.Refinement.abstract(:sys.get_state(pid))
-        assert TLA.ModelChecker.Safety.check_invariants(
-          TLA.Spec.Compiled.from_module(Specs.TransferProtocol),
+        assert ExTLA.ModelChecker.Safety.check_invariants(
+          ExTLA.Spec.Compiled.from_module(Specs.TransferProtocol),
           abstract_state
         ) == :ok
       end
@@ -924,7 +924,7 @@ end
 
 ---
 
-## Module: `TLA.Supervisor.Spec`
+## Module: `ExTLA.Supervisor.Spec`
 
 > **Status: deferred past v1** (`06-architecture.md` §Implementation Phases).
 >
@@ -943,9 +943,9 @@ Formal specification of supervision trees and crash/recovery behavior.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Supervisor.Spec do
+defmodule ExTLA.Supervisor.Spec do
   @moduledoc """
-  Extends TLA.Spec to model OTP supervision trees.
+  Extends ExTLA.Spec to model OTP supervision trees.
 
   Supervision trees introduce crash/recovery semantics that are
   critical for distributed system correctness. This module lets you
@@ -976,11 +976,11 @@ end
 
 ### Example: Supervised Transfer System
 
-<!-- tla:skip reason=deferred past v1 — TLA.Supervisor.Spec is not built; see 06-architecture.md §Implementation Phases -->
+<!-- tla:skip reason=deferred past v1 — ExTLA.Supervisor.Spec is not built; see 06-architecture.md §Implementation Phases -->
 ```elixir
 defmodule Specs.SupervisedTransfer do
-  use TLA.Spec
-  use TLA.Supervisor.Spec
+  use ExTLA.Spec
+  use ExTLA.Supervisor.Spec
 
   # ── Supervision Structure ──────────────────────────────────────
 
@@ -1045,13 +1045,13 @@ end
 
 ---
 
-## Module: `TLA.GenServer.Runtime`
+## Module: `ExTLA.GenServer.Runtime`
 
 Runtime engine for Layer 3 (not used directly by developers).
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.GenServer.Runtime do
+defmodule ExTLA.GenServer.Runtime do
   @moduledoc """
   Runtime conformance checking between implementation and spec.
   """
@@ -1170,7 +1170,7 @@ defmodule TLA.GenServer.Runtime do
 
   @doc """
   The refinement mapping applied against the memoized compiled spec.
-  `TLA.Refinement.abstract!/3` needs the compiled struct; the wrapper has only the
+  `ExTLA.Refinement.abstract!/3` needs the compiled struct; the wrapper has only the
   module.
   """
   def abstract!(spec_module, refinement, concrete)
@@ -1192,9 +1192,9 @@ new one up on its next callback rather than keeping the structure it first loade
 When a simulation stops a server it does so as a supervisor would: `exit(:shutdown)`, so a
 server that traps exits runs its `terminate/2`, with a bounded wait before a `:kill`. Failure
 injection is a crash, and a crash runs no `terminate/2`; that one is a `:kill` on purpose.
-`TLA.Simulation.run/2` stops at the first finding; `traces_run` counts the traces that ran.
+`ExTLA.Simulation.run/2` stops at the first finding; `traces_run` counts the traces that ran.
 
-**The constants are resolved by `TLA.Spec.Compiled.resolve_constants/1`, the same function
+**The constants are resolved by `ExTLA.Spec.Compiled.resolve_constants/1`, the same function
 `mix tla.check` uses.** A specification model checked under one assignment and an
 implementation checked against another are two different specifications, and a verdict
 from each is not a verdict about the same thing.
@@ -1246,7 +1246,7 @@ system that is actually running.
 ```elixir
 defmodule Mix.Tasks.Tla.Simulate do
   @moduledoc """
-  Run simulation of a TLA.GenServer against its spec.
+  Run simulation of a ExTLA.GenServer against its spec.
 
   ## Usage
 
@@ -1296,7 +1296,7 @@ the checker's graph** means one of three things, and only two are ever considere
    find. TLC agreement covers the differential corpus's models; a running server explores
    paths driven by real OTP scheduling rather than by the traversal code under test.
 
-`TLA.Conformance.against_graph/3` requires every observed state to be a node and every
+`ExTLA.Conformance.against_graph/3` requires every observed state to be a node and every
 observed step to be an edge, and classifies each divergence:
 
 | finding | when |
@@ -1319,7 +1319,7 @@ about the search — so the run's status is a required argument and a bounded on
 Reporting a bound as a checker finding is the false positive that would get this turned off.
 
 Off by default, and it runs traces one at a time: containment is a question about each
-*behaviour*, and `TLA.Simulation.run/2` returns a verdict.
+*behaviour*, and `ExTLA.Simulation.run/2` returns a verdict.
 
 ### `mix tla.replay`
 
@@ -1327,7 +1327,7 @@ Off by default, and it runs traces one at a time: containment is a question abou
 ```elixir
 defmodule Mix.Tasks.Tla.Replay do
   @moduledoc """
-  Drive a TLA.GenServer through a spec-level behavior.
+  Drive a ExTLA.GenServer through a spec-level behavior.
 
   ## Usage
 
@@ -1345,7 +1345,7 @@ defmodule Mix.Tasks.Tla.Replay do
       --trace      A model-checker counterexample to replay (see below).
       --captured   A captured trace from a running system (see below).
       --format     `human` (default) or `json`.
-      --init-arg   Accepted and NOT currently read (#165). `TLA.Replay`'s
+      --init-arg   Accepted and NOT currently read (#165). `ExTLA.Replay`'s
                    `:server`, `:init_arg` and `:timeout` options are unreachable
                    from this task, which passes none of them; the server is
                    started with `[]`. Documented rather than omitted because it
@@ -1361,7 +1361,7 @@ defmodule Mix.Tasks.Tla.Replay do
   `--captured` takes an array of `{"message": …, "state": …}`, oldest first, where
   `state` is the CONCRETE state the implementation was in AFTER that message.
 
-  Both are `TLA.State.Json` encodings, so a state is written the way the checker
+  Both are `ExTLA.State.Json` encodings, so a state is written the way the checker
   writes one and there is no second format to learn. Atom names are resolved
   against the atoms the system already has: a trace belonging to a different
   specification fails with the name that did not resolve, rather than decoding
@@ -1369,7 +1369,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
   ## Steps a trace names and this cannot drive
 
-  A trace's actions are not all actions of the spec. `TLA.Simulation` writes
+  A trace's actions are not all actions of the spec. `ExTLA.Simulation` writes
   `:unmapped` for a message the refinement mapping does not model -- its normal
   answer, not an error -- and `:restart` for a crash injected by
   `--inject-failures`. `concrete_message/2` has no clause for either.
@@ -1382,7 +1382,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
       :restart   REPRODUCED: the server is killed and started again, and
                  recovery is checked to land where the trace says it did --
-                 which is all `TLA.Simulation` checks about a restart either.
+                 which is all `ExTLA.Simulation` checks about a restart either.
                  `:kill`, because a crash runs no `terminate/2`. Only for a
                  server this task started; with `--server` it exits 3.
 
@@ -1409,7 +1409,7 @@ end
 > **Status: deferred past v1** (`06-architecture.md` §Implementation Phases).
 >
 > §Deferred gives the reason: "`mix tla.gen.test` writes code someone then has to maintain;
-> the property helpers give most of the value without that." `TLA.PropertyTest`'s two
+> the property helpers give most of the value without that." `ExTLA.PropertyTest`'s two
 > generators are those helpers, and they are built. Specified here so the design is not
 > painted into a corner, and not built.
 
@@ -1417,7 +1417,7 @@ end
 ```elixir
 defmodule Mix.Tasks.Tla.Gen.Test do
   @moduledoc """
-  Generate property-based tests from a TLA.Spec.
+  Generate property-based tests from a ExTLA.Spec.
 
   ## Usage
 
@@ -1432,7 +1432,7 @@ end
 
 ### `mix tla.stamp`
 
-Reports and updates the `spec_version:` stamps that `use TLA.GenServer` carries. A stamp
+Reports and updates the `spec_version:` stamps that `use ExTLA.GenServer` carries. A stamp
 records which version of a spec a refinement mapping was written against, and a stale one is
 a **compile error** — so the task that reports and repairs them is part of the layer's
 surface, not a convenience.
@@ -1492,7 +1492,7 @@ defmodule Mix.Tasks.Tla.Stamp do
 
                   The last is the one that looks like a finding and is not. A
                   `spec:` given as `@an_attribute` cannot be resolved by a task
-                  that reads source without compiling, but `use TLA.GenServer`
+                  that reads source without compiling, but `use ExTLA.GenServer`
                   has the attribute's VALUE at expansion, so the compile-time
                   check verifies it completely. Failing on it would be a false
                   finding about a mapping that is fully checked.
@@ -1533,11 +1533,11 @@ in deliberately: it moves liveness verdicts and nothing a mapping reads, but a s
 strong fairness admits a different set of behaviours from the same spec under weak, and a
 "mapping-relevant" version distinct from a "liveness-relevant" one would be two stamps
 where the second is maintained by nobody. The compile-time check and `mix tla.stamp`
-compute the version from **one** function, `TLA.Spec.Hash.module_version/2`; a version the
-two derive separately is not a version. Not covered: `@moduledoc`, `use TLA.Spec`, and
+compute the version from **one** function, `ExTLA.Spec.Hash.module_version/2`; a version the
+two derive separately is not a version. Not covered: `@moduledoc`, `use ExTLA.Spec`, and
 ordinary `def`s in the module, so a documentation edit does not restamp every mapping.
 
-> The stamp mechanism itself — the `spec_version:` option, `TLA.Spec.Hash`, and the
+> The stamp mechanism itself — the `spec_version:` option, `ExTLA.Spec.Hash`, and the
 > compile-time check — is otherwise unspecified. This section covers the task's surface so it
 > is gated against drift; the feature's semantics need their own section, which is tracked
 > separately.
@@ -1602,7 +1602,7 @@ end
 ```
 
 It builds the graph with `liveness_graph: true`, because the edge table is what a
-rendering needs — parent pointers are a spanning tree, and `TLA.StateGraph.to_dot/2`
+rendering needs — parent pointers are a spanning tree, and `ExTLA.StateGraph.to_dot/2`
 refuses to draw one as though it were the transition relation
 (`04-layer2-model-checker.md` §State Graph). A spec whose invariant is refuted is drawn
 with its counterexample emphasised, and the task says that the graph covers only what the

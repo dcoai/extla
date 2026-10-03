@@ -1,6 +1,6 @@
-defmodule TLA.ReplayEdgesTest do
+defmodule ExTLA.ReplayEdgesTest do
   @moduledoc """
-  What `TLA.Replay` does with a lasso and with a step that names no spec action
+  What `ExTLA.Replay` does with a lasso and with a step that names no spec action
   (#304, closes #168).
 
   ## The lasso
@@ -25,7 +25,7 @@ defmodule TLA.ReplayEdgesTest do
 
   ## The steps that name no action
 
-  A trace's `actions` are not all actions of the spec. `TLA.Simulation` writes `:unmapped`
+  A trace's `actions` are not all actions of the spec. `ExTLA.Simulation` writes `:unmapped`
   for a message the mapping does not model — its normal answer — and `:restart` for a crash
   injected by `--inject-failures`. `drive/5` called `concrete_message/2` on them regardless
   and died with a `FunctionClauseError`: the advertised simulation-to-replay handoff
@@ -34,8 +34,8 @@ defmodule TLA.ReplayEdgesTest do
 
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.Impl
-  alias TLA.{ModelChecker, Replay, Simulation, Trace}
+  alias ExTLA.Conformance.Counter.Impl
+  alias ExTLA.{ModelChecker, Replay, Simulation, Trace}
 
   # ── A spec the checker refutes, so the lasso is real ────────────────────────
 
@@ -45,7 +45,7 @@ defmodule TLA.ReplayEdgesTest do
     refuted by the cycle `0 → 1 → 0`. No fairness is needed: a behaviour that never sets
     the flag is enough.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n, type: 0..1
     variable :flag, type: [false, true]
@@ -65,7 +65,7 @@ defmodule TLA.ReplayEdgesTest do
   end
 
   defmodule StuckRefinement do
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{n: n, flag: f}), do: %{n: n, flag: f}
 
@@ -78,9 +78,9 @@ defmodule TLA.ReplayEdgesTest do
   defmodule StuckServer do
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.ReplayEdgesTest.Stuck,
-      refinement: TLA.ReplayEdgesTest.StuckRefinement
+    use ExTLA.GenServer,
+      spec: ExTLA.ReplayEdgesTest.Stuck,
+      refinement: ExTLA.ReplayEdgesTest.StuckRefinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 

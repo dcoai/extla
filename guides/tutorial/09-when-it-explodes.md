@@ -12,7 +12,7 @@ It is the same job runner, at three jobs and three attempts:
 <!-- tla:spec -->
 ```elixir
 defmodule Boom.Runner do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :jobs,         default: set([:j1, :j2, :j3])
   constant :max_attempts, default: 3
@@ -155,7 +155,7 @@ and the only one that can quietly invalidate your result, so both halves matter.
 <!-- tla:skip reason=a config fragment; the runs below are the measurements -->
 ```elixir
 # In a test, or wherever you call the checker directly.
-TLA.ModelChecker.run(Boom.Runner, %{
+ExTLA.ModelChecker.run(Boom.Runner, %{
   constants: %{jobs: MapSet.new([:j1, :j2, :j3, :j4, :j5]), max_attempts: 3},
   state_constraint: fn state ->
     Enum.count(state.status, fn {_job, s} -> s == :running end) <= 2

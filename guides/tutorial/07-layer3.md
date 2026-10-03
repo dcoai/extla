@@ -10,7 +10,7 @@ specification allows. The mapping is a **refinement**:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.Refinement do
-  use TLA.Refinement
+  use ExTLA.Refinement
 
   def abstract(%{holder: holder, waiting: waiting}) do
     pc =
@@ -50,7 +50,7 @@ Now the server, with the mapping attached:
 ```elixir
 defmodule Tutorial.CheckedLockServer do
   use GenServer
-  use TLA.GenServer, spec: Tutorial.Lock, refinement: Tutorial.Refinement
+  use ExTLA.GenServer, spec: Tutorial.Lock, refinement: Tutorial.Refinement
 
   def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -67,7 +67,7 @@ defmodule Tutorial.CheckedLockServer do
 end
 ```
 
-`use TLA.GenServer` wraps every callback (Layer 1 is built in). After each one, the pre- and
+`use ExTLA.GenServer` wraps every callback (Layer 1 is built in). After each one, the pre- and
 post-states go through `abstract/1`, the message through `abstract_action/1`, and the step is
 checked for **legality**: the named action's guard must have held in the abstract pre-state, and
 the spec's transition from that state must produce exactly the abstract post-state. That second
@@ -121,7 +121,7 @@ off-by-one in somebody's idea of a queue:
 ```elixir
 defmodule Tutorial.LeakyLockServer do
   use GenServer
-  use TLA.GenServer, spec: Tutorial.Lock, refinement: Tutorial.Refinement
+  use ExTLA.GenServer, spec: Tutorial.Lock, refinement: Tutorial.Refinement
 
   def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -174,23 +174,23 @@ State 6 [VIOLATION]:
 
 Every invariant of `Tutorial.Lock` holds in that post-state. Alice is waiting, nobody holds, the
 lock is free — a state the spec has. What the spec does not have is a `release` step that lands
-there, and that is why the *step* is what gets checked. The finding is a `TLA.Trace`, the same
+there, and that is why the *step* is what gets checked. The finding is a `ExTLA.Trace`, the same
 shape the model checker produces, and the report shows the whole behaviour that led to it.
 
 ## Replay: the counterexample, run against the code
 
 The loop that makes the three layers one tool. [Symmetry](05-symmetry.md)'s `Tutorial.NamedLock`
 has a counterexample —
-Carol requests, Carol acquires — found by the checker before any code existed. `TLA.Replay` drives
+Carol requests, Carol acquires — found by the checker before any code existed. `ExTLA.Replay` drives
 a server through that exact sequence, via `concrete_message/2`, and checks each state it reaches
 against the trace's:
 
 <!-- tla:run expect=ok -->
 ```elixir
-result = TLA.ModelChecker.run(Tutorial.NamedLock, %{constants: %{clients: MapSet.new([:alice, :bob, :carol])}})
+result = ExTLA.ModelChecker.run(Tutorial.NamedLock, %{constants: %{clients: MapSet.new([:alice, :bob, :carol])}})
 %{status: :violation} = result
 
-report = TLA.Replay.counterexample(Tutorial.CheckedLockServer, result.violation)
+report = ExTLA.Replay.counterexample(Tutorial.CheckedLockServer, result.violation)
 %{status: :ok, steps_checked: 2} = report
 ```
 
@@ -201,10 +201,10 @@ diverges at the same step:
 
 <!-- tla:run expect=ok -->
 ```elixir
-simulation = TLA.Simulation.run(Tutorial.LeakyLockServer, %{traces: 100, max_steps: 25, seed: 1})
+simulation = ExTLA.Simulation.run(Tutorial.LeakyLockServer, %{traces: 100, max_steps: 25, seed: 1})
 %{status: :violation} = simulation
 
-report = TLA.Replay.counterexample(Tutorial.LeakyLockServer, simulation.violation)
+report = ExTLA.Replay.counterexample(Tutorial.LeakyLockServer, simulation.violation)
 %{status: :violation, violation: %{kind: :diverged}} = report
 ```
 
@@ -234,8 +234,8 @@ is [Putting a specification in your project](10-in-your-project.md).
   page leaned on is stated there with its reason.
 - [`04-layer2-model-checker.md`](../../spec/04-layer2-model-checker.md) — the checker: what a run
   computes, the JSON result schema, state constraints, symmetry, parallel exploration.
-- [`05-layer3-conformance.md`](../../spec/05-layer3-conformance.md) — `TLA.GenServer`,
-  `TLA.Refinement`, `TLA.Simulation`, `TLA.Replay`, and `--against-graph`, which checks Layers 2
+- [`05-layer3-conformance.md`](../../spec/05-layer3-conformance.md) — `ExTLA.GenServer`,
+  `ExTLA.Refinement`, `ExTLA.Simulation`, `ExTLA.Replay`, and `--against-graph`, which checks Layers 2
   and 3 against each other.
 - [`07-examples.md`](../../spec/07-examples.md) — whole specifications with implementations, including
   the distributed lock this tutorial's is a small cousin of.

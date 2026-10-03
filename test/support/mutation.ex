@@ -1,4 +1,4 @@
-defmodule TLA.Mutation do
+defmodule ExTLA.Mutation do
   @moduledoc """
   Applies a deliberate defect to a copy of the checker and reports which gate, if any,
   noticed (#46).
@@ -61,7 +61,7 @@ defmodule TLA.Mutation do
       * `:name` — stable identifier; it is the key in `survivors.json`.
       * `:models` — one line saying what real defect this stands for. The catalogue is
         read more often than it is run.
-      * `:file` — path under the project root, e.g. `"lib/tla/model_checker.ex"`.
+      * `:file` — path under the project root, e.g. `"lib/ex_tla/model_checker.ex"`.
       * `:anchor` — the exact text to replace. Must appear exactly once.
       * `:replacement` — what to put there.
       * `:kills` — the gate expected to catch it, or `:nothing` where the mutant is
@@ -288,7 +288,7 @@ defmodule TLA.Mutation do
   defp run(workspace, args, timeout) do
     unless timeout_available?() do
       raise RuntimeError,
-            "TLA.Mutation needs `timeout(1)` (coreutils) so that a mutant which hangs is " <>
+            "ExTLA.Mutation needs `timeout(1)` (coreutils) so that a mutant which hangs is " <>
               "an exit status rather than a stuck job. It is not on PATH."
     end
 

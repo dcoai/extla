@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Tla.Coverage do
   @shortdoc "Render the verification ledger to TLA_COVERAGE.md"
 
   @moduledoc """
-  Build the verification ledger — every item each `TLA.Spec` declares and the verification
+  Build the verification ledger — every item each `ExTLA.Spec` declares and the verification
   covering it — and render it to `TLA_COVERAGE.md`.
 
       mix tla.coverage           # print the ledger
@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Tla.Coverage do
 
   use Mix.Task
 
-  alias TLA.Ledger
+  alias ExTLA.Ledger
 
   @golden "TLA_COVERAGE.md"
   @switches [write: :boolean, check: :boolean]
@@ -55,10 +55,10 @@ defmodule Mix.Tasks.Tla.Coverage do
   # NOTHING before #84: no test invoked this task, and in CI the job that runs it is in
   # `verify`, which never starts when `ledger_test.exs`'s own drift assertion fails first in
   # `check`. So the gate's red path had never once run (#75). The success path is exercised by
-  # the `surface-drift` job on every pipeline. The check itself is `TLA.Surface.check!/4`,
+  # the `surface-drift` job on every pipeline. The check itself is `ExTLA.Surface.check!/4`,
   # shared with every other golden's task (#270), so there is one definition of "drifted".
   @doc false
-  def check!(path, rendered), do: TLA.Surface.check!(@golden, "tla.coverage", path, rendered)
+  def check!(path, rendered), do: ExTLA.Surface.check!(@golden, "tla.coverage", path, rendered)
 
   defp summarise(sections) do
     gaps = Ledger.gaps(sections)

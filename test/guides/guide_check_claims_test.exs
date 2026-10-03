@@ -1,4 +1,4 @@
-defmodule TLA.GuideCheckClaimsTest do
+defmodule ExTLA.GuideCheckClaimsTest do
   @moduledoc """
   The claim kinds the tutorial needs (#97), each checked against a guide written to lie: a refuted
   temporal property named wrongly, a never-enabled action claimed on the wrong action, an unsound
@@ -10,7 +10,7 @@ defmodule TLA.GuideCheckClaimsTest do
 
   @moduletag :tmp_dir
 
-  alias TLA.GuideCheck
+  alias ExTLA.GuideCheck
 
   defp guide(tmp, body) do
     path = Path.join(tmp, "guide-#{System.unique_integer([:positive])}.md")
@@ -28,7 +28,7 @@ defmodule TLA.GuideCheckClaimsTest do
   defp lock(name, extra, clients \\ "[:alice, :bob, :carol]") do
     block("tla:spec", """
     defmodule #{name} do
-      use TLA.Spec
+      use ExTLA.Spec
 
       constant :clients, default: set(#{clients})
 
@@ -280,7 +280,7 @@ defmodule TLA.GuideCheckClaimsTest do
   defp servers(spec, refinement, good, leaky) do
     block("tla:spec", """
     defmodule #{refinement} do
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{holder: holder, waiting: waiting}) do
         pc =
@@ -308,7 +308,7 @@ defmodule TLA.GuideCheckClaimsTest do
 
     defmodule #{good} do
       use GenServer
-      use TLA.GenServer, spec: #{spec}, refinement: #{refinement}
+      use ExTLA.GenServer, spec: #{spec}, refinement: #{refinement}
 
       def start_link(opts \\\\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -326,7 +326,7 @@ defmodule TLA.GuideCheckClaimsTest do
 
     defmodule #{leaky} do
       use GenServer
-      use TLA.GenServer, spec: #{spec}, refinement: #{refinement}
+      use ExTLA.GenServer, spec: #{spec}, refinement: #{refinement}
 
       def start_link(opts \\\\ []), do: GenServer.start_link(__MODULE__, opts)
 

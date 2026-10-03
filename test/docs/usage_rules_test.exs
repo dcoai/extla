@@ -1,4 +1,4 @@
-defmodule TLA.UsageRulesTest do
+defmodule ExTLA.UsageRulesTest do
   @moduledoc """
   `usage-rules.md` describes the DSL that exists (#292, for #181).
 

@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Tla.PackageSurface do
 
   use Mix.Task
 
-  alias TLA.PackageSurface
+  alias ExTLA.PackageSurface
 
   @golden "PACKAGE_SURFACE.md"
   @switches [write: :boolean, check: :boolean]
@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Tla.PackageSurface do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        TLA.Surface.check!(@golden, "tla.package_surface", path, rendered)
+        ExTLA.Surface.check!(@golden, "tla.package_surface", path, rendered)
 
       true ->
         Mix.shell().info(rendered)
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.PackageSurface do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest` / `PACKAGE_SURFACE.md`, which hold a task's switches and its
+  # Exposed for `ExTLA.SpecOptionsTest` / `PACKAGE_SURFACE.md`, which hold a task's switches and its
   # documentation to each other.
   def switches, do: @switches
 end

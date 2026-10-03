@@ -1,4 +1,4 @@
-defmodule TLA.TestSpecs do
+defmodule ExTLA.TestSpecs do
   @moduledoc """
   Spec modules used across the DSL tests. They live here rather than inline in a
   test so that they compile once, with the rest of `test/support`, and so that a
@@ -7,7 +7,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Counter do
     @moduledoc "The smallest spec that exercises init, action, guard and invariant."
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :max
 
@@ -58,7 +58,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Swap do
     @moduledoc "The §2 example: an action body is a conjunction, so this swaps."
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :x
     variable :y
@@ -76,7 +76,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Transfer do
     @moduledoc "The worked example of 02-dsl-semantics.md §8, verbatim in shape."
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :accounts
     constant :max_balance
@@ -150,7 +150,7 @@ defmodule TLA.TestSpecs do
 
   defmodule PerBinding do
     @moduledoc "Per-binding fairness and a dependent param generator (§5.2, §3)."
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :processes
 
@@ -201,7 +201,7 @@ defmodule TLA.TestSpecs do
     enabled infinitely often and continuously enabled never, and weak fairness
     lets p wait forever.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :processes
 
@@ -247,7 +247,7 @@ defmodule TLA.TestSpecs do
     `advance` sits enabled beside it, so WF(advance) is what makes `eventually_two`
     hold. `IdlingUnfair` is the same spec with the declaration removed.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n, type: 0..2
     variable :spinning, type: [false, true]
@@ -284,7 +284,7 @@ defmodule TLA.TestSpecs do
 
   defmodule IdlingUnfair do
     @moduledoc "`Idling` with no fairness at all, so spinning forever is a behaviour."
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n, type: 0..2
     variable :spinning, type: [false, true]
@@ -322,7 +322,7 @@ defmodule TLA.TestSpecs do
     there forever is a legal behaviour, so `eventually_done` is refuted by the end
     state itself — the shape that refutes `raft_election`.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :phase, type: [:start, :stuck, :done]
 
@@ -352,7 +352,7 @@ defmodule TLA.TestSpecs do
     `symmetry: [:processes]` declaration over this spec is unsound, and
     `verify_symmetry: true` is what says so (`08-decisions.md` D-17).
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :processes
 
@@ -383,7 +383,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Terminating do
     @moduledoc "A spec that ends on purpose (§5.3): the end state is declared."
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :max
 
@@ -405,7 +405,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Deadlocking do
     @moduledoc "The same shape with no `terminal`, so the end state is a deadlock."
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :max
 
@@ -423,7 +423,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Unbounded do
     @moduledoc "An unbounded counter, for state constraints and max_states."
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n
 
@@ -438,7 +438,7 @@ defmodule TLA.TestSpecs do
 
   defmodule Broken do
     @moduledoc "An invariant that a reachable state refutes, and at a known depth."
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n
 
@@ -462,7 +462,7 @@ defmodule TLA.TestSpecs do
 
   defmodule WithDefaults do
     @moduledoc "Carries its own constant assignment, so `mix tla.check` can run it."
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :max, default: 3
 
@@ -498,7 +498,7 @@ defmodule TLA.TestSpecs do
     was never enabled in and the checker explored a state space this spec does
     not describe.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :accounts, default: MapSet.new([:alice, :bob])
 
@@ -524,7 +524,7 @@ defmodule TLA.TestSpecs do
     anyway would cost the spec author an unused-variable warning they cannot
     silence.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n, type: 0..3
     variable :log, type: :seq
@@ -554,7 +554,7 @@ defmodule TLA.TestSpecs do
     the path that dedups: it cannot, because a forbidden term's encoding does not recur,
     so its state always misses the fingerprint table and is always validated.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :a
     variable :b
@@ -594,7 +594,7 @@ defmodule TLA.TestSpecs do
     variable — a diagnostic about the spec being outside the language, not about the
     property being false.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n
 
@@ -627,7 +627,7 @@ defmodule TLA.TestSpecs do
     indistinguishable from one that validated every newly discovered state. Here the two
     answers differ by half.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :a
     variable :b
@@ -672,7 +672,7 @@ defmodule TLA.TestSpecs do
     :violation`) — which is exactly the thing not to build a fixture for when the point is
     to compare two complete censuses.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :modes
 
@@ -707,9 +707,9 @@ defmodule TLA.TestSpecs do
 
     The distinction is load-bearing where coverage accumulators are combined: `nil + nil`
     raises, and coercing `nil` to `0` would report "never at risk" — a finding
-    `TLA.Coverage.warnings/1` makes — about an invariant that never made it.
+    `ExTLA.Coverage.warnings/1` makes — about an invariant that never made it.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n
 
@@ -736,7 +736,7 @@ defmodule TLA.TestSpecs do
     produces a census that two worker counts must agree on exactly, and a halted one
     produces a lower bound that they need not.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     constant :modes
 
@@ -771,10 +771,10 @@ defmodule TLA.TestSpecs do
 
     Nothing else in the corpus or the fixtures has more than one, so this is what exercises
     `node_record.init_index` — the field that exists so replay knows which block produced
-    the root of a path — and what makes `TLA.PropertyTest.init_states/2` a generator over
+    the root of a path — and what makes `ExTLA.PropertyTest.init_states/2` a generator over
     more than a single value.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :side, type: [:left, :right]
     variable :steps, type: 0..2
@@ -801,7 +801,7 @@ defmodule TLA.TestSpecs do
     term; JSON strings cannot carry it; `mix tla.check --format json` used to raise from the
     report writer after the search had found this violation, and print no document.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :payload
 

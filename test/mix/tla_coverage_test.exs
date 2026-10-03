@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Tla.CoverageTest do
   `async: true`, every concurrent test reading shell output saw nothing, and failed somewhere
   unrelated with a message about its own subject. `on_exit` restores the shell, which bounds
   the window and does not remove it. The flake was found from #308 and gated at #322, which
-  added `{Mix, :shell}` to `TLA.AsyncIsolationTest`'s `@global`.
+  added `{Mix, :shell}` to `ExTLA.AsyncIsolationTest`'s `@global`.
 
   The shell stays `Mix.Shell.Process` rather than the `Mix.Shell.IO` its siblings pin, because
   these assertions read the messages it sends. Sync is what makes that safe: ExUnit runs

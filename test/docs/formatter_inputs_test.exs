@@ -1,4 +1,4 @@
-defmodule TLA.FormatterInputsTest do
+defmodule ExTLA.FormatterInputsTest do
   @moduledoc """
   `.formatter.exs` covers every Elixir file this repository tracks (#317).
 

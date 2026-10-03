@@ -1,4 +1,4 @@
-defmodule TLA.GuideCheck.LinksTest do
+defmodule ExTLA.GuideCheck.LinksTest do
   @moduledoc """
   The link gate, checked against guides whose links go nowhere (#98, #99).
 
@@ -11,9 +11,9 @@ defmodule TLA.GuideCheck.LinksTest do
 
   @moduletag :tmp_dir
 
-  alias TLA.GuideCheck.Links
+  alias ExTLA.GuideCheck.Links
 
-  doctest TLA.GuideCheck.Links
+  doctest ExTLA.GuideCheck.Links
 
   defp guide(tmp, name, body) do
     path = Path.join(tmp, name)
@@ -109,7 +109,7 @@ defmodule TLA.GuideCheck.LinksTest do
 
   describe "the real guides" do
     test "every link in every guide resolves" do
-      guides = TLA.GuideCheck.guides()
+      guides = ExTLA.GuideCheck.guides()
 
       # Renaming `guides/` left 57 of 58 tests green, this one among them: `flat_map` over
       # an empty list is `[]`, and `[] == []` (#175). The corpus is asserted before it is

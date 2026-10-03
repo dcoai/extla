@@ -26,6 +26,70 @@ call it. `mix.exs` filters the published docs on this same rule, and
 
 | Item | Kind | Detail | Locus |
 |---|---|---|---|
+| `ExTLA` | `:packaged` | ships to a consumer | `lib/ex_tla.ex` |
+| `ExTLA.ApiSurface` | `:not_packaged` | this project only | `ledger/ex_tla/api_surface.ex` |
+| `ExTLA.CliSurface` | `:not_packaged` | this project only | `ledger/ex_tla/cli_surface.ex` |
+| `ExTLA.Config` | `:packaged` | ships to a consumer | `lib/ex_tla/config.ex` |
+| `ExTLA.Conformance` | `:packaged` | ships to a consumer | `lib/ex_tla/conformance.ex` |
+| `ExTLA.Coverage` | `:packaged` | ships to a consumer | `lib/ex_tla/coverage.ex` |
+| `ExTLA.Diagnostics` | `:not_packaged` | this project only | `ledger/ex_tla/diagnostics.ex` |
+| `ExTLA.Examples` | `:not_packaged` | this project only | `ledger/ex_tla/examples.ex` |
+| `ExTLA.Fingerprint` | `:packaged` | ships to a consumer | `lib/ex_tla/fingerprint.ex` |
+| `ExTLA.Function` | `:packaged` | ships to a consumer | `lib/ex_tla/function.ex` |
+| `ExTLA.GenServer` | `:packaged` | ships to a consumer | `lib/ex_tla/gen_server.ex` |
+| `ExTLA.GenServer.Driver` | `:packaged` | ships to a consumer | `lib/ex_tla/gen_server/driver.ex` |
+| `ExTLA.GenServer.Runtime` | `:packaged` | ships to a consumer | `lib/ex_tla/gen_server/runtime.ex` |
+| `ExTLA.GenServer.Violation` | `:packaged` | ships to a consumer | `lib/ex_tla/gen_server/violation.ex` |
+| `ExTLA.Invariant` | `:packaged` | ships to a consumer | `lib/ex_tla/invariant.ex` |
+| `ExTLA.Invariant.Agent` | `:packaged` | ships to a consumer | `lib/ex_tla/invariant/agent.ex` |
+| `ExTLA.Invariant.Runtime` | `:packaged` | ships to a consumer | `lib/ex_tla/invariant/runtime.ex` |
+| `ExTLA.Invariant.Test` | `:packaged` | ships to a consumer | `lib/ex_tla/invariant/test.ex` |
+| `ExTLA.Invariant.Violation` | `:packaged` | ships to a consumer | `lib/ex_tla/invariant/violation.ex` |
+| `ExTLA.Ledger` | `:not_packaged` | this project only | `ledger/ex_tla/ledger.ex` |
+| `ExTLA.Mix.SpecTarget` | `:packaged` | ships to a consumer | `lib/ex_tla/mix/spec_target.ex` |
+| `ExTLA.Mix.TraceFile` | `:packaged` | ships to a consumer | `lib/ex_tla/mix/trace_file.ex` |
+| `ExTLA.ModelChecker` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker.ex` |
+| `ExTLA.ModelChecker.Liveness` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker/liveness.ex` |
+| `ExTLA.ModelChecker.Parallel` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker/parallel.ex` |
+| `ExTLA.ModelChecker.Run` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker.ex` |
+| `ExTLA.ModelChecker.Safety` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker/safety.ex` |
+| `ExTLA.PackageSurface` | `:not_packaged` | this project only | `ledger/ex_tla/package_surface.ex` |
+| `ExTLA.Profile` | `:packaged` | ships to a consumer | `lib/ex_tla/profile.ex` |
+| `ExTLA.PropertyTest` | `:packaged` | ships to a consumer | `lib/ex_tla/property_test.ex` |
+| `ExTLA.Refinement` | `:packaged` | ships to a consumer | `lib/ex_tla/refinement.ex` |
+| `ExTLA.Refinement.Error` | `:packaged` | ships to a consumer | `lib/ex_tla/refinement.ex` |
+| `ExTLA.Replay` | `:packaged` | ships to a consumer | `lib/ex_tla/replay.ex` |
+| `ExTLA.Set` | `:packaged` | ships to a consumer | `lib/ex_tla/set.ex` |
+| `ExTLA.Simulation` | `:packaged` | ships to a consumer | `lib/ex_tla/simulation.ex` |
+| `ExTLA.Simulation.Generator` | `:packaged` | ships to a consumer | `lib/ex_tla/simulation/generator.ex` |
+| `ExTLA.Spec` | `:packaged` | ships to a consumer | `lib/ex_tla/spec.ex` |
+| `ExTLA.Spec.Block` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/block.ex` |
+| `ExTLA.Spec.CompileError` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/compile_error.ex` |
+| `ExTLA.Spec.Compiled` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/compiled.ex` |
+| `ExTLA.Spec.DSL` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/dsl.ex` |
+| `ExTLA.Spec.Deps` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/deps.ex` |
+| `ExTLA.Spec.DomainError` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/domain_error.ex` |
+| `ExTLA.Spec.Hash` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/hash.ex` |
+| `ExTLA.Spec.Helpers` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/helpers.ex` |
+| `ExTLA.Spec.Params` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/params.ex` |
+| `ExTLA.Spec.PredicateError` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/predicate_error.ex` |
+| `ExTLA.Spec.Rewriter` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/rewriter.ex` |
+| `ExTLA.Spec.Temporal` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/temporal.ex` |
+| `ExTLA.Spec.Test` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/test.ex` |
+| `ExTLA.Spec.Type` | `:packaged` | ships to a consumer | `lib/ex_tla/spec/type.ex` |
+| `ExTLA.State` | `:packaged` | ships to a consumer | `lib/ex_tla/state.ex` |
+| `ExTLA.State.InvalidTermError` | `:packaged` | ships to a consumer | `lib/ex_tla/state.ex` |
+| `ExTLA.State.Json` | `:packaged` | ships to a consumer | `lib/ex_tla/state/json.ex` |
+| `ExTLA.State.Json.Error` | `:packaged` | ships to a consumer | `lib/ex_tla/state/json.ex` |
+| `ExTLA.StateGraph` | `:packaged` | ships to a consumer | `lib/ex_tla/state_graph.ex` |
+| `ExTLA.StateGraph.Export` | `:packaged` | ships to a consumer | `lib/ex_tla/state_graph/export.ex` |
+| `ExTLA.Surface` | `:not_packaged` | this project only | `ledger/ex_tla/surface.ex` |
+| `ExTLA.Symmetry` | `:packaged` | ships to a consumer | `lib/ex_tla/symmetry.ex` |
+| `ExTLA.Symmetry.UnsoundError` | `:packaged` | ships to a consumer | `lib/ex_tla/symmetry.ex` |
+| `ExTLA.Temporal` | `:packaged` | ships to a consumer | `lib/ex_tla/temporal.ex` |
+| `ExTLA.Temporal.Fairness` | `:packaged` | ships to a consumer | `lib/ex_tla/temporal/fairness.ex` |
+| `ExTLA.Trace` | `:packaged` | ships to a consumer | `lib/ex_tla/trace.ex` |
+| `ExTLA.Trace.Explore` | `:packaged` | ships to a consumer | `lib/ex_tla/trace/explore.ex` |
 | `Mix.Tasks.Tla.ApiSurface` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.api_surface.ex` |
 | `Mix.Tasks.Tla.Check` | `:packaged` | ships to a consumer | `lib/mix/tasks/tla.check.ex` |
 | `Mix.Tasks.Tla.CliSurface` | `:not_packaged` | this project only | `ledger/mix/tasks/tla.cli_surface.ex` |
@@ -38,67 +102,3 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `Mix.Tasks.Tla.Simulate` | `:packaged` | ships to a consumer | `lib/mix/tasks/tla.simulate.ex` |
 | `Mix.Tasks.Tla.Stamp` | `:packaged` | ships to a consumer | `lib/mix/tasks/tla.stamp.ex` |
 | `Mix.Tasks.Tla.Visualize` | `:packaged` | ships to a consumer | `lib/mix/tasks/tla.visualize.ex` |
-| `TLA` | `:packaged` | ships to a consumer | `lib/tla.ex` |
-| `TLA.ApiSurface` | `:not_packaged` | this project only | `ledger/tla/api_surface.ex` |
-| `TLA.CliSurface` | `:not_packaged` | this project only | `ledger/tla/cli_surface.ex` |
-| `TLA.Config` | `:packaged` | ships to a consumer | `lib/tla/config.ex` |
-| `TLA.Conformance` | `:packaged` | ships to a consumer | `lib/tla/conformance.ex` |
-| `TLA.Coverage` | `:packaged` | ships to a consumer | `lib/tla/coverage.ex` |
-| `TLA.Diagnostics` | `:not_packaged` | this project only | `ledger/tla/diagnostics.ex` |
-| `TLA.Examples` | `:not_packaged` | this project only | `ledger/tla/examples.ex` |
-| `TLA.Fingerprint` | `:packaged` | ships to a consumer | `lib/tla/fingerprint.ex` |
-| `TLA.Function` | `:packaged` | ships to a consumer | `lib/tla/function.ex` |
-| `TLA.GenServer` | `:packaged` | ships to a consumer | `lib/tla/gen_server.ex` |
-| `TLA.GenServer.Driver` | `:packaged` | ships to a consumer | `lib/tla/gen_server/driver.ex` |
-| `TLA.GenServer.Runtime` | `:packaged` | ships to a consumer | `lib/tla/gen_server/runtime.ex` |
-| `TLA.GenServer.Violation` | `:packaged` | ships to a consumer | `lib/tla/gen_server/violation.ex` |
-| `TLA.Invariant` | `:packaged` | ships to a consumer | `lib/tla/invariant.ex` |
-| `TLA.Invariant.Agent` | `:packaged` | ships to a consumer | `lib/tla/invariant/agent.ex` |
-| `TLA.Invariant.Runtime` | `:packaged` | ships to a consumer | `lib/tla/invariant/runtime.ex` |
-| `TLA.Invariant.Test` | `:packaged` | ships to a consumer | `lib/tla/invariant/test.ex` |
-| `TLA.Invariant.Violation` | `:packaged` | ships to a consumer | `lib/tla/invariant/violation.ex` |
-| `TLA.Ledger` | `:not_packaged` | this project only | `ledger/tla/ledger.ex` |
-| `TLA.Mix.SpecTarget` | `:packaged` | ships to a consumer | `lib/tla/mix/spec_target.ex` |
-| `TLA.Mix.TraceFile` | `:packaged` | ships to a consumer | `lib/tla/mix/trace_file.ex` |
-| `TLA.ModelChecker` | `:packaged` | ships to a consumer | `lib/tla/model_checker.ex` |
-| `TLA.ModelChecker.Liveness` | `:packaged` | ships to a consumer | `lib/tla/model_checker/liveness.ex` |
-| `TLA.ModelChecker.Parallel` | `:packaged` | ships to a consumer | `lib/tla/model_checker/parallel.ex` |
-| `TLA.ModelChecker.Run` | `:packaged` | ships to a consumer | `lib/tla/model_checker.ex` |
-| `TLA.ModelChecker.Safety` | `:packaged` | ships to a consumer | `lib/tla/model_checker/safety.ex` |
-| `TLA.PackageSurface` | `:not_packaged` | this project only | `ledger/tla/package_surface.ex` |
-| `TLA.Profile` | `:packaged` | ships to a consumer | `lib/tla/profile.ex` |
-| `TLA.PropertyTest` | `:packaged` | ships to a consumer | `lib/tla/property_test.ex` |
-| `TLA.Refinement` | `:packaged` | ships to a consumer | `lib/tla/refinement.ex` |
-| `TLA.Refinement.Error` | `:packaged` | ships to a consumer | `lib/tla/refinement.ex` |
-| `TLA.Replay` | `:packaged` | ships to a consumer | `lib/tla/replay.ex` |
-| `TLA.Set` | `:packaged` | ships to a consumer | `lib/tla/set.ex` |
-| `TLA.Simulation` | `:packaged` | ships to a consumer | `lib/tla/simulation.ex` |
-| `TLA.Simulation.Generator` | `:packaged` | ships to a consumer | `lib/tla/simulation/generator.ex` |
-| `TLA.Spec` | `:packaged` | ships to a consumer | `lib/tla/spec.ex` |
-| `TLA.Spec.Block` | `:packaged` | ships to a consumer | `lib/tla/spec/block.ex` |
-| `TLA.Spec.CompileError` | `:packaged` | ships to a consumer | `lib/tla/spec/compile_error.ex` |
-| `TLA.Spec.Compiled` | `:packaged` | ships to a consumer | `lib/tla/spec/compiled.ex` |
-| `TLA.Spec.DSL` | `:packaged` | ships to a consumer | `lib/tla/spec/dsl.ex` |
-| `TLA.Spec.Deps` | `:packaged` | ships to a consumer | `lib/tla/spec/deps.ex` |
-| `TLA.Spec.DomainError` | `:packaged` | ships to a consumer | `lib/tla/spec/domain_error.ex` |
-| `TLA.Spec.Hash` | `:packaged` | ships to a consumer | `lib/tla/spec/hash.ex` |
-| `TLA.Spec.Helpers` | `:packaged` | ships to a consumer | `lib/tla/spec/helpers.ex` |
-| `TLA.Spec.Params` | `:packaged` | ships to a consumer | `lib/tla/spec/params.ex` |
-| `TLA.Spec.PredicateError` | `:packaged` | ships to a consumer | `lib/tla/spec/predicate_error.ex` |
-| `TLA.Spec.Rewriter` | `:packaged` | ships to a consumer | `lib/tla/spec/rewriter.ex` |
-| `TLA.Spec.Temporal` | `:packaged` | ships to a consumer | `lib/tla/spec/temporal.ex` |
-| `TLA.Spec.Test` | `:packaged` | ships to a consumer | `lib/tla/spec/test.ex` |
-| `TLA.Spec.Type` | `:packaged` | ships to a consumer | `lib/tla/spec/type.ex` |
-| `TLA.State` | `:packaged` | ships to a consumer | `lib/tla/state.ex` |
-| `TLA.State.InvalidTermError` | `:packaged` | ships to a consumer | `lib/tla/state.ex` |
-| `TLA.State.Json` | `:packaged` | ships to a consumer | `lib/tla/state/json.ex` |
-| `TLA.State.Json.Error` | `:packaged` | ships to a consumer | `lib/tla/state/json.ex` |
-| `TLA.StateGraph` | `:packaged` | ships to a consumer | `lib/tla/state_graph.ex` |
-| `TLA.StateGraph.Export` | `:packaged` | ships to a consumer | `lib/tla/state_graph/export.ex` |
-| `TLA.Surface` | `:not_packaged` | this project only | `ledger/tla/surface.ex` |
-| `TLA.Symmetry` | `:packaged` | ships to a consumer | `lib/tla/symmetry.ex` |
-| `TLA.Symmetry.UnsoundError` | `:packaged` | ships to a consumer | `lib/tla/symmetry.ex` |
-| `TLA.Temporal` | `:packaged` | ships to a consumer | `lib/tla/temporal.ex` |
-| `TLA.Temporal.Fairness` | `:packaged` | ships to a consumer | `lib/tla/temporal/fairness.ex` |
-| `TLA.Trace` | `:packaged` | ships to a consumer | `lib/tla/trace.ex` |
-| `TLA.Trace.Explore` | `:packaged` | ships to a consumer | `lib/tla/trace/explore.ex` |

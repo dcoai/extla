@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Tla.Check do
-  @shortdoc "Run model checking on TLA.Spec modules"
+  @shortdoc "Run model checking on ExTLA.Spec modules"
 
   @moduledoc """
-  Run model checking on `TLA.Spec` modules.
+  Run model checking on `ExTLA.Spec` modules.
 
   ## Usage
 
@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Tla.Check do
                            symmetry declaration's soundness statically, so this is
                            the check that catches a wrong one (08-decisions.md D-17).
       --profile            Report what each of YOUR declarations cost, in reductions
-                           (`TLA.Profile`). Off by default and free when off. In
+                           (`ExTLA.Profile`). Off by default and free when off. In
                            reductions rather than milliseconds because a reduction is
                            a function of the code and the data and not of the machine
                            or its load — so two profiles are comparable, and a wall
@@ -66,8 +66,8 @@ defmodule Mix.Tasks.Tla.Check do
 
   use Mix.Task
 
-  alias TLA.Mix.SpecTarget
-  alias TLA.{Coverage, ModelChecker, Profile, Spec, Trace}
+  alias ExTLA.Mix.SpecTarget
+  alias ExTLA.{Coverage, ModelChecker, Profile, Spec, Trace}
 
   @switches [
     max_states: :integer,
@@ -89,7 +89,7 @@ defmodule Mix.Tasks.Tla.Check do
     modules = SpecTarget.resolve!(names)
 
     if modules == [] do
-      Mix.raise("no TLA.Spec modules found. Name one, or `use TLA.Spec` in a module.")
+      Mix.raise("no ExTLA.Spec modules found. Name one, or `use ExTLA.Spec` in a module.")
     end
 
     results = Enum.map(modules, &check(&1, opts))
@@ -131,7 +131,7 @@ defmodule Mix.Tasks.Tla.Check do
   defp run(spec, config) do
     {:ok, ModelChecker.run(spec, config)}
   rescue
-    error in TLA.Symmetry.UnsoundError -> {:unsound_symmetry, error}
+    error in ExTLA.Symmetry.UnsoundError -> {:unsound_symmetry, error}
   end
 
   defp config(spec, opts) do
@@ -145,7 +145,7 @@ defmodule Mix.Tasks.Tla.Check do
     # not checked at all — the two are not sound together, and `report/1` says so rather
     # than leaving the spec's own warning to imply the tool forgot.
     # Under `--workers n` liveness is not checked either, for the same reason and handled
-    # the same way: the pairing is refused in `TLA.ModelChecker`, so the task must decide
+    # the same way: the pairing is refused in `ExTLA.ModelChecker`, so the task must decide
     # rather than hand the user a raise for asking two reasonable things at once.
     # `workers_note/2` says why, beside the symmetry one.
     check_liveness? =
@@ -173,9 +173,9 @@ defmodule Mix.Tasks.Tla.Check do
   end
 
   # The same treatment, for the same reason (#180). `--fingerprint-bits 7` was passed
-  # through and raised an `ArgumentError` from inside `TLA.Fingerprint`, MID-SEARCH, with a
+  # through and raised an `ArgumentError` from inside `ExTLA.Fingerprint`, MID-SEARCH, with a
   # stack trace through the checker — a typo in a flag reported as though the library had
-  # failed, after the run had already begun. The widths are `TLA.Fingerprint`'s to decide,
+  # failed, after the run had already begun. The widths are `ExTLA.Fingerprint`'s to decide,
   # so they are asked for rather than restated here.
   defp fingerprint_bits(opts) do
     case Keyword.get(opts, :fingerprint_bits) do
@@ -183,7 +183,7 @@ defmodule Mix.Tasks.Tla.Check do
         nil
 
       bits ->
-        widths = TLA.Fingerprint.permitted_bits()
+        widths = ExTLA.Fingerprint.permitted_bits()
 
         if bits in widths do
           bits
@@ -279,7 +279,7 @@ defmodule Mix.Tasks.Tla.Check do
     )
 
     # Only when it was asked for. `nil` is not an empty profile — it is the absence of a
-    # measurement, the distinction `TLA.Coverage` already makes for a near-miss count.
+    # measurement, the distinction `ExTLA.Coverage` already makes for a near-miss count.
     if result.profile do
       Mix.shell().info(
         "\n" <> Profile.format(result.profile, title: "PROFILE: #{inspect(module)}")
@@ -314,7 +314,7 @@ defmodule Mix.Tasks.Tla.Check do
   # Bumped to 2 by #130, which added `profile`. A purely ADDITIVE key, and it bumps anyway:
   # "additive changes do not count" is the reasoning that makes a version stop meaning
   # anything, and this one exists so a reader can refuse a shape it does not know rather than
-  # misread it. The cost is bounded and self-repairing -- `TLA.Mix.TraceFile` refuses a v1
+  # misread it. The cost is bounded and self-repairing -- `ExTLA.Mix.TraceFile` refuses a v1
   # document with a message naming both versions and telling the reader to re-run
   # `mix tla.check --format json`, which regenerates it.
   #
@@ -334,7 +334,7 @@ defmodule Mix.Tasks.Tla.Check do
   def schema_version, do: @schema_version
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest`, which holds `spec/04`'s documented option list and this
+  # Exposed for `ExTLA.SpecOptionsTest`, which holds `spec/04`'s documented option list and this
   # to each other. A module attribute is not readable at runtime, and the alternative — the test
   # parsing this file's source for `@switches` — would be a second parser to keep working.
   def switches, do: @switches
@@ -376,7 +376,7 @@ defmodule Mix.Tasks.Tla.Check do
 
   # Every entry carries every key. A field that is absent because nothing measured it is
   # `null`, which is NOT the same fact as zero: a zero near-miss count is a finding, and not
-  # having looked is not (`TLA.Coverage`'s own distinction). A consumer must be able to tell
+  # having looked is not (`ExTLA.Coverage`'s own distinction). A consumer must be able to tell
   # them apart, so nothing here is defaulted to 0 on the way out.
   defp empty_result do
     %{
@@ -424,7 +424,7 @@ defmodule Mix.Tasks.Tla.Check do
     }
   end
 
-  # `TLA.Trace.to_json/1` rather than a local encoder: an earlier one wrote states and
+  # `ExTLA.Trace.to_json/1` rather than a local encoder: an earlier one wrote states and
   # bindings with `inspect/1`, which reads well and parses back into nothing — and
   # `05-layer3-conformance.md`'s pipeline feeds this output straight into
   # `mix tla.replay --trace`. The human rendering is `Trace.format/1` and is unchanged.

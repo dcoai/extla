@@ -1,11 +1,11 @@
-defmodule TLA.TemporalCheck do
+defmodule ExTLA.TemporalCheck do
   @moduledoc """
   Evaluate a spec's temporal declarations over **one observed behaviour**, with
-  `TLA.Temporal`'s operators.
+  `ExTLA.Temporal`'s operators.
 
   This is the shape `05-layer3-conformance.md`'s `check_temporal_properties/2` will take
   when Layer 3 needs it. It lives in test support until then, because what it is for here
-  is checking `TLA.ModelChecker.Liveness` against an independent implementation of the
+  is checking `ExTLA.ModelChecker.Liveness` against an independent implementation of the
   same semantics:
 
   - a lasso the checker calls a counterexample must come back `:violated` when the
@@ -18,8 +18,8 @@ defmodule TLA.TemporalCheck do
   them is evidence; a disagreement means one of them is wrong.
   """
 
-  alias TLA.Temporal
-  alias TLA.Temporal.Fairness
+  alias ExTLA.Temporal
+  alias ExTLA.Temporal.Fairness
 
   @doc """
   The verdict of every instance of the temporal property `name` over a behaviour.
@@ -27,7 +27,7 @@ defmodule TLA.TemporalCheck do
   A list because `Enum.all?(^constant, …)` is a conjunction of instances (§5.1): the
   property is refuted when any one of them is.
   """
-  @spec verdicts(TLA.Spec.Compiled.t(), map(), atom(), {TLA.State.behavior(), integer() | nil}) ::
+  @spec verdicts(ExTLA.Spec.Compiled.t(), map(), atom(), {ExTLA.State.behavior(), integer() | nil}) ::
           [Temporal.verdict()]
   def verdicts(spec, constants, name, {behavior, lasso_start}) do
     spec.temporals
@@ -44,7 +44,7 @@ defmodule TLA.TemporalCheck do
   defp instances(formula, _constants), do: [formula]
 
   # A bare state predicate as a property is a claim about the first state, which is how
-  # `TLA.ModelChecker.Liveness` reads it too.
+  # `ExTLA.ModelChecker.Liveness` reads it too.
   defp evaluate({:predicate, p}, behavior, _lasso_start),
     do: if(p.(hd(behavior)), do: :holds, else: :violated)
 
@@ -64,13 +64,13 @@ defmodule TLA.TemporalCheck do
   @doc """
   Every fairness constraint of the spec, and its verdict over the behaviour.
 
-  Keyed by `TLA.Temporal.Fairness.describe/1` so a failure names the constraint rather
+  Keyed by `ExTLA.Temporal.Fairness.describe/1` so a failure names the constraint rather
   than an index into a bitstring.
   """
   @spec fairness_verdicts(
-          TLA.Spec.Compiled.t(),
+          ExTLA.Spec.Compiled.t(),
           map(),
-          {TLA.State.behavior(), integer() | nil}
+          {ExTLA.State.behavior(), integer() | nil}
         ) :: [{String.t(), Temporal.verdict()}]
   def fairness_verdicts(spec, constants, {behavior, lasso_start}) do
     vars = Enum.map(spec.variables, & &1.name)

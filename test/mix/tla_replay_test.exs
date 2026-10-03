@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
 
   alias Mix.Tasks.Tla.{Check, Replay}
 
-  @server "TLA.Conformance.Counter.Impl.FaithfulToABuggySpec"
+  @server "ExTLA.Conformance.Counter.Impl.FaithfulToABuggySpec"
 
   setup do
     Mix.shell(Mix.Shell.IO)
@@ -46,7 +46,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
   end
 
   defp counterexample_file(tmp) do
-    {json, 1} = task(Check, ["TLA.Conformance.Counter.BuggySpec", "--format", "json"])
+    {json, 1} = task(Check, ["ExTLA.Conformance.Counter.BuggySpec", "--format", "json"])
     path = Path.join(tmp, "counterexample.json")
     File.write!(path, json)
     path
@@ -73,11 +73,11 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         |> File.read!()
         |> Jason.decode!()
         |> Map.fetch!("specs")
-        |> Enum.find(&(&1["spec"] == "TLA.Conformance.Counter.BuggySpec"))
+        |> Enum.find(&(&1["spec"] == "ExTLA.Conformance.Counter.BuggySpec"))
         |> Map.fetch!("violation")
-        |> TLA.Trace.from_json!()
+        |> ExTLA.Trace.from_json!()
 
-      assert %TLA.Trace{} = trace
+      assert %ExTLA.Trace{} = trace
       assert hd(trace.states) == %{count: 0, status: :ready}
       assert List.last(trace.states).count == 3
       assert Enum.all?(trace.actions, &is_atom/1)
@@ -93,7 +93,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         Jason.encode!(capture([{:init, 0, :ready}, {:increment, 1, :incrementing}]))
       )
 
-      {output, 0} = task(Replay, ["TLA.Conformance.Counter.Impl.Conforming", "--captured", path])
+      {output, 0} = task(Replay, ["ExTLA.Conformance.Counter.Impl.Conforming", "--captured", path])
 
       assert output =~ "REPRODUCED"
       assert output =~ "1 steps checked"
@@ -103,7 +103,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       path = Path.join(tmp, "bad.json")
       File.write!(path, Jason.encode!(capture([{:init, 0, :ready}, {:increment, 1, :ready}])))
 
-      {output, 1} = task(Replay, ["TLA.Conformance.Counter.Impl.Conforming", "--captured", path])
+      {output, 1} = task(Replay, ["ExTLA.Conformance.Counter.Impl.Conforming", "--captured", path])
 
       assert output =~ "CONFORMANCE: diverged"
       assert output =~ "step 1"
@@ -151,7 +151,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         Jason.encode!(%{
           "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
           "specs" => [
-            %{"spec" => "TLA.Conformance.Counter.BuggySpec", "status" => "ok", "violation" => nil}
+            %{"spec" => "ExTLA.Conformance.Counter.BuggySpec", "status" => "ok", "violation" => nil}
           ]
         })
       )
@@ -177,7 +177,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
             "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
             "specs" => [
               %{
-                "spec" => "TLA.Conformance.Counter.BuggySpec",
+                "spec" => "ExTLA.Conformance.Counter.BuggySpec",
                 "status" => status,
                 "distinct_states" => 20,
                 "violation" => nil
@@ -201,7 +201,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         path,
         Jason.encode!(%{
           "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
-          "specs" => [%{"spec" => "TLA.Conformance.Counter.BuggySpec", "status" => "ok"}]
+          "specs" => [%{"spec" => "ExTLA.Conformance.Counter.BuggySpec", "status" => "ok"}]
         })
       )
 
@@ -217,7 +217,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         path,
         Jason.encode!(%{
           "schema_version" => Mix.Tasks.Tla.Check.schema_version() + 1,
-          "specs" => [%{"spec" => "TLA.Conformance.Counter.BuggySpec", "violation" => nil}]
+          "specs" => [%{"spec" => "ExTLA.Conformance.Counter.BuggySpec", "violation" => nil}]
         })
       )
 
@@ -233,8 +233,8 @@ defmodule Mix.Tasks.Tla.ReplayTest do
     end
 
     test "a module that is not instrumented" do
-      assert_raise Mix.Error, ~r/does not `use TLA.GenServer`/, fn ->
-        Replay.run(["TLA.Conformance.Counter.Spec", "--trace", "x.json"])
+      assert_raise Mix.Error, ~r/does not `use ExTLA.GenServer`/, fn ->
+        Replay.run(["ExTLA.Conformance.Counter.Spec", "--trace", "x.json"])
       end
     end
   end
@@ -242,8 +242,8 @@ defmodule Mix.Tasks.Tla.ReplayTest do
   defp capture(steps) do
     Enum.map(steps, fn {message, value, status} ->
       %{
-        "message" => TLA.State.Json.encode(message),
-        "state" => TLA.State.Json.encode(%{value: value, status: status})
+        "message" => ExTLA.State.Json.encode(message),
+        "state" => ExTLA.State.Json.encode(%{value: value, status: status})
       }
     end)
   end

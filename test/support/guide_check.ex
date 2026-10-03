@@ -1,4 +1,4 @@
-defmodule TLA.GuideCheck do
+defmodule ExTLA.GuideCheck do
   @moduledoc """
   Runs ExTLA on the code blocks in `guides/`, and asserts the outcome each block claims (#94, #95).
 
@@ -73,8 +73,8 @@ defmodule TLA.GuideCheck do
   asserting more than the design promises.
   """
 
-  alias TLA.GuideCheck.Links
-  alias TLA.{ModelChecker, Simulation, Spec}
+  alias ExTLA.GuideCheck.Links
+  alias ExTLA.{ModelChecker, Simulation, Spec}
 
   # An optional `<!-- tla:... -->` on the line IMMEDIATELY before a ```elixir fence, then the
   # fence's trailing info string (which must be empty — see the moduledoc), then the code.

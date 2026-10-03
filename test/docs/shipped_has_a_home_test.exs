@@ -1,4 +1,4 @@
-defmodule TLA.ShippedHasAHomeTest do
+defmodule ExTLA.ShippedHasAHomeTest do
   @moduledoc """
   What is built is recorded where something checks it (#282).
 
@@ -26,14 +26,16 @@ defmodule TLA.ShippedHasAHomeTest do
   @root Path.expand("../..", __DIR__)
 
   # The eight #179 named, each by a string that would have to survive a rewording of the
-  # entry but not a removal of it.
+  # entry but not a removal of it. A needle naming a module is written without the `Ex`:
+  # CHANGELOG.md is a record, and entries written before the namespace moved under `ExTLA`
+  # (#338) name `TLA.*`. "TLA.Profile" matches both spellings.
   @shipped [
-    {"TLA.Profile and the --profile flag", "TLA.Profile"},
-    {"TLA.Trace.explore/3 and mix tla.explore", "tla.explore"},
+    {"ExTLA.Profile and the --profile flag", "TLA.Profile"},
+    {"ExTLA.Trace.explore/3 and mix tla.explore", "tla.explore"},
     {"mix tla.stamp and spec_version:", "spec_version"},
     {"the verification ledger", "TLA_COVERAGE.md"},
-    {"TLA.Conformance.against_graph/3", "against_graph"},
-    {"TLA.Spec.Deps", "Spec.Deps"},
+    {"ExTLA.Conformance.against_graph/3", "against_graph"},
+    {"ExTLA.Spec.Deps", "Spec.Deps"},
     {"mix tla.mutants", "tla.mutants"},
     {"JSON schema version 2", "schema_version"}
   ]

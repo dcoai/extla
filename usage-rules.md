@@ -73,7 +73,7 @@ action :consume, params: [c: ^clients] do
 end
 ```
 
-Order decides between a **disabled action** and a **raised `TLA.Spec.DomainError`**. `f[x]`
+Order decides between a **disabled action** and a **raised `ExTLA.Spec.DomainError`**. `f[x]`
 outside the domain of `f` raises (D-20) rather than answering `nil`, so a `let` that reads
 before its guard has run turns a state the action should skip into a crash. Put the guard
 above the read.
@@ -106,7 +106,7 @@ A refusal you can act on is the point. If you need both, run them as two checks.
 
 <!-- tla:skip reason=config lines, not a spec; the modes are asserted by invariant_modes_test -->
 ```elixir
-config :extla, mode: :disabled       # recompiles every module that uses TLA.Invariant
+config :extla, mode: :disabled       # recompiles every module that uses ExTLA.Invariant
 config :extla, telemetry: :verbose
 ```
 
@@ -135,7 +135,7 @@ All of TLA+'s set theory is callable **unqualified** inside a spec block — `po
 `cross`, `cross_many`, `distributed_union`, `for_all?`, `exists?`, `range`, `choose`,
 `for_each`, `update`, `except`, `domain`, `function_set`, `record_set`, plus `union`,
 `intersection`, `difference`, `subset?`, `member?`, `size` and the sequence operators. There
-is nothing to import and nothing to qualify: `TLA.Set` and `TLA.Function` hold the one
+is nothing to import and nothing to qualify: `ExTLA.Set` and `ExTLA.Function` hold the one
 implementation of each, and the helper module every spec imports delegates to them (D-38).
 
 **Two are renamed, and only two.** `{f(x) : x \in S}` is `set_map/2` and `{x \in S : P(x)}`

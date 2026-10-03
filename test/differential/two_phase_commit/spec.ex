@@ -1,4 +1,4 @@
-defmodule TLA.Differential.TwoPhaseCommit do
+defmodule ExTLA.Differential.TwoPhaseCommit do
   @moduledoc """
   `TwoPhaseCommit.tla`, in the ExTLA DSL.
 
@@ -11,7 +11,7 @@ defmodule TLA.Differential.TwoPhaseCommit do
   existed this entry declared `msgs` as `:set` and checked strictly less than TLC
   did — an entry that can agree with the oracle for the wrong reason.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :rms, default: MapSet.new([:r1, :r2, :r3])
 

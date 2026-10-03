@@ -15,7 +15,7 @@ System architecture, module dependency graph, and implementation strategy.
        ┌──────────────┬──────────────┼──────────────┬──────────────┐
        ▼              ▼              ▼              ▼              ▼
 ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
-│ModelChecker│ │TLA.Coverage│ │ Simulation │ │ TLA.Replay │ │PropertyTest│
+│ModelChecker│ │ExTLA.Coverage│ │ Simulation │ │ ExTLA.Replay │ │PropertyTest│
 │            │ │            │ │            │ │            │ │            │
 │.run/2      │ │.init/3     │ │.run/2      │ │.counter-   │ │.action_    │
 │.check_     │ │.observe_*  │ │.run_trace/2│ │ example/3  │ │ sequences/3│
@@ -28,7 +28,7 @@ System architecture, module dependency graph, and implementation strategy.
 └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────┬──────┘
       │              │              │              │              │
       │              │        ┌─────▼──────────────▼──────┐       │
-      │              │        │      TLA.GenServer         │       │
+      │              │        │      ExTLA.GenServer         │       │
       │              │        │  defoverridable + super    │       │
       │              │        │  ┌──────────────────────┐  │       │
       │              │        │  │ GenServer.Runtime    │  │       │
@@ -38,7 +38,7 @@ System architecture, module dependency graph, and implementation strategy.
       │              │        └─────────────┬──────────────┘       │
       │              │                      │                      │
       │              │        ┌─────────────▼──────────────┐       │
-      │              │        │      TLA.Refinement        │       │
+      │              │        │      ExTLA.Refinement        │       │
       │              │        │  .abstract/1               │       │
       │              │        │  .abstract_action/1        │       │
       │              │        │  .concrete_message/2  ─────┼───────┘
@@ -46,13 +46,13 @@ System architecture, module dependency graph, and implementation strategy.
       │              │        └─────────────┬──────────────┘
       │              │                      │
  ┌────▼──────────────▼──────────────────────▼────────────────────────┐
- │                        TLA.Spec.Compiled                           │
+ │                        ExTLA.Spec.Compiled                           │
  │  constants · variables · init fns · actions (pure in pre+params)   │
  │  invariants · action properties · temporal formulas · fairness     │
  └────────────────────────────┬───────────────────────────────────────┘
                               │
                  ┌────────────▼────────────┐
-                 │        TLA.Spec         │
+                 │        ExTLA.Spec         │
                  │  DSL macros + the §7    │
                  │  compile-time validator │
                  └────────────┬────────────┘
@@ -60,7 +60,7 @@ System architecture, module dependency graph, and implementation strategy.
                               │   State · Set · Function. NOT on the
                               │   three boxes below (#282).
                               │   Set and Function are reached through
-                              │   TLA.Spec.Helpers, which a spec body
+                              │   ExTLA.Spec.Helpers, which a spec body
                               │   imports and which holds no second
                               │   implementation of an operator (D-38).
                               │
@@ -69,7 +69,7 @@ System architecture, module dependency graph, and implementation strategy.
       ┌───────────────────────┬───────────────────────┐
       ▼                       ▼                       ▼
 ┌──────────────┐   ┌──────────────────┐   ┌────────────────────┐
-│TLA.Invariant │   │  TLA.StateGraph  │   │     TLA.Trace      │
+│ExTLA.Invariant │   │  ExTLA.StateGraph  │   │     ExTLA.Trace      │
 │              │   │                  │   │                    │
 │ Layer 1      │   │ fingerprint →    │   │ walk parents, then │
 │ runtime      │   │ {parent, action, │   │ REPLAY forward to  │
@@ -81,14 +81,14 @@ System architecture, module dependency graph, and implementation strategy.
 ┌────▼──────────────────────▼───────────────────────▼──────────┐
 │                       Foundation Layer                        │
 │                                                              │
-│  TLA.State       — state snapshots and transitions           │
-│  TLA.Fingerprint — canonical encoding + 64-bit identity      │
-│  TLA.Temporal    — temporal operators (bounded fragment);    │
+│  ExTLA.State       — state snapshots and transitions           │
+│  ExTLA.Fingerprint — canonical encoding + 64-bit identity      │
+│  ExTLA.Temporal    — temporal operators (bounded fragment);    │
 │                    fairness asks ModelChecker.enabled_       │
 │                    bindings/3 back up the stack (temporal.ex)│
-│  TLA.Set         — set operations; THE implementation        │
-│  TLA.Function    — function operations; THE implementation   │
-│  TLA.Config      — COMPILE-time configuration                │
+│  ExTLA.Set         — set operations; THE implementation        │
+│  ExTLA.Function    — function operations; THE implementation   │
+│  ExTLA.Config      — COMPILE-time configuration                │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,13 +97,13 @@ this repository that can go stale has a gate — `API_SURFACE.md` for the signat
 `DIAGNOSTICS.md` for the kinds, `CHANGELOG.md` for what shipped, the guide harness for
 every code block. A picture is prose, and prose about module structure is exactly the kind
 that rots: until #282 this one drew `ModelChecker.check_liveness/2` and
-`Coverage.compute/2`, neither of which has ever existed, an edge from `TLA.Spec` to
-`TLA.Invariant` that the code does not have, and omitted `TLA.Temporal`'s call back up to
+`Coverage.compute/2`, neither of which has ever existed, an edge from `ExTLA.Spec` to
+`ExTLA.Invariant` that the code does not have, and omitted `ExTLA.Temporal`'s call back up to
 `ModelChecker.enabled_bindings/3`. It was never a copy of the code; it is a copy of the
 design's module tree, from the initial commit.
 
 **The review rule, until something better exists:** check this diagram whenever
-`lib/tla/*.ex` gains or loses a module, or when a box's named function changes. That is one
+`lib/ex_tla/*.ex` gains or loses a module, or when a box's named function changes. That is one
 `grep -l` per box — `grep -rn "def check_safety(" lib/` and so on — and it is how the
 corrections above were found. Generating it from source would be the real answer; it is not
 a hard problem (the five `surface-drift` goldens do the same kind of work), and it is the
@@ -116,15 +116,15 @@ obvious next thing for anyone who finds this diagram wrong again.
 ### Model Checking Flow (Layer 2)
 
 ```
-TLA.Spec module
+ExTLA.Spec module
     │
     ▼ (compile-time macro expansion)
-TLA.Spec.Compiled struct
+ExTLA.Spec.Compiled struct
     │
     ▼ (+ constants from config)
-TLA.ModelChecker.run/2
+ExTLA.ModelChecker.run/2
     │
-    ├──► TLA.ModelChecker.Parallel.explore/2
+    ├──► ExTLA.ModelChecker.Parallel.explore/2
     │       │
     │       ├──► Generate initial states from Init
     │       │
@@ -140,11 +140,11 @@ TLA.ModelChecker.run/2
     │       │     3. Successor-less: terminal if a `terminal` admits it, else deadlock
     │       │     4. Repeat until frontier empty or violation found
     │       │
-    │       └──► TLA.StateGraph (ETS-backed)
+    │       └──► ExTLA.StateGraph (ETS-backed)
     │
-    ├──► TLA.ModelChecker.Safety (checked during exploration)
+    ├──► ExTLA.ModelChecker.Safety (checked during exploration)
     │
-    ├──► TLA.ModelChecker.Liveness (checked after graph complete)
+    ├──► ExTLA.ModelChecker.Liveness (checked after graph complete)
     │       │
     │       ├──► Compute SCCs (Tarjan's algorithm)
     │       ├──► Check temporal formulas against SCCs
@@ -152,7 +152,7 @@ TLA.ModelChecker.run/2
     │
     └──► Result
          ├── :ok → all properties verified
-         └── :violation → TLA.Trace counterexample
+         └── :violation → ExTLA.Trace counterexample
 ```
 
 ### Runtime Conformance Flow (Layer 3)
@@ -161,7 +161,7 @@ TLA.ModelChecker.run/2
 GenServer receives message
     │
     ▼
-TLA.GenServer wrapper (defoverridable + super)
+ExTLA.GenServer wrapper (defoverridable + super)
     │
     ├──► 1. pre_abstract = Refinement.abstract(pre_state)
     │
@@ -184,7 +184,7 @@ TLA.GenServer wrapper (defoverridable + super)
     │
     ├──► 5. Check spec invariants on post_abstract
     ├──► 6. Check action properties on (pre_abstract, post_abstract)
-    │         └── any violation → raise / log per TLA.Config.mode
+    │         └── any violation → raise / log per ExTLA.Config.mode
     │
     ├──► 7. Append to the bounded per-process behavior trace
     │
@@ -200,7 +200,7 @@ implementation follows the specification. See `05-layer3-conformance.md`
 ### Simulation Flow (Layer 3)
 
 ```
-TLA.Simulation.run/2
+ExTLA.Simulation.run/2
     │
     ├──► For each trace (1..config.traces):
     │       │
@@ -212,7 +212,7 @@ TLA.Simulation.run/2
     │       │       ├──► Generate random enabled message
     │       │       │    (from spec action params or custom generator)
     │       │       ├──► Send message to GenServer
-    │       │       ├──► Runtime checks fire (via TLA.GenServer wrapper)
+    │       │       ├──► Runtime checks fire (via ExTLA.GenServer wrapper)
     │       │       ├──► Optionally inject failure (kill + restart)
     │       │       └──► Record step in trace
     │       │
@@ -291,7 +291,7 @@ most once per run. `04-layer2-model-checker.md` §State Graph specifies this.
 ```
 
 **The second box is why liveness and `workers:` are refused together** (D-27). The two
-liveness structures are maps in the `TLA.StateGraph` struct, not ETS tables: under workers
+liveness structures are maps in the `ExTLA.StateGraph` struct, not ETS tables: under workers
 each process would hold its own fragment, and a cycle spanning two of them would not exist
 anywhere to be found. They were drawn inside the ETS box until #282 — which made the
 refusal read as a policy rather than as the consequence of the storage that it is, and
@@ -357,8 +357,8 @@ sentence forbidding copies.
 An earlier plan made Layer 1 the MVP, on the reasoning that it is the easiest piece to
 build and the easiest to adopt. That ordering was inverted for one specific reason:
 **Layer 1 de-risks nothing about Layer 2.** The two share almost no machinery — Layer 1
-needs `TLA.State` and `TLA.Config`, both trivial, while `TLA.Temporal`, `TLA.Set`,
-`TLA.Function` and `TLA.Fingerprint` are all Layer 2's. Building Layer 1 first would
+needs `ExTLA.State` and `ExTLA.Config`, both trivial, while `ExTLA.Temporal`, `ExTLA.Set`,
+`ExTLA.Function` and `ExTLA.Fingerprint` are all Layer 2's. Building Layer 1 first would
 therefore ship into a market that already holds Corsa, Bond, Oath and ExContract, with
 no differentiator, while the genuinely unproven part — whether the DSL of
 `02-dsl-semantics.md` can be compiled and checked at all — stays untested.
@@ -375,15 +375,15 @@ runtime checking engine it requires.
 **Goal:** a spec written in the DSL compiles, and its safety properties are checked
 correctly.
 
-- `TLA.State`, `TLA.Config`, `TLA.Fingerprint`
-- `TLA.Set`, `TLA.Function`
-- `TLA.Spec`, `TLA.Spec.DSL`, `TLA.Spec.Compiled` — including the full compile-time
+- `ExTLA.State`, `ExTLA.Config`, `ExTLA.Fingerprint`
+- `ExTLA.Set`, `ExTLA.Function`
+- `ExTLA.Spec`, `ExTLA.Spec.DSL`, `ExTLA.Spec.Compiled` — including the full compile-time
   validation pass of `02-dsl-semantics.md` §7
-- `TLA.StateGraph` (parent-pointer model), single-threaded BFS
-- `TLA.ModelChecker`, `TLA.ModelChecker.Safety` — including `terminal` states
+- `ExTLA.StateGraph` (parent-pointer model), single-threaded BFS
+- `ExTLA.ModelChecker`, `ExTLA.ModelChecker.Safety` — including `terminal` states
   (`02-dsl-semantics.md` §5.3) and the implicit `type_ok` invariant (§1.5)
-- `TLA.Trace` with replay-based state regeneration
-- `TLA.Coverage` — action coverage and vacuity, from the first release
+- `ExTLA.Trace` with replay-based state regeneration
+- `ExTLA.Coverage` — action coverage and vacuity, from the first release
 - `Mix.Tasks.Tla.Check`
 - **The differential corpus against TLC** (`04-layer2-model-checker.md` §Differential
   testing), which is the acceptance criterion for this phase, not a follow-up
@@ -395,10 +395,10 @@ exercised, and agrees with TLC on every spec in the corpus.
 
 **Complete.**
 
-- `TLA.Temporal`, `TLA.Temporal.Fairness`
-- The liveness graph: edge table and per-state ENABLED bits in `TLA.StateGraph`,
+- `ExTLA.Temporal`, `ExTLA.Temporal.Fairness`
+- The liveness graph: edge table and per-state ENABLED bits in `ExTLA.StateGraph`,
   built only under `check_liveness: true` (`04-layer2-model-checker.md` §State Graph)
-- `TLA.ModelChecker.Liveness` — SCC-based, over the bounded fragment of
+- `ExTLA.ModelChecker.Liveness` — SCC-based, over the bounded fragment of
   `02-dsl-semantics.md` §5.1, with per-binding fairness (§5.2)
 - Symmetry reduction and `--verify-symmetry` (`04-layer2-model-checker.md` §Symmetry)
 
@@ -411,21 +411,21 @@ exercised, and agrees with TLC on every spec in the corpus.
 Layer 1 is small once the runtime checking engine exists; it ships alongside Layer 3
 rather than ahead of it.
 
-- `TLA.Invariant`, `TLA.Invariant.Runtime`, `TLA.Invariant.Violation`
-- `TLA.Invariant.Agent` — Layer 1 for a behaviour with no callback module of its own
-- `TLA.Invariant.Test` — the ExUnit helpers of `03-layer1-invariants.md` §Testing
+- `ExTLA.Invariant`, `ExTLA.Invariant.Runtime`, `ExTLA.Invariant.Violation`
+- `ExTLA.Invariant.Agent` — Layer 1 for a behaviour with no callback module of its own
+- `ExTLA.Invariant.Test` — the ExUnit helpers of `03-layer1-invariants.md` §Testing
   Integration, including `refute_invariant/3`, which is the only evidence an invariant is
   not vacuously true
-- `TLA.Refinement` with `validate!/2` at compile time
-- `TLA.GenServer`, `TLA.GenServer.Runtime` — including `check_step!/5`, the
-  refinement check that is the point of the layer, and `TLA.GenServer.Violation`,
+- `ExTLA.Refinement` with `validate!/2` at compile time
+- `ExTLA.GenServer`, `ExTLA.GenServer.Runtime` — including `check_step!/5`, the
+  refinement check that is the point of the layer, and `ExTLA.GenServer.Violation`,
   whose `:diverged` diff is the layer's primary output
-- `TLA.Replay` — counterexample replay and captured-trace validation, and the
-  reporting forms of each `TLA.GenServer.Runtime` check that a replay is built from
-- `TLA.Simulation`, `TLA.Simulation.Generator`, and `TLA.GenServer.Driver` — the
-  monitored call `TLA.Replay` and `TLA.Simulation` both drive a server through
+- `ExTLA.Replay` — counterexample replay and captured-trace validation, and the
+  reporting forms of each `ExTLA.GenServer.Runtime` check that a replay is built from
+- `ExTLA.Simulation`, `ExTLA.Simulation.Generator`, and `ExTLA.GenServer.Driver` — the
+  monitored call `ExTLA.Replay` and `ExTLA.Simulation` both drive a server through
 - `Mix.Tasks.Tla.Simulate`, `Mix.Tasks.Tla.Replay`
-- `TLA.State.Json` — the round-trippable form of a §6 state term, which is what
+- `ExTLA.State.Json` — the round-trippable form of a §6 state term, which is what
   makes `mix tla.check --format json` into `mix tla.replay --trace` a pipeline
   rather than two commands that print at each other
 
@@ -436,17 +436,17 @@ against the real GenServer.
 
 **Complete.** All three entries are built, on the terms this section set for them.
 
-- `TLA.ModelChecker.Parallel` — added only once the single-threaded checker was correct
+- `ExTLA.ModelChecker.Parallel` — added only once the single-threaded checker was correct
   and had been profiled. A wrong answer computed on eight cores is still wrong, and
   parallelism makes every correctness bug harder to reproduce. Level-synchronous BFS
   (D-27), because D-9's corpus compares the *length* of the shortest counterexample and a
   free-running frontier does not preserve it. 5.40x at 8 workers; the corpus agrees with
   TLC at 1, 2, 4 and 8. Liveness is refused alongside it, as D-22 refuses symmetry.
-- `TLA.PropertyTest` — `init_states/2` and `action_sequences/3`, drawing their choices
+- `ExTLA.PropertyTest` — `init_states/2` and `action_sequences/3`, drawing their choices
   from the checker's own `enabled_steps/3` rather than a second implementation.
   `Mix.Tasks.Tla.Gen.Test` is **not** built: §Deferred removes generated test files from
   v1, and `05-layer3-conformance.md` now says so where it used to specify them.
-- `Mix.Tasks.Tla.Visualize` (DOT only) — over `TLA.StateGraph.to_dot/2` and `to_json/1`.
+- `Mix.Tasks.Tla.Visualize` (DOT only) — over `ExTLA.StateGraph.to_dot/2` and `to_json/1`.
   Both require the edge table and refuse to draw the spanning tree of parent pointers as
   though it were the transition relation; both refuse a graph past the cap while naming
   its true count.
@@ -462,11 +462,11 @@ recorded in `CHANGELOG.md` as it lands, under a gate. Nothing below this line is
 
 | Item | Why |
 |---|---|
-| `TLA.Supervisor.Spec` | Faithful OTP restart semantics is a research-scale problem; nothing below it needs it |
+| `ExTLA.Supervisor.Spec` | Faithful OTP restart semantics is a research-scale problem; nothing below it needs it |
 | View abstraction | Easy to make unsound; symmetry covers the common case |
 | HTML/D3 visualizer | DOT is enough, and a bespoke viewer is a maintenance sink |
 | Generated test *files* | `mix tla.gen.test` writes code someone then has to maintain; the property helpers give most of the value without that |
-| Atomic-bound near-miss probes | `TLA.Coverage` derives a near-miss probe only from a top-level `or`, so an invariant written as a bare bound (`count <= max`, `size(s) < k`) reports `nil` — not measured. Pressing such a bound to equality is exactly the near miss the column exists to report, and deriving it means recognising the comparison and its edge rather than negating a disjunct. Deferred, not rejected: the shape is worth having, and reporting `nil` is honest in the meantime |
+| Atomic-bound near-miss probes | `ExTLA.Coverage` derives a near-miss probe only from a top-level `or`, so an invariant written as a bare bound (`count <= max`, `size(s) < k`) reports `nil` — not measured. Pressing such a bound to equality is exactly the near miss the column exists to report, and deriving it means recognising the comparison and its edge rather than negating a disjunct. Deferred, not rejected: the shape is worth having, and reporting `nil` is honest in the meantime |
 
 ---
 

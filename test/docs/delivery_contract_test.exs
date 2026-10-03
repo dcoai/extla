@@ -1,4 +1,4 @@
-defmodule TLA.DeliveryContractTest do
+defmodule ExTLA.DeliveryContractTest do
   @moduledoc """
   The delivery contract is stated the same way in every place that states it (#305, for #172).
 
@@ -70,8 +70,8 @@ defmodule TLA.DeliveryContractTest do
 
       # The reason the cost is nothing, which is the part a reader has to be able to check:
       # both drivers already make that call once per step.
-      assert d36 =~ "TLA.Replay"
-      assert d36 =~ "TLA.Simulation"
+      assert d36 =~ "ExTLA.Replay"
+      assert d36 =~ "ExTLA.Simulation"
     end
 
     # A decision recording only what was chosen is half a decision.
@@ -88,10 +88,10 @@ defmodule TLA.DeliveryContractTest do
     # document describing a capability the code does not have is this project's signature
     # defect; a "not yet" that outlived its plan is the same defect pointing the other way.
     test "agree that a cast is delivered as a cast" do
-      driver = read("lib/tla/gen_server/driver.ex")
+      driver = read("lib/ex_tla/gen_server/driver.ex")
 
       assert driver =~ ~s|{:"$gen_cast", message}|,
-             "`TLA.GenServer.Driver` cannot send a cast, so spec/05 and usage-rules.md " <>
+             "`ExTLA.GenServer.Driver` cannot send a cast, so spec/05 and usage-rules.md " <>
                "describe a capability that does not exist."
     end
 

@@ -1,4 +1,4 @@
-defmodule TLA.DifferentialCase do
+defmodule ExTLA.DifferentialCase do
   @moduledoc """
   The comparisons every differential corpus entry runs against TLC.
 
@@ -8,8 +8,8 @@ defmodule TLA.DifferentialCase do
   ExUnit run the entries concurrently. The corpus is now big enough for both to
   matter; `raft_election` alone explores 58k states.
 
-      defmodule TLA.DifferentialTest.RaftElection do
-        use TLA.DifferentialCase, entry: entry
+      defmodule ExTLA.DifferentialTest.RaftElection do
+        use ExTLA.DifferentialCase, entry: entry
       end
 
   An `entry` is `%{name:, module:, constants:, names:}`, described in
@@ -42,7 +42,7 @@ defmodule TLA.DifferentialCase do
     quote do
       use ExUnit.Case, async: true
 
-      alias TLA.ModelChecker
+      alias ExTLA.ModelChecker
 
       @entry unquote(opts[:entry])
       @corpus Path.expand("../differential", __DIR__)
@@ -60,12 +60,12 @@ defmodule TLA.DifferentialCase do
         # states for a reason that is not a bug. `audit_log` is where that stops
         # being hypothetical — its `log_only_grows` is refuted at the third step,
         # so selecting it here would compare 2 states against TLC's 3.
-        # `liveness_graph: true` so the edge table exists for `TLA.GraphAudit` to audit.
+        # `liveness_graph: true` so the edge table exists for `ExTLA.GraphAudit` to audit.
         # Built here rather than in that test, because building it there meant exploring
         # `raft_election` a second time — 20 seconds of this suite for a graph this one
         # already has.
         {result, graph} =
-          TLA.DifferentialCase.explore(@entry,
+          ExTLA.DifferentialCase.explore(@entry,
             invariants: [],
             action_properties: [],
             liveness_graph: true
@@ -97,7 +97,7 @@ defmodule TLA.DifferentialCase do
 
         assert stuck? == ctx.expected["deadlock"]
 
-        spec = TLA.Spec.Compiled.from_module(@entry.module)
+        spec = ExTLA.Spec.Compiled.from_module(@entry.module)
 
         if spec.terminals != [] do
           refute ctx.result.deadlock,
@@ -108,7 +108,7 @@ defmodule TLA.DifferentialCase do
       end
 
       test "agrees with TLC on every invariant", ctx do
-        spec = TLA.DifferentialCase.run_spec(@entry)
+        spec = ExTLA.DifferentialCase.run_spec(@entry)
 
         {holding, violated} =
           Enum.split_with(ctx.expected["invariants"], fn {_, verdict} -> verdict == "holds" end)
@@ -120,22 +120,22 @@ defmodule TLA.DifferentialCase do
         if holding != [] do
           names =
             Enum.map(holding, fn {tlc_name, _} ->
-              TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+              ExTLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
             end)
 
-          result = TLA.DifferentialCase.check(@entry, invariants: names, action_properties: [])
+          result = ExTLA.DifferentialCase.check(@entry, invariants: names, action_properties: [])
 
           assert result.status == :ok,
                  "every one of #{inspect(names)} holds under TLC, but ExTLA reported " <>
-                   "#{inspect(result.status)}#{TLA.DifferentialCase.describe(result.violation)}"
+                   "#{inspect(result.status)}#{ExTLA.DifferentialCase.describe(result.violation)}"
         end
 
         # A violated one still needs a run of its own: TLC halts at the first
         # violation and so does this checker, so the shortest counterexample for
         # THIS invariant is only what a run checking only it reports.
         for {tlc_name, %{"violated_at" => depth}} <- violated do
-          name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
-          result = TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+          name = ExTLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+          result = ExTLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
 
           assert result.status == :violation
           assert result.violation.property == name
@@ -163,12 +163,12 @@ defmodule TLA.DifferentialCase do
       # A test that establishes presence is worth having only over the full list;
       # over part of it, it certifies the part it looks at and hides the rest.
       test "declares the properties TLC was given, and no others", ctx do
-        spec = TLA.Spec.Compiled.from_module(@entry.module)
+        spec = ExTLA.Spec.Compiled.from_module(@entry.module)
 
         checked =
           ctx.expected["properties"]
           |> Map.keys()
-          |> MapSet.new(&TLA.DifferentialCase.dsl_name(&1, @entry))
+          |> MapSet.new(&ExTLA.DifferentialCase.dsl_name(&1, @entry))
 
         declared =
           MapSet.new(spec.temporals ++ spec.action_properties, &Atom.to_string(&1.name))
@@ -186,49 +186,49 @@ defmodule TLA.DifferentialCase do
       # one of them, because nothing stopped it early; a violated one needs a run of its
       # own, because both checkers halt at the first.
       test "agrees with TLC on every temporal property", ctx do
-        spec = TLA.Spec.Compiled.from_module(@entry.module)
+        spec = ExTLA.Spec.Compiled.from_module(@entry.module)
 
         # `properties` holds both kinds, because it records the .cfg section they
         # came from. Which kind a name is, is a question about the ExTLA spec and
         # is answered there rather than written into the fixture.
         {holding, violated} =
           spec
-          |> TLA.DifferentialCase.properties_of_kind(ctx.expected, @entry, :temporal)
+          |> ExTLA.DifferentialCase.properties_of_kind(ctx.expected, @entry, :temporal)
           |> Enum.split_with(fn {_, verdict} -> verdict == "holds" end)
 
         if holding != [] do
           names = Enum.map(holding, &elem(&1, 0))
 
-          result = TLA.DifferentialCase.check_liveness(@entry, names)
+          result = ExTLA.DifferentialCase.check_liveness(@entry, names)
 
           assert result.status == :ok,
                  "every one of #{inspect(names)} holds under TLC, but ExTLA refuted " <>
-                   inspect(TLA.DifferentialCase.refuted(result))
+                   inspect(ExTLA.DifferentialCase.refuted(result))
         end
 
         # The row that distinguishes a working liveness checker from one that answers
         # "holds" to everything.
         for {name, "violated"} <- violated do
-          result = TLA.DifferentialCase.check_liveness(@entry, [name])
+          result = ExTLA.DifferentialCase.check_liveness(@entry, [name])
 
           assert result.status == :violation,
                  "TLC refutes #{name}, but ExTLA reported #{inspect(result.status)}"
 
-          assert TLA.DifferentialCase.refuted(result) == name
+          assert ExTLA.DifferentialCase.refuted(result) == name
           assert result.violation.prefix.length > 0
 
-          # The counterexample, checked a second way. `TLA.ModelChecker.Liveness` reasons
-          # about components of the state graph; `TLA.Temporal` walks the behaviour it
+          # The counterexample, checked a second way. `ExTLA.ModelChecker.Liveness` reasons
+          # about components of the state graph; `ExTLA.Temporal` walks the behaviour it
           # handed back. They share no code, so agreement is evidence — and the cycle has
           # to be one the spec's own fairness permits, or the lasso is not a behaviour of
           # the spec at all.
-          behavior = TLA.Trace.to_behavior(result.violation)
+          behavior = ExTLA.Trace.to_behavior(result.violation)
 
-          assert :violated in TLA.TemporalCheck.verdicts(spec, @entry.constants, name, behavior),
+          assert :violated in ExTLA.TemporalCheck.verdicts(spec, @entry.constants, name, behavior),
                  "the checker refuted #{name}, but its own counterexample does not"
 
           for {constraint, verdict} <-
-                TLA.TemporalCheck.fairness_verdicts(spec, @entry.constants, behavior) do
+                ExTLA.TemporalCheck.fairness_verdicts(spec, @entry.constants, behavior) do
             assert verdict == :holds,
                    "the counterexample's cycle breaks #{constraint}, so the spec's " <>
                      "fairness forbids the behaviour it was handed back as"
@@ -247,11 +247,11 @@ defmodule TLA.DifferentialCase do
       # point: #112's defect returned the right VERDICT from the wrong trace, so a
       # comparison of verdicts alone would have passed it.
       test "agrees with TLC on every action property", ctx do
-        spec = TLA.DifferentialCase.run_spec(@entry)
+        spec = ExTLA.DifferentialCase.run_spec(@entry)
 
         {holding, violated} =
           spec
-          |> TLA.DifferentialCase.properties_of_kind(ctx.expected, @entry, :action_property)
+          |> ExTLA.DifferentialCase.properties_of_kind(ctx.expected, @entry, :action_property)
           |> Enum.split_with(fn {_, verdict} -> verdict == "holds" end)
 
         # Several that hold share one run, for the reason several invariants do: a run
@@ -259,18 +259,18 @@ defmodule TLA.DifferentialCase do
         # stopped it early.
         if holding != [] do
           names = Enum.map(holding, &elem(&1, 0))
-          result = TLA.DifferentialCase.check_action_properties(@entry, names)
+          result = ExTLA.DifferentialCase.check_action_properties(@entry, names)
 
           assert result.status == :ok,
                  "every one of #{inspect(names)} holds under TLC, but ExTLA reported " <>
-                   "#{inspect(result.status)}#{TLA.DifferentialCase.describe(result.violation)}"
+                   "#{inspect(result.status)}#{ExTLA.DifferentialCase.describe(result.violation)}"
         end
 
         # A refuted one needs a run of its own, because both checkers halt at the first
         # violation and the shortest counterexample for THIS property is only what a run
         # checking only it reports.
         for {name, %{"violated_at" => depth}} <- violated do
-          result = TLA.DifferentialCase.check_action_properties(@entry, [name])
+          result = ExTLA.DifferentialCase.check_action_properties(@entry, [name])
 
           assert result.status == :violation,
                  "TLC refutes #{name}, but ExTLA reported #{inspect(result.status)}"
@@ -290,23 +290,23 @@ defmodule TLA.DifferentialCase do
       # states could be reachable, the actions real, and the pairing between them
       # fabricated, and every gate in the project would pass it.
       test "every counterexample it produces is a behaviour the spec admits", ctx do
-        spec = TLA.DifferentialCase.run_spec(@entry)
+        spec = ExTLA.DifferentialCase.run_spec(@entry)
 
         for {tlc_name, %{"violated_at" => _}} <- ctx.expected["invariants"] do
-          name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+          name = ExTLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
 
           result =
-            TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+            ExTLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
 
-          assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
+          assert ExTLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
                  "the safety counterexample for #{name} is not a behaviour of the spec"
         end
 
         for {name, "violated"} <-
-              TLA.DifferentialCase.properties_of_kind(spec, ctx.expected, @entry, :temporal) do
-          result = TLA.DifferentialCase.check_liveness(@entry, [name])
+              ExTLA.DifferentialCase.properties_of_kind(spec, ctx.expected, @entry, :temporal) do
+          result = ExTLA.DifferentialCase.check_liveness(@entry, [name])
 
-          assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
+          assert ExTLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
                  "the lasso for #{name} is not a behaviour of the spec"
         end
 
@@ -316,15 +316,15 @@ defmodule TLA.DifferentialCase do
         # a fabricated counterexample fails — #112's trace was a legal path to an
         # innocent state, which the pre-#113 `validate/3` accepted.
         for {name, %{"violated_at" => _}} <-
-              TLA.DifferentialCase.properties_of_kind(
+              ExTLA.DifferentialCase.properties_of_kind(
                 spec,
                 ctx.expected,
                 @entry,
                 :action_property
               ) do
-          result = TLA.DifferentialCase.check_action_properties(@entry, [name])
+          result = ExTLA.DifferentialCase.check_action_properties(@entry, [name])
 
-          assert TLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
+          assert ExTLA.Trace.validate(result.violation, spec, @entry.constants) == :ok,
                  "the counterexample for the action property #{name} is not a behaviour " <>
                    "of the spec, or does not refute it"
         end
@@ -341,21 +341,21 @@ defmodule TLA.DifferentialCase do
       # one state; `die_hard` is where it hid, because losing one of twelve looks like nothing.
       # A guard that covers only the entry that failed is a guard against one instance.
       test "no counterexample names an action the coverage report calls never-enabled", ctx do
-        spec = TLA.DifferentialCase.run_spec(@entry)
+        spec = ExTLA.DifferentialCase.run_spec(@entry)
 
         runs =
           for {tlc_name, %{"violated_at" => _}} <- ctx.expected["invariants"] do
-            name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
-            TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+            name = ExTLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+            ExTLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
           end ++
             for {name, %{"violated_at" => _}} <-
-                  TLA.DifferentialCase.properties_of_kind(
+                  ExTLA.DifferentialCase.properties_of_kind(
                     spec,
                     ctx.expected,
                     @entry,
                     :action_property
                   ) do
-              TLA.DifferentialCase.check_action_properties(@entry, [name])
+              ExTLA.DifferentialCase.check_action_properties(@entry, [name])
             end
 
         for result <- runs do
@@ -374,7 +374,7 @@ defmodule TLA.DifferentialCase do
       # unfindable, and an unfindable cycle is indistinguishable from a property that
       # holds, so every temporal verdict still matched `expected.json`.
       test "what the search recorded is what the spec admits", ctx do
-        spec = TLA.DifferentialCase.run_spec(@entry)
+        spec = ExTLA.DifferentialCase.run_spec(@entry)
 
         # Only a complete run can be audited. A bounded one has states it discovered and
         # never expanded, and reading those as missing edges would manufacture a finding
@@ -382,22 +382,22 @@ defmodule TLA.DifferentialCase do
         assert ctx.result.status in [:ok, :violation],
                "the audit needs a complete run, got #{inspect(ctx.result.status)}"
 
-        assert TLA.GraphAudit.audit(spec, @entry.constants, ctx.graph) == :ok
+        assert ExTLA.GraphAudit.audit(spec, @entry.constants, ctx.graph) == :ok
 
         # Every invariant the run would check, including the implicit `type_ok`, decides
         # every reachable state with a real boolean — `Safety.check_invariants/4` reads
         # the result with `if`, so a truthy non-boolean would report `holds` and `nil`
         # would report a violation the spec never expressed.
-        invariants = TLA.ModelChecker.checked_invariants(spec, @entry.constants)
+        invariants = ExTLA.ModelChecker.checked_invariants(spec, @entry.constants)
 
         # Found once, used twice: an independent walk over the whole reachable set is the
         # expensive part, and both remaining checks are questions about that same set.
-        states = TLA.GraphAudit.reachable(spec, @entry.constants)
+        states = ExTLA.GraphAudit.reachable(spec, @entry.constants)
 
-        assert TLA.GraphAudit.invariant_partition(@entry.constants, invariants, states) == :ok
+        assert ExTLA.GraphAudit.invariant_partition(@entry.constants, invariants, states) == :ok
 
         # The collision margin a run reports is a probability. This is the observation.
-        assert TLA.GraphAudit.fingerprint_injectivity(ctx.graph, states) == :ok
+        assert ExTLA.GraphAudit.fingerprint_injectivity(ctx.graph, states) == :ok
       end
 
       # Shortest-ness, checked without the fixture. `expected.json` records TLC's length
@@ -412,16 +412,16 @@ defmodule TLA.DifferentialCase do
       # a test that silently does nothing.
       test "a violated invariant's counterexample is the shortest one there is", ctx do
         violated = Enum.filter(ctx.expected["invariants"], fn {_, v} -> is_map(v) end)
-        spec = TLA.DifferentialCase.run_spec(@entry)
+        spec = ExTLA.DifferentialCase.run_spec(@entry)
 
         for {tlc_name, _} <- violated do
-          name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+          name = ExTLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
           invariant = Enum.find(spec.invariants, &(&1.name == name))
 
           result =
-            TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+            ExTLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
 
-          assert TLA.BoundedSearch.nothing_violates_before?(
+          assert ExTLA.BoundedSearch.nothing_violates_before?(
                    spec,
                    @entry.constants,
                    &invariant.predicate.(@entry.constants, &1),
@@ -437,9 +437,9 @@ defmodule TLA.DifferentialCase do
 
         if violated do
           {tlc_name, _} = violated
-          spec = TLA.DifferentialCase.run_spec(@entry)
-          name = TLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
-          result = TLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
+          spec = ExTLA.DifferentialCase.run_spec(@entry)
+          name = ExTLA.DifferentialCase.invariant_name!(spec, tlc_name, @entry)
+          result = ExTLA.DifferentialCase.check(@entry, invariants: [name], action_properties: [])
           invariant = Enum.find(spec.invariants, &(&1.name == name))
 
           states = result.violation.states
@@ -456,7 +456,7 @@ defmodule TLA.DifferentialCase do
 
   @doc "Run the checker on an entry, returning `{result, graph}`."
   def explore(entry, opts) do
-    TLA.ModelChecker.explore(
+    ExTLA.ModelChecker.explore(
       entry.module,
       Map.merge(%{constants: entry.constants}, Map.new(opts))
     )
@@ -501,8 +501,8 @@ defmodule TLA.DifferentialCase do
   here, and the corpus compares the two.
   """
   def run_spec(entry) do
-    spec = TLA.Spec.Compiled.from_module(entry.module)
-    %{spec | invariants: TLA.ModelChecker.checked_invariants(spec, entry.constants)}
+    spec = ExTLA.Spec.Compiled.from_module(entry.module)
+    %{spec | invariants: ExTLA.ModelChecker.checked_invariants(spec, entry.constants)}
   end
 
   @doc """
@@ -577,7 +577,7 @@ defmodule TLA.DifferentialCase do
               ". Declared action properties: " <>
               Enum.map_join(spec.action_properties, ", ", &inspect(&1.name)) <> "."
 
-      # Uniqueness is checked per kind (`TLA.Spec.check_unique_names!/3`), so one name can
+      # Uniqueness is checked per kind (`ExTLA.Spec.check_unique_names!/3`), so one name can
       # legally be both — and then the .cfg's single entry does not say which one TLC
       # checked, and the comparison would silently pick one.
       {%{}, %{}} ->

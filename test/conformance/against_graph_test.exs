@@ -1,4 +1,4 @@
-defmodule TLA.ConformanceAgainstGraphTest do
+defmodule ExTLA.ConformanceAgainstGraphTest do
   @moduledoc """
   Layer 2 and Layer 3 checked against each other (#49/#60).
 
@@ -11,8 +11,8 @@ defmodule TLA.ConformanceAgainstGraphTest do
 
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.{Impl, Spec}
-  alias TLA.{Conformance, ModelChecker, Simulation, StateGraph}
+  alias ExTLA.Conformance.Counter.{Impl, Spec}
+  alias ExTLA.{Conformance, ModelChecker, Simulation, StateGraph}
 
   @constants %{max_val: 5}
 

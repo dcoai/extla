@@ -10,7 +10,7 @@
 # reports "no violation found" in exactly the same words as one that explores
 # all 16.
 #
-# The comparisons themselves are in `TLA.DifferentialCase`; this file is the
+# The comparisons themselves are in `ExTLA.DifferentialCase`; this file is the
 # corpus table. Each entry names its ExTLA spec module and the constants TLC was
 # run with — `die_hard` has none, since the jugs are in the module.
 #
@@ -20,7 +20,7 @@
 # entry rather than guessed — which also means an invariant that goes missing
 # from the DSL spec is reported instead of silently skipped.
 entries = [
-  %{name: "die_hard", module: TLA.Differential.DieHard, constants: %{}, names: %{}},
+  %{name: "die_hard", module: ExTLA.Differential.DieHard, constants: %{}, names: %{}},
   # The smallest entry, and the only one whose subject is a declaration KIND rather than an
   # algorithm: `action_property` is the one Layer 2 feature the oracle had never seen, which
   # is how #112 survived for as long as the feature had existed. Its `compact` empties the
@@ -29,19 +29,19 @@ entries = [
   # than merely a different path. See `AuditLog.tla`.
   %{
     name: "audit_log",
-    module: TLA.Differential.AuditLog,
+    module: ExTLA.Differential.AuditLog,
     constants: %{max_entries: 2},
     names: %{}
   },
   %{
     name: "two_phase_commit",
-    module: TLA.Differential.TwoPhaseCommit,
+    module: ExTLA.Differential.TwoPhaseCommit,
     constants: %{rms: MapSet.new([:r1, :r2, :r3])},
     names: %{"TPTypeOK" => :type_ok}
   },
   %{
     name: "distributed_lock",
-    module: TLA.Differential.DistributedLock,
+    module: ExTLA.Differential.DistributedLock,
     constants: %{
       processes: MapSet.new([:p1, :p2]),
       resources: MapSet.new([:r1, :r2])
@@ -50,7 +50,7 @@ entries = [
   },
   %{
     name: "raft_election",
-    module: TLA.Differential.RaftElection,
+    module: ExTLA.Differential.RaftElection,
     constants: %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2},
     names: %{}
   },
@@ -60,13 +60,13 @@ entries = [
   # means `\E q \in SUBSET S : ...` and not merely that it returns something.
   %{
     name: "set_vocabulary",
-    module: TLA.Differential.SetVocabulary,
+    module: ExTLA.Differential.SetVocabulary,
     constants: %{nodes: MapSet.new([:n1, :n2, :n3])},
     names: %{}
   },
   %{
     name: "paxos",
-    module: TLA.Differential.Paxos,
+    module: ExTLA.Differential.Paxos,
     constants: %{
       acceptors: MapSet.new([:a1, :a2, :a3]),
       values: MapSet.new([:v1, :v2]),
@@ -83,7 +83,7 @@ entries = [
   },
   %{
     name: "bounded_buffer",
-    module: TLA.Differential.BoundedBuffer,
+    module: ExTLA.Differential.BoundedBuffer,
     constants: %{
       producers: MapSet.new([:p1, :p2]),
       consumers: MapSet.new([:c1, :c2]),
@@ -95,12 +95,12 @@ entries = [
 ]
 
 for entry <- entries do
-  defmodule Module.concat(TLA.DifferentialTest, Macro.camelize(entry.name)) do
-    use TLA.DifferentialCase, entry: entry
+  defmodule Module.concat(ExTLA.DifferentialTest, Macro.camelize(entry.name)) do
+    use ExTLA.DifferentialCase, entry: entry
   end
 end
 
-defmodule TLA.DifferentialTest.DeclarationKinds do
+defmodule ExTLA.DifferentialTest.DeclarationKinds do
   @moduledoc """
   A claim about the corpus as a whole rather than about any one entry: **every kind of
   declaration the DSL has is put to TLC somewhere** (#114).
@@ -128,13 +128,13 @@ defmodule TLA.DifferentialTest.DeclarationKinds do
   @routed [:action, :invariant, :temporal, :action_property, :terminal]
 
   test "there is a stated route to TLC for every declaration kind the DSL has" do
-    declared = MapSet.new(TLA.Spec.Hash.kinds())
+    declared = MapSet.new(ExTLA.Spec.Hash.kinds())
     routed = MapSet.new(@routed)
 
     assert MapSet.equal?(declared, routed), """
     The DSL and this test disagree about which declaration kinds exist.
 
-      only in TLA.Spec.Hash.kinds/0: #{inspect(Enum.sort(MapSet.difference(declared, routed)))}
+      only in ExTLA.Spec.Hash.kinds/0: #{inspect(Enum.sort(MapSet.difference(declared, routed)))}
       only in @routed:               #{inspect(Enum.sort(MapSet.difference(routed, declared)))}
 
     A kind in the first list is a declaration the differential corpus has no oracle for.
@@ -245,10 +245,10 @@ defmodule TLA.DifferentialTest.DeclarationKinds do
           |> File.read!()
           |> Jason.decode!()
 
-        {entry, TLA.Spec.Compiled.from_module(entry.module), expected}
+        {entry, ExTLA.Spec.Compiled.from_module(entry.module), expected}
       end)
 
-    # `@routed` rather than `TLA.Spec.Hash.kinds/0`: the test above owns the claim that the
+    # `@routed` rather than `ExTLA.Spec.Hash.kinds/0`: the test above owns the claim that the
     # two agree, and iterating the DSL's list here would blow up with a FunctionClauseError
     # on a kind that has no clause instead of leaving that failure where its message is.
     for kind <- @routed do
@@ -290,7 +290,7 @@ defmodule TLA.DifferentialTest.DeclarationKinds do
   # right behaviour here too — a fixture naming a property the spec does not declare is a
   # finding, not something to return `false` for.
   defp exercised?(kind, spec, expected) when kind in [:temporal, :action_property] do
-    TLA.DifferentialCase.properties_of_kind(spec, expected, %{names: %{}}, kind) != []
+    ExTLA.DifferentialCase.properties_of_kind(spec, expected, %{names: %{}}, kind) != []
   end
 
   # A `terminal` is compared through `deadlock`: TLC calls any successor-less state a

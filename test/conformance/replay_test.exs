@@ -1,8 +1,8 @@
-defmodule TLA.ConformanceReplayTest do
+defmodule ExTLA.ConformanceReplayTest do
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.{BuggySpec, Impl}
-  alias TLA.{ModelChecker, Replay, Trace}
+  alias ExTLA.Conformance.Counter.{BuggySpec, Impl}
+  alias ExTLA.{ModelChecker, Replay, Trace}
 
   describe "a model-checker counterexample, replayed against the code" do
     # The loop that makes the three layers one tool: `BuggySpec` contradicts itself,
@@ -57,8 +57,8 @@ defmodule TLA.ConformanceReplayTest do
   # Every timeout below is the default 5 s (#266). These tests are about the SHAPE of the
   # outcome for each server form; a 500 ms timeout encoded a latency assumption the 2-core
   # runner does not share under full-suite load, and turned a violation into `{:timeout, 500}`.
-  describe "TLA.GenServer.Driver.call/3" do
-    alias TLA.GenServer.Driver
+  describe "ExTLA.GenServer.Driver.call/3" do
+    alias ExTLA.GenServer.Driver
 
     test "a pid and a registered name give the same outcome for a violation" do
       name = :"driver_named_#{System.unique_integer([:positive])}"
@@ -70,14 +70,14 @@ defmodule TLA.ConformanceReplayTest do
       steps = [:increment, :done, :increment, :done]
       for step <- steps, do: assert({:ok, :ok} = Driver.call(name, step, 5_000))
 
-      assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
+      assert {:violation, %ExTLA.GenServer.Violation{kind: :invariant}} =
                Driver.call(name, :increment, 5_000)
 
       {:ok, pid} = GenServer.start_link(Impl.FaithfulToABuggySpec, [])
       Process.unlink(pid)
       for step <- steps, do: assert({:ok, :ok} = Driver.call(pid, step, 5_000))
 
-      assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
+      assert {:violation, %ExTLA.GenServer.Violation{kind: :invariant}} =
                Driver.call(pid, :increment, 5_000)
     end
 
@@ -140,7 +140,7 @@ defmodule TLA.ConformanceReplayTest do
           assert {:ok, :ok} = Driver.call(server, step, 5_000), "#{shape}: #{step}"
         end
 
-        assert {:violation, %TLA.GenServer.Violation{kind: :invariant}} =
+        assert {:violation, %ExTLA.GenServer.Violation{kind: :invariant}} =
                  Driver.call(server, :increment, 5_000),
                "#{shape}: the third increment"
 

@@ -1,4 +1,4 @@
-defmodule TLA.SpecOptionsTest do
+defmodule ExTLA.SpecOptionsTest do
   @moduledoc """
   The specification's list of a task's options, and the task's own `@switches`, held to each
   other (#132, #134) — over the set of tasks `CLI_SURFACE.md` derives (#272).
@@ -17,7 +17,7 @@ defmodule TLA.SpecOptionsTest do
   and nothing would have said so — a task absent from the list reads exactly like a task that
   passes, which is the vacuity this project keeps finding in its own gates.
 
-  The set now comes from `TLA.CliSurface`, which finds the tasks by walking `mix/tasks/` and
+  The set now comes from `ExTLA.CliSurface`, which finds the tasks by walking `mix/tasks/` and
   finds each one's spec section by searching `spec/*.md` for its `defmodule` line. So this test
   iterates what the directory holds, a task with no section fails the "every shipped task is
   specified" assertion below rather than going unchecked, and the golden a reader opens lists
@@ -30,7 +30,7 @@ defmodule TLA.SpecOptionsTest do
   """
   use ExUnit.Case, async: true
 
-  alias TLA.CliSurface
+  alias ExTLA.CliSurface
 
   @layer2 Path.expand("../../spec/04-layer2-model-checker.md", __DIR__)
   @root Path.expand("../..", __DIR__)
@@ -99,7 +99,7 @@ defmodule TLA.SpecOptionsTest do
     test "raises when a section carries no option list at all" do
       assert_raise RuntimeError, ~r/no option lines/, fn ->
         # A real anchor whose section is prose and code, with no `--flag` definitions in it.
-        documented_options(@layer2, "defmodule TLA.Spec.Compiled do")
+        documented_options(@layer2, "defmodule ExTLA.Spec.Compiled do")
       end
     end
 

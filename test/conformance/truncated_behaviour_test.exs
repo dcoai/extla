@@ -1,10 +1,10 @@
-defmodule TLA.Conformance.TruncatedBehaviourTest do
+defmodule ExTLA.Conformance.TruncatedBehaviourTest do
   @moduledoc """
   A behaviour that lost its beginning cannot settle a claim about its beginning (#278).
 
   ## The defect
 
-  `TLA.GenServer.Runtime`'s trace buffer keeps the newest states and drops the rest —
+  `ExTLA.GenServer.Runtime`'s trace buffer keeps the newest states and drops the rest —
   correctly, since an unbounded per-process trace is a memory leak in any long-lived
   GenServer. It recorded nothing about having dropped them, and the bare-predicate verdict
   read `hd(behavior)` as "the behaviour's first state".
@@ -32,11 +32,11 @@ defmodule TLA.Conformance.TruncatedBehaviourTest do
   """
   use ExUnit.Case, async: true
 
-  alias TLA.GenServer.Runtime
+  alias ExTLA.GenServer.Runtime
 
   defmodule Spec do
     @moduledoc false
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n, type: 0..2000
 
@@ -130,7 +130,7 @@ defmodule TLA.Conformance.TruncatedBehaviourTest do
   describe "the shape" do
     # A bare list is refused rather than read as complete. Defaulting `dropped` to 0 would
     # have left every existing caller compiling and the truncated one still lying — the
-    # argument `TLA.Conformance` already makes about its own `status:`.
+    # argument `ExTLA.Conformance` already makes about its own `status:`.
     test "is required, and the refusal says what to pass" do
       error =
         assert_raise ArgumentError, fn ->

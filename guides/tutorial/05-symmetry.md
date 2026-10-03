@@ -77,7 +77,7 @@ Here is a declaration that is wrong, on a spec whose one invariant can tell the 
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.NamedLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob, :carol])
 

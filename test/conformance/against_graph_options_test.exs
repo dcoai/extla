@@ -1,4 +1,4 @@
-defmodule TLA.AgainstGraphOptionsTest do
+defmodule ExTLA.AgainstGraphOptionsTest do
   @moduledoc """
   `--against-graph` runs one suite, under the options it was given (#313, for #180).
 
@@ -17,7 +17,7 @@ defmodule TLA.AgainstGraphOptionsTest do
 
   ## What it is
 
-  The graph is built once and handed to `TLA.Simulation` as `against_graph:`, which holds
+  The graph is built once and handed to `ExTLA.Simulation` as `against_graph:`, which holds
   each behaviour against it **as that behaviour finishes** — beside the temporal check,
   which is the other per-trace question. **One suite cannot diverge from itself**, so the
   forwarding, the step default and the seed derivation are not three fixes but one.
@@ -29,8 +29,8 @@ defmodule TLA.AgainstGraphOptionsTest do
 
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.{Impl, Spec}
-  alias TLA.{Conformance, ModelChecker, Simulation}
+  alias ExTLA.Conformance.Counter.{Impl, Spec}
+  alias ExTLA.{Conformance, ModelChecker, Simulation}
 
   @constants %{max_val: 5}
 
@@ -220,7 +220,7 @@ defmodule TLA.AgainstGraphOptionsTest do
   end
 
   describe "the finding it reports" do
-    test "keeps TLA.Conformance's classes, which is what it is for", ctx do
+    test "keeps ExTLA.Conformance's classes, which is what it is for", ctx do
       # Built directly: the `:checker` class — the search missed a step the spec permits —
       # is the one finding no other gate can produce, and a simulation cannot be made to
       # produce it on demand. What this asserts is that the class survives the trip.

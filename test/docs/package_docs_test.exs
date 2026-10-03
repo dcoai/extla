@@ -1,10 +1,10 @@
-defmodule TLA.PackageDocsTest do
+defmodule ExTLA.PackageDocsTest do
   @moduledoc """
   The published documentation advertises nothing a consumer cannot call (#274, from #270).
 
   `mix docs` runs under `MIX_ENV=dev` — `ex_doc` is a dev dependency and exists nowhere else
   — and `elixirc_paths(:dev)` includes `ledger/`. So the built documentation carried
-  `TLA.Ledger`, `TLA.Spec.Version`, `mix tla.coverage` and eight more, eleven modules in all,
+  `ExTLA.Ledger`, `ExTLA.Spec.Version`, `mix tla.coverage` and eight more, eleven modules in all,
   to a reader whose `mix deps.get` brings them `lib/` only. Nobody decided to document the
   ledger: the docs job's environment did.
 
@@ -29,7 +29,7 @@ defmodule TLA.PackageDocsTest do
   @built Path.join(@root, "doc")
 
   setup_all do
-    %{surface: TLA.PackageSurface.run(@root)}
+    %{surface: ExTLA.PackageSurface.run(@root)}
   end
 
   describe "the built documentation" do

@@ -1,4 +1,4 @@
-defmodule TLA.CiCoverageTest do
+defmodule ExTLA.CiCoverageTest do
   @moduledoc """
   Every directory of tests is run by some CI job (#175).
 

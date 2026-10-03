@@ -25,13 +25,13 @@ defmodule Mix.Tasks.Tla.Examples do
 
   The other five goldens render a document from code. This one renders code from a
   document, because here the document is the specification — the thing a reader is told to
-  copy — and the corpus is its consumer. `TLA.Examples` says what the generator changes
+  copy — and the corpus is its consumer. `ExTLA.Examples` says what the generator changes
   (the module name, and `default:` on the constants) and why neither is drift.
   """
 
   use Mix.Task
 
-  alias TLA.Examples
+  alias ExTLA.Examples
 
   @switches [write: :boolean, check: :boolean]
 
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.Examples do
           Mix.shell().info("wrote #{golden}")
 
         opts[:check] ->
-          TLA.Surface.check!(golden, "tla.examples", entry.path, rendered)
+          ExTLA.Surface.check!(golden, "tla.examples", entry.path, rendered)
 
         true ->
           Mix.shell().info(rendered)
@@ -58,7 +58,7 @@ defmodule Mix.Tasks.Tla.Examples do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest` / `CLI_SURFACE.md`, which hold a task's switches and
+  # Exposed for `ExTLA.SpecOptionsTest` / `CLI_SURFACE.md`, which hold a task's switches and
   # its documentation to each other.
   def switches, do: @switches
 end
