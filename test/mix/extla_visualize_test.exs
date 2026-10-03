@@ -1,6 +1,6 @@
-defmodule Mix.Tasks.Tla.VisualizeTest do
+defmodule Mix.Tasks.Extla.VisualizeTest do
   @moduledoc """
-  `mix tla.visualize` — the Phase 4 entry `06-architecture.md` lists as "DOT only".
+  `mix extla.visualize` — the Phase 4 entry `06-architecture.md` lists as "DOT only".
 
   The refusals carry most of the weight here, as they do for the export underneath: a
   visualization is a claim about a graph, and the ways it can quietly be a claim about a
@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Tla.Visualize
+  alias Mix.Tasks.Extla.Visualize
 
   setup do
     Mix.shell(Mix.Shell.IO)
@@ -133,7 +133,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
       end
     end
 
-    test "an unknown --format, the way mix tla.check does" do
+    test "an unknown --format, the way mix extla.check does" do
       assert_raise Mix.Error, ~r/unknown --format "svg"; expected dot/, fn ->
         visualize(["ExTLA.TestSpecs.WithDefaults", "--format", "svg"])
       end

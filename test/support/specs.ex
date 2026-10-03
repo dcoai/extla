@@ -461,7 +461,7 @@ defmodule ExTLA.TestSpecs do
   end
 
   defmodule WithDefaults do
-    @moduledoc "Carries its own constant assignment, so `mix tla.check` can run it."
+    @moduledoc "Carries its own constant assignment, so `mix extla.check` can run it."
     use ExTLA.Spec
 
     constant :max, default: 3
@@ -798,7 +798,7 @@ defmodule ExTLA.TestSpecs do
   defmodule RawBytes do
     @moduledoc """
     A violation whose state holds a binary that is not valid UTF-8 (#198). §6 permits the
-    term; JSON strings cannot carry it; `mix tla.check --format json` used to raise from the
+    term; JSON strings cannot carry it; `mix extla.check --format json` used to raise from the
     report writer after the search had found this violation, and print no document.
     """
     use ExTLA.Spec

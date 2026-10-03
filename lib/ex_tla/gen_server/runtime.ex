@@ -372,7 +372,7 @@ defmodule ExTLA.GenServer.Runtime do
 
   # Without this clause the same off-fragment formulas that raised in the model checker died
   # HERE with a `FunctionClauseError` printing three closures and no property name, under
-  # `mix tla.simulate` and Layer 3's conformance run (#277). The compile-time refusal means
+  # `mix extla.simulate` and Layer 3's conformance run (#277). The compile-time refusal means
   # neither can happen now; this says so rather than leaving the second door unlabelled.
   defp verdict(formula, _behavior, _constants) do
     raise ArgumentError,
@@ -496,7 +496,7 @@ defmodule ExTLA.GenServer.Runtime do
     end
   end
 
-  # The resolution `mix tla.check` performs, without its Mix-flavoured error: a spec
+  # The resolution `mix extla.check` performs, without its Mix-flavoured error: a spec
   # checked against an implementation and a spec model checked have to be given the same
   # constants, or the two verdicts are about different specifications.
   defp constants(spec) do

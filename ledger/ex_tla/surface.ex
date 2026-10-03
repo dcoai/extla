@@ -2,7 +2,7 @@ defmodule ExTLA.Surface do
   @moduledoc """
   The one drift check every surface golden shares (#270).
 
-  `mix tla.coverage --check` had this as a private function until `API_SURFACE.md` needed the
+  `mix extla.coverage --check` had this as a private function until `API_SURFACE.md` needed the
   same three outcomes — current, drifted, missing — and the alternative was a second copy of a
   gate, which is how two gates come to disagree about what "drifted" means. The message carries
   the remedy: a gate that fails without saying what to run is one somebody works around.

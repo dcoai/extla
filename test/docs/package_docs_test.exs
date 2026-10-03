@@ -4,7 +4,7 @@ defmodule ExTLA.PackageDocsTest do
 
   `mix docs` runs under `MIX_ENV=dev` — `ex_doc` is a dev dependency and exists nowhere else
   — and `elixirc_paths(:dev)` includes `ledger/`. So the built documentation carried
-  `ExTLA.Ledger`, `ExTLA.Spec.Version`, `mix tla.coverage` and eight more, eleven modules in all,
+  `ExTLA.Ledger`, `ExTLA.Spec.Version`, `mix extla.coverage` and eight more, eleven modules in all,
   to a reader whose `mix deps.get` brings them `lib/` only. Nobody decided to document the
   ledger: the docs job's environment did.
 

@@ -1,14 +1,14 @@
-defmodule Mix.Tasks.Tla.CliSurface do
-  @shortdoc "Render every mix tla.* task's switches and exit codes to CLI_SURFACE.md"
+defmodule Mix.Tasks.Extla.Diagnostics do
+  @shortdoc "Render every mix extla.* task's switches and exit codes to DIAGNOSTICS.md"
 
   @moduledoc """
-  Scan every `mix tla.*` task for its switches, its documented exit codes and the
-  specification section that reproduces it, and render the result to `CLI_SURFACE.md`
+  Scan every `mix extla.*` task for its switches, its documented exit codes and the
+  specification section that reproduces it, and render the result to `DIAGNOSTICS.md`
   (#270, #272).
 
-      mix tla.cli_surface           # print the golden
-      mix tla.cli_surface --write   # regenerate CLI_SURFACE.md
-      mix tla.cli_surface --check   # fail if the golden has drifted from the source
+      mix extla.diagnostics           # print the golden
+      mix extla.diagnostics --write   # regenerate DIAGNOSTICS.md
+      mix extla.diagnostics --check   # fail if the golden has drifted from the source
 
   ## Why `--check` is HARD
 
@@ -23,16 +23,16 @@ defmodule Mix.Tasks.Tla.CliSurface do
 
   use Mix.Task
 
-  alias ExTLA.CliSurface
+  alias ExTLA.Diagnostics
 
-  @golden "CLI_SURFACE.md"
+  @golden "DIAGNOSTICS.md"
   @switches [write: :boolean, check: :boolean]
 
   @impl Mix.Task
   def run(argv) do
     {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
 
-    rendered = CliSurface.run() |> CliSurface.render()
+    rendered = Diagnostics.run() |> Diagnostics.render()
     path = Path.join(File.cwd!(), @golden)
 
     cond do
@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Tla.CliSurface do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        ExTLA.Surface.check!(@golden, "tla.cli_surface", path, rendered)
+        ExTLA.Surface.check!(@golden, "extla.diagnostics", path, rendered)
 
       true ->
         Mix.shell().info(rendered)
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.CliSurface do
   end
 
   @doc false
-  # Exposed for `ExTLA.SpecOptionsTest` / `CLI_SURFACE.md`, which hold a task's switches and its
+  # Exposed for `ExTLA.SpecOptionsTest` / `DIAGNOSTICS.md`, which hold a task's switches and its
   # documentation to each other.
   def switches, do: @switches
 end

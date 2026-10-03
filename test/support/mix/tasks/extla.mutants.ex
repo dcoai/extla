@@ -1,13 +1,13 @@
-defmodule Mix.Tasks.Tla.Mutants do
+defmodule Mix.Tasks.Extla.Mutants do
   @shortdoc "Measure what the correctness gates catch"
 
   @moduledoc """
   Break the checker on purpose, and report which gate noticed (#46).
 
-      mix tla.mutants                    # sweep, and write test/mutation/survivors.json
-      mix tla.mutants --check            # sweep, and fail on any drift (CI)
-      mix tla.mutants --only drops_an_action
-      mix tla.mutants --timeout 600
+      mix extla.mutants                    # sweep, and write test/mutation/survivors.json
+      mix extla.mutants --check            # sweep, and fail on any drift (CI)
+      mix extla.mutants --only drops_an_action
+      mix extla.mutants --timeout 600
 
   Runs in `MIX_ENV=test` whichever way it is invoked — `mix.exs` declares that, because
   the catalogue and the runner live in `test/support/` and a sweep in any other
@@ -25,7 +25,7 @@ defmodule Mix.Tasks.Tla.Mutants do
 
   ## A survivor is a finding, not a failure
 
-  `mix tla.mutants` exits 0 with survivors in it. The gap is the measurement — #46 exists
+  `mix extla.mutants` exits 0 with survivors in it. The gap is the measurement — #46 exists
   to size it, not to pretend it is closed — so a survivor is reported and recorded rather
   than failing the run. What fails is a survivor that was not *expected*, which is drift.
 
@@ -113,7 +113,7 @@ defmodule Mix.Tasks.Tla.Mutants do
   defp write(_results, only) when is_binary(only) do
     Mix.shell().info(
       "not written: --only investigates one mutant, and #{@artifact} records the whole\n" <>
-        "catalogue. Run `mix tla.mutants` with no --only to record."
+        "catalogue. Run `mix extla.mutants` with no --only to record."
     )
   end
 
@@ -133,7 +133,7 @@ defmodule Mix.Tasks.Tla.Mutants do
 
         {:error, :enoent} ->
           Mix.raise(
-            "#{@artifact} does not exist. Run `mix tla.mutants` to record what the gates " <>
+            "#{@artifact} does not exist. Run `mix extla.mutants` to record what the gates " <>
               "catch, and commit it — the file is the measurement."
           )
       end
@@ -165,7 +165,7 @@ defmodule Mix.Tasks.Tla.Mutants do
       lines("PROGRESS — these are now killed and were not", progress),
       lines("new to the catalogue", added),
       lines("gone from the catalogue", removed),
-      "\nRe-run `mix tla.mutants` and commit the result. A gate that got weaker is a\n",
+      "\nRe-run `mix extla.mutants` and commit the result. A gate that got weaker is a\n",
       "defect; a gate that got stronger is progress that has to be recorded or it can be\n",
       "lost again without anything noticing."
     ]

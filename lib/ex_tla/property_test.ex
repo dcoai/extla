@@ -24,7 +24,7 @@ defmodule ExTLA.PropertyTest do
   ## What is deferred
 
   `generate_test_module/3`, which §05 also specifies. `06-architecture.md` §Deferred
-  removes generated test *files* from v1: "`mix tla.gen.test` writes code someone then has
+  removes generated test *files* from v1: "`mix extla.gen.test` writes code someone then has
   to maintain; the property helpers give most of the value without that". These are those
   helpers.
   """
@@ -60,7 +60,7 @@ defmodule ExTLA.PropertyTest do
 
     A state outside §6's permitted terms raises, and so does one outside the variables'
     declared types — both naming the `init` block and the variable. A spec whose `init`
-    produces such a state is one `mix tla.check` would refute at depth 1, and a generator
+    produces such a state is one `mix extla.check` would refute at depth 1, and a generator
     that quietly filtered it away would hide the same defect behind a property that
     silently tested less than it appeared to.
     """
@@ -181,7 +181,7 @@ defmodule ExTLA.PropertyTest do
           raise ArgumentError,
                 "#{inspect(spec.module)}'s `init` block #{index} produces a state outside " <>
                   "the declared types: #{Type.explain(spec, constants, state)}. " <>
-                  "`mix tla.check` refutes this spec at depth 1; generating from it would " <>
+                  "`mix extla.check` refutes this spec at depth 1; generating from it would " <>
                   "test a state the spec itself does not admit."
         end
 

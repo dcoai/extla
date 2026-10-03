@@ -1,6 +1,6 @@
 defmodule ExTLA.StampTest do
   @moduledoc """
-  `mix tla.stamp` end to end, over a tree with all four statuses (#308, for #173).
+  `mix extla.stamp` end to end, over a tree with all four statuses (#308, for #173).
 
   ## What was not covered
 
@@ -20,13 +20,13 @@ defmodule ExTLA.StampTest do
 
   A genuinely stale stamp in a compiled tree is a **compile error** — that is what the
   mechanism is for — so the corpus cannot hold one, and a stale stamp anywhere
-  `Mix.Tasks.Tla.Stamp.roots/0` scans would put the repository's own report permanently in
+  `Mix.Tasks.Extla.Stamp.roots/0` scans would put the repository's own report permanently in
   the red. `test/fixtures/stamp/README.md` has the rest; `run/2` and `states/1` take the
   roots for exactly this.
   """
 
   # `async: false`, and `Mix.shell/1` is why: it is VM-global, and
-  # `test/mix/tla_coverage_test.exs` swaps it to `Mix.Shell.Process` in its own setup. Run
+  # `test/mix/extla_coverage_test.exs` swaps it to `Mix.Shell.Process` in its own setup. Run
   # concurrently with that, `capture_io/1` here sees an empty string and the report tests
   # fail for a reason that has nothing to do with the report. Every other Mix task test in
   # this directory that reads shell output is `async: false` and pins the shell in setup;
@@ -35,7 +35,7 @@ defmodule ExTLA.StampTest do
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Tla.Stamp
+  alias Mix.Tasks.Extla.Stamp
 
   setup do
     Mix.shell(Mix.Shell.IO)
@@ -94,12 +94,12 @@ defmodule ExTLA.StampTest do
 
     # The fixture is inert by construction, and that is load-bearing rather than tidy: a
     # stale stamp in a compiled tree is a compile error, and one in a scanned tree would put
-    # `mix tla.stamp` permanently in the red for this repository.
+    # `mix extla.stamp` permanently in the red for this repository.
     test "and is not in any tree the task scans by default" do
       scanned = Stamp.sources()
 
       refute Enum.any?(scanned, &String.starts_with?(&1, "test/fixtures/")),
-             "the fixture is on the default roots, so this repository's own `mix tla.stamp` " <>
+             "the fixture is on the default roots, so this repository's own `mix extla.stamp` " <>
                "reports a stale stamp that is not a finding about it"
     end
 

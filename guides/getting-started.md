@@ -95,7 +95,7 @@ end
 Reading it top to bottom:
 
 - **`constant`** is something fixed for a whole run — here, who the clients are. Constants are
-  written with a pin, `^clients`, wherever they are used. `default:` is the value `mix tla.check`
+  written with a pin, `^clients`, wherever they are used. `default:` is the value `mix extla.check`
   uses when nothing else supplies one.
 - **`variable`** is state. `free` is a boolean; `pc` is a map from each client to what that
   client is doing (TLA+ would call it a function). The `type:` is checked in every state the
@@ -117,7 +117,7 @@ in [`02-dsl-semantics.md`](../spec/02-dsl-semantics.md); this page does not repe
 ## 3. Check it, and read the output
 
 ```sh
-mix tla.check Specs.Lock
+mix extla.check Specs.Lock
 ```
 
 <!-- tla:check module=Specs.Lock expect=ok states=8 depth=4 -->
@@ -234,7 +234,7 @@ end
 ```
 
 ```sh
-mix tla.check Specs.SplitLock
+mix extla.check Specs.SplitLock
 ```
 
 <!-- tla:check module=Specs.SplitLock expect=violation invariant=mutual_exclusion length=7 -->
@@ -318,7 +318,7 @@ states is the least it takes.
 
 It is **complete evidence**. Every state is printed in full, and `← changed` marks what the
 action altered, so there is no interpretation to do: you can follow the chain by hand from
-`init` and confirm each step is an action the spec allows. `mix tla.replay` can drive an
+`init` and confirm each step is an action the spec allows. `mix extla.replay` can drive an
 implementation through the same sequence.
 
 And **the numbers below it are a lower bound**. The run stopped when it found the violation, so
@@ -341,7 +341,7 @@ code, and it is the question the tool exists to make you answer.
   [getting from a system you have to a specification](tutorial/08-modelling.md),
   [what to do when the state space explodes](tutorial/09-when-it-explodes.md), and
   [keeping a specification in a project](tutorial/10-in-your-project.md).
-- `mix help tla.check` — the flags, and the exit codes.
+- `mix help extla.check` — the flags, and the exit codes.
 - [`02-dsl-semantics.md`](../spec/02-dsl-semantics.md) — the DSL, normatively: the three name
   classes, what an action body means, where nondeterminism comes from, types.
 - [`04-layer2-model-checker.md`](../spec/04-layer2-model-checker.md) — the checker: what a run

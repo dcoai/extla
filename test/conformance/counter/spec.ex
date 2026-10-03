@@ -52,7 +52,7 @@ defmodule ExTLA.Conformance.Counter.BuggySpec do
   @moduledoc """
   The same counter with a design bug in it: `increment` may run up to `max_val`, and the
   invariant says the count never exceeds two. Nothing about the implementation is wrong —
-  the specification contradicts itself, and `mix tla.check` finds it before any code
+  the specification contradicts itself, and `mix extla.check` finds it before any code
   exists.
 
   This entry is what `ExTLA.Replay.counterexample/3` is measured on. A counterexample is

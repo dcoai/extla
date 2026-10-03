@@ -85,9 +85,9 @@ defmodule ExTLA.GuideCheck do
   # would render as an empty grey box.
   @bare_claim ~r/^[ \t]*<!--[ \t]*(tla:(?:check|liveness|simulate)[^\n]*?)[ \t]*-->[ \t]*$(?!\n```elixir)/m
 
-  # `mix tla.simulate`'s own defaults, and a fixed seed: a claim about a random walk is only a
+  # `mix extla.simulate`'s own defaults, and a fixed seed: a claim about a random walk is only a
   # claim if the walk is the same one every time — and with these, it is the walk the page
-  # quotes from `mix tla.simulate Server --seed 1`.
+  # quotes from `mix extla.simulate Server --seed 1`.
   @simulate_defaults %{traces: 100, max_steps: 25, seed: 1}
 
   @doc """
@@ -503,7 +503,7 @@ defmodule ExTLA.GuideCheck do
 
   defp simulate(module, config), do: isolated(fn -> Simulation.run(module, config) end)
 
-  # Constants come from `default:` the way a reader's `mix tla.check` takes them, through the same
+  # Constants come from `default:` the way a reader's `mix extla.check` takes them, through the same
   # `Spec.Compiled.resolve_constants/1` the task calls. A guide spec whose constant has no default
   # is a spec the reader cannot run, and it fails here rather than working by way of a config file
   # the page never showed.

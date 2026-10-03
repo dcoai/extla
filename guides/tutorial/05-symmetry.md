@@ -20,7 +20,7 @@ config :extla, Tutorial.StrongLock, symmetry: [:clients]
 ```
 
 ```sh
-mix tla.check Tutorial.StrongLock --verify-symmetry
+mix extla.check Tutorial.StrongLock --verify-symmetry
 ```
 
 <!-- tla:check module=Tutorial.StrongLock expect=ok states=20 depth=5 -->

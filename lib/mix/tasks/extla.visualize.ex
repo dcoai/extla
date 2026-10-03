@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Tla.Visualize do
+defmodule Mix.Tasks.Extla.Visualize do
   @shortdoc "Render a spec's state graph as DOT"
 
   @moduledoc """
@@ -6,13 +6,13 @@ defmodule Mix.Tasks.Tla.Visualize do
 
   ## Usage
 
-      mix tla.visualize Specs.TransferProtocol
-      mix tla.visualize Specs.TransferProtocol --output graph.dot
-      mix tla.visualize Specs.TransferProtocol --max-states 2000
+      mix extla.visualize Specs.TransferProtocol
+      mix extla.visualize Specs.TransferProtocol --output graph.dot
+      mix extla.visualize Specs.TransferProtocol --max-states 2000
 
-      mix tla.visualize Specs.X --output g.dot && dot -Tsvg g.dot -o g.svg
+      mix extla.visualize Specs.X --output g.dot && dot -Tsvg g.dot -o g.svg
 
-  Constants come from the same two places `mix tla.check` takes them from, in the
+  Constants come from the same two places `mix extla.check` takes them from, in the
   same order of precedence, and a constant with neither is the same error.
 
   ## What it draws
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.Visualize do
   something that looks complete.
 
   **`--max-states` bounds the search as well**, and means the same thing here as in
-  `mix tla.check` — how many states to explore. Exploring past a limit the task will refuse
+  `mix extla.check` — how many states to explore. Exploring past a limit the task will refuse
   to draw is work thrown away: it used to run to the checker's own million-state default in
   order to render none of them, and where that default was *reached*, it drew a truncated
   graph with no note and exited 0 (#180).
@@ -66,10 +66,10 @@ defmodule Mix.Tasks.Tla.Visualize do
          counterexample emphasised, and it covers only what the search reached
       2  more states than `--max-states`, so nothing was drawn
 
-  Exit code 1 is not a failure of the task. It is the same distinction `mix tla.check`
+  Exit code 1 is not a failure of the task. It is the same distinction `mix extla.check`
   draws: the picture is real, and it is a picture of an interrupted search.
 
-  Exit code 2 is not a failure of the spec. It is `mix tla.check`'s code for a run that did
+  Exit code 2 is not a failure of the spec. It is `mix extla.check`'s code for a run that did
   not see the whole state space, and it is separate from 1 because "too big to draw" and
   "the design is wrong" are different answers that used to share a number.
   """
@@ -96,7 +96,7 @@ defmodule Mix.Tasks.Tla.Visualize do
         visualize(module, opts)
 
       modules ->
-        # A graph is one file and stdout is one stream, so unlike `mix tla.check` this
+        # A graph is one file and stdout is one stream, so unlike `mix extla.check` this
         # cannot fan out over a project's specs without deciding where each one goes.
         Mix.raise(
           "name one spec to visualize; got #{Enum.map_join(modules, ", ", &inspect/1)}. " <>
@@ -133,7 +133,7 @@ defmodule Mix.Tasks.Tla.Visualize do
     # Asked before rendering rather than caught after, so the refusal reads like the task's
     # others instead of an `ArgumentError` with a stack trace. Its own exit code, and not
     # `Mix.raise`'s 1: `1` here already means "the spec has a violation", and a graph too
-    # big to draw is not a finding about the spec. `2` is what `mix tla.check` returns for a
+    # big to draw is not a finding about the spec. `2` is what `mix extla.check` returns for a
     # run that did not see the whole state space, which is exactly what this is.
     if message = StateGraph.Export.refusal(graph, max_states, "--max-states") do
       Mix.shell().error(message <> bounded_note(result, max_states))
@@ -168,7 +168,7 @@ defmodule Mix.Tasks.Tla.Visualize do
   end
 
   # To stderr-ish (`Mix.shell().info/1`) rather than into the DOT, so that
-  # `mix tla.visualize X > g.dot` still produces a file Graphviz reads.
+  # `mix extla.visualize X > g.dot` still produces a file Graphviz reads.
   defp note(result, output, graph) do
     if result.status == :violation do
       Mix.shell().info(
@@ -197,7 +197,7 @@ defmodule Mix.Tasks.Tla.Visualize do
 
   @doc false
   # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
-  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # option list to each other (#163). `extla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches
 end

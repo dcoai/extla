@@ -15,12 +15,12 @@ defmodule ExTLA.CliSurfaceTest do
 
   @moduletag :tmp_dir
 
-  # A task whose help text is computed, like `mix tla.visualize`'s default `--max-states`. Its
+  # A task whose help text is computed, like `mix extla.visualize`'s default `--max-states`. Its
   # moduledoc is a `<<>>` AST node rather than a binary, and an earlier draft's `is_binary`
   # guard read it as absent — silently emptying the exit-code table of the one task whose help
   # is computed. The fixture exists so that class cannot return.
   @interpolated ~S'''
-  defmodule Mix.Tasks.Tla.Fixture do
+  defmodule Mix.Tasks.Extla.Fixture do
     @shortdoc "a fixture"
     @moduledoc """
     Usage:
@@ -45,7 +45,7 @@ defmodule ExTLA.CliSurfaceTest do
   '''
 
   @plain ~S'''
-  defmodule Mix.Tasks.Tla.Plain do
+  defmodule Mix.Tasks.Extla.Plain do
     @moduledoc "No table here."
     use Mix.Task
 
@@ -78,21 +78,21 @@ defmodule ExTLA.CliSurfaceTest do
 
   describe "what the scanner reads" do
     setup %{tmp_dir: tmp} do
-      %{tasks: tree(tmp, [{"tla.fixture.ex", @interpolated}, {"tla.plain.ex", @plain}])}
+      %{tasks: tree(tmp, [{"extla.fixture.ex", @interpolated}, {"extla.plain.ex", @plain}])}
     end
 
     test "every task under a mix/tasks directory, by the name a user types", %{tasks: tasks} do
-      assert Enum.map(tasks, & &1.task) == ["tla.fixture", "tla.plain"]
+      assert Enum.map(tasks, & &1.task) == ["extla.fixture", "extla.plain"]
     end
 
     test "the switches, sorted, with the type OptionParser is given", %{tasks: tasks} do
-      assert task(tasks, "tla.fixture").switches == [dry_run: :boolean, max_states: :integer]
-      assert task(tasks, "tla.plain").switches == [only: :string]
+      assert task(tasks, "extla.fixture").switches == [dry_run: :boolean, max_states: :integer]
+      assert task(tasks, "extla.plain").switches == [only: :string]
     end
 
     test "an exit-code table, including a meaning that runs onto a second line",
          %{tasks: tasks} do
-      assert task(tasks, "tla.fixture").exit_codes == [
+      assert task(tasks, "extla.fixture").exit_codes == [
                {"0", "the thing was done"},
                {"1",
                 "the thing was not done, and this is why: a reason that runs onto a second line"}
@@ -100,15 +100,15 @@ defmodule ExTLA.CliSurfaceTest do
     end
 
     test "prose after the table is not an exit code", %{tasks: tasks} do
-      refute Enum.any?(task(tasks, "tla.fixture").exit_codes, fn {_, meaning} ->
+      refute Enum.any?(task(tasks, "extla.fixture").exit_codes, fn {_, meaning} ->
                meaning =~ "Prose after"
              end)
     end
 
     test "a task with no table has no exit rows, which is a finding and not a blank",
          %{tasks: tasks} do
-      assert task(tasks, "tla.plain").exit_codes == []
-      assert CliSurface.render(tasks) =~ "`mix tla.plain`"
+      assert task(tasks, "extla.plain").exit_codes == []
+      assert CliSurface.render(tasks) =~ "`mix extla.plain`"
       assert CliSurface.render(tasks) =~ "NO EXIT-CODE TABLE"
     end
   end
@@ -118,18 +118,21 @@ defmodule ExTLA.CliSurfaceTest do
       tasks =
         tree(
           tmp,
-          [{"tla.plain.ex", @plain}],
-          [{"07-tasks.md", "```elixir\ndefmodule Mix.Tasks.Tla.Plain do\n  --only  a flag\n```"}]
+          [{"extla.plain.ex", @plain}],
+          [
+            {"07-tasks.md",
+             "```elixir\ndefmodule Mix.Tasks.Extla.Plain do\n  --only  a flag\n```"}
+          ]
         )
 
-      assert task(tasks, "tla.plain").spec ==
-               {"spec/07-tasks.md", "defmodule Mix.Tasks.Tla.Plain do"}
+      assert task(tasks, "extla.plain").spec ==
+               {"spec/07-tasks.md", "defmodule Mix.Tasks.Extla.Plain do"}
     end
 
     test "a shipped task with no section is listed and says so — the case @documented could not",
          %{tmp_dir: tmp} do
-      tasks = tree(tmp, [{"tla.plain.ex", @plain}])
-      plain = task(tasks, "tla.plain")
+      tasks = tree(tmp, [{"extla.plain.ex", @plain}])
+      plain = task(tasks, "extla.plain")
 
       assert plain.shipped?
       assert plain.spec == nil
@@ -139,7 +142,7 @@ defmodule ExTLA.CliSurfaceTest do
 
   describe "the golden is a stable function of source" do
     setup %{tmp_dir: tmp} do
-      %{tasks: tree(tmp, [{"tla.fixture.ex", @interpolated}, {"tla.plain.ex", @plain}])}
+      %{tasks: tree(tmp, [{"extla.fixture.ex", @interpolated}, {"extla.plain.ex", @plain}])}
     end
 
     test "rendering twice produces identical bytes", %{tasks: tasks} do
@@ -148,16 +151,16 @@ defmodule ExTLA.CliSurfaceTest do
 
     test "a blank line above a task's switches leaves its version unchanged", %{tmp_dir: tmp} do
       moved = String.replace(@plain, "  @switches", "\n  # moved down\n  @switches")
-      before = tree(tmp, [{"tla.plain.ex", @plain}]) |> task("tla.plain")
-      after_move = tree(tmp, [{"tla.plain.ex", moved}]) |> task("tla.plain")
+      before = tree(tmp, [{"extla.plain.ex", @plain}]) |> task("extla.plain")
+      after_move = tree(tmp, [{"extla.plain.ex", moved}]) |> task("extla.plain")
 
       assert before.version == after_move.version
     end
 
     test "adding a switch moves the version", %{tmp_dir: tmp} do
       changed = String.replace(@plain, "[only: :string]", "[only: :string, all: :boolean]")
-      before = tree(tmp, [{"tla.plain.ex", @plain}]) |> task("tla.plain")
-      after_change = tree(tmp, [{"tla.plain.ex", changed}]) |> task("tla.plain")
+      before = tree(tmp, [{"extla.plain.ex", @plain}]) |> task("extla.plain")
+      after_change = tree(tmp, [{"extla.plain.ex", changed}]) |> task("extla.plain")
 
       refute before.version == after_change.version
     end

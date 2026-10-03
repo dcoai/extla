@@ -58,7 +58,7 @@ defmodule ExTLA.Simulation do
           # The model checker's graph, to hold each behaviour against as it finishes:
           # `%{graph: ExTLA.StateGraph.t(), status: atom()}`, or `nil` to skip the check.
           #
-          # Given here rather than run as a second suite afterwards (#180). `mix tla.simulate
+          # Given here rather than run as a second suite afterwards (#180). `mix extla.simulate
           # --against-graph` used to run `traces` MORE simulations, one at a time, forwarding
           # two of the five options -- so `--unrestricted --against-graph` audited containment
           # with the RESTRICTED generator while printing that every state was a node, and the

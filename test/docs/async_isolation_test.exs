@@ -40,7 +40,7 @@ defmodule ExTLA.AsyncIsolationTest do
   Two things a reader should take from that, both of which cost real time to learn:
 
   * **`on_exit` does not make such a test safe.** It runs after the damage, and the window
-    is the whole body of the test. `test/mix/tla_coverage_test.exs` restored the shell
+    is the whole body of the test. `test/mix/extla_coverage_test.exs` restored the shell
     faithfully and still blanked `Mix.shell()` output for every concurrent reader while it
     ran — which surfaces as a failed assertion in some unrelated file, about its own
     subject rather than about the shell.
@@ -71,7 +71,7 @@ defmodule ExTLA.AsyncIsolationTest do
   # sets it, everyone sees it, and `on_exit` bounds the window rather than removing it.
   # Application config, `:persistent_term`, the Mix shell, the compiler options. Two of
   # these were missing until #322, with three live offenders between them — `{Mix, :shell}`
-  # (`test/mix/tla_coverage_test.exs`, the flake that started #322) and
+  # (`test/mix/extla_coverage_test.exs`, the flake that started #322) and
   # `{Code, :put_compiler_option}` (`test/docs/moduledoc_examples_test.exs`, which set it
   # from a spawned process under a comment claiming that isolated it, and
   # `test/ex_tla/declaration_shapes_test.exs`, which set it in the test process outright).

@@ -84,7 +84,7 @@ sanctioned.
 
 `BuggySpec` is the same counter with a design bug written into it: `increment` runs up to
 `max_val` and the invariant says the count never exceeds two. Nothing about the
-implementation is wrong — the specification contradicts itself, `mix tla.check` finds it
+implementation is wrong — the specification contradicts itself, `mix extla.check` finds it
 before any code exists, and `Impl.FaithfulToABuggySpec` refines it exactly. A spec whose
 invariant no behaviour violates cannot produce a counterexample, which is why this entry
 exists at all.
@@ -120,7 +120,7 @@ The unrestricted row is the interesting one. `Impl.Conforming`'s `handle_call(:d
 has no guard of its own, so it accepts `:done` in a state where the spec's `done` is
 disabled — and `:not_enabled` is the correct finding about that pair. It is also a finding
 about nearly every server ever written, which is why the enabled-only generator is the
-default and the unrestricted one is `mix tla.simulate --unrestricted`.
+default and the unrestricted one is `mix extla.simulate --unrestricted`.
 
 ## What `validate!/3` does not decide
 

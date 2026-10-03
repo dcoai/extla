@@ -1,14 +1,14 @@
-defmodule Mix.Tasks.Tla.Diagnostics do
-  @shortdoc "Render every mix tla.* task's switches and exit codes to DIAGNOSTICS.md"
+defmodule Mix.Tasks.Extla.PackageSurface do
+  @shortdoc "Render every mix extla.* task's switches and exit codes to PACKAGE_SURFACE.md"
 
   @moduledoc """
-  Scan every `mix tla.*` task for its switches, its documented exit codes and the
-  specification section that reproduces it, and render the result to `DIAGNOSTICS.md`
+  Scan every `mix extla.*` task for its switches, its documented exit codes and the
+  specification section that reproduces it, and render the result to `PACKAGE_SURFACE.md`
   (#270, #272).
 
-      mix tla.diagnostics           # print the golden
-      mix tla.diagnostics --write   # regenerate DIAGNOSTICS.md
-      mix tla.diagnostics --check   # fail if the golden has drifted from the source
+      mix extla.package_surface           # print the golden
+      mix extla.package_surface --write   # regenerate PACKAGE_SURFACE.md
+      mix extla.package_surface --check   # fail if the golden has drifted from the source
 
   ## Why `--check` is HARD
 
@@ -23,16 +23,16 @@ defmodule Mix.Tasks.Tla.Diagnostics do
 
   use Mix.Task
 
-  alias ExTLA.Diagnostics
+  alias ExTLA.PackageSurface
 
-  @golden "DIAGNOSTICS.md"
+  @golden "PACKAGE_SURFACE.md"
   @switches [write: :boolean, check: :boolean]
 
   @impl Mix.Task
   def run(argv) do
     {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
 
-    rendered = Diagnostics.run() |> Diagnostics.render()
+    rendered = PackageSurface.run() |> PackageSurface.render()
     path = Path.join(File.cwd!(), @golden)
 
     cond do
@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Tla.Diagnostics do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        ExTLA.Surface.check!(@golden, "tla.diagnostics", path, rendered)
+        ExTLA.Surface.check!(@golden, "extla.package_surface", path, rendered)
 
       true ->
         Mix.shell().info(rendered)
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.Diagnostics do
   end
 
   @doc false
-  # Exposed for `ExTLA.SpecOptionsTest` / `DIAGNOSTICS.md`, which hold a task's switches and its
+  # Exposed for `ExTLA.SpecOptionsTest` / `PACKAGE_SURFACE.md`, which hold a task's switches and its
   # documentation to each other.
   def switches, do: @switches
 end

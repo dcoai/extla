@@ -1,14 +1,14 @@
-defmodule Mix.Tasks.Tla.ReplayTest do
+defmodule Mix.Tasks.Extla.ReplayTest do
   @moduledoc """
   The pipeline `05-layer3-conformance.md` §Full verification pipeline describes, run end
-  to end: `mix tla.check --format json` writes a counterexample, and `mix tla.replay`
+  to end: `mix extla.check --format json` writes a counterexample, and `mix extla.replay`
   drives the real server through it.
   """
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Tla.{Check, Replay}
+  alias Mix.Tasks.Extla.{Check, Replay}
 
   @server "ExTLA.Conformance.Counter.Impl.FaithfulToABuggySpec"
 
@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
   end
 
   describe "the pipeline, end to end" do
-    test "a counterexample mix tla.check wrote is replayed against the real server", %{tmp: tmp} do
+    test "a counterexample mix extla.check wrote is replayed against the real server", %{tmp: tmp} do
       path = counterexample_file(tmp)
 
       {output, code} = task(Replay, [@server, "--trace", path])
@@ -133,7 +133,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       File.write!(
         path,
         Jason.encode!(%{
-          "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+          "schema_version" => Mix.Tasks.Extla.Check.schema_version(),
           "specs" => [%{"spec" => "Some.Other.Spec", "violation" => nil}]
         })
       )
@@ -151,7 +151,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       File.write!(
         path,
         Jason.encode!(%{
-          "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+          "schema_version" => Mix.Tasks.Extla.Check.schema_version(),
           "specs" => [
             %{
               "spec" => "ExTLA.Conformance.Counter.BuggySpec",
@@ -180,7 +180,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         File.write!(
           path,
           Jason.encode!(%{
-            "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+            "schema_version" => Mix.Tasks.Extla.Check.schema_version(),
             "specs" => [
               %{
                 "spec" => "ExTLA.Conformance.Counter.BuggySpec",
@@ -206,7 +206,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       File.write!(
         path,
         Jason.encode!(%{
-          "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
+          "schema_version" => Mix.Tasks.Extla.Check.schema_version(),
           "specs" => [%{"spec" => "ExTLA.Conformance.Counter.BuggySpec", "status" => "ok"}]
         })
       )
@@ -222,7 +222,7 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       File.write!(
         path,
         Jason.encode!(%{
-          "schema_version" => Mix.Tasks.Tla.Check.schema_version() + 1,
+          "schema_version" => Mix.Tasks.Extla.Check.schema_version() + 1,
           "specs" => [%{"spec" => "ExTLA.Conformance.Counter.BuggySpec", "violation" => nil}]
         })
       )

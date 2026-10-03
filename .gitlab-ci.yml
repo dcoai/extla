@@ -297,7 +297,7 @@ mutation:
     # ~8.5 minutes for 13 mutants, measured rather than estimated: each one compiles the
     # tree and runs a gate, and a killed mutant is fast while a surviving one pays for the
     # whole corpus. The timeout below is that measurement plus room, not a guess.
-    - mix tla.mutants --check
+    - mix extla.mutants --check
   timeout: 40 minutes
 
 # The oracle side of the corpus. This job is the reason expected.json can be
@@ -324,7 +324,7 @@ mutation:
 # It is not redundant. The test exercises `ExTLA.Ledger.render/1`; this job is the only thing that
 # runs the mix TASK — its argv parsing, `--check`, and `check!/2`. Deleting it would leave that
 # task with no coverage at all. Its `Mix.raise` branches are covered by
-# `test/mix/tla_coverage_test.exs` since #84; before that they had never executed anywhere.
+# `test/mix/extla_coverage_test.exs` since #84; before that they had never executed anywhere.
 #
 # ONE JOB FOR EVERY SURFACE GOLDEN (#270). `tla-coverage-drift` was this job's name while the
 # ledger was the only golden; `API_SURFACE.md` (#271) joined it, and the goldens #270 still
@@ -336,15 +336,15 @@ surface-drift:
   variables:
     MIX_ENV: test
   script:
-    - mix tla.coverage --check
-    - mix tla.api_surface --check
-    - mix tla.cli_surface --check
-    - mix tla.diagnostics --check
-    - mix tla.package_surface --check
+    - mix extla.coverage --check
+    - mix extla.api_surface --check
+    - mix extla.cli_surface --check
+    - mix extla.diagnostics --check
+    - mix extla.package_surface --check
     # The one that runs the other way: `spec/07-examples.md` is the SOURCE and the corpus
     # entries are the artifact (#280). Same guarantee, same job — a golden's header names
     # `surface-drift` as its gate, and that name has to be one job.
-    - mix tla.examples --check
+    - mix extla.examples --check
 
 # The only job that builds the documentation, and the only place the built-docs link gate can
 # run (#102, #103).

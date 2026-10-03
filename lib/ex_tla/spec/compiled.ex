@@ -174,7 +174,7 @@ defmodule ExTLA.Spec.Compiled do
   The constant assignments for a run, from application config over the declared defaults.
 
   `{:error, missing}` names the constants nothing assigned, rather than letting a run
-  proceed on a spec with holes in it. Both `mix tla.check` and Layer 3's conformance
+  proceed on a spec with holes in it. Both `mix extla.check` and Layer 3's conformance
   checking resolve constants HERE rather than each their own way: a specification model
   checked with one assignment and an implementation checked against another are two
   different specifications, and a verdict from each is not a verdict about the same thing.

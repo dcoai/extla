@@ -17,7 +17,7 @@ required — and being compiled with the application is the point: a spec in a d
 not build is a spec that stops compiling without anyone noticing.
 
 Name them for the thing they describe rather than for what they are: `Specs.Lock`,
-`Specs.JobRunner`. `mix tla.check` with no arguments finds every module in the project that
+`Specs.JobRunner`. `mix extla.check` with no arguments finds every module in the project that
 `use`s `ExTLA.Spec`, so a consistent home is enough to make "check everything" work.
 
 ## Checking them from the suite
@@ -89,11 +89,11 @@ the slow check runs on every pipeline and not on every save.
 
 ## Looking at the graph
 
-`mix tla.visualize` renders the state space as DOT, which is the fastest way to see whether a
+`mix extla.visualize` renders the state space as DOT, which is the fastest way to see whether a
 design goes where you thought:
 
 ```sh
-mix tla.visualize Specs.Lock --output lock.dot && dot -Tsvg lock.dot -o lock.svg
+mix extla.visualize Specs.Lock --output lock.dot && dot -Tsvg lock.dot -o lock.svg
 ```
 
 For a two-client lock with no waiting state, the whole graph is small enough to read:
@@ -142,11 +142,11 @@ undefined function. Declare it yourself if you want them.
 
 ## After an incident
 
-The one that is worth knowing before you need it. `mix tla.replay --captured` takes a trace
+The one that is worth knowing before you need it. `mix extla.replay --captured` takes a trace
 recorded from a running system and checks it against the specification:
 
 ```sh
-mix tla.replay MyApp.LockServer --captured incident.json
+mix extla.replay MyApp.LockServer --captured incident.json
 ```
 
 The file is an array of `{"message": …, "state": …}` entries, oldest first, where `state` is the

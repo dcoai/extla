@@ -1,4 +1,4 @@
-# `mix tla.stamp` fixture tree
+# `mix extla.stamp` fixture tree
 
 A tree carrying the two stamp statuses this project's own sources cannot produce
 (#308, for #173).
@@ -13,11 +13,11 @@ not move, because the golden records `stale 0`. Dead with them: both `detail/1` 
 They cannot be produced there, either. A genuinely stale stamp in a compiled tree is a
 **compile error** — that is what the mechanism is for — so the corpus cannot hold one.
 
-So this tree is deliberately **outside every path `Mix.Tasks.Tla.Stamp.roots/0` scans**, and
+So this tree is deliberately **outside every path `Mix.Tasks.Extla.Stamp.roots/0` scans**, and
 outside `elixirc_paths` in every environment:
 
 * nothing here is compiled, so the stale stamps are inert;
-* the repository's own `mix tla.stamp` does not see them, so its report stays a report about
+* the repository's own `mix extla.stamp` does not see them, so its report stays a report about
   the repository. Once #311 makes the task gate CI, a stale stamp inside a scanned tree
   would fail every build.
 
@@ -60,5 +60,5 @@ hash could not be computed".
 `dropped.ex` never gets that far. `spec_of/1` returns `nil` for a `spec:` that is not a
 literal alias, and `mappings/1` rejects the entry — so the mapping is **silently
 dropped** and the task can go on to say "no refinement mappings found" about a file it
-read and could not understand. `test/mix/tla_stamp_test.exs` pins that, so #310 changing
+read and could not understand. `test/mix/extla_stamp_test.exs` pins that, so #310 changing
 it is deliberate.

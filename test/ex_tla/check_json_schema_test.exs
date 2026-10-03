@@ -17,12 +17,12 @@ defmodule ExTLA.CheckJsonSchemaTest do
   )
   @coverage_keys ~w(actions never_enabled invariants vacuous terminal_but_live terminals bounded_by)
 
-  # The exit status is deliberately NOT asserted to be 0: `mix tla.check` exits non-zero when
+  # The exit status is deliberately NOT asserted to be 0: `mix extla.check` exits non-zero when
   # it finds a violation, and a violating run is half of what this schema has to cover. Pinning
   # it to 0 would silently restrict these assertions to the happy path.
   defp emit(spec) do
     {output, _status} =
-      System.cmd("mix", ["tla.check", spec, "--format", "json"],
+      System.cmd("mix", ["extla.check", spec, "--format", "json"],
         env: [{"MIX_ENV", "test"}],
         stderr_to_stdout: false
       )
@@ -41,7 +41,7 @@ defmodule ExTLA.CheckJsonSchemaTest do
 
   describe "the envelope" do
     test "leads with a schema version a reader can refuse on", %{ok: json} do
-      assert json["schema_version"] == Mix.Tasks.Tla.Check.schema_version()
+      assert json["schema_version"] == Mix.Tasks.Extla.Check.schema_version()
       assert is_integer(json["schema_version"])
     end
 

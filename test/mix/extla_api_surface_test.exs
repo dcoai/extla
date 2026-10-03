@@ -1,10 +1,10 @@
-defmodule Mix.Tasks.Tla.ApiSurfaceTest do
+defmodule Mix.Tasks.Extla.ApiSurfaceTest do
   @moduledoc """
-  `mix tla.api_surface --check` is a HARD gate on `API_SURFACE.md` (#270, #271), and its red
+  `mix extla.api_surface --check` is a HARD gate on `API_SURFACE.md` (#270, #271), and its red
   paths are exercised here for the reason `tla_coverage_test.exs` gives: a gate whose failure
   branches no test has run is one that has only ever been seen succeeding.
 
-  The check is `ExTLA.Surface.check!/4`, shared with `tla.coverage` so there is one definition
+  The check is `ExTLA.Surface.check!/4`, shared with `extla.coverage` so there is one definition
   of "drifted" (#270); its three outcomes are asserted once, here, against a `tmp_dir`. The
   real golden is never touched.
   """
@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
       path = Path.join(tmp, "API_SURFACE.md")
       File.write!(path, "identical")
 
-      assert ExTLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "identical") == :ok
+      assert ExTLA.Surface.check!("API_SURFACE.md", "extla.api_surface", path, "identical") == :ok
     end
 
     test "raises on drift, naming the golden and how to regenerate it", %{tmp_dir: tmp} do
@@ -36,11 +36,16 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
 
       error =
         assert_raise Mix.Error, fn ->
-          ExTLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "what the source says")
+          ExTLA.Surface.check!(
+            "API_SURFACE.md",
+            "extla.api_surface",
+            path,
+            "what the source says"
+          )
         end
 
       assert error.message =~ "API_SURFACE.md has drifted"
-      assert error.message =~ "mix tla.api_surface --write"
+      assert error.message =~ "mix extla.api_surface --write"
     end
 
     test "raises when the file is missing, rather than reading absence as agreement",
@@ -49,11 +54,11 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
 
       error =
         assert_raise Mix.Error, fn ->
-          ExTLA.Surface.check!("API_SURFACE.md", "tla.api_surface", path, "anything")
+          ExTLA.Surface.check!("API_SURFACE.md", "extla.api_surface", path, "anything")
         end
 
       assert error.message =~ "API_SURFACE.md is missing"
-      assert error.message =~ "mix tla.api_surface --write"
+      assert error.message =~ "mix extla.api_surface --write"
     end
   end
 
@@ -67,7 +72,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
       [job] = Regex.run(~r/^surface-drift:\n(?:  .*\n)+/m, ci)
 
       # A golden's task is the one that can both render and compare: `--write` regenerates,
-      # `--check` refuses a difference. `mix tla.mutants` has a `--check` of its own and no
+      # `--check` refuses a difference. `mix extla.mutants` has a `--check` of its own and no
       # `--write`, and it is not a golden — the pair is what identifies one.
       checkers =
         for task <- ExTLA.CliSurface.run(),
@@ -88,7 +93,7 @@ defmodule Mix.Tasks.Tla.ApiSurfaceTest do
         Path.expand("../../API_SURFACE.md", __DIR__) |> File.read!() |> String.slice(0, 400)
 
       assert header =~ "gate `surface-drift` (HARD)"
-      assert header =~ "mix tla.api_surface --write"
+      assert header =~ "mix extla.api_surface --write"
     end
   end
 end

@@ -38,7 +38,7 @@ defmodule Tutorial.FirstTry do
 end
 ```
 
-Nothing else changes: no specification, no refinement mapping, no `mix tla.check`. Run your suite,
+Nothing else changes: no specification, no refinement mapping, no `mix extla.check`. Run your suite,
 and if the property holds the server behaves exactly as it did before. This one does not hold —
 `acquire` grants the lock and forgets to take the client off the waiting list:
 
@@ -184,7 +184,7 @@ helper in the next section says so by name rather than reporting the declaration
 
 An invariant no test has ever seen return `false` is indistinguishable from `true` — and a `true`
 invariant is checked on every transition forever while proving nothing. It is the same vacuity
-`mix tla.check` reports at Layer 2, one layer down, and it is **not detectable from the passing
+`mix extla.check` reports at Layer 2, one layer down, and it is **not detectable from the passing
 side**.
 
 `ExTLA.Invariant.Test` checks a declaration against a *state value* rather than a running process,

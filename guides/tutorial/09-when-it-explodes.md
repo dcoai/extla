@@ -128,7 +128,7 @@ beats every other lever combined.
 
 <!-- tla:skip reason=a shell invocation, and the timing below is from this machine -->
 ```sh
-mix tla.check Boom.Runner --workers 4
+mix extla.check Boom.Runner --workers 4
 ```
 
 On this model that is **slower** — 90 ms against 55 ms — and the reason is worth knowing: the

@@ -345,7 +345,7 @@ defmodule ExTLA.Replay do
   end
 
   # A skip is not a silent one: it reaches the caller in `skipped` and, where there were
-  # any, in `detail` — so a green `mix tla.replay` says what it did not drive.
+  # any, in `detail` — so a green `mix extla.replay` says what it did not drive.
   defp finish(%{skipped: []} = result), do: result
 
   defp finish(%{skipped: skipped, detail: nil} = result) do

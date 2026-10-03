@@ -179,7 +179,7 @@ end
 
 <!-- tla:check module=Tutorial.Quorum expect=ok states=12 depth=5 -->
 ```
-mix tla.check Tutorial.Quorum
+mix extla.check Tutorial.Quorum
 ✓ verified · 12 distinct states · depth 5
 ```
 
@@ -265,7 +265,7 @@ end
 ## The run
 
 ```sh
-mix tla.check Tutorial.Lock
+mix extla.check Tutorial.Lock
 ```
 
 <!-- tla:check module=Tutorial.Lock expect=ok states=20 depth=5 -->

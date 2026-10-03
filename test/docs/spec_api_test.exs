@@ -31,7 +31,7 @@ defmodule ExTLA.SpecApiTest do
 
   ## What is checked, and what belongs to another gate
 
-  A block sketching a module **ExTLA provides** — `ExTLA.*` or `Mix.Tasks.Tla.*` — is this
+  A block sketching a module **ExTLA provides** — `ExTLA.*` or `Mix.Tasks.Extla.*` — is this
   gate's business: it is the published surface, and a reader coding to it gets an
   `UndefinedFunctionError` when it is wrong. A block under any other name is an example of
   what a *consumer* writes (`defmodule BankAccount`, `defmodule MyApp.TransferServer`, the
@@ -278,7 +278,7 @@ defmodule ExTLA.SpecApiTest do
     name = inspect(module)
 
     name == "ExTLA" or String.starts_with?(name, "ExTLA.") or
-      String.starts_with?(name, "Mix.Tasks.Tla.")
+      String.starts_with?(name, "Mix.Tasks.Extla.")
   end
 
   defp parse(block), do: Code.string_to_quoted(block.source)

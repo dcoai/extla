@@ -1,13 +1,13 @@
-defmodule Mix.Tasks.Tla.SimulateTest do
+defmodule Mix.Tasks.Extla.SimulateTest do
   @moduledoc """
-  `mix tla.simulate MyServer` walks the real implementation against its spec, says what
+  `mix extla.simulate MyServer` walks the real implementation against its spec, says what
   the walk covered, and reports its verdict in the exit code.
   """
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Tla.Simulate
+  alias Mix.Tasks.Extla.Simulate
 
   setup do
     Mix.shell(Mix.Shell.IO)

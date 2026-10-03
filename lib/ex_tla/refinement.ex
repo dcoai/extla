@@ -493,7 +493,7 @@ defmodule ExTLA.Refinement do
   end
 
   # One binding per action, drawn on an initial state — enough to round-trip a mapping
-  # without exploring the state space, which is `mix tla.check`'s job and not this one's.
+  # without exploring the state space, which is `mix extla.check`'s job and not this one's.
   # The bindings to probe a mapping with, and `[]` where there are none to probe it with.
   #
   # An action with no params has exactly one binding — the empty one — so `%{}` is the real

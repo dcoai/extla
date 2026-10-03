@@ -1,20 +1,20 @@
-defmodule Mix.Tasks.Tla.ApiSurface do
+defmodule Mix.Tasks.Extla.ApiSurface do
   @shortdoc "Render what lib/ declares to API_SURFACE.md"
 
   @moduledoc """
   Scan `lib/` for every public function head and every named type, and render the result to
   `API_SURFACE.md` (#270, #271).
 
-      mix tla.api_surface           # print the golden
-      mix tla.api_surface --write   # regenerate API_SURFACE.md
-      mix tla.api_surface --check   # fail if the golden has drifted from the source
+      mix extla.api_surface           # print the golden
+      mix extla.api_surface --write   # regenerate API_SURFACE.md
+      mix extla.api_surface --check   # fail if the golden has drifted from the source
 
   ## Why `--check` is HARD
 
   The golden is the code's side of a comparison the specification's API blocks are held to
   (#164). A drift means a signature or a type changed and the document that lists it was not
   regenerated — which is exactly the moment the spec block that cites it may have gone stale
-  too. An advisory gate on that document is the D-10 mistake `mix tla.coverage` refuses.
+  too. An advisory gate on that document is the D-10 mistake `mix extla.coverage` refuses.
 
   It reads source, not compiled modules (`Surfex.SourceScan`), so it runs before the build and
   lists what a reader of `lib/` would find.
@@ -40,7 +40,7 @@ defmodule Mix.Tasks.Tla.ApiSurface do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        ExTLA.Surface.check!(@golden, "tla.api_surface", path, rendered)
+        ExTLA.Surface.check!(@golden, "extla.api_surface", path, rendered)
 
       true ->
         Mix.shell().info(rendered)

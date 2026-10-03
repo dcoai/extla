@@ -27,7 +27,7 @@ defmodule ExTLA.MixProject do
         #
         # `mix docs` runs under `MIX_ENV=dev`, because `ex_doc` is a dev dependency, and
         # `elixirc_paths(:dev)` includes `ledger/` — so until this filter the published
-        # documentation carried `ExTLA.Ledger`, `ExTLA.Spec.Version` and `mix tla.coverage`,
+        # documentation carried `ExTLA.Ledger`, `ExTLA.Spec.Version` and `mix extla.coverage`,
         # eleven modules in all, to a reader whose `mix deps.get` brings them `lib/` only.
         # Nobody decided to document the ledger: the docs job's environment did, and the
         # `consumer-compile` job that proves the package is right cannot see the docs.
@@ -61,7 +61,7 @@ defmodule ExTLA.MixProject do
         # it is self-maintaining in the only way that matters: naming another ledger module in
         # prose fails the `docs` job with a warning that says which one. The list cannot go
         # stale silently, which is the property that makes a hand-kept list acceptable.
-        skip_code_autolink_to: ["ExTLA.Ledger", "mix tla.coverage"],
+        skip_code_autolink_to: ["ExTLA.Ledger", "mix extla.coverage"],
         # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
         # and the order here is the order the sidebar lists them in.
         #
@@ -108,11 +108,11 @@ defmodule ExTLA.MixProject do
 
   def application, do: [extra_applications: [:logger, :crypto]]
 
-  # `mix tla.mutants` lives in `test/support/` — it mutates ExTLA's own source, so it is a
+  # `mix extla.mutants` lives in `test/support/` — it mutates ExTLA's own source, so it is a
   # tool of this checkout rather than of the library, and it must not ship in the package.
-  # Declaring its environment here is what lets it be invoked as `mix tla.mutants` instead
-  # of `MIX_ENV=test mix tla.mutants`, which is a prefix everyone forgets once.
-  def cli, do: [preferred_envs: ["tla.mutants": :test]]
+  # Declaring its environment here is what lets it be invoked as `mix extla.mutants` instead
+  # of `MIX_ENV=test mix extla.mutants`, which is a prefix everyone forgets once.
+  def cli, do: [preferred_envs: ["extla.mutants": :test]]
 
   @doc """
   Whether the package ships the module a doc chunk came from (#274).

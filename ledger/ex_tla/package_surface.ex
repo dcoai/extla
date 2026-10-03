@@ -16,7 +16,7 @@ defmodule ExTLA.PackageSurface do
 
   **Modules.** The docs are built with `MIX_ENV=dev`, and `elixirc_paths(:dev)` includes
   `ledger/`, so the published documentation advertises `ExTLA.Ledger`, `ExTLA.Spec.Version` and
-  `mix tla.coverage` to a consumer whose package contains `lib/` only. Nobody decided to
+  `mix extla.coverage` to a consumer whose package contains `lib/` only. Nobody decided to
   document the ledger; the environment did (#181). The `consumer-compile` job proves the
   package is right and cannot see the docs; nothing compared the two.
 
@@ -238,7 +238,7 @@ defmodule ExTLA.PackageSurface do
       purpose:
         "What ExTLA depends on and what it ships. Linked from 06-architecture.md " <>
           "§Dependencies; the published docs are filtered on the same rule.",
-      task: "tla.package_surface",
+      task: "extla.package_surface",
       gate: "surface-drift",
       hardness: :hard,
       prose: prose(),

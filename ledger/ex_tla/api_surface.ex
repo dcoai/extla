@@ -266,7 +266,7 @@ defmodule ExTLA.ApiSurface do
       purpose:
         "Every public function head and every named type lib/ declares. Checked against " <>
           "spec/01–05's API blocks (#164).",
-      task: "tla.api_surface",
+      task: "extla.api_surface",
       gate: "surface-drift",
       hardness: :hard,
       prose: prose(),

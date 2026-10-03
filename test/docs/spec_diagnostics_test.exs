@@ -81,7 +81,7 @@ defmodule ExTLA.SpecDiagnosticsTest do
       untested = raised -- tested()
 
       # 17 when this gate was written (#273): 33 of the 50 kinds are pinned by a fixture.
-      # The backlog is recorded rather than gated to zero, for the reason `mix tla.coverage`
+      # The backlog is recorded rather than gated to zero, for the reason `mix extla.coverage`
       # gives about NOTHING entries — a gate that failed on gaps could only be satisfied by
       # deleting rows. What is gated is that it cannot GROW: a new diagnostic arrives with a
       # test, or this number goes up and someone has to say why.

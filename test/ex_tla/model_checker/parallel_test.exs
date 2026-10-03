@@ -167,7 +167,7 @@ defmodule ExTLA.ModelChecker.ParallelTest do
 
     # The finding that made this merge part of the coordinator's work rather than a later
     # item: a report claiming an action was never enabled when it was is a false statement
-    # about the model, and `mix tla.check --strict-coverage` fails the build on it.
+    # about the model, and `mix extla.check --strict-coverage` fails the build on it.
     test "names no action as never enabled that a single-threaded run enabled" do
       one = ModelChecker.run(TestSpecs.Transfer, transfer_config(1))
       many = ModelChecker.run(TestSpecs.Transfer, transfer_config(8))

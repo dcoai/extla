@@ -60,7 +60,7 @@ defmodule ExTLA.Trace do
   Accepts a lasso too, which round-trips as `%{prefix:, cycle:}`. States and bindings go
   through `ExTLA.State.Json`, because `inspect/1` produces something a person can read and a
   machine cannot parse — and `05-layer3-conformance.md`'s pipeline runs
-  `mix tla.check --format json` into `mix tla.replay --trace`, which needs the second.
+  `mix extla.check --format json` into `mix extla.replay --trace`, which needs the second.
   """
   def to_json(%__MODULE__{} = trace) do
     %{

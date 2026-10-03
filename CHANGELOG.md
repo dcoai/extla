@@ -26,6 +26,10 @@ it is mechanical.
   prose alone. For example, replace `TLA` with `ExTLA` where it is followed by `.` and a
   letter or `{`, and is not preceded by a letter, digit, `.` or `:`. Then fix any bare `TLA`
   module reference by hand.
+- **Mix tasks:** `mix tla.<task>` → `mix extla.<task>` for `check`, `explore`, `replay`,
+  `simulate`, `stamp` and `visualize`: in scripts, CI files, Makefiles and aliases. A module
+  that calls a task directly moves from `Mix.Tasks.Tla.*` to `Mix.Tasks.Extla.*`. Switches,
+  arguments, output and exit codes are unchanged.
 - **Unchanged:** the application name `:extla` (your `deps` entry), telemetry event names
   (already `[:extla, …]`), configuration keys, and every spec you have written. A spec module
   is yours; only the `use` line names ExTLA.
@@ -58,6 +62,16 @@ it is mechanical.
   the suite had never exercised this.
 
 ### Changed
+
+- **The Mix tasks are `mix extla.*`** (#339, for #337). The same rule as the modules, one
+  level down. Elixir lets a library define tasks under `Mix.Tasks`, and its own example names
+  the task after the library, so `mix tla.check` was open to the same collision as `TLA.*`.
+  The six user tasks, the six ledger tasks that regenerate the goldens, and the test-support
+  `mutants` task move to `Mix.Tasks.Extla.*`. CI, golden headers, spec, guides and README use
+  the new names, and so does the deferred `mix extla.gen.test` the spec designs.
+  `CLI_SURFACE.md`'s discovery reads `extla.*.ex`. Worked test-first like #338: 33 test files
+  renamed and run against the old tasks gave 156 red, and each of the 237 that stayed green
+  was explained (#339 records the run).
 
 - **Every module lives under `ExTLA`** (#338, for #337; `spec/08` D-40). ExTLA defined its
   modules under `TLA`, a namespace it doesn't own: Elixir's code anti-patterns call that

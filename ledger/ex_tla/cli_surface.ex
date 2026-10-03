@@ -1,6 +1,6 @@
 defmodule ExTLA.CliSurface do
   @moduledoc """
-  What the `mix tla.*` tasks accept and what they return — every switch, every documented exit
+  What the `mix extla.*` tasks accept and what they return — every switch, every documented exit
   code, and the specification section that reproduces each task — as a surfex golden,
   `CLI_SURFACE.md` (#270, #272).
 
@@ -12,7 +12,7 @@ defmodule ExTLA.CliSurface do
   nothing would have said so — a task absent from the list is a task nobody checks, which reads
   exactly like a task that passes.
 
-  Here the set is derived twice over. The tasks are every `tla.*.ex` under a `mix/tasks`
+  Here the set is derived twice over. The tasks are every `extla.*.ex` under a `mix/tasks`
   directory, and each task's spec section is found by searching `spec/*.md` for the `defmodule`
   line that opens it. So a task added without a section is a row that says `not specified`, and
   the gate that reads these rows refuses it — the difference between a gap that is recorded and
@@ -24,7 +24,7 @@ defmodule ExTLA.CliSurface do
   and one per documented exit code. Both are read from **source**: the switches from the AST's
   `@switches`, the exit codes from the `## Exit codes` block of the moduledoc. A task with no
   exit-code table has no exit rows and says so in its heading rather than appearing complete —
-  `mix tla.stamp` is that case today (#173), and it is a finding the golden reports rather than
+  `mix extla.stamp` is that case today (#173), and it is a finding the golden reports rather than
   one a reader has to notice.
 
   ## Which tasks must be specified
@@ -50,7 +50,7 @@ defmodule ExTLA.CliSurface do
         }
 
   @doc """
-  Every `mix tla.*` task, in name order, from the project root that holds `mix.exs`.
+  Every `mix extla.*` task, in name order, from the project root that holds `mix.exs`.
   """
   def run(root \\ SourceScan.project_root("mix.exs")) do
     specs = spec_sources(root)
@@ -68,10 +68,10 @@ defmodule ExTLA.CliSurface do
   # gate rests on; the test that found it is in `cli_surface_test.exs`.
   @source_roots ~w(lib ledger test)
 
-  @doc "Every `mix/tasks/tla.*.ex` in a source tree under `root`."
+  @doc "Every `mix/tasks/extla.*.ex` in a source tree under `root`."
   def task_sources(root) do
     @source_roots
-    |> Enum.flat_map(&Path.wildcard(Path.join([root, &1, "**/mix/tasks/tla.*.ex"])))
+    |> Enum.flat_map(&Path.wildcard(Path.join([root, &1, "**/mix/tasks/extla.*.ex"])))
     |> Enum.sort()
   end
 
@@ -108,7 +108,7 @@ defmodule ExTLA.CliSurface do
     }
   end
 
-  # `Mix.Tasks.Tla.ApiSurface` → "tla.api_surface", the name a user types.
+  # `Mix.Tasks.Extla.ApiSurface` → "extla.api_surface", the name a user types.
   defp task_name(module), do: Mix.Task.task_name(module)
 
   # ── Reading a task's source ─────────────────────────────────────────────────
@@ -123,7 +123,7 @@ defmodule ExTLA.CliSurface do
     found
   end
 
-  # A moduledoc may be an interpolated heredoc — `mix tla.visualize` renders its default
+  # A moduledoc may be an interpolated heredoc — `mix extla.visualize` renders its default
   # `--max-states` into its own help — and that arrives as a `<<>>` node rather than a binary.
   # Its literal segments are read and each interpolation stands as `…`: this reads a document
   # for structure, and a value computed at compile time is not part of the structure. Returning
@@ -142,7 +142,7 @@ defmodule ExTLA.CliSurface do
 
   # `@switches [a: :boolean, b: :string]`, as `OptionParser` is given them. Read from the AST
   # rather than from `switches/0`, because a task that forgot the accessor would otherwise be
-  # invisible here — and one did: `mix tla.coverage` has never had one.
+  # invisible here — and one did: `mix extla.coverage` has never had one.
   defp switches(ast) do
     {_, found} =
       Macro.prewalk(ast, [], fn
@@ -228,9 +228,9 @@ defmodule ExTLA.CliSurface do
     %{
       name: "CLI_SURFACE.md",
       purpose:
-        "Every mix tla.* task's switches and documented exit codes, and the specification " <>
+        "Every mix extla.* task's switches and documented exit codes, and the specification " <>
           "section that reproduces it. Held against spec/04 and spec/05 by spec_options_test.",
-      task: "tla.cli_surface",
+      task: "extla.cli_surface",
       gate: "surface-drift",
       hardness: :hard,
       prose: prose(),

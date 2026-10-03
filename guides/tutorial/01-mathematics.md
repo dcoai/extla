@@ -182,7 +182,7 @@ preserved, which is genuinely hard.
 **By exhaustion.** Fix the constants — three clients, not *n* — and the state space becomes
 finite. Then enumerate it: start from the initial states, apply every action to every state, and
 check the invariants in each new one. No ingenuity required. This is model checking, it is what
-`mix tla.check` does, and the mechanics are visible in the report — breadth-first, so the first
+`mix extla.check` does, and the mechanics are visible in the report — breadth-first, so the first
 violating state found is the *nearest* one, which is why a counterexample is the shortest.
 
 Here is the lock this tutorial is built around — the same three actions and the same invariant
@@ -231,7 +231,7 @@ end
 ```
 
 ```sh
-mix tla.check Math.Lock
+mix extla.check Math.Lock
 ```
 
 <!-- tla:check module=Math.Lock expect=ok states=256 depth=8 -->
@@ -263,7 +263,7 @@ found" but "the question was not answered", and the tool must not blur the two. 
 specification, given a state limit smaller than its state space:
 
 ```sh
-mix tla.check Math.Lock --max-states 100
+mix extla.check Math.Lock --max-states 100
 ```
 
 <!-- tla:check module=Math.Lock expect=incomplete max_states=100 states=101 -->

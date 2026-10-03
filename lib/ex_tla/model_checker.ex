@@ -141,7 +141,7 @@ defmodule ExTLA.ModelChecker do
   swallowed; this is the same isolate-and-observe shape as `ExTLA.Ledger`'s own check.
 
   It is invisible under ExUnit, where every test is its own process. It accumulates in
-  `mix tla.check A B C`, in `ExTLA.Spec.Test`, and in any long-lived caller.
+  `mix extla.check A B C`, in `ExTLA.Spec.Test`, and in any long-lived caller.
   """
   def run(spec, config \\ %{}) do
     parent = self()
@@ -165,7 +165,7 @@ defmodule ExTLA.ModelChecker do
   # The search is isolated for the tables' sake, not to contain failures, so a failure has
   # to arrive at the caller as the failure it was. A raise leaves a monitored process as
   # `{reason, stacktrace}`, and `:erlang.raise/3` puts both back — which is what keeps
-  # `mix tla.check`'s `rescue error in ExTLA.Symmetry.UnsoundError` matching, and what keeps
+  # `mix extla.check`'s `rescue error in ExTLA.Symmetry.UnsoundError` matching, and what keeps
   # the stack pointing at the spec rather than at this line.
   defp propagate({reason, stacktrace}) when is_list(stacktrace) do
     if stacktrace?(stacktrace),
@@ -230,7 +230,7 @@ defmodule ExTLA.ModelChecker do
           reduced
 
         # A bounded comparison cannot answer. The first version of this appended the message
-        # to `warnings` and left `status: :ok` -- so `mix tla.check` printed `— verified` and
+        # to `warnings` and left `status: :ok` -- so `mix extla.check` printed `— verified` and
         # exited 0 with "could not be verified" as a trailing line. A run that ASKED for the
         # check came back looking verified to anything reading the exit code, which is the
         # defect this milestone exists to close, introduced by the fix for it (#170).
@@ -741,7 +741,7 @@ defmodule ExTLA.ModelChecker do
   # A search the budget stopped, or a safety counterexample halted, is not asked the liveness
   # question either -- and used to say nothing about that (#208). #167 named the deadlock skip
   # and the constraint skip and left these two silent, which mattered most for the bound:
-  # `mix tla.check --allow-incomplete` turns a bounded run into exit 0, and a temporal property
+  # `mix extla.check --allow-incomplete` turns a bounded run into exit 0, and a temporal property
   # nobody checked went unmentioned in a green result.
   defp check_temporals(%{outcome: :max_states_reached} = run),
     do: %{run | liveness_skipped: :bounded}
@@ -808,7 +808,7 @@ defmodule ExTLA.ModelChecker do
 
             # Whether the constraint HELD SOMETHING BACK, not whether one was configured
             # (#167). An exhaustive run whose constraint never fired reached every state,
-            # and reporting it as unverified made `mix tla.check` exit 2 and `assert_spec`
+            # and reporting it as unverified made `mix extla.check` exit 2 and `assert_spec`
             # fail over a predicate that turned out to exclude nothing.
             run.coverage.held_back > 0 ->
               {:constrained, nil}

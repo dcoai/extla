@@ -521,7 +521,7 @@ defmodule ExTLA.Invariant.Test do
   Assert that a state VIOLATES a named invariant. The negative test that
   proves an invariant can actually fail — an invariant no test has ever
   seen return false is indistinguishable from `true`, and is exactly the
-  vacuity problem `mix tla.check` reports at Layer 2
+  vacuity problem `mix extla.check` reports at Layer 2
   (`04-layer2-model-checker.md` §Coverage and Vacuity).
   """
   defmacro refute_invariant(module, name, state)

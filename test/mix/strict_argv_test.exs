@@ -1,12 +1,12 @@
 defmodule ExTLA.StrictArgvTest do
   @moduledoc """
-  Every `mix tla.*` task refuses an unknown flag rather than dropping it (#166).
+  Every `mix extla.*` task refuses an unknown flag rather than dropping it (#166).
 
   Three of the eight used `OptionParser.parse/2` and discarded the invalid-options element,
   so a typo was accepted and the flag simply did not apply. Two of the three are CI gates:
 
-      mix tla.coverage --check   exit 1 when the ledger has drifted
-      mix tla.coverage --chek    exit 0, prints the ledger, checks nothing
+      mix extla.coverage --check   exit 1 when the ledger has drifted
+      mix extla.coverage --chek    exit 0, prints the ledger, checks nothing
 
   D-10 forbids exactly that — an advisory gate on a verification artifact — and this is how
   it arrives without anyone deciding it: through a typo in a pipeline file nobody re-reads.
@@ -19,10 +19,10 @@ defmodule ExTLA.StrictArgvTest do
   use ExUnit.Case, async: true
 
   # Discovered rather than written down. `Mix.Task.load_all/0` returns every task module the
-  # project and its dependencies define; the `Tla.` prefix selects this project's.
+  # project and its dependencies define; the `Extla.` prefix selects this project's.
   defp tla_tasks do
     Mix.Task.load_all()
-    |> Enum.filter(&(&1 |> Module.split() |> Enum.take(3) == ~w(Mix Tasks Tla)))
+    |> Enum.filter(&(&1 |> Module.split() |> Enum.take(3) == ~w(Mix Tasks Extla)))
     |> Enum.sort()
   end
 
@@ -34,7 +34,7 @@ defmodule ExTLA.StrictArgvTest do
     assert length(tasks) >= 6, """
     Found only #{inspect(tasks)}.
 
-    Either the tasks moved out of the `Mix.Tasks.Tla` namespace or this discovery is no
+    Either the tasks moved out of the `Mix.Tasks.Extla` namespace or this discovery is no
     longer finding them. Both are worth knowing: an empty list would make every assertion
     below vacuous.
     """

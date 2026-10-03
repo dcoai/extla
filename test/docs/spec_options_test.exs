@@ -3,7 +3,7 @@ defmodule ExTLA.SpecOptionsTest do
   The specification's list of a task's options, and the task's own `@switches`, held to each
   other (#132, #134) — over the set of tasks `CLI_SURFACE.md` derives (#272).
 
-  `spec/04-layer2-model-checker.md` reproduces `Mix.Tasks.Tla.Check`'s moduledoc as prose, and
+  `spec/04-layer2-model-checker.md` reproduces `Mix.Tasks.Extla.Check`'s moduledoc as prose, and
   nothing compared the copy to the original. What that cost: the spec asserted `--workers` was
   **not** a flag of the task, nine hundred lines after the same file documented `workers:` as a
   config option — so it disagreed with the code and with itself, from Phase 4 until #132. Four
@@ -92,7 +92,7 @@ defmodule ExTLA.SpecOptionsTest do
     # returning an empty set, and that behaviour is asserted rather than assumed.
     test "raises when the anchor is absent rather than comparing against nothing" do
       assert_raise RuntimeError, ~r/no section anchored at/, fn ->
-        documented_options(@layer2, "defmodule Mix.Tasks.Tla.NoSuchTask do")
+        documented_options(@layer2, "defmodule Mix.Tasks.Extla.NoSuchTask do")
       end
     end
 
@@ -104,10 +104,10 @@ defmodule ExTLA.SpecOptionsTest do
     end
 
     test "reads option definitions and not usage examples" do
-      # `mix tla.check Specs.X --max-states 100000` is a usage line, and `--max-states` is also a
+      # `mix extla.check Specs.X --max-states 100000` is a usage line, and `--max-states` is also a
       # definition further down. The distinction matters: if usage lines counted, the `--graph`
       # example that started #132 would have read as documentation of a flag that does not exist.
-      options = documented_options(@layer2, "defmodule Mix.Tasks.Tla.Check do")
+      options = documented_options(@layer2, "defmodule Mix.Tasks.Extla.Check do")
 
       assert "--max-states" in options
       refute "--graph" in options

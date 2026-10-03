@@ -23,7 +23,7 @@ defmodule ExTLA.GuideCheckTest do
   defp block(annotation, code), do: "<!-- #{annotation} -->\n```elixir\n#{code}```\n"
 
   # A run-claim stands alone, with no fence under it -- the shape the guides use beside a
-  # `mix tla.check` command.
+  # `mix extla.check` command.
   defp claim(annotation), do: "\n<!-- #{annotation} -->\n"
 
   # A spec with an invariant a reachable state refutes, at a known depth.

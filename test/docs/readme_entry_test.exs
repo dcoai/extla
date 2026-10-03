@@ -13,7 +13,7 @@ defmodule ExTLA.ReadmeEntryTest do
   and the first a GitLab visitor sees. It routed them into the normative specification,
   which `mix.exs` itself describes as "the authority" that the guides link *to*.
 
-  Its command list named three of the six `mix tla.*` tasks that ship.
+  Its command list named three of the six `mix extla.*` tasks that ship.
 
   ## What is gated, and what is not
 
@@ -67,14 +67,14 @@ defmodule ExTLA.ReadmeEntryTest do
       assert missing == [], """
       the README does not mention #{Enum.join(missing, ", ")}.
 
-      Every `mix tla.*` task that ships in the package should be discoverable from the
-      front page; `mix tla.explore` and `mix tla.stamp` were both absent when #155 was
+      Every `mix extla.*` task that ships in the package should be discoverable from the
+      front page; `mix extla.explore` and `mix extla.stamp` were both absent when #155 was
       filed. The list of packaged tasks is CLI_SURFACE.md's, which is generated.
       """
     end
 
     test "and mentions no task that does not ship" do
-      # The ledger's own tooling — `mix tla.api_surface` and friends — is not packaged, so
+      # The ledger's own tooling — `mix extla.api_surface` and friends — is not packaged, so
       # a reader following the README could not run it.
       internal =
         for task <- all_tasks(),
@@ -90,19 +90,19 @@ defmodule ExTLA.ReadmeEntryTest do
     # empty list passes either way.
     test "and the task list it is checked against is the real one" do
       assert length(packaged_tasks()) >= 6
-      assert "mix tla.check" in packaged_tasks()
-      assert "mix tla.api_surface" in all_tasks()
-      refute "mix tla.api_surface" in packaged_tasks()
+      assert "mix extla.check" in packaged_tasks()
+      assert "mix extla.api_surface" in all_tasks()
+      refute "mix extla.api_surface" in packaged_tasks()
     end
   end
 
-  # `## \`mix tla.check\` — specified in spec/04-…` versus
-  # `## \`mix tla.api_surface\` — ledger tooling, not packaged`.
+  # `## \`mix extla.check\` — specified in spec/04-…` versus
+  # `## \`mix extla.api_surface\` — ledger tooling, not packaged`.
   defp all_tasks do
     @root
     |> Path.join("CLI_SURFACE.md")
     |> File.read!()
-    |> then(&Regex.scan(~r/^## `(mix tla\.[\w.]+)`/m, &1))
+    |> then(&Regex.scan(~r/^## `(mix extla\.[\w.]+)`/m, &1))
     |> Enum.map(fn [_match, task] -> task end)
   end
 
@@ -110,7 +110,7 @@ defmodule ExTLA.ReadmeEntryTest do
     @root
     |> Path.join("CLI_SURFACE.md")
     |> File.read!()
-    |> then(&Regex.scan(~r/^## `(mix tla\.[\w.]+)` — ([^\n]*)/m, &1))
+    |> then(&Regex.scan(~r/^## `(mix extla\.[\w.]+)` — ([^\n]*)/m, &1))
     |> Enum.reject(fn [_match, _task, detail] ->
       String.contains?(detail, "not packaged")
     end)
