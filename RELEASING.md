@@ -190,7 +190,10 @@ so the same commit edits the tag to the version being cut. `release.exs` is proj
 and doesn't know the page exists. v0.4.0's release MR found this the slow way: its pipeline
 went red on the gate.
 
-Opening a new minor line is the same sequence with `--minor` on every invocation.
+Opening a new minor line is the same sequence with `--minor` on the dry run, `--prepare` and
+`--tag`, but **not** on `--post-bump`. Once `vX.Y.0` exists, `--minor` names the *next* line,
+so `--minor --post-bump` after v0.4.0 wrote `0.5.1-dev`. Run `--post-bump --version X.Y.0`
+instead, which writes `X.Y.1-dev`. v0.4.0's post-bump caught this before it merged.
 
 ## History
 
