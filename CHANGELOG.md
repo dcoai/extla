@@ -9,10 +9,29 @@ All notable changes to ExTLA are recorded here, following
 which is the single source of truth for that. This file records what *changed* and when, and
 does not restate it.
 
-## [Unreleased]
+## [0.4.0] — 2026-10-03
 
-`mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
-release it merely follows.
+**A minor line, opened by the namespace.** Every module moved from `TLA` to `ExTLA`, and
+every Mix task from `mix tla.*` to `mix extla.*` (#337, D-40). `TLA` was a namespace ExTLA
+doesn't own, which Elixir's code anti-patterns call *namespace trespassing*. The change is
+breaking and mechanical, and it is why this is 0.4.0 rather than 0.3.21. **Migrating to
+0.4.0**, below, is the whole rewrite: the application (`:extla`), telemetry, configuration
+and every spec you have written are unchanged.
+
+The rest is the three weeks since 0.3.20, and most of it moves the surface on its own:
+- `mix extla.check --format json` is schema 3;
+- predicates that return a non-boolean are refused rather than counted as holding;
+- a temporal formula outside §5.1's fragment is refused at compile time;
+- unknown options, names and flags are refused instead of being dropped.
+
+Beside those are the gates that hold the project to its specification: the surface goldens
+(`API_SURFACE.md`, `CLI_SURFACE.md`, `PACKAGE_SURFACE.md`, `DIAGNOSTICS.md`), a decision log
+whose every entry is pinned to a test, and the guide harness over `spec/` and `README.md`.
+Then the fixes those gates and two reviews found.
+
+**Entries written before the rename name the modules and tasks as they were then** (`TLA.*`,
+`mix tla.*`). The CHANGELOG is a record, so they are left as written; read them through the
+migration.
 
 ### Migrating to 0.4.0
 
@@ -2129,7 +2148,7 @@ compatibility promise.
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view
   abstraction are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
-[Unreleased]: https://gitlab.conet.yarina.org/dco-tek/extla/-/compare/v0.3.20...main
+[0.4.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.4.0
 [0.3.20]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.3.20
 [0.2.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.2.0
 [0.1.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.1.0
