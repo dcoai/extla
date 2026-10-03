@@ -51,7 +51,10 @@ defmodule ExTLA.Diagnostics do
 
   @doc "The sources a diagnostic can be raised from: the DSL's compile-time front end."
   def sources(root) do
-    [Path.join(root, "lib/ex_tla/spec.ex") | Path.wildcard(Path.join(root, "lib/ex_tla/spec/*.ex"))]
+    [
+      Path.join(root, "lib/ex_tla/spec.ex")
+      | Path.wildcard(Path.join(root, "lib/ex_tla/spec/*.ex"))
+    ]
     |> Enum.filter(&File.regular?/1)
     |> Enum.sort()
   end

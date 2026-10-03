@@ -19,7 +19,9 @@ defmodule ExTLA.NamespaceTest do
   # Mix tasks are the one exception the anti-pattern names: Mix owns `Mix.Tasks`, and a task
   # is found by living there.
   defp allowed?(name),
-    do: name == "ExTLA" or String.starts_with?(name, "ExTLA.") or String.starts_with?(name, "Mix.Tasks.")
+    do:
+      name == "ExTLA" or String.starts_with?(name, "ExTLA.") or
+        String.starts_with?(name, "Mix.Tasks.")
 
   defp project_modules do
     {:ok, modules} = :application.get_key(:extla, :modules)
@@ -31,7 +33,8 @@ defmodule ExTLA.NamespaceTest do
   end
 
   test "every module under lib/ and ledger/ is ExTLA, ExTLA.* or a Mix task" do
-    outside = for {name, source} <- project_modules(), not allowed?(name), do: "#{name} (#{source})"
+    outside =
+      for {name, source} <- project_modules(), not allowed?(name), do: "#{name} (#{source})"
 
     assert outside == [], """
     #{length(outside)} module(s) outside the ExTLA namespace:

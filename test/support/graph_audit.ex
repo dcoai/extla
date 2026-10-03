@@ -101,7 +101,8 @@ defmodule ExTLA.GraphAudit do
   It also catches a predicate that **raises** on a reachable state, which today surfaces
   from inside the search rather than as a finding about the invariant.
   """
-  @spec invariant_partition(map(), [map()], MapSet.t(ExTLA.State.t())) :: :ok | {:error, String.t()}
+  @spec invariant_partition(map(), [map()], MapSet.t(ExTLA.State.t())) ::
+          :ok | {:error, String.t()}
   def invariant_partition(constants, invariants, states) do
     total = MapSet.size(states)
 

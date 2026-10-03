@@ -177,7 +177,8 @@ defmodule ExTLA.DeclarationShapesTest do
     for %{severity: :warning, message: message} <- diagnostics, do: message
   end
 
-  defp unique(prefix), do: :"ExTLA.DeclarationShapes.#{prefix}#{System.unique_integer([:positive])}"
+  defp unique(prefix),
+    do: :"ExTLA.DeclarationShapes.#{prefix}#{System.unique_integer([:positive])}"
 
   defp comb(_list, 0), do: [[]]
   defp comb([], _n), do: []

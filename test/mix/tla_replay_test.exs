@@ -93,7 +93,8 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         Jason.encode!(capture([{:init, 0, :ready}, {:increment, 1, :incrementing}]))
       )
 
-      {output, 0} = task(Replay, ["ExTLA.Conformance.Counter.Impl.Conforming", "--captured", path])
+      {output, 0} =
+        task(Replay, ["ExTLA.Conformance.Counter.Impl.Conforming", "--captured", path])
 
       assert output =~ "REPRODUCED"
       assert output =~ "1 steps checked"
@@ -103,7 +104,8 @@ defmodule Mix.Tasks.Tla.ReplayTest do
       path = Path.join(tmp, "bad.json")
       File.write!(path, Jason.encode!(capture([{:init, 0, :ready}, {:increment, 1, :ready}])))
 
-      {output, 1} = task(Replay, ["ExTLA.Conformance.Counter.Impl.Conforming", "--captured", path])
+      {output, 1} =
+        task(Replay, ["ExTLA.Conformance.Counter.Impl.Conforming", "--captured", path])
 
       assert output =~ "CONFORMANCE: diverged"
       assert output =~ "step 1"
@@ -151,7 +153,11 @@ defmodule Mix.Tasks.Tla.ReplayTest do
         Jason.encode!(%{
           "schema_version" => Mix.Tasks.Tla.Check.schema_version(),
           "specs" => [
-            %{"spec" => "ExTLA.Conformance.Counter.BuggySpec", "status" => "ok", "violation" => nil}
+            %{
+              "spec" => "ExTLA.Conformance.Counter.BuggySpec",
+              "status" => "ok",
+              "violation" => nil
+            }
           ]
         })
       )

@@ -550,7 +550,9 @@ defmodule ExTLA.Simulation do
 
   # The struct clause first: a `%Violation{}` carries a `detail` of its own, and matching
   # on that key would report a fragment of the message as the whole of it.
-  defp violation_message(%ExTLA.GenServer.Violation{} = violation), do: Exception.message(violation)
+  defp violation_message(%ExTLA.GenServer.Violation{} = violation),
+    do: Exception.message(violation)
+
   defp violation_message(%{detail: detail}) when is_binary(detail), do: detail
 
   # `branches_covered` in §05 had no definition anywhere in the project — nothing else

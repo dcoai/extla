@@ -231,7 +231,9 @@ defmodule ExTLA.InvariantBehavioursTest do
   # is made from a task whose own exit is observed, rather than by catching one.
   # A violation raised inside an agent reaches a watcher wrapped in one of two shapes,
   # depending on whether it came through a call or a cast.
-  defp violation_of({:exited, {%ExTLA.Invariant.Violation{} = violation, _stack}, _}), do: violation
+  defp violation_of({:exited, {%ExTLA.Invariant.Violation{} = violation, _stack}, _}),
+    do: violation
+
   defp violation_of({{%ExTLA.Invariant.Violation{} = violation, _stack}, _}), do: violation
   defp violation_of({%ExTLA.Invariant.Violation{} = violation, _stack}), do: violation
   defp violation_of(%ExTLA.Invariant.Violation{} = violation), do: violation

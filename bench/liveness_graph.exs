@@ -27,7 +27,9 @@ entries = [
 best_of_three = fn module, config ->
   ExTLA.ModelChecker.run(module, config)
 
-  Enum.min(for _ <- 1..3, do: elem(:timer.tc(fn -> ExTLA.ModelChecker.run(module, config) end), 0))
+  Enum.min(
+    for _ <- 1..3, do: elem(:timer.tc(fn -> ExTLA.ModelChecker.run(module, config) end), 0)
+  )
 end
 
 # Heap the finished graph holds: total memory with it alive minus total before it

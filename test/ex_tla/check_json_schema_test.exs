@@ -33,7 +33,10 @@ defmodule ExTLA.CheckJsonSchemaTest do
   # A clean run and a violating run, because a schema that only holds for the happy path is
   # not a schema.
   setup_all do
-    %{ok: emit("ExTLA.Differential.TwoPhaseCommit"), violation: emit("ExTLA.Differential.DieHard")}
+    %{
+      ok: emit("ExTLA.Differential.TwoPhaseCommit"),
+      violation: emit("ExTLA.Differential.DieHard")
+    }
   end
 
   describe "the envelope" do

@@ -72,7 +72,9 @@ else
   System.halt(1)
 end
 
-Check.raises!("ExTLA.PropertyTest.init_states/2", fn -> ExTLA.PropertyTest.init_states(nil, nil) end)
+Check.raises!("ExTLA.PropertyTest.init_states/2", fn ->
+  ExTLA.PropertyTest.init_states(nil, nil)
+end)
 
 Check.raises!("ExTLA.PropertyTest.action_sequences/3", fn ->
   ExTLA.PropertyTest.action_sequences(nil, nil)

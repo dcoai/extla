@@ -27,7 +27,12 @@ defmodule ExTLA.TemporalCheck do
   A list because `Enum.all?(^constant, …)` is a conjunction of instances (§5.1): the
   property is refuted when any one of them is.
   """
-  @spec verdicts(ExTLA.Spec.Compiled.t(), map(), atom(), {ExTLA.State.behavior(), integer() | nil}) ::
+  @spec verdicts(
+          ExTLA.Spec.Compiled.t(),
+          map(),
+          atom(),
+          {ExTLA.State.behavior(), integer() | nil}
+        ) ::
           [Temporal.verdict()]
   def verdicts(spec, constants, name, {behavior, lasso_start}) do
     spec.temporals
