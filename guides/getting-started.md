@@ -47,7 +47,7 @@ nothing to keep out of production with `only:` or `runtime: false`.
 
 ## 2. Write a spec
 
-A spec is an ordinary Elixir module that says `use TLA.Spec`. Put this one anywhere Mix compiles,
+A spec is an ordinary Elixir module that says `use ExTLA.Spec`. Put this one anywhere Mix compiles,
 `lib/specs/lock.ex` say.
 
 It describes a lock shared by two clients. Each client is idle, or waiting for the lock, or
@@ -56,7 +56,7 @@ holding it, and the lock is free or not. That is the whole state.
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.Lock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob])
 
@@ -192,7 +192,7 @@ between:
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.SplitLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob])
 

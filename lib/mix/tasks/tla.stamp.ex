@@ -41,9 +41,9 @@ defmodule Mix.Tasks.Tla.Stamp do
 
   The last row is the one worth stating, because it looks like a finding and is not. A
   `spec:` given as `@an_attribute` cannot be resolved by a task that reads source without
-  compiling — but `use TLA.GenServer` has the attribute's *value* at expansion, so the
+  compiling — but `use ExTLA.GenServer` has the attribute's *value* at expansion, so the
   compile-time check verifies that stamp completely. Measured: a mapping with an attribute
-  `spec:` and a wrong stamp raises `TLA.Spec.CompileError` exactly as a literal one does.
+  `spec:` and a wrong stamp raises `ExTLA.Spec.CompileError` exactly as a literal one does.
   Failing a build on it would be a false finding about a mapping that is fully checked.
 
   **And there is deliberately no CI job for this task.** A stale stamp is already a compile
@@ -66,7 +66,7 @@ defmodule Mix.Tasks.Tla.Stamp do
 
   use Mix.Task
 
-  alias TLA.Spec.Hash
+  alias ExTLA.Spec.Hash
 
   @switches [check: :boolean, restamp: :boolean]
 
@@ -177,7 +177,7 @@ defmodule Mix.Tasks.Tla.Stamp do
 
   defp collect_modules(_other, _prefix), do: []
 
-  @doc "Every `use TLA.GenServer` site, as `%{module, spec, stamp, path}`."
+  @doc "Every `use ExTLA.GenServer` site, as `%{module, spec, stamp, path}`."
   def mappings(index) do
     index
     |> Map.values()
@@ -215,7 +215,7 @@ defmodule Mix.Tasks.Tla.Stamp do
       nodes -> nodes
     end)
     |> Enum.flat_map(fn
-      {:use, _, [{:__aliases__, _, [:TLA, :GenServer]}, opts]} when is_list(opts) ->
+      {:use, _, [{:__aliases__, _, [:ExTLA, :GenServer]}, opts]} when is_list(opts) ->
         [%{spec: spec_of(opts), stamp: Keyword.get(opts, :spec_version)}]
 
       _ ->
@@ -261,7 +261,7 @@ defmodule Mix.Tasks.Tla.Stamp do
     Map.merge(mapping, %{current: current, status: status, reason: reason})
   end
 
-  # The one formula, from `TLA.Spec.Hash` — this used to re-derive it from `Hash.scan/2`, so
+  # The one formula, from `ExTLA.Spec.Hash` — this used to re-derive it from `Hash.scan/2`, so
   # widening what the version covers (#194) in one place would have made every stamp stale in
   # the other. A version the compile-time check and this task compute differently is not a
   # version.
@@ -373,7 +373,7 @@ defmodule Mix.Tasks.Tla.Stamp do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
   # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches

@@ -1,4 +1,4 @@
-defmodule TLA.SpecDecisionsTest do
+defmodule ExTLA.SpecDecisionsTest do
   @moduledoc """
   Every decision in `spec/08-decisions.md` names the test that would fail if it were
   reversed — or says, in as many words, that nothing would (#176).

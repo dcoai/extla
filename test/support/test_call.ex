@@ -1,4 +1,4 @@
-defmodule TLA.TestCall do
+defmodule ExTLA.TestCall do
   @moduledoc """
   A `GenServer.call/3` that reports a violated invariant as a value.
 
@@ -29,7 +29,7 @@ defmodule TLA.TestCall do
   racing it from here.
   """
 
-  alias TLA.Invariant.Violation
+  alias ExTLA.Invariant.Violation
 
   @doc """
   `{:ok, reply}`, or `{:violation, violation}` when the server died of one.

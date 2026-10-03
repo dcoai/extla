@@ -1,4 +1,4 @@
-defmodule TLA.SpecApiTest do
+defmodule ExTLA.SpecApiTest do
   @moduledoc """
   The specification's API blocks, against `API_SURFACE.md` (#164, from #153; gate design from
   #214's root-cause note, form from #270).
@@ -31,7 +31,7 @@ defmodule TLA.SpecApiTest do
 
   ## What is checked, and what belongs to another gate
 
-  A block sketching a module **ExTLA provides** — `TLA.*` or `Mix.Tasks.Tla.*` — is this
+  A block sketching a module **ExTLA provides** — `ExTLA.*` or `Mix.Tasks.Tla.*` — is this
   gate's business: it is the published surface, and a reader coding to it gets an
   `UndefinedFunctionError` when it is wrong. A block under any other name is an example of
   what a *consumer* writes (`defmodule BankAccount`, `defmodule MyApp.TransferServer`, the
@@ -192,7 +192,7 @@ defmodule TLA.SpecApiTest do
                "read wrongly and layer 2 is comparing nothing"
 
       assert Enum.any?(records, &MapSet.member?(&1, :constants)),
-             "TLA.ModelChecker.config()'s keys did not parse"
+             "ExTLA.ModelChecker.config()'s keys did not parse"
     end
 
     test "the spec yields heads and types", %{blocks: blocks} do
@@ -235,8 +235,8 @@ defmodule TLA.SpecApiTest do
         module: Module.concat([name]),
         source: source,
         # The marker is written either into the `@moduledoc` of the thing it defers or as a
-        # blockquote introducing the section — `TLA.PropertyTest.generate_test_module/3` does
-        # the first, `TLA.Supervisor.Spec` the second — so both the block and the prose
+        # blockquote introducing the section — `ExTLA.PropertyTest.generate_test_module/3` does
+        # the first, `ExTLA.Supervisor.Spec` the second — so both the block and the prose
         # immediately above it are read. Reading only one of the two made a deliberately
         # recorded design look like a missing module.
         deferred?:
@@ -277,7 +277,7 @@ defmodule TLA.SpecApiTest do
   defp ours?(module) do
     name = inspect(module)
 
-    name == "TLA" or String.starts_with?(name, "TLA.") or
+    name == "ExTLA" or String.starts_with?(name, "ExTLA.") or
       String.starts_with?(name, "Mix.Tasks.Tla.")
   end
 
@@ -294,8 +294,8 @@ defmodule TLA.SpecApiTest do
   end
 
   # `defdelegate` reads as a head here for the same reason `API_SURFACE.md` scans one: it
-  # declares a public function. #319 turned `TLA.Spec.Helpers` into a façade over
-  # `TLA.Set`/`TLA.Function`, so most of that module's sketch in `04` is delegations — and
+  # declares a public function. #319 turned `ExTLA.Spec.Helpers` into a façade over
+  # `ExTLA.Set`/`ExTLA.Function`, so most of that module's sketch in `04` is delegations — and
   # a reader that skipped them would exempt from this gate exactly the block that had just
   # been rewritten, which is layer 0's objection one kind of node further in.
   @head_kinds [:def, :defmacro, :defdelegate]
@@ -353,7 +353,7 @@ defmodule TLA.SpecApiTest do
 
   # `API_SURFACE.md`, read back as `%{module => %{functions: %{name => arities},
   # types: %{name => keys}}}`. Parsed from the rendered rows rather than from
-  # `TLA.ApiSurface.run/0`, so this gate reads the artifact the `surface-drift` job publishes
+  # `ExTLA.ApiSurface.run/0`, so this gate reads the artifact the `surface-drift` job publishes
   # — if the golden is stale, that job fails; if it is current, this is what a reader sees.
   defp surface do
     rows =

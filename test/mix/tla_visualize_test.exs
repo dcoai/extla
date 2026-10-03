@@ -62,10 +62,10 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
 
   describe "rendering" do
     test "writes DOT to stdout, and exits 0" do
-      {output, code} = visualize(["TLA.TestSpecs.WithDefaults"])
+      {output, code} = visualize(["ExTLA.TestSpecs.WithDefaults"])
 
       assert code == 0
-      assert output =~ ~s(digraph "TLA.TestSpecs.WithDefaults")
+      assert output =~ ~s(digraph "ExTLA.TestSpecs.WithDefaults")
       assert output =~ "rankdir=LR"
       assert output =~ "->"
       assert output =~ "n = 0"
@@ -74,7 +74,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     @tag :tmp_dir
     test "writes to --output instead, and says where", %{tmp_dir: dir} do
       path = Path.join(dir, "graph.dot")
-      {output, code} = visualize(["TLA.TestSpecs.WithDefaults", "--output", path])
+      {output, code} = visualize(["ExTLA.TestSpecs.WithDefaults", "--output", path])
 
       assert code == 0
       assert output =~ "wrote #{path}"
@@ -90,7 +90,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
       # The violation note goes to the shell rather than into the DOT, so that redirecting
       # stdout still produces a file a layout engine accepts.
       path = Path.join(dir, "broken.dot")
-      {_output, 1} = visualize(["TLA.TestSpecs.Broken", "--output", path])
+      {_output, 1} = visualize(["ExTLA.TestSpecs.Broken", "--output", path])
 
       dot = File.read!(path)
       refute dot =~ "refuted"
@@ -100,7 +100,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
 
   describe "a spec with a violation" do
     test "still writes the graph, emphasises the counterexample, and exits 1" do
-      {output, code} = visualize(["TLA.TestSpecs.Broken"])
+      {output, code} = visualize(["ExTLA.TestSpecs.Broken"])
 
       assert code == 1
       assert output =~ "digraph"
@@ -118,7 +118,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     test "--format html, naming the decision rather than the absence" do
       error =
         assert_raise Mix.Error, fn ->
-          visualize(["TLA.TestSpecs.WithDefaults", "--format", "html"])
+          visualize(["ExTLA.TestSpecs.WithDefaults", "--format", "html"])
         end
 
       message = Exception.message(error)
@@ -129,13 +129,13 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
 
     test "--format mermaid, the same way" do
       assert_raise Mix.Error, ~r/§Deferred/, fn ->
-        visualize(["TLA.TestSpecs.WithDefaults", "--format", "mermaid"])
+        visualize(["ExTLA.TestSpecs.WithDefaults", "--format", "mermaid"])
       end
     end
 
     test "an unknown --format, the way mix tla.check does" do
       assert_raise Mix.Error, ~r/unknown --format "svg"; expected dot/, fn ->
-        visualize(["TLA.TestSpecs.WithDefaults", "--format", "svg"])
+        visualize(["ExTLA.TestSpecs.WithDefaults", "--format", "svg"])
       end
     end
 
@@ -144,7 +144,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     # `--max-states` bounds the search now, so the number in the message is where the search
     # stopped and the message says so instead of offering it as a census.
     test "a graph past --max-states, which says the count is not a census" do
-      {stderr, code} = visualize_err(["TLA.TestSpecs.WithDefaults", "--max-states", "1"])
+      {stderr, code} = visualize_err(["ExTLA.TestSpecs.WithDefaults", "--max-states", "1"])
 
       assert code == 2, "a graph too big to draw is not exit 1; that means a violation"
       assert stderr =~ "the limit is 1"
@@ -156,7 +156,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     # states there are, and the refusal cannot fire at all — so nothing is ever drawn from a
     # search that stopped early.
     test "and a spec that fits is drawn in full, with no note" do
-      {output, code} = visualize(["TLA.TestSpecs.WithDefaults", "--max-states", "50"])
+      {output, code} = visualize(["ExTLA.TestSpecs.WithDefaults", "--max-states", "50"])
 
       assert code == 0
       assert output =~ "digraph"
@@ -164,7 +164,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     end
 
     test "a module that is not a spec" do
-      assert_raise Mix.Error, ~r/does not `use TLA.Spec`/, fn ->
+      assert_raise Mix.Error, ~r/does not `use ExTLA.Spec`/, fn ->
         visualize(["Enum"])
       end
     end
@@ -172,14 +172,14 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     test "several specs at once, because a graph is one file" do
       error =
         assert_raise Mix.Error, fn ->
-          visualize(["TLA.TestSpecs.WithDefaults", "TLA.TestSpecs.Broken"])
+          visualize(["ExTLA.TestSpecs.WithDefaults", "ExTLA.TestSpecs.Broken"])
         end
 
       assert Exception.message(error) =~ "name one spec to visualize"
     end
 
     test "a spec whose constants are unassigned, with both places named" do
-      error = assert_raise Mix.Error, fn -> visualize(["TLA.TestSpecs.Counter"]) end
+      error = assert_raise Mix.Error, fn -> visualize(["ExTLA.TestSpecs.Counter"]) end
 
       message = Exception.message(error)
       assert message =~ "no assignment for :max"
@@ -192,17 +192,17 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
   describe "--max-states bounds the search, not only the rendering" do
     # The defect, in the form that makes it measurable rather than inferred. `Cube` has 8
     # states; bounded at 3 the search must stop having seen fewer than all of them, which
-    # `TLA.ModelChecker` reports as `:max_states_reached`. Before #312 the flag was read
+    # `ExTLA.ModelChecker` reports as `:max_states_reached`. Before #312 the flag was read
     # AFTER `explore/2` and the search ran to the checker's million-state default.
     test "so a bounded run stops rather than exploring past the limit" do
-      {result, graph} = bounded(TLA.TestSpecs.Cube, 3)
+      {result, graph} = bounded(ExTLA.TestSpecs.Cube, 3)
 
       assert result.status == :max_states_reached
       assert graph.state_count < 8
     end
 
     test "and an unbounded run over the same spec finds all eight" do
-      {result, graph} = bounded(TLA.TestSpecs.Cube, 50)
+      {result, graph} = bounded(ExTLA.TestSpecs.Cube, 50)
 
       assert result.status == :ok
       assert graph.state_count == 8
@@ -212,7 +212,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     # count in the refusal is therefore a fact about the search rather than about the spec.
     # Asserted through the task, so it is the task's config that is under test.
     test "and the task refuses without ever drawing a truncated graph" do
-      {stderr, code} = visualize_err(["TLA.TestSpecs.Cube", "--max-states", "3"])
+      {stderr, code} = visualize_err(["ExTLA.TestSpecs.Cube", "--max-states", "3"])
 
       assert code == 2
       refute stderr =~ "digraph"
@@ -220,7 +220,7 @@ defmodule Mix.Tasks.Tla.VisualizeTest do
     end
 
     defp bounded(module, max_states) do
-      TLA.ModelChecker.explore(module, %{
+      ExTLA.ModelChecker.explore(module, %{
         constants: %{},
         liveness_graph: true,
         check_deadlock: false,

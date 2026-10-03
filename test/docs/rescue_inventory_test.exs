@@ -1,4 +1,4 @@
-defmodule TLA.RescueInventoryTest do
+defmodule ExTLA.RescueInventoryTest do
   @moduledoc """
   Every `rescue` in `lib/` is named here, with the reason it is one (#182, #315).
 
@@ -6,7 +6,7 @@ defmodule TLA.RescueInventoryTest do
   scoped to a *function* rather than to a *call* reports any failure underneath it as the
   one failure it was written for. That is not a swallowed error, which a reviewer looks for
   — it is a **confident wrong diagnosis**, which a reviewer believes. #315 found one:
-  `TLA.Refinement`'s totality probe reported a partial *helper* as a missing catch-all
+  `ExTLA.Refinement`'s totality probe reported a partial *helper* as a missing catch-all
   clause, and advised adding the clause the mapping already had.
 
   So the answer is not a count. Each of the four sites was reviewed on its own and two were
@@ -24,7 +24,7 @@ defmodule TLA.RescueInventoryTest do
     the code and not only here.
   - Each one's enclosing function body is **one call**. That is the property #315 was
     about: the private `check/2` in `Mix.Tasks.Tla.Check` and the private `total!/1` in
-    `TLA.Refinement` both rescued over several calls, and both were split so the rescue
+    `ExTLA.Refinement` both rescued over several calls, and both were split so the rescue
     covers only the call that can raise.
 
   The AST, not a `grep`: this project's source discusses `rescue` in prose in four modules
@@ -36,7 +36,7 @@ defmodule TLA.RescueInventoryTest do
 
   # file => "function/arity" => why it is permitted.
   @permitted %{
-    "lib/tla/trace/explore.ex" => %{
+    "lib/ex_tla/trace/explore.ex" => %{
       "evaluate_at/2" =>
         "the exception is data about the user's own expression: preserved whole, " <>
           "attributed to the state it happened at, and shown as a marked cell"
@@ -51,7 +51,7 @@ defmodule TLA.RescueInventoryTest do
         "converts the one exception --verify-symmetry reports by into the one exit " <>
           "status the task reports by; the message travels with it"
     },
-    "lib/tla/refinement.ex" => %{
+    "lib/ex_tla/refinement.ex" => %{
       "probe/1" =>
         "reads one stack frame to tell the probed call's own FunctionClauseError from " <>
           "any other, and re-raises every other one untouched"
@@ -112,7 +112,7 @@ defmodule TLA.RescueInventoryTest do
         #{Enum.join(wide, "\n  ")}
 
       This is the #315 defect itself. A rescue over several calls reports whichever of them
-      failed as the one it was written for — `TLA.Refinement`'s probe reported a partial
+      failed as the one it was written for — `ExTLA.Refinement`'s probe reported a partial
       helper as a missing catch-all clause, and `mix tla.check` would have reported a second
       future raise site as an unsound symmetry declaration. Extract the one call that raises
       into its own function and rescue there.

@@ -228,7 +228,7 @@ test:
   stage: check
   variables:
     # `mix test` reads this repository's own history, so it cannot run on a shallow clone
-    # (#147). `test/tla/changelog_guard_test.exs` pins eight real merges and asserts what the
+    # (#147). `test/ex_tla/changelog_guard_test.exs` pins eight real merges and asserts what the
     # guard says about each -- #142 chose real merges over fixtures deliberately, so that the
     # regression cannot agree with itself -- and the oldest reaches back 39 commits.
     #
@@ -321,7 +321,7 @@ mutation:
 # golden** — `check` has already failed — so a reader seeing `skipped` here beside a red `test`
 # is looking at the system working, not at a gate that was missed.
 #
-# It is not redundant. The test exercises `TLA.Ledger.render/1`; this job is the only thing that
+# It is not redundant. The test exercises `ExTLA.Ledger.render/1`; this job is the only thing that
 # runs the mix TASK — its argv parsing, `--check`, and `check!/2`. Deleting it would leave that
 # task with no coverage at all. Its `Mix.raise` branches are covered by
 # `test/mix/tla_coverage_test.exs` since #84; before that they had never executed anywhere.
@@ -353,7 +353,7 @@ surface-drift:
 # `mix docs` is not available to them. So the docs are built under dev and the gate — which reads
 # `doc/*.html` and needs no ex_doc of its own — is run under test, in this one job.
 #
-# Without it the gate would be a local courtesy: `TLA.DocLinks.check/1` returns `:not_built` when
+# Without it the gate would be a local courtesy: `ExTLA.DocLinks.check/1` returns `:not_built` when
 # nothing has been generated, and the test says so rather than passing. A check that never runs in
 # CI is the shape #75 and #90 were raised about, and #102 is what it costs — ExDoc's sidebar home
 # link 404'd on all 84 generated pages, invisible to every gate this project had, because a gate
@@ -363,7 +363,7 @@ docs:
   stage: verify
   script:
     # `--warnings-as-errors` since #291. The build emitted 34 unresolved references and
-    # exited 0, and `TLA.DocLinks` cannot see them: it scans `@href` in the built HTML, and
+    # exited 0, and `ExTLA.DocLinks` cannot see them: it scans `@href` in the built HTML, and
     # an unresolvable reference emits NO href — it renders as plain inline code. A gate that
     # cannot see the surface the defect lives on, which is #102's shape one door over.
     - MIX_ENV=dev mix docs --warnings-as-errors

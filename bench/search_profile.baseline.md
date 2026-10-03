@@ -12,7 +12,7 @@ the end says what `workers:` actually delivers, and at what — regenerate with
 Elixir 1.20.4, Erlang/OTP 29 (erts-17.0.5, jit). A number without the machine it was taken
 on is not a measurement.
 
-## `raft` — `TLA.Differential.RaftElection`, the corpus constants
+## `raft` — `ExTLA.Differential.RaftElection`, the corpus constants
 
 58,359 distinct states, 255,270 transitions, diameter 19.
 
@@ -60,7 +60,7 @@ Validation fell from 18,215 ms to 4,072 ms: **4.47x, against the 4.37x that 255,
 transitions over 58,359 distinct states predicts.** The measurement matching the ratio it
 should is the evidence that what changed is *how often* validation runs and nothing else.
 
-## `buffer` — `TLA.Differential.BoundedBuffer`, the corpus constants
+## `buffer` — `ExTLA.Differential.BoundedBuffer`, the corpus constants
 
 4,460 distinct states, 15,776 transitions, diameter 29.
 

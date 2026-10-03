@@ -17,7 +17,7 @@ Always explicit, via `--minor`.
 
 The judgement is about the surface, not the size of the diff. v0.2.0 is the worked example:
 it was asked for as `v0.1.1` and was almost entirely documentation, but it added
-`TLA.Spec.Deps` as a new public module and tightened `TLA.Trace.validate/3` so that a trace
+`ExTLA.Spec.Deps` as a new public module and tightened `ExTLA.Trace.validate/3` so that a trace
 which returned `:ok` under v0.1.0 can now return `{:error, _}`. A patch number promises
 backwards-compatible fixes only, which was false on both counts.
 

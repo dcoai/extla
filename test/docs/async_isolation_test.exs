@@ -1,4 +1,4 @@
-defmodule TLA.AsyncIsolationTest do
+defmodule ExTLA.AsyncIsolationTest do
   @moduledoc """
   No `async: true` test file writes VM-global state (#285).
 
@@ -6,7 +6,7 @@ defmodule TLA.AsyncIsolationTest do
 
   `test/conformance/step_test.exs` was `async: true` and set
   `Application.put_env(:extla, :trace_buffer, 3)` to watch the buffer drop states.
-  `trace_buffer` is read by `TLA.GenServer.Runtime.record_transition!/4` **in whatever
+  `trace_buffer` is read by `ExTLA.GenServer.Runtime.record_transition!/4` **in whatever
   process is recording**, so for the duration of that test every concurrently running test
   that recorded a transition saw a 3-state buffer.
 
@@ -16,7 +16,7 @@ defmodule TLA.AsyncIsolationTest do
   satisfies. That is this milestone's subject: a passing result that means nothing was
   checked, arriving here through the *config of a different test file*.
 
-  The discipline already existed — `TLA.InvariantModesTest` and `TLA.TelemetryVerboseTest`
+  The discipline already existed — `ExTLA.InvariantModesTest` and `ExTLA.TelemetryVerboseTest`
   are `async: false` and say why — and one file broke it. A sweep that is not gated is a
   sweep that has to be repeated, which is why this exists rather than a one-line fix.
 
@@ -74,7 +74,7 @@ defmodule TLA.AsyncIsolationTest do
   # (`test/mix/tla_coverage_test.exs`, the flake that started #322) and
   # `{Code, :put_compiler_option}` (`test/docs/moduledoc_examples_test.exs`, which set it
   # from a spawned process under a comment claiming that isolated it, and
-  # `test/tla/declaration_shapes_test.exs`, which set it in the test process outright).
+  # `test/ex_tla/declaration_shapes_test.exs`, which set it in the test process outright).
   # Spawning isolates the caller, not the setting: a child's write is measurable in the
   # parent for both.
   #
@@ -104,7 +104,7 @@ defmodule TLA.AsyncIsolationTest do
   # twice and match itself, proving nothing; this is an independent statement of what the
   # calls look like, so the two can disagree.
   @fixture """
-  defmodule TLA.AsyncIsolationFixture do
+  defmodule ExTLA.AsyncIsolationFixture do
     def every_write do
       Application.put_env(:extla, :k, 1)
       Application.delete_env(:extla, :k)
@@ -133,8 +133,8 @@ defmodule TLA.AsyncIsolationTest do
       process calls it, so a value set here is set for every test running beside this one.
       `on_exit` bounds the window; it does not remove it.
 
-      Either mark the file `async: false` — `TLA.InvariantModesTest`,
-      `TLA.TelemetryVerboseTest` and `TLA.Conformance.TraceBufferTest` all do, and say why —
+      Either mark the file `async: false` — `ExTLA.InvariantModesTest`,
+      `ExTLA.TelemetryVerboseTest` and `ExTLA.Conformance.TraceBufferTest` all do, and say why —
       or reach the behaviour without the global, as `truncated_behaviour_test.exs` does by
       driving past the shipped default.
       """
@@ -153,7 +153,7 @@ defmodule TLA.AsyncIsolationTest do
              "the detector found VM-global writes in only #{inspect(allowed)}; it should " <>
                "see them in every `async: false` file that sets application config"
 
-      assert "test/tla/invariant_modes_test.exs" in allowed
+      assert "test/ex_tla/invariant_modes_test.exs" in allowed
       assert "test/conformance/trace_buffer_test.exs" in allowed
     end
 

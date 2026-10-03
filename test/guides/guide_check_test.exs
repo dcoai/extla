@@ -1,4 +1,4 @@
-defmodule TLA.GuideCheckTest do
+defmodule ExTLA.GuideCheckTest do
   @moduledoc """
   The harness that keeps `guides/` honest, checked against guides written to lie (#94, #95).
 
@@ -10,7 +10,7 @@ defmodule TLA.GuideCheckTest do
 
   @moduletag :tmp_dir
 
-  alias TLA.GuideCheck
+  alias ExTLA.GuideCheck
 
   defp guide(tmp, body) do
     path = Path.join(tmp, "guide-#{System.unique_integer([:positive])}.md")
@@ -30,7 +30,7 @@ defmodule TLA.GuideCheckTest do
   defp broken_spec(name) do
     block("tla:spec", """
     defmodule #{name} do
-      use TLA.Spec
+      use ExTLA.Spec
 
       variable :n, type: 0..10
 
@@ -53,7 +53,7 @@ defmodule TLA.GuideCheckTest do
   defp working_spec(name) do
     block("tla:spec", """
     defmodule #{name} do
-      use TLA.Spec
+      use ExTLA.Spec
 
       variable :n, type: 0..2
 
@@ -198,7 +198,7 @@ defmodule TLA.GuideCheckTest do
           tmp,
           block("tla:spec", """
           defmodule Guide.Nonsense do
-            use TLA.Spec
+            use ExTLA.Spec
             variable :n, type: 0..2
             init do
               n = 0
@@ -237,7 +237,7 @@ defmodule TLA.GuideCheckTest do
           tmp,
           block(~s(tla:compile_error match="a message it will never produce"), """
           defmodule Guide.AlsoNonsense do
-            use TLA.Spec
+            use ExTLA.Spec
             variable :n, type: 0..2
             init do
               n = 0
@@ -378,7 +378,7 @@ defmodule TLA.GuideCheckTest do
           tmp,
           block("tla:spec", """
           defmodule #{m} do
-            use TLA.Spec
+            use ExTLA.Spec
             variable :n, type: 0..2
             init do
               n = 0

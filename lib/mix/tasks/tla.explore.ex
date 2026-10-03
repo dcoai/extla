@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Tla.Explore do
   > #### Not state-space exploration {: .neutral}
   >
   > `explore` means searching the state space everywhere else in this project
-  > (`TLA.ModelChecker.explore/2`). This task does not search anything. It reads a
+  > (`ExTLA.ModelChecker.explore/2`). This task does not search anything. It reads a
   > counterexample off disk and evaluates expressions over the states already in it — the
   > TLA+ Toolbox's *Trace Explorer*, not TLC. `mix tla.check` is the task that searches.
 
@@ -47,7 +47,7 @@ defmodule Mix.Tasks.Tla.Explore do
   `--trace` takes what `mix tla.check --format json` writes — the whole document, or a single
   trace object lifted out of it — and a lasso as readily as a trace.
 
-  The module argument is not decoration: `TLA.Trace.from_json!/1` resolves the trace's atoms
+  The module argument is not decoration: `ExTLA.Trace.from_json!/1` resolves the trace's atoms
   with `String.to_existing_atom/1`, so the spec has to be loaded before its counterexample can
   be decoded. A trace belonging to a different spec fails naming the atom that did not
   resolve, rather than quietly decoding into something else.
@@ -60,7 +60,7 @@ defmodule Mix.Tasks.Tla.Explore do
 
   use Mix.Task
 
-  alias TLA.{Mix.SpecTarget, Trace}
+  alias ExTLA.{Mix.SpecTarget, Trace}
 
   @switches [trace: :string, expr: :keep, changed_only: :boolean]
 
@@ -71,7 +71,7 @@ defmodule Mix.Tasks.Tla.Explore do
     {opts, names} = OptionParser.parse!(args, strict: @switches)
     [spec] = SpecTarget.resolve!(module!(names))
 
-    trace = TLA.Mix.TraceFile.read!(path!(opts), inspect(spec))
+    trace = ExTLA.Mix.TraceFile.read!(path!(opts), inspect(spec))
     expressions = expressions!(opts, representative(trace))
 
     Mix.shell().info(
@@ -83,7 +83,7 @@ defmodule Mix.Tasks.Tla.Explore do
   # `mix tla.check` and wrong here: a trace file is a counterexample for ONE spec, and
   # guessing which would decode it against the wrong set of atoms.
   defp module!([name]), do: [name]
-  defp module!([]), do: Mix.raise("name the TLA.Spec module the trace belongs to.")
+  defp module!([]), do: Mix.raise("name the ExTLA.Spec module the trace belongs to.")
   defp module!(many), do: Mix.raise("one spec at a time; got #{Enum.join(many, ", ")}.")
 
   defp path!(opts) do
@@ -174,7 +174,7 @@ defmodule Mix.Tasks.Tla.Explore do
   #
   # A **runtime** error — arithmetic on an atom, a key that is not there, `hd([])` — depends on
   # the state and is the normal case: the trace is being explored *because* something in it is
-  # wrong, so `TLA.Trace.explore/3` reports it in the cell at the state it happened in.
+  # wrong, so `ExTLA.Trace.explore/3` reports it in the cell at the state it happened in.
   #
   # A **deterministic** error — a misspelled variable, a remote call to a function that does
   # not exist — does not depend on the state at all, so leaving it to the table means the same
@@ -232,7 +232,7 @@ defmodule Mix.Tasks.Tla.Explore do
   # PERMITTED RESCUE. Scoped to the one call it wraps, and it decides nothing: it hands the
   # exception back as data so `compiles!/3` can sort the deterministic failures from the
   # state-dependent ones. A state-dependent one is returned to the caller untouched and is
-  # raised again, at its own state, by `TLA.Trace.explore/3`.
+  # raised again, at its own state, by `ExTLA.Trace.explore/3`.
   defp attempt(evaluator, state) do
     {:ok, evaluator.(state)}
   rescue
@@ -240,7 +240,7 @@ defmodule Mix.Tasks.Tla.Explore do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
   # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches

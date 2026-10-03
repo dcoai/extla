@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
 
   # The task signals its verdict by exiting, which is part of what is under test. It runs
   # in a monitored process so the exit arrives as a message — the same reason
-  # `TLA.GenServer.Driver` sends its own `:"$gen_call"`.
+  # `ExTLA.GenServer.Driver` sends its own `:"$gen_call"`.
   defp simulate(args) do
     parent = self()
 
@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
   describe "a conforming server" do
     test "exits 0, and says what the walk covered" do
       {output, code} =
-        simulate(["TLA.Conformance.Counter.Impl.Conforming", "--traces", "20", "--steps", "10"])
+        simulate(["ExTLA.Conformance.Counter.Impl.Conforming", "--traces", "20", "--steps", "10"])
 
       assert code == 0
       assert output =~ "NO FINDING"
@@ -57,7 +57,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     test "runs the seed it is given, and reports it back" do
       {output, 0} =
         simulate([
-          "TLA.Conformance.Counter.Impl.Conforming",
+          "ExTLA.Conformance.Counter.Impl.Conforming",
           "--traces",
           "2",
           "--steps",
@@ -72,7 +72,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     test "answers in json when asked" do
       {output, 0} =
         simulate([
-          "TLA.Conformance.Counter.Impl.Conforming",
+          "ExTLA.Conformance.Counter.Impl.Conforming",
           "--traces",
           "2",
           "--steps",
@@ -92,7 +92,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     test "exits 1 and prints the counterexample as a trace" do
       {output, code} =
         simulate([
-          "TLA.Conformance.Counter.Impl.CollapsesTwoSteps",
+          "ExTLA.Conformance.Counter.Impl.CollapsesTwoSteps",
           "--traces",
           "5",
           "--steps",
@@ -113,7 +113,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     test "asks whether the server refuses what the spec forbids there" do
       {output, code} =
         simulate([
-          "TLA.Conformance.Counter.Impl.Conforming",
+          "ExTLA.Conformance.Counter.Impl.Conforming",
           "--traces",
           "10",
           "--steps",
@@ -130,8 +130,8 @@ defmodule Mix.Tasks.Tla.SimulateTest do
 
   describe "what it refuses to run" do
     test "a module that is not instrumented, naming the reason" do
-      assert_raise Mix.Error, ~r/does not `use TLA.GenServer`/, fn ->
-        Simulate.run(["TLA.Conformance.Counter.Spec"])
+      assert_raise Mix.Error, ~r/does not `use ExTLA.GenServer`/, fn ->
+        Simulate.run(["ExTLA.Conformance.Counter.Spec"])
       end
     end
 
@@ -142,13 +142,13 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     end
 
     test "no module at all" do
-      assert_raise Mix.Error, ~r/name the TLA.GenServer module/, fn -> Simulate.run([]) end
+      assert_raise Mix.Error, ~r/name the ExTLA.GenServer module/, fn -> Simulate.run([]) end
     end
 
     test "an unknown --format" do
       assert_raise Mix.Error, ~r/unknown --format/, fn ->
         Simulate.run([
-          "TLA.Conformance.Counter.Impl.Conforming",
+          "ExTLA.Conformance.Counter.Impl.Conforming",
           "--traces",
           "1",
           "--steps",
@@ -163,7 +163,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
   # ── --against-graph ─────────────────────────────────────────────────────────
 
   describe "--against-graph" do
-    @conforming "TLA.Conformance.Counter.Impl.Conforming"
+    @conforming "ExTLA.Conformance.Counter.Impl.Conforming"
 
     test "runs the traces asked for and no others" do
       {output, code} =
@@ -246,16 +246,16 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     # unreachable nor produced by nothing — it was **untested**, which is a different fault
     # and the one fixed here. Measured before writing the test:
     #
-    #     TLA.Simulation.run(SlowServer, %{timeout: 200})
+    #     ExTLA.Simulation.run(SlowServer, %{timeout: 200})
     #     #=> {:error, "no reply within 200ms"}
     #
     # So the code was right and nothing held it to that. Both halves are gated now.
     defmodule Slow do
       use GenServer
 
-      use TLA.GenServer,
-        spec: TLA.Conformance.Counter.Spec,
-        refinement: TLA.Conformance.Counter.Refinement
+      use ExTLA.GenServer,
+        spec: ExTLA.Conformance.Counter.Spec,
+        refinement: ExTLA.Conformance.Counter.Refinement
 
       def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -277,9 +277,9 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     defmodule Declines do
       use GenServer
 
-      use TLA.GenServer,
-        spec: TLA.Conformance.Counter.Spec,
-        refinement: TLA.Conformance.Counter.Refinement
+      use ExTLA.GenServer,
+        spec: ExTLA.Conformance.Counter.Spec,
+        refinement: ExTLA.Conformance.Counter.Refinement
 
       def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -289,7 +289,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
 
     test "reaches the timeout path, which says how long it waited" do
       result =
-        TLA.Simulation.run(Slow, %{traces: 2, max_steps: 5, seed: 1, timeout: 200})
+        ExTLA.Simulation.run(Slow, %{traces: 2, max_steps: 5, seed: 1, timeout: 200})
 
       assert result.status == :error
       assert result.detail == "no reply within 200ms"
@@ -316,7 +316,7 @@ defmodule Mix.Tasks.Tla.SimulateTest do
     test "whereas a server that starts exits 0" do
       {_output, code} =
         simulate([
-          "TLA.Conformance.Counter.Impl.Conforming",
+          "ExTLA.Conformance.Counter.Impl.Conforming",
           "--traces",
           "2",
           "--steps",

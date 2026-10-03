@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Tla.Visualize do
   @shortdoc "Render a spec's state graph as DOT"
 
   @moduledoc """
-  Render a `TLA.Spec` module's state graph as DOT, for Graphviz.
+  Render a `ExTLA.Spec` module's state graph as DOT, for Graphviz.
 
   ## Usage
 
@@ -30,7 +30,7 @@ defmodule Mix.Tasks.Tla.Visualize do
 
       --output       Write here instead of to stdout.
       --max-states   How many states to explore, and therefore at most how many
-                     to draw (default #{TLA.StateGraph.Export.default_max_states()}).
+                     to draw (default #{ExTLA.StateGraph.Export.default_max_states()}).
       --format       dot, and only dot. See below.
 
   ## Why DOT only
@@ -76,8 +76,8 @@ defmodule Mix.Tasks.Tla.Visualize do
 
   use Mix.Task
 
-  alias TLA.Mix.SpecTarget
-  alias TLA.{ModelChecker, Spec, StateGraph}
+  alias ExTLA.Mix.SpecTarget
+  alias ExTLA.{ModelChecker, Spec, StateGraph}
 
   @switches [output: :string, max_states: :integer, format: :string]
 
@@ -90,7 +90,7 @@ defmodule Mix.Tasks.Tla.Visualize do
 
     case SpecTarget.resolve!(names) do
       [] ->
-        Mix.raise("no TLA.Spec modules found. Name one, or `use TLA.Spec` in a module.")
+        Mix.raise("no ExTLA.Spec modules found. Name one, or `use ExTLA.Spec` in a module.")
 
       [module] ->
         visualize(module, opts)
@@ -111,7 +111,7 @@ defmodule Mix.Tasks.Tla.Visualize do
 
     # `liveness_graph: true` rather than `check_liveness: true`: the edge table is what the
     # export needs, and checking the temporal properties is work this task has no use for.
-    # `TLA.StateGraph.to_dot/2` refuses without it, and refuses for a good reason — parent
+    # `ExTLA.StateGraph.to_dot/2` refuses without it, and refuses for a good reason — parent
     # pointers are a spanning tree — so the task asks for it rather than hitting that.
     #
     # `max_states` bounds the SEARCH as well as the rendering (#180). It was read after this
@@ -196,7 +196,7 @@ defmodule Mix.Tasks.Tla.Visualize do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
   # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches

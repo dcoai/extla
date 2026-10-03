@@ -1,10 +1,10 @@
-defmodule TLA.Conformance.Counter.Impl do
+defmodule ExTLA.Conformance.Counter.Impl do
   @moduledoc """
   Example 4's implementations: the GenServer that refines `Specs.Counter`, and the step
   mutants that do not.
 
   The mapping mutants in `refinements.ex` are faults in the *mapping*; these are faults in
-  the *implementation*, and they are the ones `TLA.GenServer.Runtime.check_step!/5` exists
+  the *implementation*, and they are the ones `ExTLA.GenServer.Runtime.check_step!/5` exists
   for. `CollapsesTwoSteps` is the entry that justifies the layer: every invariant of the
   spec still holds in its post-state, so a Layer 3 that checked only invariants and action
   properties would report conformance on a server that took a step the design never
@@ -21,9 +21,9 @@ defmodule TLA.Conformance.Counter.Impl do
     #
     # Its siblings below are deliberately left unstamped: the stamp is opt-in, and a corpus in
     # which every mapping is stamped could not show that an unstamped one still compiles.
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement,
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement,
       spec_version: "0ad20b7a"
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
@@ -47,14 +47,14 @@ defmodule TLA.Conformance.Counter.Impl do
     @moduledoc """
     Refines `BuggySpec` exactly — and `BuggySpec` contradicts itself, so the trace the
     model checker produces from it is a behaviour this server really performs. That is the
-    loop `TLA.Replay.counterexample/3` closes: a design bug found before the code existed,
+    loop `ExTLA.Replay.counterexample/3` closes: a design bug found before the code existed,
     run against the code.
     """
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.BuggySpec,
-      refinement: TLA.Conformance.Counter.Refinement
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.BuggySpec,
+      refinement: ExTLA.Conformance.Counter.Refinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -77,9 +77,9 @@ defmodule TLA.Conformance.Counter.Impl do
     """
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -96,9 +96,9 @@ defmodule TLA.Conformance.Counter.Impl do
     @moduledoc "Correct, and its mapping defines no `concrete_message/2`."
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Mutants.Undrivable
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Mutants.Undrivable
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -122,9 +122,9 @@ defmodule TLA.Conformance.Counter.Impl do
     """
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -148,9 +148,9 @@ defmodule TLA.Conformance.Counter.Impl do
     """
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -171,9 +171,9 @@ defmodule TLA.Conformance.Counter.Impl do
     """
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -201,9 +201,9 @@ defmodule TLA.Conformance.Counter.Impl do
     """
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.CastRefinement
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.CastRefinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 

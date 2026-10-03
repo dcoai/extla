@@ -1,4 +1,4 @@
-defmodule TLA.Differential.Paxos do
+defmodule ExTLA.Differential.Paxos do
   @moduledoc """
   `Paxos.tla`, in the ExTLA DSL — Lamport's specification of the algorithm in
   *Paxos Made Simple*, the consensus half without the leader election that makes
@@ -14,7 +14,7 @@ defmodule TLA.Differential.Paxos do
   Message-type tags are model values on the TLC side and atoms here:
   `phase1a`/`:phase_1a` and so on, per the corpus README.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :acceptors, default: MapSet.new([:a1, :a2, :a3])
   constant :values, default: MapSet.new([:v1, :v2])

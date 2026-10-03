@@ -1,32 +1,32 @@
-defmodule TLA.BehaviourInvariantTest do
+defmodule ExTLA.BehaviourInvariantTest do
   @moduledoc """
   One invariant for a behaviour trace, held by every producer (#303, for #168).
 
   ## What was wrong
 
   The invariant — *n states, n - 1 actions, one binding each, `length` == n* — was already
-  written down, as a private `misaligned?/1` in `TLA.Trace`, and checked at three
+  written down, as a private `misaligned?/1` in `ExTLA.Trace`, and checked at three
   **consumers**: `from_json!/1`, `to_diffs/1` and `legal_steps/4`. Two producers broke it
   and neither said so:
 
-  * `TLA.Simulation`'s restart path pushed a state with no action on a **successful**
+  * `ExTLA.Simulation`'s restart path pushed a state with no action on a **successful**
     restart, while its own violation branch pushed all three. `to_diffs/1`'s comment
     records the cost — it was found when `Trace.Explore` and `format/1` disagreed about
     one trace, three modules from where it broke, after it had been rendered wrong.
 
-  * `TLA.GenServer.Runtime.record_initial!/3` recorded a transition from the initial state
+  * `ExTLA.GenServer.Runtime.record_initial!/3` recorded a transition from the initial state
     to itself, and `record_transition!/4` seeds an empty buffer with its own `pre` — so
     the first state landed **twice** and every recorded behaviour opened with a step that
-    never happened. Fed to `TLA.Conformance.against_graph/3` that self-step classifies as
+    never happened. Fed to `ExTLA.Conformance.against_graph/3` that self-step classifies as
     **forbidden**, unless the spec happens to carry a self-loop at its initial state. The
     layer's two behaviour sources disagreed with each other about the same server.
 
-  So the predicate is public now (`TLA.Trace.well_formed/1`) and asserted where a trace is
+  So the predicate is public now (`ExTLA.Trace.well_formed/1`) and asserted where a trace is
   **built**, which is where the fix goes.
 
   ## Why the counter corpus could not have caught the second one
 
-  `TLA.Conformance.Counter.Spec` has `reset`, which requires `status == :ready` and sets
+  `ExTLA.Conformance.Counter.Spec` has `reset`, which requires `status == :ready` and sets
   `count = 0` — from the initial `%{count: 0, status: :ready}` that is a **self-loop**. The
   duplicated state was therefore a legal step of that spec and `against_graph/3` passed it.
   `Ratchet` below has no self-loop anywhere, which is the whole reason it exists.
@@ -34,9 +34,9 @@ defmodule TLA.BehaviourInvariantTest do
 
   use ExUnit.Case, async: true
 
-  alias TLA.{Conformance, ModelChecker, Simulation, Trace}
-  alias TLA.Conformance.Counter.Impl
-  alias TLA.GenServer.Runtime
+  alias ExTLA.{Conformance, ModelChecker, Simulation, Trace}
+  alias ExTLA.Conformance.Counter.Impl
+  alias ExTLA.GenServer.Runtime
 
   # ── A spec with no self-loop at its initial state ───────────────────────────
 
@@ -45,7 +45,7 @@ defmodule TLA.BehaviourInvariantTest do
     `n` counts up to two and nothing brings it back. Every step changes `n`, so no state
     has an edge to itself — which is what makes the duplicated initial state visible.
     """
-    use TLA.Spec
+    use ExTLA.Spec
 
     variable :n, type: 0..2
 
@@ -60,7 +60,7 @@ defmodule TLA.BehaviourInvariantTest do
   end
 
   defmodule RatchetRefinement do
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{count: c}), do: %{n: c}
 
@@ -73,9 +73,9 @@ defmodule TLA.BehaviourInvariantTest do
   defmodule RatchetServer do
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.BehaviourInvariantTest.Ratchet,
-      refinement: TLA.BehaviourInvariantTest.RatchetRefinement
+    use ExTLA.GenServer,
+      spec: ExTLA.BehaviourInvariantTest.Ratchet,
+      refinement: ExTLA.BehaviourInvariantTest.RatchetRefinement
 
     def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -161,14 +161,14 @@ defmodule TLA.BehaviourInvariantTest do
       malformed = %Trace{states: [%{n: 0}, %{n: 1}], actions: [], bindings: [], length: 2}
 
       assert_raise ArgumentError, ~r/TLA\.Nonsense produced a malformed trace/, fn ->
-        Trace.well_formed!(malformed, "TLA.Nonsense")
+        Trace.well_formed!(malformed, "ExTLA.Nonsense")
       end
     end
 
     test "and passes a well-formed one through unchanged" do
       trace = %Trace{states: [%{n: 0}, %{n: 1}], actions: [:bump], bindings: [%{}], length: 2}
 
-      assert Trace.well_formed!(trace, "TLA.Nonsense") == trace
+      assert Trace.well_formed!(trace, "ExTLA.Nonsense") == trace
     end
   end
 
@@ -262,11 +262,11 @@ defmodule TLA.BehaviourInvariantTest do
         ModelChecker.explore(Ratchet, %{check_deadlock: false, liveness_graph: true})
 
       initial = %{n: 0}
-      id = TLA.StateGraph.id_of(graph, initial)
+      id = ExTLA.StateGraph.id_of(graph, initial)
 
       assert id != nil
 
-      refute Enum.any?(TLA.StateGraph.successors(graph, id), fn {_action, _binding, to} ->
+      refute Enum.any?(ExTLA.StateGraph.successors(graph, id), fn {_action, _binding, to} ->
                to == id
              end),
              "Ratchet has a self-loop at its initial state, so this file's central test " <>

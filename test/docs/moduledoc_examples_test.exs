@@ -1,24 +1,24 @@
-defmodule TLA.ModuledocExamplesTest do
+defmodule ExTLA.ModuledocExamplesTest do
   @moduledoc """
   Every `defmodule` example in a `lib/` moduledoc compiles (#301, for #171).
 
   ## Why this exists
 
-  #171 proved the gap the hard way: the example at the top of `TLA.Invariant` — the first
+  #171 proved the gap the hard way: the example at the top of `ExTLA.Invariant` — the first
   thing a reader copies — did not compile, and had not for as long as it had existed.
   Nothing was looking. The guide harness globs `guides/`, `spec/` and `README.md` (#281);
   doctests cover six modules; the options gate parses option lines rather than code. A
   `defmodule` in a moduledoc was checked by nothing at all.
 
   It found a second one immediately, which is the better argument for it than the first:
-  #300 fixed the `init/1` injection for Layer 1 and left `use TLA.GenServer` — where the
-  same defect is **unconditional** — so `TLA.GenServer`'s own front-page example was still
+  #300 fixed the `init/1` injection for Layer 1 and left `use ExTLA.GenServer` — where the
+  same defect is **unconditional** — so `ExTLA.GenServer`'s own front-page example was still
   broken after the fix that was supposed to close it. A gate that catches the thing the
   previous work item missed is worth more than one that confirms it.
 
   ## The annotation problem, and why there is no annotation
 
-  `TLA.GuideCheck` carries its claims in `<!-- tla:… -->` comments, which markdown renderers
+  `ExTLA.GuideCheck` carries its claims in `<!-- tla:… -->` comments, which markdown renderers
   drop. A moduledoc has nowhere to put one: an HTML comment renders as text in ExDoc, and a
   comment inside the example renders as part of the example.
 
@@ -34,7 +34,7 @@ defmodule TLA.ModuledocExamplesTest do
   # A doc example that cannot be compiled here, and why. The reason is the whole content of
   # the entry: "we could not compile it" is what an unannotated block already says.
   @skip %{
-    "lib/tla/invariant/test.ex" =>
+    "lib/ex_tla/invariant/test.ex" =>
       "an ExUnit.Case module — compiling one outside a running ExUnit raises, and it is " <>
         "the reader's suite that runs it, not this gate"
   }
@@ -68,9 +68,9 @@ defmodule TLA.ModuledocExamplesTest do
       assert length(found) >= 6, "only #{length(found)} doc examples found; the reader is wrong"
 
       paths = found |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
-      assert "lib/tla/invariant.ex" in paths
-      assert "lib/tla/gen_server.ex" in paths
-      assert "lib/tla/spec.ex" in paths
+      assert "lib/ex_tla/invariant.ex" in paths
+      assert "lib/ex_tla/gen_server.ex" in paths
+      assert "lib/ex_tla/spec.ex" in paths
     end
 
     # An entry that names a file with no example is an exception for nothing, which is how
@@ -117,8 +117,8 @@ defmodule TLA.ModuledocExamplesTest do
     end)
   end
 
-  # In its own process, observing the exit — the shape `TLA.GuideCheck.isolated/1` and
-  # `TLA.Ledger.check/2` both use. A `rescue` would hide a bug in this gate among the
+  # In its own process, observing the exit — the shape `ExTLA.GuideCheck.isolated/1` and
+  # `ExTLA.Ledger.check/2` both use. A `rescue` would hide a bug in this gate among the
   # failures it is reporting, and CLAUDE.md forbids it outright.
   #
   # The spawn buys isolation of the *caller*, and nothing more. This used to set

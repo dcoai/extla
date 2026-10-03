@@ -4,7 +4,7 @@ The foundation layer provides the primitive building blocks that all higher laye
 
 ---
 
-## Module: `TLA.State`
+## Module: `ExTLA.State`
 
 Represents a snapshot of all variables at a single point in time, and transitions between states.
 
@@ -12,7 +12,7 @@ Represents a snapshot of all variables at a single point in time, and transition
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.State do
+defmodule ExTLA.State do
   @moduledoc """
   A state is an immutable snapshot of all specification variables.
   A step is a pair of consecutive states (pre-state and post-state).
@@ -28,7 +28,7 @@ defmodule TLA.State do
 
   @type behavior :: [t(), ...]
 
-  # A counterexample is `TLA.Trace.t()` (04-layer2-model-checker.md §TLA.Trace).
+  # A counterexample is `ExTLA.Trace.t()` (04-layer2-model-checker.md §ExTLA.Trace).
   # An earlier draft defined a second `trace` type here; one concept, one type.
 end
 ```
@@ -76,7 +76,7 @@ def unchanged?({pre, post}, vars)
 
 @doc """
 Assert that every value in the state is deterministically serializable, per
-`02-dsl-semantics.md` §6. Returns the state; raises `TLA.State.InvalidTermError`
+`02-dsl-semantics.md` §6. Returns the state; raises `ExTLA.State.InvalidTermError`
 naming the variable and the position inside it.
 """
 def validate!(state)
@@ -97,14 +97,14 @@ the fingerprint would then faithfully preserve as a distinct state.
 
 ---
 
-## Module: `TLA.Temporal`
+## Module: `ExTLA.Temporal`
 
 Temporal logic operators for reasoning about behaviors (sequences of states), and
 `ENABLED`.
 
 ### Two ways to evaluate a temporal formula
 
-`TLA.ModelChecker.Liveness` evaluates the 5.1 fragment over the STATE GRAPH, by looking
+`ExTLA.ModelChecker.Liveness` evaluates the 5.1 fragment over the STATE GRAPH, by looking
 for a strongly connected component a fair behavior could cycle in forever. That answers a
 question about every behavior of the spec at once, which is what model checking is for.
 
@@ -134,18 +134,18 @@ A **lasso** removes the doubt. When the trace is a prefix followed by a cycle th
 forever — which is what a model-checker counterexample is, and what a simulation reaching
 a `terminal` state produces — the behavior is fully described by finitely many states, and
 every operator gives a definite answer. `lasso_start` is the index the cycle returns to;
-`TLA.Trace.to_behavior/1` computes it. Without one, `<>[]P`, `[]<>P` and `P ~> Q` are
+`ExTLA.Trace.to_behavior/1` computes it. Without one, `<>[]P`, `[]<>P` and `P ~> Q` are
 `:inconclusive` for every trace, because nothing finite settles them in either direction.
 
 ### Operators
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Temporal do
+defmodule ExTLA.Temporal do
   @type verdict :: :holds | :violated | :inconclusive
-  @type predicate :: (TLA.State.t() -> boolean())
-  @type action_predicate :: (TLA.State.t(), TLA.State.t() -> boolean())
-  @type behavior :: TLA.State.behavior()
+  @type predicate :: (ExTLA.State.t() -> boolean())
+  @type action_predicate :: (ExTLA.State.t(), ExTLA.State.t() -> boolean())
+  @type behavior :: ExTLA.State.behavior()
   @type lasso_start :: non_neg_integer() | nil
 
   @doc "[]P — P holds in every state. Refutable by any trace; established only by a lasso."
@@ -209,7 +209,7 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Temporal.Fairness do
+defmodule ExTLA.Temporal.Fairness do
   @moduledoc """
   Weak and strong fairness: over a spec's declarations, and over one behavior.
 
@@ -218,7 +218,7 @@ defmodule TLA.Temporal.Fairness do
   """
 
   @typedoc "A declaration, and the binding of the leading params it is about."
-  @type constraint :: {TLA.Spec.Compiled.fairness_def(), binding :: map()}
+  @type constraint :: {ExTLA.Spec.Compiled.fairness_def(), binding :: map()}
 
   @doc """
   Every fairness constraint of a spec under `constants`, in declaration order and,
@@ -226,7 +226,7 @@ defmodule TLA.Temporal.Fairness do
 
   `fairness :strong, acquire_lock: [:p]` is one constraint PER ELEMENT of the set p
   ranges over (02-dsl-semantics.md 5.2). The order is the bit order of
-  `TLA.StateGraph`'s enabled bitstrings, so it has to be deterministic.
+  `ExTLA.StateGraph`'s enabled bitstrings, so it has to be deterministic.
   """
   def expand(spec, constants, state)
 
@@ -250,7 +250,7 @@ defmodule TLA.Temporal.Fairness do
 
   Over a lasso both disjuncts reduce to the cycle, since nothing outside it recurs:
   the first is "A is disabled SOMEWHERE in the cycle", the second is "an A-step
-  occurs INSIDE it". Those are the conditions `TLA.ModelChecker.Liveness` reads off a
+  occurs INSIDE it". Those are the conditions `ExTLA.ModelChecker.Liveness` reads off a
   strongly connected component, arrived at from the other direction.
   """
   def weak_fairness(behavior, action, enabled, vars, lasso_start \\ nil)
@@ -280,41 +280,41 @@ answer lives.
 
 ## The vocabulary a spec body reaches (D-38)
 
-`TLA.Set` and `TLA.Function` below are the foundation the rest of this document builds
+`ExTLA.Set` and `ExTLA.Function` below are the foundation the rest of this document builds
 on, and **every operator in them is callable unqualified from inside an `action`, `init`,
-`invariant`, `terminal` or `action_property` block.** `use TLA.Spec` imports
-`TLA.Spec.Helpers`, which delegates each one of them to the module below; it holds no
+`invariant`, `terminal` or `action_property` block.** `use ExTLA.Spec` imports
+`ExTLA.Spec.Helpers`, which delegates each one of them to the module below; it holds no
 second implementation of any operator (D-38). Four arrive under another name, and only
 those four:
 
 | In a spec body | Here | Why the other name |
 |---|---|---|
-| `for_each/2` | `TLA.Function.construct/2` | the DSL's own spelling, from before this document |
-| `update/3` | `TLA.Function.except_with/3` | the DSL's own spelling |
-| `set_map/2` | `TLA.Set.map/2` | an unqualified `map/2` in a spec body reads as `Enum.map/2` |
-| `set_filter/2` | `TLA.Set.filter/2` | likewise `Enum.filter/2` |
+| `for_each/2` | `ExTLA.Function.construct/2` | the DSL's own spelling, from before this document |
+| `update/3` | `ExTLA.Function.except_with/3` | the DSL's own spelling |
+| `set_map/2` | `ExTLA.Set.map/2` | an unqualified `map/2` in a spec body reads as `Enum.map/2` |
+| `set_filter/2` | `ExTLA.Set.filter/2` | likewise `Enum.filter/2` |
 
 Until #319 only `choose/1,2` was reachable, and the four operators defined on both sides
 had drifted apart — `for_each/2` refused a sequence where `construct/2` deduplicated one,
-and `domain/1` read a sequence where `TLA.Function.domain/1` answered a set with the
-struct's own fields. #318 is the measurement, `test/tla/spec/operator_agreement_test.exs`
+and `domain/1` read a sequence where `ExTLA.Function.domain/1` answered a set with the
+struct's own fields. #318 is the measurement, `test/ex_tla/spec/operator_agreement_test.exs`
 the gate, and `test/differential/set_vocabulary/` a corpus entry that uses the vocabulary
 against TLC the way an author would.
 
-`TLA.Spec.Helpers` also defines a handful of names of its own — `set/1`, `put/2`,
+`ExTLA.Spec.Helpers` also defines a handful of names of its own — `set/1`, `put/2`,
 `union/2`, `len/1`, `sum/1` and the other thin covers over `MapSet` and `Enum`, sketched
 in `04-layer2-model-checker.md`. Those have no counterpart here, which is what makes them
 its own rather than a duplicate.
 
 ---
 
-## Module: `TLA.Set`
+## Module: `ExTLA.Set`
 
 Extended set operations matching TLA+ built-in set operators.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Set do
+defmodule ExTLA.Set do
   @moduledoc """
   Set operations corresponding to TLA+ set theory operators.
   Builds on Elixir's MapSet with additional TLA+ operations.
@@ -400,13 +400,13 @@ end
 
 ---
 
-## Module: `TLA.Function`
+## Module: `ExTLA.Function`
 
 TLA+ function operations (functions as total maps from domain to range).
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Function do
+defmodule ExTLA.Function do
   @moduledoc """
   TLA+ function operations. In TLA+, a function maps every element
   of its domain to a value. Elixir maps serve as the implementation.
@@ -478,7 +478,7 @@ end
 
 ---
 
-## Module: `TLA.Fingerprint`
+## Module: `ExTLA.Fingerprint`
 
 State identity. Every state the checker visits is reduced to a fingerprint; two states
 with the same fingerprint are treated as the same state and only one is explored.
@@ -490,7 +490,7 @@ specified here, in the foundation, rather than left as an implementation detail.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Fingerprint do
+defmodule ExTLA.Fingerprint do
   @moduledoc """
   Canonical, collision-resistant state identity.
 
@@ -517,7 +517,7 @@ defmodule TLA.Fingerprint do
 
   @doc """
   Expected number of distinct states silently lost to collisions, by the birthday
-  bound: n^2 / 2^(bits+1). Reported in every `TLA.ModelChecker.result()` so a run's
+  bound: n^2 / 2^(bits+1). Reported in every `ExTLA.ModelChecker.result()` so a run's
   soundness margin is visible rather than assumed.
   """
   def collision_estimate(distinct_states, bits)
@@ -557,7 +557,7 @@ variable rather than silently mis-fingerprinting.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Config do
+defmodule ExTLA.Config do
   @moduledoc """
   Global configuration for ExTLA behavior.
   """
@@ -590,14 +590,14 @@ defmodule TLA.Config do
 
   The `compile_env` call is inside the `quote`, not in the macro body. In the body
   it would run once, while ExTLA itself compiles — baking the value into the
-  dependency's build and attaching the config dependency to `TLA.Config` instead of
+  dependency's build and attaching the config dependency to `ExTLA.Config` instead of
   to the user's module. Inside the quote it expands in the caller, which is where
   both the value and the dependency belong.
 
   Consequently `mode/0` may only be called from a MODULE BODY: `compile_env/3`
   raises "cannot be called inside functions". The `@before_compile` hooks in Layers
   1 and 3 therefore resolve it into a module attribute
-  (`@tla_mode TLA.Config.mode()`) and branch on the attribute when emitting each
+  (`@tla_mode ExTLA.Config.mode()`) and branch on the attribute when emitting each
   wrapper. That is the correct shape anyway — the point of compile-time resolution
   is that `:disabled` emits no wrapper, which is a decision made while the module
   body is being expanded, not inside a function that has already been emitted.
@@ -619,7 +619,7 @@ defmodule TLA.Config do
   end
 
   # There is deliberately no `max_states/0` here. It stood in this block and in `lib/`
-  # until #317, answering a number nothing read: `TLA.ModelChecker`'s own defaults carry
+  # until #317, answering a number nothing read: `ExTLA.ModelChecker`'s own defaults carry
   # `max_states: 1_000_000` and every caller goes through those, so the repository held two
   # copies of one number and the configuration copy was dead. `workers/0` below is the
   # shape that works — it is DERIVED, it answers something only the machine knows, and the

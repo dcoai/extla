@@ -1,10 +1,10 @@
-defmodule TLA.Conformance.ParamMappingTest do
+defmodule ExTLA.Conformance.ParamMappingTest do
   @moduledoc """
   A refinement mapping for actions that take **params** (#284).
 
   ## The gap this closes
 
-  `TLA.Refinement.validate!/3` probes each action by applying `concrete_message/2` to a
+  `ExTLA.Refinement.validate!/3` probes each action by applying `concrete_message/2` to a
   sample binding, and `sample_params/3` fell back to `%{}` whenever it had no state to
   draw one from — which is whenever a constant has no value at compile time. For a
   param-less action `%{}` is the real binding and the probe is sound. For an action with
@@ -13,7 +13,7 @@ defmodule TLA.Conformance.ParamMappingTest do
   validator**.
 
   It survived because every refinement fixture in `test/conformance/` is for
-  `TLA.Conformance.Counter.Spec`, whose three actions take no params — so the whole suite
+  `ExTLA.Conformance.Counter.Spec`, whose three actions take no params — so the whole suite
   exercised exactly the one case the fallback handles. The specification's own examples do
   not: `spec/07`'s lock server maps `request_lock` with `%{p: p, r: r}`, and it could not
   compile.
@@ -26,11 +26,11 @@ defmodule TLA.Conformance.ParamMappingTest do
   # `async: true` file that does this, which is how the rule is kept.
   use ExUnit.Case, async: false
 
-  alias TLA.Refinement
+  alias ExTLA.Refinement
 
   defmodule Spec do
     @moduledoc false
-    use TLA.Spec
+    use ExTLA.Spec
 
     # No `default:`, which is the shape a published example has: the assignment belongs to
     # a run, so at compile time there is no initial state to draw a binding from.
@@ -55,7 +55,7 @@ defmodule TLA.Conformance.ParamMappingTest do
 
   defmodule Mapping do
     @moduledoc false
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{locks: locks}), do: %{held: locks}
 
@@ -79,7 +79,7 @@ defmodule TLA.Conformance.ParamMappingTest do
 
       # Tagged `:for_this_mapping` since #169, because an un-probed action is news about
       # THIS mapping rather than a limit of every compile — and that is the tag
-      # `use TLA.GenServer` prints.
+      # `use ExTLA.GenServer` prints.
       assert {:for_this_mapping, unprobed} =
                Enum.find(deferred, &match?({:for_this_mapping, _rule}, &1)),
              "nothing in #{inspect(deferred)} names the action that was not probed"
@@ -103,7 +103,7 @@ defmodule TLA.Conformance.ParamMappingTest do
   describe "the check is not weakened where it can still be made" do
     defmodule Unnamed do
       @moduledoc false
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
       def abstract_action({:grab, r}), do: {:grab, %{r: r}}
@@ -140,7 +140,7 @@ defmodule TLA.Conformance.ParamMappingTest do
   # contract is a `Refinement.Error` with a sentence naming the action, which is precisely
   # what that rule exists to report.
   #
-  # It is a list comparison now: `use TLA.Refinement` records the first argument of every
+  # It is a list comparison now: `use ExTLA.Refinement` records the first argument of every
   # clause with `@on_definition`, and the spec's actions are compared against the record
   # (D-39). The suite had never exercised the case — every fixture in `test/conformance/`
   # has a clause for every action, and `Counter.Mutants.ActionNeverNamed` names an action
@@ -148,7 +148,7 @@ defmodule TLA.Conformance.ParamMappingTest do
   describe "the three shapes a `concrete_message/2` can have" do
     defmodule NoClauseForDropAll do
       @moduledoc false
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
 
@@ -164,7 +164,7 @@ defmodule TLA.Conformance.ParamMappingTest do
 
     defmodule NoClauseForGrab do
       @moduledoc false
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
 
@@ -180,7 +180,7 @@ defmodule TLA.Conformance.ParamMappingTest do
 
     defmodule ByName do
       @moduledoc false
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
 
@@ -200,7 +200,7 @@ defmodule TLA.Conformance.ParamMappingTest do
 
     defmodule NoConcreteMessage do
       @moduledoc false
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
 
@@ -222,7 +222,7 @@ defmodule TLA.Conformance.ParamMappingTest do
     # A clause either exists or it does not, and answering that needs no binding — which is
     # the argument for a list comparison over a probe. Before this, `grab` was unprobeable
     # here and therefore unchecked, so the mapping validated and the gap surfaced at the
-    # first `TLA.Replay`.
+    # first `ExTLA.Replay`.
     test "and an action with no binding to probe with is checked all the same" do
       error = assert_raise Refinement.Error, fn -> Refinement.validate!(NoClauseForGrab, Spec) end
 
@@ -261,7 +261,7 @@ defmodule TLA.Conformance.ParamMappingTest do
     defmodule Handwritten do
       @moduledoc false
       # No `use`, so no `@on_definition` and no record of which actions the clauses cover.
-      @behaviour TLA.Refinement
+      @behaviour ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
 
@@ -281,7 +281,7 @@ defmodule TLA.Conformance.ParamMappingTest do
         Refinement.validate!(Handwritten, Spec, %{resources: MapSet.new([:r1, :r2])})
 
       assert Enum.any?(deferred, fn
-               {:for_this_mapping, rule} -> rule =~ "without `use TLA.Refinement`"
+               {:for_this_mapping, rule} -> rule =~ "without `use ExTLA.Refinement`"
                _always -> false
              end),
              "nothing in #{inspect(deferred)} says the clauses were never recorded"
@@ -333,7 +333,7 @@ defmodule TLA.Conformance.ParamMappingTest do
     # sets a param draws from are mostly empty there.
     defmodule FiveResources do
       @moduledoc false
-      use TLA.Spec
+      use ExTLA.Spec
 
       constant :resources, default: MapSet.new([:r1, :r2, :r3, :r4, :r5])
 
@@ -351,7 +351,7 @@ defmodule TLA.Conformance.ParamMappingTest do
 
     defmodule WrongForTheFourth do
       @moduledoc false
-      use TLA.Refinement
+      use ExTLA.Refinement
 
       def abstract(%{locks: locks}), do: %{held: locks}
 

@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Tla.Diagnostics do
 
   use Mix.Task
 
-  alias TLA.Diagnostics
+  alias ExTLA.Diagnostics
 
   @golden "DIAGNOSTICS.md"
   @switches [write: :boolean, check: :boolean]
@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Tla.Diagnostics do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        TLA.Surface.check!(@golden, "tla.diagnostics", path, rendered)
+        ExTLA.Surface.check!(@golden, "tla.diagnostics", path, rendered)
 
       true ->
         Mix.shell().info(rendered)
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.Diagnostics do
   end
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest` / `DIAGNOSTICS.md`, which hold a task's switches and its
+  # Exposed for `ExTLA.SpecOptionsTest` / `DIAGNOSTICS.md`, which hold a task's switches and its
   # documentation to each other.
   def switches, do: @switches
 end

@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Tla.Replay do
-  @shortdoc "Drive a TLA.GenServer through a spec-level behaviour"
+  @shortdoc "Drive a ExTLA.GenServer through a spec-level behaviour"
 
   @moduledoc """
-  Drive a `TLA.GenServer` through a spec-level behaviour, or check a captured one.
+  Drive a `ExTLA.GenServer` through a spec-level behaviour, or check a captured one.
 
   ## Usage
 
@@ -25,12 +25,12 @@ defmodule Mix.Tasks.Tla.Replay do
 
   `--captured` takes an array of `{"message": …, "state": …}` objects, oldest first, where
   `state` is the CONCRETE state the implementation was in *after* that message. Both
-  encodings are `TLA.State.Json`'s, so a state is written the way the checker writes one
+  encodings are `ExTLA.State.Json`'s, so a state is written the way the checker writes one
   and no second format has to be learned.
 
   ## Steps a trace names and this cannot drive
 
-  A trace's actions are not all actions of the spec. `TLA.Simulation` writes `:unmapped`
+  A trace's actions are not all actions of the spec. `ExTLA.Simulation` writes `:unmapped`
   for a message the refinement mapping does not model — its *normal* answer, not an error —
   and `:restart` for a crash injected by `--inject-failures`. `concrete_message/2` has no
   clause for either, and calling it regardless is what this used to do (#168).
@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Tla.Replay do
   that skipped a step and then exited `0` would report more than it did.
 
   `:restart` is **reproduced**: the server is killed and started again, and recovery is
-  checked to land where the trace says it did — all `TLA.Simulation` checks about a restart
+  checked to land where the trace says it did — all `ExTLA.Simulation` checks about a restart
   either. `:kill` rather than a polite stop, because a crash runs no `terminate/2`. Only
   for a server this task started.
 
@@ -59,7 +59,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
   use Mix.Task
 
-  alias TLA.{Replay, State}
+  alias ExTLA.{Replay, State}
 
   @switches [trace: :string, captured: :string, format: :string, init_arg: :string]
 
@@ -96,7 +96,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
       not function_exported?(module, :__tla_spec_module__, 0) ->
         Mix.raise(
-          "#{inspect(module)} does not `use TLA.GenServer`, so there is no specification " <>
+          "#{inspect(module)} does not `use ExTLA.GenServer`, so there is no specification " <>
             "to replay against."
         )
 
@@ -105,14 +105,14 @@ defmodule Mix.Tasks.Tla.Replay do
     end
   end
 
-  defp module!([]), do: Mix.raise("name the TLA.GenServer module to replay against.")
+  defp module!([]), do: Mix.raise("name the ExTLA.GenServer module to replay against.")
   defp module!(many), do: Mix.raise("one module at a time; got #{Enum.join(many, ", ")}.")
 
   # `mix tla.check --format json` writes a versioned envelope; a file holding one lifted-out
-  # trace is accepted too. `TLA.Mix.TraceFile` holds the reading, shared with
+  # trace is accepted too. `ExTLA.Mix.TraceFile` holds the reading, shared with
   # `mix tla.explore` so the two cannot drift on what they accept or how they refuse it.
   defp read_trace!(path, module) do
-    TLA.Mix.TraceFile.read!(path, inspect(module.__tla_spec_module__()))
+    ExTLA.Mix.TraceFile.read!(path, inspect(module.__tla_spec_module__()))
   end
 
   defp read_capture!(path) do
@@ -198,7 +198,7 @@ defmodule Mix.Tasks.Tla.Replay do
   defp exit_with(%{status: :not_replayable}), do: exit({:shutdown, 3})
 
   @doc false
-  # Exposed for `TLA.SpecOptionsTest`, which holds this and the specification's documented
+  # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
   # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches

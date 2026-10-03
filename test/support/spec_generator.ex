@@ -1,4 +1,4 @@
-defmodule TLA.SpecGenerator do
+defmodule ExTLA.SpecGenerator do
   @moduledoc """
   Small random specifications, as a scenario source for the agreement properties (#50).
 
@@ -10,10 +10,10 @@ defmodule TLA.SpecGenerator do
 
   ## Structs, not modules
 
-  A generated spec is a `%TLA.Spec.Compiled{}` built directly, with closures for its
+  A generated spec is a `%ExTLA.Spec.Compiled{}` built directly, with closures for its
   guards and transitions. The alternative — emitting DSL source and compiling a module per
   spec — would be slow and would **create an atom per module**, which is the one thing
-  `TLA.State.Json`'s `String.to_existing_atom/1` exists to avoid doing from data. Every
+  `ExTLA.State.Json`'s `String.to_existing_atom/1` exists to avoid doing from data. Every
   name here comes from a fixed pool, so a thousand generated specs create no atoms at all.
 
   ## Generated from a description, so shrinking is readable
@@ -35,7 +35,7 @@ defmodule TLA.SpecGenerator do
   **Symmetry declarations.** Soundness is the author's obligation (D-17): a declaration is
   sound only if no action and no property can tell the constant's elements apart, and
   nothing verifies that statically. A generator that emitted unsound ones would spend its
-  budget on `TLA.Symmetry.UnsoundError` rather than on the property under test, so the
+  budget on `ExTLA.Symmetry.UnsoundError` rather than on the property under test, so the
   symmetry arm of #50 is left to the hand-written `symmetry_test.exs` until the generator
   can guarantee what D-17 requires.
 
@@ -43,7 +43,7 @@ defmodule TLA.SpecGenerator do
   worker property is safety-only by construction.
   """
 
-  alias TLA.Spec
+  alias ExTLA.Spec
 
   # Fixed pools. Nothing here is computed from generated data, so no atom is ever created
   # at runtime however many specs are drawn.
@@ -127,12 +127,12 @@ defmodule TLA.SpecGenerator do
     @doc "Unavailable: `stream_data` is not loaded."
     @spec description() :: no_return()
     def description do
-      raise ArgumentError, "TLA.SpecGenerator needs `stream_data`, which is not loaded."
+      raise ArgumentError, "ExTLA.SpecGenerator needs `stream_data`, which is not loaded."
     end
   end
 
   @doc """
-  Turn a description into a `TLA.Spec.Compiled` the checker will run.
+  Turn a description into a `ExTLA.Spec.Compiled` the checker will run.
 
   Deterministic: the same description always compiles to the same spec, which is what
   makes a recorded seed reproduce a failure exactly.

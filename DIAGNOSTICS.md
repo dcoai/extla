@@ -13,57 +13,57 @@ each other, and to the kinds the tests assert on.
 
 | Kind | Problem | Locus |
 |---|---|---|
-| `:already_declared` | … is already declared | `lib/tla/spec/dsl.ex:576` |
-| `:assignment_outside_init_or_action` | assignment to variable … outside `init`/`action` | `lib/tla/spec/block.ex:448` |
-| `:assignment_to_undeclared_variable` | assignment to undeclared variable: … | `lib/tla/spec/block.ex:105` |
-| `:binder_shadows_binding` | … binds …, which this declaration already binds | `lib/tla/spec/block.ex:562` |
-| `:binder_shadows_constant` | … binds …, which is a declared constant | `lib/tla/spec/block.ex:550` |
-| `:binder_shadows_variable` | … binds …, which is a declared variable | `lib/tla/spec/block.ex:538` |
-| `:collection_type_arity` | …/… takes exactly one element type | `lib/tla/spec/type.ex:128` |
-| `:constant_without_pin` | constant … referenced without `^` | `lib/tla/spec/rewriter.ex:138` |
-| `:declaration_name_not_an_atom` | … name must be a literal atom, got: … | `lib/tla/spec/dsl.ex:529` |
-| `:declaration_without_a_block` | … needs a `do` block | `lib/tla/spec/dsl.ex:658` |
-| `:destructuring_without_let` | destructuring assignment without `let`: … | `lib/tla/spec/block.ex:60` |
-| `:duplicate_declaration` | … … is declared … times | `lib/tla/spec.ex:245` |
-| `:duplicate_param` | param … is declared twice | `lib/tla/spec/dsl.ex:624` |
-| `:fairness_kind` | fairness kind must be :weak or :strong, got: … | `lib/tla/spec/dsl.ex:410` |
-| `:fairness_not_a_list` | fairness takes a list, got: … | `lib/tla/spec/dsl.ex:392` |
-| `:fairness_over_a_state_drawn_param` | fairness over a state-drawn param: ….… | `lib/tla/spec.ex:308` |
-| `:fairness_params_not_a_prefix` | fairness params … are not a leading prefix of… | `lib/tla/spec.ex:292` |
-| `:ill_formed_type` | ill-formed type: … | `lib/tla/spec/type.ex:178` |
-| `:implicit_invariant_redeclared` | … is checked implicitly and cannot be declared | `lib/tla/spec/dsl.ex:556` |
-| `:init_does_not_assign` | `init` does not assign … | `lib/tla/spec/block.ex:299` |
-| `:let_without_binding` | `let` needs a binding: … | `lib/tla/spec/block.ex:50` |
-| `:let_without_binding` | `let` needs a binding: … | `lib/tla/spec/block.ex:382` |
-| `:list_type_element_not_literal` | a list type may only list literals, got: … | `lib/tla/spec/type.ex:162` |
-| `:malformed_fairness_entry` | malformed fairness entry: … | `lib/tla/spec/dsl.ex:378` |
-| `:malformed_params_entry` | malformed `params:` entry: … | `lib/tla/spec/params.ex:50` |
-| `:no_init_block` | no `init` block | `lib/tla/spec.ex:261` |
-| `:options_not_a_keyword_list` | … options must be a keyword list, got: … | `lib/tla/spec/dsl.ex:672` |
-| `:options_not_literal` | options must be a literal keyword list, got:… | `lib/tla/spec/dsl.ex:644` |
-| `:options_not_literal` | options must be a literal keyword list, got: … | `lib/tla/spec/dsl.ex:692` |
-| `:options_not_literal` | options must be a literal keyword list, got: … | `lib/tla/spec/dsl.ex:733` |
-| `:param_draws_from_a_non_set` | param … draws from a non-set:… | `lib/tla/spec/params.ex:127` |
-| `:param_generator_arity` | the `…` generator takes … arguments | `lib/tla/spec/params.ex:147` |
-| `:param_generator_clauses` | the `…` generator has … clauses | `lib/tla/spec/params.ex:115` |
-| `:param_is_a_reserved_name` | param … is a reserved name | `lib/tla/spec/dsl.ex:605` |
-| `:param_shadows_a_variable` | param … has the same name as a declared variable | `lib/tla/spec/dsl.ex:593` |
-| `:params_not_a_keyword_list` | `params:` must be a keyword list, got: … | `lib/tla/spec/params.ex:64` |
-| `:record_type_key_not_literal` | a record type's keys must be literals, got: … | `lib/tla/spec/type.ex:148` |
-| `:require_in_init` | `require` is not permitted in `init` | `lib/tla/spec/block.ex:281` |
-| `:reserved_name` | … is a reserved name | `lib/tla/spec/dsl.ex:540` |
-| `:temporal_block_not_one_formula` | a `temporal` block is a single formula, got … statements | `lib/tla/spec/temporal.ex:72` |
-| `:temporal_nesting_outside_fragment` | a nesting the fragment does not evaluate: … …… | `lib/tla/spec/temporal.ex:249` |
-| `:temporal_operator_in_state_predicate` | temporal operator … where a state predicate is required | `lib/tla/spec/temporal.ex:202` |
-| `:temporal_quantifier_domain` | a temporal quantifier must range over a constant or a literal list | `lib/tla/spec/temporal.ex:146` |
-| `:type_names_undeclared_constant` | the type refers to ^…, which is not a declared constant | `lib/tla/spec/type.ex:56` |
-| `:type_range_bound` | a range bound must be an integer or ^constant, got:… | `lib/tla/spec/type.ex:221` |
-| `:type_range_step_zero` | a range step of 0 is not a range | `lib/tla/spec/type.ex:91` |
-| `:undeclared_constant` | undeclared constant: ^… | `lib/tla/spec/rewriter.ex:72` |
-| `:undeclared_variable` | undeclared variable: … | `lib/tla/spec/rewriter.ex:146` |
-| `:unexpected_statement` | unexpected statement: … | `lib/tla/spec/block.ex:72` |
-| `:unknown_action_in_fairness` | unknown action in fairness: … | `lib/tla/spec.ex:279` |
-| `:unknown_option` | unknown option…: … | `lib/tla/spec/dsl.ex:747` |
-| `:unsupported_temporal_operator` | unsupported temporal operator: … | `lib/tla/spec/temporal.ex:178` |
-| `:variable_assigned_twice` | variable … assigned … times | `lib/tla/spec/block.ex:125` |
-| `:variable_not_readable_here` | … | `lib/tla/spec/rewriter.ex:160` |
+| `:already_declared` | … is already declared | `lib/ex_tla/spec/dsl.ex:576` |
+| `:assignment_outside_init_or_action` | assignment to variable … outside `init`/`action` | `lib/ex_tla/spec/block.ex:448` |
+| `:assignment_to_undeclared_variable` | assignment to undeclared variable: … | `lib/ex_tla/spec/block.ex:105` |
+| `:binder_shadows_binding` | … binds …, which this declaration already binds | `lib/ex_tla/spec/block.ex:562` |
+| `:binder_shadows_constant` | … binds …, which is a declared constant | `lib/ex_tla/spec/block.ex:550` |
+| `:binder_shadows_variable` | … binds …, which is a declared variable | `lib/ex_tla/spec/block.ex:538` |
+| `:collection_type_arity` | …/… takes exactly one element type | `lib/ex_tla/spec/type.ex:128` |
+| `:constant_without_pin` | constant … referenced without `^` | `lib/ex_tla/spec/rewriter.ex:138` |
+| `:declaration_name_not_an_atom` | … name must be a literal atom, got: … | `lib/ex_tla/spec/dsl.ex:529` |
+| `:declaration_without_a_block` | … needs a `do` block | `lib/ex_tla/spec/dsl.ex:658` |
+| `:destructuring_without_let` | destructuring assignment without `let`: … | `lib/ex_tla/spec/block.ex:60` |
+| `:duplicate_declaration` | … … is declared … times | `lib/ex_tla/spec.ex:245` |
+| `:duplicate_param` | param … is declared twice | `lib/ex_tla/spec/dsl.ex:624` |
+| `:fairness_kind` | fairness kind must be :weak or :strong, got: … | `lib/ex_tla/spec/dsl.ex:410` |
+| `:fairness_not_a_list` | fairness takes a list, got: … | `lib/ex_tla/spec/dsl.ex:392` |
+| `:fairness_over_a_state_drawn_param` | fairness over a state-drawn param: ….… | `lib/ex_tla/spec.ex:308` |
+| `:fairness_params_not_a_prefix` | fairness params … are not a leading prefix of… | `lib/ex_tla/spec.ex:292` |
+| `:ill_formed_type` | ill-formed type: … | `lib/ex_tla/spec/type.ex:178` |
+| `:implicit_invariant_redeclared` | … is checked implicitly and cannot be declared | `lib/ex_tla/spec/dsl.ex:556` |
+| `:init_does_not_assign` | `init` does not assign … | `lib/ex_tla/spec/block.ex:299` |
+| `:let_without_binding` | `let` needs a binding: … | `lib/ex_tla/spec/block.ex:50` |
+| `:let_without_binding` | `let` needs a binding: … | `lib/ex_tla/spec/block.ex:382` |
+| `:list_type_element_not_literal` | a list type may only list literals, got: … | `lib/ex_tla/spec/type.ex:162` |
+| `:malformed_fairness_entry` | malformed fairness entry: … | `lib/ex_tla/spec/dsl.ex:378` |
+| `:malformed_params_entry` | malformed `params:` entry: … | `lib/ex_tla/spec/params.ex:50` |
+| `:no_init_block` | no `init` block | `lib/ex_tla/spec.ex:261` |
+| `:options_not_a_keyword_list` | … options must be a keyword list, got: … | `lib/ex_tla/spec/dsl.ex:672` |
+| `:options_not_literal` | options must be a literal keyword list, got:… | `lib/ex_tla/spec/dsl.ex:644` |
+| `:options_not_literal` | options must be a literal keyword list, got: … | `lib/ex_tla/spec/dsl.ex:692` |
+| `:options_not_literal` | options must be a literal keyword list, got: … | `lib/ex_tla/spec/dsl.ex:733` |
+| `:param_draws_from_a_non_set` | param … draws from a non-set:… | `lib/ex_tla/spec/params.ex:127` |
+| `:param_generator_arity` | the `…` generator takes … arguments | `lib/ex_tla/spec/params.ex:147` |
+| `:param_generator_clauses` | the `…` generator has … clauses | `lib/ex_tla/spec/params.ex:115` |
+| `:param_is_a_reserved_name` | param … is a reserved name | `lib/ex_tla/spec/dsl.ex:605` |
+| `:param_shadows_a_variable` | param … has the same name as a declared variable | `lib/ex_tla/spec/dsl.ex:593` |
+| `:params_not_a_keyword_list` | `params:` must be a keyword list, got: … | `lib/ex_tla/spec/params.ex:64` |
+| `:record_type_key_not_literal` | a record type's keys must be literals, got: … | `lib/ex_tla/spec/type.ex:148` |
+| `:require_in_init` | `require` is not permitted in `init` | `lib/ex_tla/spec/block.ex:281` |
+| `:reserved_name` | … is a reserved name | `lib/ex_tla/spec/dsl.ex:540` |
+| `:temporal_block_not_one_formula` | a `temporal` block is a single formula, got … statements | `lib/ex_tla/spec/temporal.ex:72` |
+| `:temporal_nesting_outside_fragment` | a nesting the fragment does not evaluate: … …… | `lib/ex_tla/spec/temporal.ex:249` |
+| `:temporal_operator_in_state_predicate` | temporal operator … where a state predicate is required | `lib/ex_tla/spec/temporal.ex:202` |
+| `:temporal_quantifier_domain` | a temporal quantifier must range over a constant or a literal list | `lib/ex_tla/spec/temporal.ex:146` |
+| `:type_names_undeclared_constant` | the type refers to ^…, which is not a declared constant | `lib/ex_tla/spec/type.ex:56` |
+| `:type_range_bound` | a range bound must be an integer or ^constant, got:… | `lib/ex_tla/spec/type.ex:221` |
+| `:type_range_step_zero` | a range step of 0 is not a range | `lib/ex_tla/spec/type.ex:91` |
+| `:undeclared_constant` | undeclared constant: ^… | `lib/ex_tla/spec/rewriter.ex:72` |
+| `:undeclared_variable` | undeclared variable: … | `lib/ex_tla/spec/rewriter.ex:146` |
+| `:unexpected_statement` | unexpected statement: … | `lib/ex_tla/spec/block.ex:72` |
+| `:unknown_action_in_fairness` | unknown action in fairness: … | `lib/ex_tla/spec.ex:279` |
+| `:unknown_option` | unknown option…: … | `lib/ex_tla/spec/dsl.ex:747` |
+| `:unsupported_temporal_operator` | unsupported temporal operator: … | `lib/ex_tla/spec/temporal.ex:178` |
+| `:variable_assigned_twice` | variable … assigned … times | `lib/ex_tla/spec/block.ex:125` |
+| `:variable_not_readable_here` | … | `lib/ex_tla/spec/rewriter.ex:160` |

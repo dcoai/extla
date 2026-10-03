@@ -34,7 +34,7 @@ of something that looks like state and is not.
 <!-- tla:spec -->
 ```elixir
 defmodule Modelling.WithCount do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :jobs, default: set([:j1, :j2])
 
@@ -78,7 +78,7 @@ Now the same model with `queued_count` deleted, and nothing else changed:
 <!-- tla:spec -->
 ```elixir
 defmodule Modelling.Lean do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :jobs, default: set([:j1, :j2])
 
@@ -121,7 +121,7 @@ and `count_agrees` exists only to check that you did. Forget it in one action:
 <!-- tla:spec -->
 ```elixir
 defmodule Modelling.ForgotToCount do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :jobs, default: set([:j1, :j2])
 
@@ -214,7 +214,7 @@ Here is the model those decisions produce, with the retry bound the property is 
 <!-- tla:spec -->
 ```elixir
 defmodule Modelling.Runner do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :jobs,         default: set([:j1, :j2])
   constant :max_attempts, default: 2

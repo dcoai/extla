@@ -1,4 +1,4 @@
-defmodule TLA.StrictArgvTest do
+defmodule ExTLA.StrictArgvTest do
   @moduledoc """
   Every `mix tla.*` task refuses an unknown flag rather than dropping it (#166).
 

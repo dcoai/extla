@@ -18,7 +18,7 @@ not build is a spec that stops compiling without anyone noticing.
 
 Name them for the thing they describe rather than for what they are: `Specs.Lock`,
 `Specs.JobRunner`. `mix tla.check` with no arguments finds every module in the project that
-`use`s `TLA.Spec`, so a consistent home is enough to make "check everything" work.
+`use`s `ExTLA.Spec`, so a consistent home is enough to make "check everything" work.
 
 ## Checking them from the suite
 
@@ -26,7 +26,7 @@ Name them for the thing they describe rather than for what they are: `Specs.Lock
 
 <!-- tla:run expect=ok -->
 ```elixir
-import TLA.Spec.Test
+import ExTLA.Spec.Test
 
 assert_spec Tutorial.StrongLock, %{
   constants: %{clients: MapSet.new([:alice, :bob, :carol])},
@@ -41,7 +41,7 @@ In a suite that is a test like any other:
 ```elixir
 defmodule Specs.LockTest do
   use ExUnit.Case, async: true
-  import TLA.Spec.Test
+  import ExTLA.Spec.Test
 
   @tag :spec
   test "the lock keeps mutual exclusion, and nobody starves" do
@@ -123,13 +123,13 @@ DOT only, deliberately: `06-architecture.md` defers an HTML viewer as "a mainten
 
 ## Generators from the specification
 
-`TLA.PropertyTest` hands the spec's own state space to a `check all` of your own, for the property
+`ExTLA.PropertyTest` hands the spec's own state space to a `check all` of your own, for the property
 tests that keep an implementation honest between conformance runs:
 
 <!-- tla:skip reason=a property test, run by your suite with stream_data available -->
 ```elixir
 property "the server survives any initial state the spec admits" do
-  check all state <- TLA.PropertyTest.init_states(Specs.Lock, %{clients: MapSet.new([:a, :b])}) do
+  check all state <- ExTLA.PropertyTest.init_states(Specs.Lock, %{clients: MapSet.new([:a, :b])}) do
     # drive your implementation from `state` and assert what you like about it
     assert is_map(state)
   end
@@ -150,7 +150,7 @@ mix tla.replay MyApp.LockServer --captured incident.json
 ```
 
 The file is an array of `{"message": …, "state": …}` entries, oldest first, where `state` is the
-concrete state the implementation was in *after* that message — the same `TLA.State.Json`
+concrete state the implementation was in *after* that message — the same `ExTLA.State.Json`
 encoding the checker writes, so there is no second format to learn. Exit 0 means the captured
 behaviour is one the specification permits; exit 1 means it is not, and names the step.
 

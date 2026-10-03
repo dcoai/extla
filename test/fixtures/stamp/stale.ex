@@ -13,9 +13,9 @@ defmodule StampFixture.Stale do
   defmodule First do
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement,
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement,
       spec_version: "00000000"
 
     def init(arg), do: {:ok, arg}
@@ -24,9 +24,9 @@ defmodule StampFixture.Stale do
   defmodule Second do
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement,
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement,
       spec_version: "00000000"
 
     def init(arg), do: {:ok, arg}

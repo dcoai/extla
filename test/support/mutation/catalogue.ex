@@ -1,4 +1,4 @@
-defmodule TLA.Mutation.Catalogue do
+defmodule ExTLA.Mutation.Catalogue do
   @moduledoc """
   The mutants, and what each one models (#46).
 
@@ -15,7 +15,7 @@ defmodule TLA.Mutation.Catalogue do
   ## What it measured, the first time it ran
 
   **11 killed, 1 survived, 1 timeout.** It began at 10 and 2; `drops_a_liveness_edge` was
-  the first survivor closed, by #59's `TLA.GraphAudit`. The sweep runs in 8m33s on the
+  the first survivor closed, by #59's `ExTLA.GraphAudit`. The sweep runs in 8m33s on the
   machine `bench/search_profile.baseline.md` names, which is why it is its own CI job
   rather than part of `mix test`, and which is a measurement rather than an estimate.
 
@@ -40,7 +40,7 @@ defmodule TLA.Mutation.Catalogue do
   kill-count alone cannot say.
   """
 
-  alias TLA.Mutation.Mutant
+  alias ExTLA.Mutation.Mutant
 
   @doc """
   Every mutant, in a stable order.
@@ -51,7 +51,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :drops_an_action,
         models: "successor generation that silently omits an action",
-        file: "lib/tla/model_checker.ex",
+        file: "lib/ex_tla/model_checker.ex",
         anchor: "    run.spec.actions\n    |> Enum.reduce_while(",
         replacement: "    Enum.drop(run.spec.actions, 1)\n    |> Enum.reduce_while(",
         kills: :corpus
@@ -81,7 +81,7 @@ defmodule TLA.Mutation.Catalogue do
             "that has to finish can ever kill it. The axis is real; a terminating gate " <>
             "is the wrong instrument for it, and #50's generated models — small by " <>
             "construction — are the right one",
-        file: "lib/tla/model_checker.ex",
+        file: "lib/ex_tla/model_checker.ex",
         anchor: """
           def enabled_bindings(action, constants, state) do
             action
@@ -105,7 +105,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :drops_a_binding,
         models: "parameter enumeration that misses one binding of an enabled action",
-        file: "lib/tla/model_checker.ex",
+        file: "lib/ex_tla/model_checker.ex",
         anchor: """
           def enabled_bindings(action, constants, state) do
             action
@@ -128,7 +128,7 @@ defmodule TLA.Mutation.Catalogue do
         models:
           "a frontier that stops being breadth-first, so a counterexample is no longer " <>
             "the shortest — the length D-9 compares and D-27's barrier exists to preserve",
-        file: "lib/tla/model_checker.ex",
+        file: "lib/ex_tla/model_checker.ex",
         anchor: "    case :queue.out(run.frontier) do",
         replacement: "    case :queue.out_r(run.frontier) do",
         kills: :corpus
@@ -136,7 +136,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :truncates_the_fingerprint,
         models: "state identity narrow enough to collide, silently merging distinct states",
-        file: "lib/tla/fingerprint.ex",
+        file: "lib/ex_tla/fingerprint.ex",
         anchor: "    |> binary_part(0, div(bits, 8))",
         replacement: "    |> binary_part(0, 2)",
         kills: :corpus
@@ -145,7 +145,7 @@ defmodule TLA.Mutation.Catalogue do
         name: :skips_symmetry_canonicalization,
         models:
           "a symmetric state that is not put in canonical form, so an orbit is explored twice",
-        file: "lib/tla/state_graph.ex",
+        file: "lib/ex_tla/state_graph.ex",
         anchor: """
           defp fingerprint(graph, state) do
             state
@@ -166,7 +166,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :inverts_a_weak_fairness_bit,
         models: "an ENABLED bit recorded the wrong way round, so fairness is read inverted",
-        file: "lib/tla/model_checker.ex",
+        file: "lib/ex_tla/model_checker.ex",
         anchor: "      <<bits::bitstring, if(on, do: 1, else: 0)::1>>",
         replacement: "      <<bits::bitstring, if(on, do: 0, else: 1)::1>>",
         kills: :corpus
@@ -174,7 +174,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :drops_a_liveness_edge,
         models: "an out-edge missing from the liveness table, so a cycle cannot be found",
-        file: "lib/tla/state_graph.ex",
+        file: "lib/ex_tla/state_graph.ex",
         anchor: "      | edges: Map.put(graph.edges, id, edges),",
         replacement: "      | edges: Map.put(graph.edges, id, Enum.drop(edges, 1)),",
         kills: :corpus
@@ -182,7 +182,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :off_by_one_in_the_path_walk,
         models: "a trace one step short, because the walk back drops a step",
-        file: "lib/tla/state_graph.ex",
+        file: "lib/ex_tla/state_graph.ex",
         anchor: "        walk_back(graph, parent, [{action, params} | steps])",
         replacement: "        walk_back(graph, parent, steps)",
         kills: :corpus
@@ -192,7 +192,7 @@ defmodule TLA.Mutation.Catalogue do
         models:
           "replay starting from the wrong `init` block, which only a spec with more than " <>
             "one can expose",
-        file: "lib/tla/state_graph.ex",
+        file: "lib/ex_tla/state_graph.ex",
         anchor: "        {index, steps}",
         replacement: "        {0, steps}",
 
@@ -204,7 +204,7 @@ defmodule TLA.Mutation.Catalogue do
       %Mutant{
         name: :drops_a_worker_contribution,
         models: "a parallel merge that loses one worker's states, under-counting the search",
-        file: "lib/tla/model_checker/parallel.ex",
+        file: "lib/ex_tla/model_checker/parallel.ex",
         anchor: "      | state_count: graph.state_count + from.state_count,",
         replacement: "      | state_count: graph.state_count,",
         kills: :corpus
@@ -216,7 +216,7 @@ defmodule TLA.Mutation.Catalogue do
             "coordinator. D-27 names this asymmetry. The CORPUS does not catch it — " <>
             "`finalize/2` drops `param_universe` from the report, so a wrong one shows " <>
             "only where a run has unreached params to name — and #39's unit tests do",
-        file: "lib/tla/coverage.ex",
+        file: "lib/ex_tla/coverage.ex",
         anchor: "        live_terminals: MapSet.union(into.live_terminals, from.live_terminals)",
         replacement:
           "        live_terminals: MapSet.union(into.live_terminals, from.live_terminals),\n" <>

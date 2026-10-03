@@ -1,6 +1,6 @@
 # Layer 2a: DSL Semantics (Normative)
 
-The `TLA.Spec` DSL reinterprets Elixir syntax. This document is the **normative
+The `ExTLA.Spec` DSL reinterprets Elixir syntax. This document is the **normative
 definition** of that reinterpretation: exactly how a name in a spec block resolves,
 what an action block means, and where nondeterminism comes from.
 
@@ -149,13 +149,13 @@ gap in the language, not a mistake in the example.
 
 Types are checked as an implicit invariant named `:type_ok` in every reachable state
 — which is why the coverage report lists one without the spec declaring it — and
-they are the domain `TLA.Simulation.Generator` draws from. They do not restrict
+they are the domain `ExTLA.Simulation.Generator` draws from. They do not restrict
 exploration: a state outside its type is a reported violation, not a pruned branch.
 
 ### 1.6 `f[x]` is function application, and it is strict
 
 Inside a spec block, `f[x]` means TLA+ function application, **not** `Access.get/2`.
-It compiles to `TLA.Spec.Helpers.at/3`, which raises `TLA.Spec.DomainError` when `x`
+It compiles to `ExTLA.Spec.Helpers.at/3`, which raises `ExTLA.Spec.DomainError` when `x`
 is outside the domain of `f`:
 
 | `f` | `f[x]` | Outside the domain |
@@ -238,7 +238,7 @@ the post-state and are evaluated only once the whole guard holds, so no `require
 ordered after an assignment in any way that matters.
 
 The order is load-bearing rather than incidental, and §1.6 is why. Function application
-is strict, so `f[x]` outside `f`'s domain raises `TLA.Spec.DomainError` rather than
+is strict, so `f[x]` outside `f`'s domain raises `ExTLA.Spec.DomainError` rather than
 returning `nil`. That makes this legal and necessary:
 
 <!-- tla:skip reason=an action declaration on its own, not a compilable module -->
@@ -255,7 +255,7 @@ The first `require` is what stops `inbox[^client]` raising, and it only stops it
 the conjunction short-circuits over the binding. Hoisting the guards would evaluate the
 `let` first and raise on exactly the states the guard exists to exclude. So the choice is
 between a guard that can protect a binding and one that cannot, and the DSL takes the
-first (`TLA.Spec.Block.guard_body/2`).
+first (`ExTLA.Spec.Block.guard_body/2`).
 
 A `require` placed *after* the `let` it should have guarded is therefore a real error and
 not a style question: the action raises where it should have been disabled.
@@ -333,7 +333,7 @@ exactly as a false guard would.
 
 ### 3.1 `choose/2` keeps its TLA+ meaning
 
-`TLA.Spec.Helpers.choose/2` and `TLA.Set.choose/2` are **deterministic**: they return
+`ExTLA.Spec.Helpers.choose/2` and `ExTLA.Set.choose/2` are **deterministic**: they return
 the same element for the same set and predicate, and raise if none satisfies it. That
 is TLA+'s `CHOOSE`. They do not branch, and they are not a nondeterminism mechanism.
 
@@ -386,7 +386,7 @@ return their last operand, so `n >= 0 and status` evaluates to `status`; a check
 tested the result for truthiness would count that as holding whenever `status` was
 anything but `nil` or `false`. Every predicate — `invariant`, `terminal`,
 `action_property`, and each state predicate inside a `temporal` — is compiled with a
-result check, and a non-boolean raises `TLA.Spec.PredicateError` naming the declaration
+result check, and a non-boolean raises `ExTLA.Spec.PredicateError` naming the declaration
 and the value. It raises rather than reporting a violation because a predicate that
 returned `:idle` was not violated; it was broken, and a "violation" would send the
 author looking for the wrong bug. The check is on the compiled function, so every
@@ -412,7 +412,7 @@ checker could not evaluate compiled, and then died three frames into a run — a
 `ArgumentError` with no module, declaration or line, only under `check_liveness: true`,
 and under the default configuration never at all. The bound is now enforced where this
 document says every rule is enforced: at compile time, by
-`TLA.Spec.Temporal`'s nesting table.
+`ExTLA.Spec.Temporal`'s nesting table.
 
 `always(always(P))` is `always(P)` and `eventually(eventually(P))` is `eventually(P)`, so
 nothing expressible is lost by refusing them; what is gained is that the reader is told so
@@ -468,7 +468,7 @@ constant or a literal (§3) — a state-drawn param cannot be quantified over, b
 the set it ranges over changes from state to state. Both are compile errors (§7).
 The checker expands `acquire_lock: [:p]` into `|^processes|` separate constraints
 once the constants are known, each with its own `ENABLED` computed over the
-remaining params (`01-foundation.md` §`TLA.Temporal.enabled?/4`).
+remaining params (`01-foundation.md` §`ExTLA.Temporal.enabled?/4`).
 
 Without this form, `no_starvation` in `07-examples.md` Example 1 is unprovable.
 
@@ -503,13 +503,13 @@ detection on for all the others.
 ## 6. Terms permitted in state
 
 A spec variable's value MUST be deterministically serializable, because state identity
-is a hash of that value (`01-foundation.md` §`TLA.Fingerprint`). Permitted: atoms,
+is a hash of that value (`01-foundation.md` §`ExTLA.Fingerprint`). Permitted: atoms,
 integers, binaries, tuples, lists, maps, `MapSet`s, and structs built from those.
 
 **Forbidden in spec state:** pids, references, ports, funs, floats, and bitstrings that
 are not a whole number of bytes. The first four have no stable identity across runs;
 floats introduce `-0.0`/`NaN` comparison hazards that make two "equal" states hash
-differently; a bitstring such as `<<1::3>>` has no JSON form (`TLA.State.Json` carries
+differently; a bitstring such as `<<1::3>>` has no JSON form (`ExTLA.State.Json` carries
 bytes), so admitting it would let a violation the search found be lost when the report
 is written. A binary need not be valid UTF-8 — `<<255, 0>>` is a permitted term, and the
 wire format carries it as base64 under its own tag. Assigning a forbidden term is a
@@ -530,7 +530,7 @@ Every rule above is checked when the spec module compiles, because the DSL alrea
 accumulates every declaration it needs. A spec either means something precise or does
 not compile.
 
-**The first column is the diagnostic's `kind`** — the identifier `TLA.Spec.CompileError`
+**The first column is the diagnostic's `kind`** — the identifier `ExTLA.Spec.CompileError`
 carries, `DIAGNOSTICS.md` lists and `test/docs/spec_diagnostics_test.exs` holds this table
 to. Before #273 the column was a name chosen per row and the code carried nothing to match
 it against, so the table could not be checked and was not: it was twenty-eight rows short,
@@ -643,7 +643,7 @@ The transfer protocol from `04-layer2-model-checker.md`, in the settled syntax:
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.TransferProtocol do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :accounts
   constant :max_balance
@@ -724,7 +724,7 @@ So do not copy this spec expecting it to verify: it is a worked example of a che
 finding a bug, and the bug is the point. The `action` blocks, the `params:` and the
 `invariant` syntax above are what to copy.
 
-**Pinned by:** `test/tla/model_checker_test.exs` "and the worked example is refuted
+**Pinned by:** `test/ex_tla/model_checker_test.exs` "and the worked example is refuted
 exactly as §04's trace output shows". Until #280 nothing asserted it, and the one test
 that ran this spec passed `invariants: []` — so "fixing" `fail_transfer` would have left
 §04's printed trace describing a run that no longer happens, with the whole suite green.

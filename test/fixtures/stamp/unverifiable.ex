@@ -14,9 +14,9 @@ defmodule StampFixture.Unverifiable do
   """
   use GenServer
 
-  use TLA.GenServer,
+  use ExTLA.GenServer,
     spec: StampFixture.NoSuchSpec,
-    refinement: TLA.Conformance.Counter.Refinement,
+    refinement: ExTLA.Conformance.Counter.Refinement,
     spec_version: "33333333"
 
   def init(arg), do: {:ok, arg}

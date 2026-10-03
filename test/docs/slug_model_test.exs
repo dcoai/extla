@@ -1,6 +1,6 @@
-defmodule TLA.SlugModelTest do
+defmodule ExTLA.SlugModelTest do
   @moduledoc """
-  `TLA.GuideCheck.Links.slug/1` is ExDoc's slug, compared against ids ExDoc really generated
+  `ExTLA.GuideCheck.Links.slug/1` is ExDoc's slug, compared against ids ExDoc really generated
   (#290, for #156).
 
   ## The gate that had never run
@@ -40,7 +40,7 @@ defmodule TLA.SlugModelTest do
 
   @moduletag :needs_built_docs
 
-  alias TLA.GuideCheck.Links
+  alias ExTLA.GuideCheck.Links
 
   @root Path.expand("../..", __DIR__)
   @page "spec/02-dsl-semantics.md"

@@ -13,11 +13,11 @@ defmodule StampFixture.Dropped do
   """
   use GenServer
 
-  @spec_module TLA.Conformance.Counter.Spec
+  @spec_module ExTLA.Conformance.Counter.Spec
 
-  use TLA.GenServer,
+  use ExTLA.GenServer,
     spec: @spec_module,
-    refinement: TLA.Conformance.Counter.Refinement,
+    refinement: ExTLA.Conformance.Counter.Refinement,
     spec_version: "44444444"
 
   def init(arg), do: {:ok, arg}

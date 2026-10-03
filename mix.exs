@@ -27,7 +27,7 @@ defmodule ExTLA.MixProject do
         #
         # `mix docs` runs under `MIX_ENV=dev`, because `ex_doc` is a dev dependency, and
         # `elixirc_paths(:dev)` includes `ledger/` — so until this filter the published
-        # documentation carried `TLA.Ledger`, `TLA.Spec.Version` and `mix tla.coverage`,
+        # documentation carried `ExTLA.Ledger`, `ExTLA.Spec.Version` and `mix tla.coverage`,
         # eleven modules in all, to a reader whose `mix deps.get` brings them `lib/` only.
         # Nobody decided to document the ledger: the docs job's environment did, and the
         # `consumer-compile` job that proves the package is right cannot see the docs.
@@ -42,7 +42,7 @@ defmodule ExTLA.MixProject do
         # `Mod.fun/arity` form, which ExDoc reads as a link claim — and states this exemption
         # in the same breath: *a changelog that cannot name a removed function cannot record a
         # removal*. `Coverage.observe_action/5` was removed by #135, `Parallel.merge/2` made
-        # private, `TLA.Mix.TraceFile` hidden; each is named in the entry that did it, which is
+        # private, `ExTLA.Mix.TraceFile` hidden; each is named in the entry that did it, which is
         # exactly where a reader looking for it will be.
         #
         # So the exemption is declared here rather than the history being reworded to suit a
@@ -61,7 +61,7 @@ defmodule ExTLA.MixProject do
         # it is self-maintaining in the only way that matters: naming another ledger module in
         # prose fails the `docs` job with a warning that says which one. The list cannot go
         # stale silently, which is the property that makes a hand-kept list acceptable.
-        skip_code_autolink_to: ["TLA.Ledger", "mix tla.coverage"],
+        skip_code_autolink_to: ["ExTLA.Ledger", "mix tla.coverage"],
         # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
         # and the order here is the order the sidebar lists them in.
         #

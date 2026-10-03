@@ -1,4 +1,4 @@
-defmodule TLA.BoundedSearch do
+defmodule ExTLA.BoundedSearch do
   @moduledoc """
   A second, deliberately stupid search, so that "this counterexample is the shortest" is
   something the project checks rather than something it records (#47).
@@ -13,7 +13,7 @@ defmodule TLA.BoundedSearch do
   ## What it shares, and what it must not
 
   It uses the spec's own guards and transitions, through
-  `TLA.ModelChecker.enabled_steps/3`. That sharing is unavoidable and correct: those *are*
+  `ExTLA.ModelChecker.enabled_steps/3`. That sharing is unavoidable and correct: those *are*
   the spec, and a re-search that re-derived them would be checking a different model.
 
   What it does not share is **the search**. No frontier queue, no fingerprints, no state
@@ -47,17 +47,17 @@ defmodule TLA.BoundedSearch do
   seen.
   """
 
-  alias TLA.{ModelChecker, Spec}
+  alias ExTLA.{ModelChecker, Spec}
 
   @doc """
   Every state reachable in at most `steps` steps.
 
   Dedup is `MapSet` membership on the state term itself. That is exactly what the real
-  search cannot afford — it is why `TLA.Fingerprint` exists (D-5) — and exactly what makes
+  search cannot afford — it is why `ExTLA.Fingerprint` exists (D-5) — and exactly what makes
   this independent of it.
   """
   @spec reachable_within(Spec.Compiled.t(), map(), non_neg_integer() | :infinity) ::
-          MapSet.t(TLA.State.t())
+          MapSet.t(ExTLA.State.t())
   def reachable_within(spec, constants, steps) do
     initial = Enum.map(spec.init, & &1.(constants))
     grow(spec, constants, MapSet.new(initial), initial, steps)
@@ -95,7 +95,7 @@ defmodule TLA.BoundedSearch do
   Is `predicate` true of every state reachable in a behaviour of fewer than `length`
   states?
 
-  `length` is a counterexample's length in **states**, as `TLA.Trace` counts it — so a
+  `length` is a counterexample's length in **states**, as `ExTLA.Trace` counts it — so a
   behaviour of `length` states takes `length - 1` steps, and "shorter than that" means
   `length - 2` steps.
 
@@ -105,7 +105,7 @@ defmodule TLA.BoundedSearch do
   @spec nothing_violates_before?(
           Spec.Compiled.t(),
           map(),
-          (TLA.State.t() -> boolean()),
+          (ExTLA.State.t() -> boolean()),
           pos_integer()
         ) :: boolean()
   def nothing_violates_before?(spec, constants, predicate, length) when length >= 1 do

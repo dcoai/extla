@@ -1,4 +1,4 @@
-defmodule TLA.DocLinksTest do
+defmodule ExTLA.DocLinksTest do
   @moduledoc """
   The gate over the **built** documentation (#102, #103), and the fixtures that prove it can fail.
 
@@ -11,7 +11,7 @@ defmodule TLA.DocLinksTest do
 
   @moduletag :tmp_dir
 
-  alias TLA.DocLinks
+  alias ExTLA.DocLinks
 
   defp page(tmp, name, body) do
     File.write!(Path.join(tmp, name), body)

@@ -14,11 +14,11 @@ Layer 1 instruments GenServer (and other OTP behaviors) to automatically verify:
 - **Preconditions** — conditions that must hold before an action executes
 - **Postconditions** — conditions that must hold after an action completes
 
-Checking is controlled by `TLA.Config.mode/0` and compiles away entirely in `:disabled` mode.
+Checking is controlled by `ExTLA.Config.mode/0` and compiles away entirely in `:disabled` mode.
 
 ---
 
-## Module: `TLA.Invariant`
+## Module: `ExTLA.Invariant`
 
 The primary macro module for annotating GenServer modules with invariants.
 
@@ -28,14 +28,14 @@ The primary macro module for annotating GenServer modules with invariants.
 ```elixir
 defmodule BankAccount do
   use GenServer
-  use TLA.Invariant
+  use ExTLA.Invariant
 
   # ── Type Invariant ──────────────────────────────────────────────
   # Checked after every state transition. Defines the "shape" of
   # valid states. Analogous to TLA+ TypeOK.
   #
   # The block is a BARE BOOLEAN EXPRESSION, not a `fn` — the same shape
-  # `TLA.Spec` invariants have (02-dsl-semantics.md §5). `state` is
+  # `ExTLA.Spec` invariants have (02-dsl-semantics.md §5). `state` is
   # implicitly bound.
   #
   # Layer 1 qualifies with `state.` where Layer 2 writes variables bare.
@@ -123,7 +123,7 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Invariant do
+defmodule ExTLA.Invariant do
   @moduledoc """
   Provides macros for annotating OTP behaviors with formal invariants
   and action properties. Wraps callbacks to check properties at every
@@ -132,7 +132,7 @@ defmodule TLA.Invariant do
 
   defmacro __using__(_opts) do
     quote do
-      import TLA.Invariant, only: [
+      import ExTLA.Invariant, only: [
         invariant: 2, invariant: 3,
         action_property: 2, action_property: 3,
         precondition: 2, precondition: 3,
@@ -144,7 +144,7 @@ defmodule TLA.Invariant do
       Module.register_attribute(__MODULE__, :tla_preconditions, accumulate: true)
       Module.register_attribute(__MODULE__, :tla_postconditions, accumulate: true)
 
-      @before_compile TLA.Invariant
+      @before_compile ExTLA.Invariant
     end
   end
 
@@ -221,22 +221,22 @@ defoverridable handle_call: 3
 
 def handle_call(msg, from, state) do
   # 1. Preconditions whose PATTERN matches this message
-  TLA.Invariant.Runtime.check_preconditions!(__MODULE__, :handle_call, msg, state)
+  ExTLA.Invariant.Runtime.check_preconditions!(__MODULE__, :handle_call, msg, state)
 
   # 2. The developer's own clauses, with their own guards and matching
   result = super(msg, from, state)
 
   # 3. Extract the post-state from the return tuple
-  new_state = TLA.Invariant.Runtime.extract_state(result, state)
+  new_state = ExTLA.Invariant.Runtime.extract_state(result, state)
 
   # 4. Postconditions whose pattern matches
-  TLA.Invariant.Runtime.check_postconditions!(__MODULE__, :handle_call, msg, state, new_state)
+  ExTLA.Invariant.Runtime.check_postconditions!(__MODULE__, :handle_call, msg, state, new_state)
 
   # 5. Invariants on the post-state -- BY NAME, resolved from `callbacks:` here
-  TLA.Invariant.Runtime.check_invariants!(__MODULE__, [:in_bounds], new_state)
+  ExTLA.Invariant.Runtime.check_invariants!(__MODULE__, [:in_bounds], new_state)
 
   # 6. Action properties on the transition
-  TLA.Invariant.Runtime.check_action_properties!(__MODULE__, [:no_free_money], state, new_state)
+  ExTLA.Invariant.Runtime.check_action_properties!(__MODULE__, [:no_free_money], state, new_state)
 
   result
 end
@@ -245,9 +245,9 @@ end
 **Only the callbacks the module's own author defined are wrapped**, and they are
 identified with `@on_definition` rather than `Module.defines?/2`. `use GenServer`
 injects defaults for `handle_call/3`, `handle_cast/2` and `handle_info/2` before
-`use TLA.Invariant` runs, `Module.defines?/2` cannot tell those from the author's,
+`use ExTLA.Invariant` runs, `Module.defines?/2` cannot tell those from the author's,
 and calling `super` on a GenServer default is deprecated besides — quite apart from
-its being a transition nobody wrote. This is why `use TLA.Invariant` belongs
+its being a transition nobody wrote. This is why `use ExTLA.Invariant` belongs
 directly after `use GenServer` and before the callbacks: `@on_definition` sees a
 definition only once it is installed.
 
@@ -273,10 +273,10 @@ Two more consequences worth stating:
 
 ### `:disabled` emits nothing
 
-When `TLA.Config.mode/0` resolves to `:disabled` at compile time, `@before_compile`
+When `ExTLA.Config.mode/0` resolves to `:disabled` at compile time, `@before_compile`
 emits **no wrapper and no `defoverridable`**. The module compiles exactly as written.
 
-This is why `TLA.Config.mode/0` is a `compile_env` macro rather than a runtime
+This is why `ExTLA.Config.mode/0` is a `compile_env` macro rather than a runtime
 `get_env` lookup (`01-foundation.md` §Configuration). A runtime lookup could not remove
 the wrapper — it would leave an `Application.get_env/2` call plus a branch on every
 callback, which by itself would exceed the Layer 1 per-check budget. "Zero production
@@ -284,16 +284,16 @@ cost" means no emitted code, not cheap emitted code.
 
 ---
 
-## Module: `TLA.Invariant.Runtime`
+## Module: `ExTLA.Invariant.Runtime`
 
 Runtime checking engine (not used directly by developers).
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Invariant.Runtime do
+defmodule ExTLA.Invariant.Runtime do
   @moduledoc """
   Runtime engine for invariant and property checking.
-  Behavior depends on TLA.Config.mode/0.
+  Behavior depends on ExTLA.Config.mode/0.
   """
 
   @doc """
@@ -355,7 +355,7 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Invariant.Violation do
+defmodule ExTLA.Invariant.Violation do
   @moduledoc """
   Handles invariant violations according to the configured mode.
   """
@@ -374,7 +374,7 @@ defmodule TLA.Invariant.Violation do
 
   @doc """
   Report a violation. Behavior depends on mode:
-  - :enabled  → raise TLA.Invariant.Violation
+  - :enabled  → raise ExTLA.Invariant.Violation
   - :log_only → Logger.error with structured metadata
   - :disabled → no-op (but this function should never be called in :disabled)
   """
@@ -417,7 +417,7 @@ Layer 1 supports invariant checking for:
 | `GenServer` | `init/1`, `handle_call/3`, `handle_cast/2`, `handle_info/2`, `handle_continue/2` | Primary target |
 | `GenStateMachine` | `handle_event/4` | State + data checked |
 | `:gen_statem` | `handle_event/4` | Erlang behavior support |
-| `Agent` | `fun` passed to `Agent.update/get` | Via `TLA.Invariant.Agent` |
+| `Agent` | `fun` passed to `Agent.update/get` | Via `ExTLA.Invariant.Agent` |
 
 ### What a state machine's `state` is, and what its message is
 
@@ -447,10 +447,10 @@ Three consequences:
 
 ### An `Agent`'s checks cannot be compiled away
 
-`TLA.Invariant.Agent` wraps `start_link/3`, `update/4`, `cast/3`, `get_and_update/4` and
+`ExTLA.Invariant.Agent` wraps `start_link/3`, `update/4`, `cast/3`, `get_and_update/4` and
 `get/4`, each taking as its first argument the module whose declarations apply. An `Agent`
 has no callback module of its own, so the declarations live in an ordinary module that
-`use`s `TLA.Invariant` and nothing there is wrapped.
+`use`s `ExTLA.Invariant` and nothing there is wrapped.
 
 Two consequences that the rest of Layer 1 does not have (D-25):
 
@@ -469,7 +469,7 @@ Two consequences that the rest of Layer 1 does not have (D-25):
 ```elixir
 defmodule TrafficLight do
   use GenStateMachine
-  use TLA.Invariant
+  use ExTLA.Invariant
 
   # For state machines the implicit binding is a {state_name, data} tuple,
   # so destructure it with `let`-free ordinary matching in the expression.
@@ -501,7 +501,7 @@ end
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule TLA.Invariant.Test do
+defmodule ExTLA.Invariant.Test do
   @moduledoc """
   ExUnit helpers for testing invariants in isolation.
   """
@@ -543,7 +543,7 @@ end
 ```
 
 Every helper here raises rather than fails when it is given a module carrying no
-predicates — one that does not `use TLA.Invariant`, or one compiled under
+predicates — one that does not `use ExTLA.Invariant`, or one compiled under
 `mode: :disabled`, which emits none. Failing as though the declaration were false would
 report the mode as a broken invariant. `refute_invariant/3` raises the same way for a name
 the module does not declare: a renamed declaration would otherwise turn the test green by
@@ -559,7 +559,7 @@ other two behind another test run.
 ```elixir
 defmodule BankAccountTest do
   use ExUnit.Case
-  use TLA.Invariant.Test
+  use ExTLA.Invariant.Test
 
   test "withdrawal maintains invariants" do
     state = %{balance: 100, owner: "Alice", status: :active,
@@ -612,7 +612,7 @@ Layer 1 emits telemetry for observability:
 `:verbose` to the invariant and action-property checks and not to the precondition and
 postcondition ones, which had no `:verbose` arity to pass it to — so this table listed four
 events, the argument below counted four, and the code emitted two. The API block for
-`TLA.Invariant.Runtime` three hundred lines down said so plainly, listing the two arities
+`ExTLA.Invariant.Runtime` three hundred lines down said so plainly, listing the two arities
 that existed: #22 amended that block from the code and left this table where it was.
 
 **Success events are opt-in, and off by default.** `:telemetry.execute/3` costs on the

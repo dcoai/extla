@@ -9,9 +9,9 @@ defmodule StampFixture.StaleDistinct do
   defmodule First do
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement,
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement,
       spec_version: "11111111"
 
     def init(arg), do: {:ok, arg}
@@ -20,9 +20,9 @@ defmodule StampFixture.StaleDistinct do
   defmodule Second do
     use GenServer
 
-    use TLA.GenServer,
-      spec: TLA.Conformance.Counter.Spec,
-      refinement: TLA.Conformance.Counter.Refinement,
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.Spec,
+      refinement: ExTLA.Conformance.Counter.Refinement,
       spec_version: "22222222"
 
     def init(arg), do: {:ok, arg}

@@ -12,14 +12,14 @@ That makes it the easiest thing here to adopt, so start there.
 ## The smallest useful step
 
 Take a server you already have — here the lock this tutorial has been specifying, written as an
-ordinary GenServer. Add `use TLA.Invariant` and one property you believe about its state: the one
+ordinary GenServer. Add `use ExTLA.Invariant` and one property you believe about its state: the one
 you would be embarrassed to be wrong about.
 
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.FirstTry do
   use GenServer
-  use TLA.Invariant
+  use ExTLA.Invariant
 
   invariant :holder_is_not_waiting,
     desc: "the client holding the lock is not also queued for it" do
@@ -50,7 +50,7 @@ GenServer.call(pid, {:acquire, :alice})
 ```
 
 ```
-** (TLA.Invariant.Violation) ═══ INVARIANT VIOLATED: holder_is_not_waiting ══════════
+** (ExTLA.Invariant.Violation) ═══ INVARIANT VIOLATED: holder_is_not_waiting ══════════
   the client holding the lock is not also queued for it
   module: Tutorial.FirstTry
   state:
@@ -73,7 +73,7 @@ existed. Everything below is detail you will want once it is in.
 ```elixir
 defmodule Tutorial.LockServer do
   use GenServer
-  use TLA.Invariant
+  use ExTLA.Invariant
 
   invariant :holder_is_not_waiting do
     state.holder == nil or state.holder not in state.waiting
@@ -138,7 +138,7 @@ GenServer.call(pid, {:release, :bob})
 ```
 
 ```
-** (TLA.Invariant.Violation) ═══ PRECONDITION VIOLATED: handle_call ═════════════════════════════
+** (ExTLA.Invariant.Violation) ═══ PRECONDITION VIOLATED: handle_call ═════════════════════════════
   only the holder releases
   module: Tutorial.LockServer
   message: {:release, :bob}
@@ -187,13 +187,13 @@ invariant is checked on every transition forever while proving nothing. It is th
 `mix tla.check` reports at Layer 2, one layer down, and it is **not detectable from the passing
 side**.
 
-`TLA.Invariant.Test` checks a declaration against a *state value* rather than a running process,
+`ExTLA.Invariant.Test` checks a declaration against a *state value* rather than a running process,
 which is what makes the negative case writable: a state a server can only reach through a
 sequence of calls is just a map here.
 
 <!-- tla:run expect=ok -->
 ```elixir
-import TLA.Invariant.Test
+import ExTLA.Invariant.Test
 
 # It holds where it should.
 assert_invariants(Tutorial.LockServer, %{holder: :alice, waiting: [:bob]})
@@ -202,7 +202,7 @@ assert_invariants(Tutorial.LockServer, %{holder: :alice, waiting: [:bob]})
 refute_invariant(Tutorial.LockServer, :holder_is_not_waiting, %{holder: :alice, waiting: [:alice]})
 ```
 
-In a suite that is `use TLA.Invariant.Test` after `use ExUnit.Case`. `assert_action_properties/3`
+In a suite that is `use ExTLA.Invariant.Test` after `use ExUnit.Case`. `assert_action_properties/3`
 is there too, taking the old and new state.
 
 ## Telemetry
@@ -217,7 +217,7 @@ the violation struct in the metadata:
   "queue-violations",
   [:extla, :invariant, :violated],
   fn _event, _measurements, metadata, _config ->
-    # metadata: %{module: …, name: …, violation: %TLA.Invariant.Violation{}}
+    # metadata: %{module: …, name: …, violation: %ExTLA.Invariant.Violation{}}
     :ok = Enum.each([:module, :name, :violation], &Map.fetch!(metadata, &1))
   end,
   nil
@@ -261,10 +261,10 @@ The same declarations work for the other OTP shapes, with one exception worth kn
   shaped differently there.
 - **`Agent`** cannot be wrapped, and the reason is structural: `Agent.start_link/2` takes a
   function, not a behaviour module, so there is no callback module for `@before_compile` to
-  instrument and nothing to carry the declarations. `TLA.Invariant.Agent` handles it by taking the
+  instrument and nothing to carry the declarations. `ExTLA.Invariant.Agent` handles it by taking the
   declaring module as an argument on every call — `Checked.update(Counter, pid, &…)` — which also
   means an `Agent`'s checks **cannot be compiled away**.
-- **Supervision trees** are not modelled at Layer 1 at all; `TLA.Supervisor.Spec` is deferred past
+- **Supervision trees** are not modelled at Layer 1 at all; `ExTLA.Supervisor.Spec` is deferred past
   v1 ([`06-architecture.md`](../../spec/06-architecture.md#deferred-past-v1-deliberately)).
 
 ## What Layer 1 cannot tell you

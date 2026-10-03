@@ -1,4 +1,4 @@
-defmodule TLA.StampTest do
+defmodule ExTLA.StampTest do
   @moduledoc """
   `mix tla.stamp` end to end, over a tree with all four statuses (#308, for #173).
 
@@ -67,7 +67,7 @@ defmodule TLA.StampTest do
       assert status_of(StampFixture.Unstamped) == :unstamped
       assert status_of(StampFixture.Unverifiable) == :unverifiable
       assert Enum.find(states(), &(&1.module == StampFixture.Unverifiable)).current == nil
-      assert status_of(TLA.Conformance.Counter.Impl.Conforming) == :fresh
+      assert status_of(ExTLA.Conformance.Counter.Impl.Conforming) == :fresh
     end
 
     # The two stale files carry different SHAPES of staleness, and the distinction is what
@@ -174,7 +174,7 @@ defmodule TLA.StampTest do
     test "and runs against this project's own sources" do
       output = capture_io(fn -> Stamp.run([]) end)
 
-      assert output =~ "TLA.Conformance.Counter.Impl.Conforming"
+      assert output =~ "ExTLA.Conformance.Counter.Impl.Conforming"
       assert output =~ "fresh"
     end
   end
@@ -194,7 +194,7 @@ defmodule TLA.StampTest do
     test "and scanning them finds the mappings this repository has" do
       modules = Stamp.states() |> Enum.map(& &1.module)
 
-      assert TLA.Conformance.Counter.Impl.Conforming in modules
+      assert ExTLA.Conformance.Counter.Impl.Conforming in modules
       refute StampFixture.Stale.First in modules
     end
   end
@@ -211,7 +211,7 @@ defmodule TLA.StampTest do
       assert distinct =~ ~s(spec_version: "22222222")
 
       # And none of them can become current by accident when the spec moves.
-      current = TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec)
+      current = ExTLA.Spec.Hash.module_version(ExTLA.Conformance.Counter.Spec)
       refute current in ~w(00000000 11111111 22222222 33333333)
     end
   end
@@ -235,7 +235,7 @@ defmodule TLA.StampTest do
 
     defp copied(copy, name), do: copy |> Path.join(name) |> File.read!()
 
-    defp current_version, do: TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec)
+    defp current_version, do: ExTLA.Spec.Hash.module_version(ExTLA.Conformance.Counter.Spec)
 
     defp occurrences(source, stamp) do
       source |> String.split(~s(spec_version: "#{stamp}")) |> length() |> Kernel.-(1)
@@ -296,7 +296,7 @@ defmodule TLA.StampTest do
 
     setup %{tmp_dir: tmp} do
       path = Path.join(tmp, "one.ex")
-      File.write!(path, ~s(  use TLA.GenServer, spec_version: "aaaaaaaa"\n))
+      File.write!(path, ~s(  use ExTLA.GenServer, spec_version: "aaaaaaaa"\n))
       %{path: path}
     end
 
@@ -373,9 +373,9 @@ defmodule TLA.StampTest do
       defmodule CheckFixture.#{name} do
         use GenServer
 
-        use TLA.GenServer,
+        use ExTLA.GenServer,
           spec: #{Keyword.fetch!(opts, :spec)},
-          refinement: TLA.Conformance.Counter.Refinement#{stamp}
+          refinement: ExTLA.Conformance.Counter.Refinement#{stamp}
 
         def init(a), do: {:ok, a}
       end
@@ -396,7 +396,7 @@ defmodule TLA.StampTest do
 
     test "exits 1 on a stale stamp", ctx do
       dir =
-        mapping(ctx.tmp, "Stale", spec: "TLA.Conformance.Counter.Spec", stamp: "00000000")
+        mapping(ctx.tmp, "Stale", spec: "ExTLA.Conformance.Counter.Spec", stamp: "00000000")
 
       output = check([dir, ctx.conformance])
 
@@ -416,15 +416,15 @@ defmodule TLA.StampTest do
     end
 
     test "but exits 0 on a fresh stamp", ctx do
-      current = TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec)
-      dir = mapping(ctx.tmp, "Fresh", spec: "TLA.Conformance.Counter.Spec", stamp: current)
+      current = ExTLA.Spec.Hash.module_version(ExTLA.Conformance.Counter.Spec)
+      dir = mapping(ctx.tmp, "Fresh", spec: "ExTLA.Conformance.Counter.Spec", stamp: current)
 
       check_passes([dir, ctx.conformance])
     end
 
     # The stamp is opt-in. Failing on its absence would make it mandatory by the back door.
     test "and on an unstamped mapping", ctx do
-      dir = mapping(ctx.tmp, "Unstamped", spec: "TLA.Conformance.Counter.Spec")
+      dir = mapping(ctx.tmp, "Unstamped", spec: "ExTLA.Conformance.Counter.Spec")
 
       check_passes([dir, ctx.conformance])
     end
@@ -440,11 +440,11 @@ defmodule TLA.StampTest do
       File.write!(Path.join(dir, "m.ex"), """
       defmodule CheckFixture.Attr do
         use GenServer
-        @spec_mod TLA.Conformance.Counter.Spec
+        @spec_mod ExTLA.Conformance.Counter.Spec
 
-        use TLA.GenServer,
+        use ExTLA.GenServer,
           spec: @spec_mod,
-          refinement: TLA.Conformance.Counter.Refinement,
+          refinement: ExTLA.Conformance.Counter.Refinement,
           spec_version: "00000000"
 
         def init(a), do: {:ok, a}
@@ -465,15 +465,15 @@ defmodule TLA.StampTest do
     # D-37 rests on these two facts, so they are measured here rather than described. If
     # either stops being true, `--check`'s rule is wrong and so is the decision not to gate.
     test "raises on a stale stamp given as a literal alias" do
-      assert_raise TLA.Spec.CompileError, ~r/is stamped against/, fn ->
-        compile_mapping("TLA.Conformance.Counter.Spec", ~s("deadbeef"))
+      assert_raise ExTLA.Spec.CompileError, ~r/is stamped against/, fn ->
+        compile_mapping("ExTLA.Conformance.Counter.Spec", ~s("deadbeef"))
       end
     end
 
     # The row `--check` deliberately passes: an attribute `spec:` is resolved at expansion,
     # so the stamp IS verified — by the compiler, not by the task.
     test "and raises just the same when the spec: is an attribute" do
-      assert_raise TLA.Spec.CompileError, ~r/is stamped against/, fn ->
+      assert_raise ExTLA.Spec.CompileError, ~r/is stamped against/, fn ->
         compile_mapping("@spec_mod", ~s("deadbeef"))
       end
     end
@@ -481,9 +481,9 @@ defmodule TLA.StampTest do
     # Anti-vacuity: the same shapes with a correct stamp compile, so the two above are
     # failing on the stamp rather than on anything else about the fixture.
     test "and compiles either shape with the current stamp" do
-      current = inspect(TLA.Spec.Hash.module_version(TLA.Conformance.Counter.Spec))
+      current = inspect(ExTLA.Spec.Hash.module_version(ExTLA.Conformance.Counter.Spec))
 
-      assert [_ | _] = compile_mapping("TLA.Conformance.Counter.Spec", current)
+      assert [_ | _] = compile_mapping("ExTLA.Conformance.Counter.Spec", current)
       assert [_ | _] = compile_mapping("@spec_mod", current)
     end
 
@@ -493,11 +493,11 @@ defmodule TLA.StampTest do
       Code.compile_string("""
       defmodule #{name} do
         use GenServer
-        @spec_mod TLA.Conformance.Counter.Spec
+        @spec_mod ExTLA.Conformance.Counter.Spec
 
-        use TLA.GenServer,
+        use ExTLA.GenServer,
           spec: #{spec},
-          refinement: TLA.Conformance.Counter.Refinement,
+          refinement: ExTLA.Conformance.Counter.Refinement,
           spec_version: #{stamp}
 
         def init(a), do: {:ok, a}

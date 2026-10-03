@@ -1,11 +1,11 @@
-defmodule TLA.Differential.SetVocabulary do
+defmodule ExTLA.Differential.SetVocabulary do
   @moduledoc """
   `SetVocabulary.tla`, in the ExTLA DSL — the seventh corpus entry, and the only one whose
   subject is the **vocabulary** rather than an algorithm (#319, for #183).
 
   `01-foundation.md` specifies the set-theoretic and function operators as the foundation
   everything else builds on, and until #319 a spec body could not reach most of them: an
-  author had to write `TLA.Set.powerset/1` in full, and exactly one spec in the repository
+  author had to write `ExTLA.Set.powerset/1` in full, and exactly one spec in the repository
   did. A unit test would have shown that the operators still work. It would not have shown
   that a spec *using* them means what TLA+ means — that `exists?(powerset(^nodes), …)` is
   `\\E q \\in SUBSET Nodes : …`, reachable state for reachable state.
@@ -24,7 +24,7 @@ defmodule TLA.Differential.SetVocabulary do
   | `for_each/2` | `[x \\in S |-> e]` | always; one implementation since #319 |
   | `update/3` | `[f EXCEPT ![k] = v]` | always; one implementation since #319 |
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :nodes, default: MapSet.new([:n1, :n2, :n3])
 

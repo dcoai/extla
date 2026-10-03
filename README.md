@@ -8,7 +8,7 @@ that running GenServers actually conform to them.
 <!-- tla:spec -->
 ```elixir
 defmodule Specs.Counter do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :max_val
 
@@ -148,9 +148,9 @@ four entries were typing a variable *weaker* than the TLA+ they are checked agai
 that `f[x]` outside a function's domain was `nil` rather than an error.
 
 **Phase 3** added Layer 1 invariants on running processes and the Layer 3 conformance
-bridge — `TLA.GenServer`, `TLA.Refinement`, `mix tla.simulate` and `mix tla.replay`.
+bridge — `ExTLA.GenServer`, `ExTLA.Refinement`, `mix tla.simulate` and `mix tla.replay`.
 **Phase 4** added parallel exploration (**5.40x at 8 workers**; `raft_election` went from
-23.4 s to 1.65 s, with the corpus agreeing with TLC at 1, 2, 4 and 8), `TLA.PropertyTest`,
+23.4 s to 1.65 s, with the corpus agreeing with TLC at 1, 2, 4 and 8), `ExTLA.PropertyTest`,
 and `mix tla.visualize`.
 
 **What is built** is [`CHANGELOG.md`](CHANGELOG.md), which is gated: `bin/changelog_guard.exs`

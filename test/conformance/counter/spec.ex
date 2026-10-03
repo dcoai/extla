@@ -1,4 +1,4 @@
-defmodule TLA.Conformance.Counter.Spec do
+defmodule ExTLA.Conformance.Counter.Spec do
   @moduledoc """
   `spec/07-examples.md` Example 4's `Specs.Counter`, verbatim.
 
@@ -7,7 +7,7 @@ defmodule TLA.Conformance.Counter.Spec do
   where the project explains what Layer 3's step check buys, and it comes with the bug it
   is meant to catch already written down.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :max_val, default: 5
 
@@ -48,18 +48,18 @@ defmodule TLA.Conformance.Counter.Spec do
   fairness(:weak, [:done])
 end
 
-defmodule TLA.Conformance.Counter.BuggySpec do
+defmodule ExTLA.Conformance.Counter.BuggySpec do
   @moduledoc """
   The same counter with a design bug in it: `increment` may run up to `max_val`, and the
   invariant says the count never exceeds two. Nothing about the implementation is wrong —
   the specification contradicts itself, and `mix tla.check` finds it before any code
   exists.
 
-  This entry is what `TLA.Replay.counterexample/3` is measured on. A counterexample is
+  This entry is what `ExTLA.Replay.counterexample/3` is measured on. A counterexample is
   only worth having if it can be run against the code, and a spec whose invariant no
   behaviour violates cannot produce one.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :max_val, default: 5
 

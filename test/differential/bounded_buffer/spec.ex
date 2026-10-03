@@ -3,7 +3,7 @@
 # Regenerate with `mix tla.examples --write`; the `surface-drift` job fails on a
 # difference. The specification is the page's fence: editing this file is editing a
 # copy, which is the drift D-21 introduced and #280 closed.
-defmodule TLA.Differential.BoundedBuffer do
+defmodule ExTLA.Differential.BoundedBuffer do
   @moduledoc """
   `BoundedBuffer.tla`, in the ExTLA DSL — generated from `spec/07-examples.md` Example
   3, so "verbatim" holds by construction rather than by discipline.
@@ -11,7 +11,7 @@ defmodule TLA.Differential.BoundedBuffer do
   What this entry adds over the others is in `test/differential/README.md`. What it
   *specifies* is the page, and only the page.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :producers, default: MapSet.new([:p1, :p2])
   constant :consumers, default: MapSet.new([:c1, :c2])

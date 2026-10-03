@@ -1,4 +1,4 @@
-defmodule TLA.Guides.TutorialChainTest do
+defmodule ExTLA.Guides.TutorialChainTest do
   @moduledoc """
   The tutorial's forward chain: every page but the last hands the reader to the next one
   (#288, for #155).
@@ -19,7 +19,7 @@ defmodule TLA.Guides.TutorialChainTest do
 
   ## Why a test rather than a review step
 
-  The same argument `TLA.GuideCheck.Links` makes for anchors: a link that silently goes
+  The same argument `ExTLA.GuideCheck.Links` makes for anchors: a link that silently goes
   nowhere is drift, and a page that silently goes nowhere is the same thing one level up.
   Nothing here reads prose — only whether the last link forward exists and points at the
   successor in sorted order, which is a fact about the file names and needs no judgement.

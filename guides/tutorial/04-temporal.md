@@ -32,7 +32,7 @@ and `02-dsl-semantics.md` §5.2 says why the whole-action form would not do:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.WeakLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob, :carol])
 
@@ -139,7 +139,7 @@ and then:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.StrongLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob, :carol])
 
@@ -211,7 +211,7 @@ waits forever anyway:
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.WholeActionLock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:alice, :bob, :carol])
 

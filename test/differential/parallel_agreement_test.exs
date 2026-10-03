@@ -13,10 +13,10 @@
 # `06-architecture.md` §Phase 4 and D-9 are the reason this file exists at all: a wrong
 # answer computed on eight cores is still wrong, and parallelism makes every correctness
 # bug harder to reproduce.
-defmodule TLA.Differential.ParallelAgreementTest do
+defmodule ExTLA.Differential.ParallelAgreementTest do
   use ExUnit.Case, async: false
 
-  alias TLA.ModelChecker
+  alias ExTLA.ModelChecker
 
   @worker_counts [2, 4, 8]
 
@@ -25,20 +25,20 @@ defmodule TLA.Differential.ParallelAgreementTest do
   # raft — the one large enough for workers to be doing anything real — gets its own test
   # at the top count.
   @sweep [
-    %{name: "die_hard", module: TLA.Differential.DieHard, constants: %{}},
+    %{name: "die_hard", module: ExTLA.Differential.DieHard, constants: %{}},
     %{
       name: "two_phase_commit",
-      module: TLA.Differential.TwoPhaseCommit,
+      module: ExTLA.Differential.TwoPhaseCommit,
       constants: %{rms: MapSet.new([:r1, :r2, :r3])}
     },
     %{
       name: "distributed_lock",
-      module: TLA.Differential.DistributedLock,
+      module: ExTLA.Differential.DistributedLock,
       constants: %{processes: MapSet.new([:p1, :p2]), resources: MapSet.new([:r1, :r2])}
     },
     %{
       name: "bounded_buffer",
-      module: TLA.Differential.BoundedBuffer,
+      module: ExTLA.Differential.BoundedBuffer,
       constants: %{
         producers: MapSet.new([:p1, :p2]),
         consumers: MapSet.new([:c1, :c2]),
@@ -50,7 +50,7 @@ defmodule TLA.Differential.ParallelAgreementTest do
 
   @raft %{
     name: "raft_election",
-    module: TLA.Differential.RaftElection,
+    module: ExTLA.Differential.RaftElection,
     constants: %{servers: MapSet.new([:s1, :s2, :s3]), max_term: 2}
   }
 
@@ -75,11 +75,11 @@ defmodule TLA.Differential.ParallelAgreementTest do
     test "is the same length as the single-threaded one, on every violated invariant" do
       entry = %{
         name: "distributed_lock",
-        module: TLA.Differential.DistributedLock,
+        module: ExTLA.Differential.DistributedLock,
         constants: %{processes: MapSet.new([:p1, :p2]), resources: MapSet.new([:r1, :r2])}
       }
 
-      spec = TLA.Spec.Compiled.from_module(entry.module)
+      spec = ExTLA.Spec.Compiled.from_module(entry.module)
 
       for invariant <- spec.invariants, workers <- @worker_counts do
         one = check(entry, 1, invariants: [invariant.name])
@@ -103,13 +103,13 @@ defmodule TLA.Differential.ParallelAgreementTest do
       # n == 5, so there is a level with several states in it when the violation is
       # found — the shape where a per-worker report would show up as duplicates.
       for workers <- @worker_counts do
-        result = ModelChecker.run(TLA.TestSpecs.Broken, %{workers: workers})
+        result = ModelChecker.run(ExTLA.TestSpecs.Broken, %{workers: workers})
 
         assert result.status == :violation
         assert result.violation.property == :below_three
 
         assert result.violation.length ==
-                 ModelChecker.run(TLA.TestSpecs.Broken, %{}).violation.length
+                 ModelChecker.run(ExTLA.TestSpecs.Broken, %{}).violation.length
       end
     end
   end
@@ -157,7 +157,7 @@ defmodule TLA.Differential.ParallelAgreementTest do
     test "a state space smaller than the budget is not bounded at any worker count" do
       for workers <- [1 | @worker_counts] do
         result =
-          ModelChecker.run(TLA.TestSpecs.Cube, %{
+          ModelChecker.run(ExTLA.TestSpecs.Cube, %{
             workers: workers,
             max_states: 1_000,
             check_deadlock: false
@@ -177,8 +177,8 @@ defmodule TLA.Differential.ParallelAgreementTest do
     # reads as "the search is finished".
     test "a level smaller than one batch completes" do
       config = %{invariants: [], action_properties: []}
-      one = ModelChecker.run(TLA.TestSpecs.Broken, config)
-      many = ModelChecker.run(TLA.TestSpecs.Broken, Map.put(config, :workers, 8))
+      one = ModelChecker.run(ExTLA.TestSpecs.Broken, config)
+      many = ModelChecker.run(ExTLA.TestSpecs.Broken, Map.put(config, :workers, 8))
 
       assert many.status == one.status
       assert many.distinct_states == one.distinct_states

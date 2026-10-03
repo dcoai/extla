@@ -1,4 +1,4 @@
-defmodule TLA.ReadmeEntryTest do
+defmodule ExTLA.ReadmeEntryTest do
   @moduledoc """
   The README is the way in, and it has to lead somewhere (#289, for #155).
 
@@ -21,7 +21,7 @@ defmodule TLA.ReadmeEntryTest do
   exist and gated by `surface-drift` — so "the README lists the tasks" is a fact about the
   code rather than a hand-kept set that goes stale the way the install pin did (#154).
 
-  The **links** are not re-checked here: `TLA.GuideCheck.Links` already resolves every
+  The **links** are not re-checked here: `ExTLA.GuideCheck.Links` already resolves every
   relative link on this page, and #281 brought `README.md` under that harness. What this
   adds is that the links a reader needs are *present*, which no link checker can tell you.
 

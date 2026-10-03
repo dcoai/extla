@@ -7,18 +7,18 @@
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Layer 3: Conformance Bridge                        │
-│  TLA.GenServer — step legality against the spec     │
-│  TLA.Replay    — counterexample + trace validation  │
+│  ExTLA.GenServer — step legality against the spec     │
+│  ExTLA.Replay    — counterexample + trace validation  │
 ├─────────────────────────────────────────────────────┤
 │  Layer 2: Specification DSL + Model Checker         │
-│  TLA.Spec      — state machines, actions            │
-│  TLA.Coverage  — what the run actually exercised    │
+│  ExTLA.Spec      — state machines, actions            │
+│  ExTLA.Coverage  — what the run actually exercised    │
 ├─────────────────────────────────────────────────────┤
 │  Layer 1: Runtime Invariant Checking                │
-│  TLA.Invariant — design-by-contract for GenServers  │
+│  ExTLA.Invariant — design-by-contract for GenServers  │
 ├─────────────────────────────────────────────────────┤
 │  Foundation: Core Types & Operators                 │
-│  TLA.Temporal, TLA.Set, TLA.State, TLA.Fingerprint  │
+│  ExTLA.Temporal, ExTLA.Set, ExTLA.State, ExTLA.Fingerprint  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -30,11 +30,11 @@ The layers describe **verification power**, not build order. Build order is
 
 | Document | Content | Status |
 |---|---|---|
-| [01-foundation.md](01-foundation.md) | `TLA.State`, `TLA.Temporal`, `TLA.Set`, `TLA.Function`, `TLA.Fingerprint`, `TLA.Config` | Specified |
+| [01-foundation.md](01-foundation.md) | `ExTLA.State`, `ExTLA.Temporal`, `ExTLA.Set`, `ExTLA.Function`, `ExTLA.Fingerprint`, `ExTLA.Config` | Specified |
 | [02-dsl-semantics.md](02-dsl-semantics.md) | **Normative DSL semantics.** Name resolution, types, action semantics, nondeterminism, fairness, terminal states, compile-time validation | Specified |
-| [03-layer1-invariants.md](03-layer1-invariants.md) | `TLA.Invariant` — runtime invariant checking | Specified |
-| [04-layer2-model-checker.md](04-layer2-model-checker.md) | `TLA.ModelChecker`, `TLA.StateGraph`, `TLA.Trace`, `TLA.Coverage`, state-space reduction | Specified |
-| [05-layer3-conformance.md](05-layer3-conformance.md) | `TLA.GenServer`, `TLA.Refinement`, `TLA.Replay`, `TLA.Simulation` | Specified |
+| [03-layer1-invariants.md](03-layer1-invariants.md) | `ExTLA.Invariant` — runtime invariant checking | Specified |
+| [04-layer2-model-checker.md](04-layer2-model-checker.md) | `ExTLA.ModelChecker`, `ExTLA.StateGraph`, `ExTLA.Trace`, `ExTLA.Coverage`, state-space reduction | Specified |
+| [05-layer3-conformance.md](05-layer3-conformance.md) | `ExTLA.GenServer`, `ExTLA.Refinement`, `ExTLA.Replay`, `ExTLA.Simulation` | Specified |
 | [06-architecture.md](06-architecture.md) | Dependency graph, data flow, storage, phases, non-goals, performance targets | Specified |
 | [08-decisions.md](08-decisions.md) | Design decisions and their rationale | Living |
 | [07-examples.md](07-examples.md) | The acceptance corpus: distributed lock, Raft election, producer-consumer, counter | Specified |

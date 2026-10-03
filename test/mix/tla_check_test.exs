@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
 
   setup do
     Mix.shell(Mix.Shell.IO)
-    on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Terminating) end)
+    on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.Terminating) end)
     :ok
   end
 
@@ -43,15 +43,15 @@ defmodule Mix.Tasks.Tla.CheckTest do
 
   describe "verdicts and exit codes" do
     test "a verified spec exits 0 and says so" do
-      {output, code} = check(["TLA.TestSpecs.WithDefaults"])
+      {output, code} = check(["ExTLA.TestSpecs.WithDefaults"])
 
       assert code == 0
-      assert output =~ "TLA.TestSpecs.WithDefaults — verified"
+      assert output =~ "ExTLA.TestSpecs.WithDefaults — verified"
       assert output =~ "4 distinct states"
     end
 
     test "a violation exits 1 and prints the counterexample" do
-      {output, code} = check(["TLA.TestSpecs.Broken"])
+      {output, code} = check(["ExTLA.TestSpecs.Broken"])
 
       assert code == 1
       assert output =~ "VIOLATION: below_three"
@@ -61,7 +61,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
     # A spec that declares a `temporal` is asking for it to be checked, so the task
     # checks it — and prints a lasso rather than a trace when one is refuted.
     test "a refuted temporal property exits 1 and prints the lasso" do
-      {output, code} = check(["TLA.TestSpecs.IdlingUnfair"])
+      {output, code} = check(["ExTLA.TestSpecs.IdlingUnfair"])
 
       assert code == 1
       assert output =~ "LIVENESS: eventually_two"
@@ -69,7 +69,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
     end
 
     test "--safety-only leaves the temporal properties unchecked, and says so" do
-      {output, code} = check(["TLA.TestSpecs.IdlingUnfair", "--safety-only"])
+      {output, code} = check(["ExTLA.TestSpecs.IdlingUnfair", "--safety-only"])
 
       assert code == 0
       assert output =~ "verified"
@@ -82,16 +82,16 @@ defmodule Mix.Tasks.Tla.CheckTest do
     # test that pinned the API behaviour asserted only the warning text, so nothing here saw
     # the exit code; this does.
     test "--verify-symmetry that could not verify does not exit 0 or say verified" do
-      Application.put_env(:extla, TLA.TestSpecs.PerBinding,
+      Application.put_env(:extla, ExTLA.TestSpecs.PerBinding,
         constants: %{processes: MapSet.new([:p1, :p2])},
         symmetry: [:processes]
       )
 
-      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.PerBinding) end)
+      on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.PerBinding) end)
 
       # `PerBinding` reduces 8 states to 5, so 6 truncates only the unreduced run.
       {output, code} =
-        check(["TLA.TestSpecs.PerBinding", "--verify-symmetry", "--max-states", "6"])
+        check(["ExTLA.TestSpecs.PerBinding", "--verify-symmetry", "--max-states", "6"])
 
       assert code == 2, "an inconclusive verification is a bounded run, exit 2; got #{code}"
       refute output =~ "— verified"
@@ -99,14 +99,14 @@ defmodule Mix.Tasks.Tla.CheckTest do
     end
 
     test "--verify-symmetry catches a declaration the spec does not deserve" do
-      Application.put_env(:extla, TLA.TestSpecs.Asymmetric,
+      Application.put_env(:extla, ExTLA.TestSpecs.Asymmetric,
         constants: %{processes: MapSet.new([:p1, :p2])},
         symmetry: [:processes]
       )
 
-      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Asymmetric) end)
+      on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.Asymmetric) end)
 
-      {output, code} = check(["TLA.TestSpecs.Asymmetric", "--verify-symmetry"])
+      {output, code} = check(["ExTLA.TestSpecs.Asymmetric", "--verify-symmetry"])
 
       assert code == 1
       assert output =~ "UNSOUND SYMMETRY"
@@ -115,14 +115,14 @@ defmodule Mix.Tasks.Tla.CheckTest do
     end
 
     test "a symmetry declaration without --verify-symmetry is taken at its word" do
-      Application.put_env(:extla, TLA.TestSpecs.Asymmetric,
+      Application.put_env(:extla, ExTLA.TestSpecs.Asymmetric,
         constants: %{processes: MapSet.new([:p1, :p2])},
         symmetry: [:processes]
       )
 
-      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Asymmetric) end)
+      on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.Asymmetric) end)
 
-      {output, code} = check(["TLA.TestSpecs.Asymmetric"])
+      {output, code} = check(["ExTLA.TestSpecs.Asymmetric"])
 
       assert code == 0
       assert output =~ "verified"
@@ -130,10 +130,10 @@ defmodule Mix.Tasks.Tla.CheckTest do
     end
 
     test "a deadlock is reported as one" do
-      Application.put_env(:extla, TLA.TestSpecs.Deadlocking, constants: %{max: 2})
-      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.Deadlocking) end)
+      Application.put_env(:extla, ExTLA.TestSpecs.Deadlocking, constants: %{max: 2})
+      on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.Deadlocking) end)
 
-      {output, code} = check(["TLA.TestSpecs.Deadlocking"])
+      {output, code} = check(["ExTLA.TestSpecs.Deadlocking"])
 
       assert code == 1
       assert output =~ "DEADLOCK"
@@ -142,7 +142,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
     # "We ran out of budget" is not "it holds", and a tool that returns them as
     # the same number teaches its users to believe something false.
     test "a bounded run exits 2, not 0" do
-      {output, code} = check(["TLA.TestSpecs.Unbounded", "--max-states", "20"])
+      {output, code} = check(["ExTLA.TestSpecs.Unbounded", "--max-states", "20"])
 
       assert code == 2
       assert output =~ "INCOMPLETE (state limit)"
@@ -150,7 +150,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
 
     test "--allow-incomplete accepts a bounded run deliberately" do
       {_output, code} =
-        check(["TLA.TestSpecs.Unbounded", "--max-states", "20", "--allow-incomplete"])
+        check(["ExTLA.TestSpecs.Unbounded", "--max-states", "20", "--allow-incomplete"])
 
       assert code == 0
     end
@@ -160,7 +160,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
     # and is stopped at two states here.
     test "--allow-incomplete still says which temporal properties were not checked" do
       {output, code} =
-        check(["TLA.TestSpecs.Idling", "--max-states", "2", "--allow-incomplete"])
+        check(["ExTLA.TestSpecs.Idling", "--max-states", "2", "--allow-incomplete"])
 
       assert code == 0
       assert output =~ "2 temporal properties were not checked"
@@ -168,14 +168,14 @@ defmodule Mix.Tasks.Tla.CheckTest do
     end
 
     test "--strict-coverage exits 3 on a never-enabled action" do
-      {output, code} = check(["TLA.TestSpecs.WithDefaults", "--strict-coverage"])
+      {output, code} = check(["ExTLA.TestSpecs.WithDefaults", "--strict-coverage"])
 
       assert code == 3
       assert output =~ "NEVER ENABLED"
     end
 
     test "the same spec without --strict-coverage exits 0, with a warning" do
-      {output, code} = check(["TLA.TestSpecs.WithDefaults"])
+      {output, code} = check(["ExTLA.TestSpecs.WithDefaults"])
 
       assert code == 0
       assert output =~ "1 warning."
@@ -184,24 +184,24 @@ defmodule Mix.Tasks.Tla.CheckTest do
 
   describe "constants" do
     test "come from `default:` beside the declaration" do
-      {output, 0} = check(["TLA.TestSpecs.WithDefaults"])
+      {output, 0} = check(["ExTLA.TestSpecs.WithDefaults"])
 
       assert output =~ "4 distinct states"
     end
 
     test "can be supplied by application config" do
-      Application.put_env(:extla, TLA.TestSpecs.Terminating, constants: %{max: 4})
+      Application.put_env(:extla, ExTLA.TestSpecs.Terminating, constants: %{max: 4})
 
-      {output, 0} = check(["TLA.TestSpecs.Terminating"])
+      {output, 0} = check(["ExTLA.TestSpecs.Terminating"])
 
       assert output =~ "5 distinct states"
     end
 
     test "application config wins over a default" do
-      Application.put_env(:extla, TLA.TestSpecs.WithDefaults, constants: %{max: 5})
-      on_exit(fn -> Application.delete_env(:extla, TLA.TestSpecs.WithDefaults) end)
+      Application.put_env(:extla, ExTLA.TestSpecs.WithDefaults, constants: %{max: 5})
+      on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.WithDefaults) end)
 
-      {output, _} = check(["TLA.TestSpecs.WithDefaults"])
+      {output, _} = check(["ExTLA.TestSpecs.WithDefaults"])
 
       assert output =~ "6 distinct states"
     end
@@ -211,33 +211,33 @@ defmodule Mix.Tasks.Tla.CheckTest do
     test "a constant with neither is an error naming both ways to supply it" do
       error =
         assert_raise Mix.Error, fn ->
-          capture_io(fn -> Check.run(["TLA.TestSpecs.Terminating"]) end)
+          capture_io(fn -> Check.run(["ExTLA.TestSpecs.Terminating"]) end)
         end
 
       assert error.message =~ "has no assignment for :max"
       assert error.message =~ "constant :max, default:"
-      assert error.message =~ "config :extla, TLA.TestSpecs.Terminating"
+      assert error.message =~ "config :extla, ExTLA.TestSpecs.Terminating"
     end
   end
 
   describe "output" do
     test "always prints the coverage report" do
-      {output, 0} = check(["TLA.TestSpecs.WithDefaults"])
+      {output, 0} = check(["ExTLA.TestSpecs.WithDefaults"])
 
-      assert output =~ "COVERAGE: TLA.TestSpecs.WithDefaults"
+      assert output =~ "COVERAGE: ExTLA.TestSpecs.WithDefaults"
       assert output =~ "Actions"
       assert output =~ "Invariants"
     end
 
     test "--format json carries the result, the coverage and the counterexample" do
-      {output, 1} = check(["TLA.TestSpecs.Broken", "--format", "json"])
+      {output, 1} = check(["ExTLA.TestSpecs.Broken", "--format", "json"])
 
       # #66: results now arrive in a versioned envelope, as a sorted list of self-describing
       # entries rather than a map keyed by module name.
       decoded = Jason.decode!(output)
 
       assert decoded["schema_version"] == Check.schema_version()
-      entry = Enum.find(decoded["specs"], &(&1["spec"] == "TLA.TestSpecs.Broken"))
+      entry = Enum.find(decoded["specs"], &(&1["spec"] == "ExTLA.TestSpecs.Broken"))
 
       assert entry["status"] == "violation"
       assert entry["violation"]["property"] == "below_three"
@@ -251,20 +251,20 @@ defmodule Mix.Tasks.Tla.CheckTest do
     # and the task exited with a stack trace and no document. A found counterexample must
     # never be lost to its own serialisation.
     test "--format json carries a counterexample whose state is not valid UTF-8" do
-      {output, 1} = check(["TLA.TestSpecs.RawBytes", "--format", "json"])
+      {output, 1} = check(["ExTLA.TestSpecs.RawBytes", "--format", "json"])
 
       entry = output |> Jason.decode!() |> Map.fetch!("specs") |> hd()
 
       assert entry["status"] == "violation"
       assert entry["violation"]["property"] == "payload_is_text"
 
-      last = entry["violation"]["states"] |> List.last() |> TLA.State.Json.decode!()
+      last = entry["violation"]["states"] |> List.last() |> ExTLA.State.Json.decode!()
       assert last == %{payload: <<255, 0>>}
     end
 
     test "an unknown format is refused" do
       assert_raise Mix.Error, ~r/unknown --format/, fn ->
-        capture_io(fn -> Check.run(["TLA.TestSpecs.WithDefaults", "--format", "yaml"]) end)
+        capture_io(fn -> Check.run(["ExTLA.TestSpecs.WithDefaults", "--format", "yaml"]) end)
       end
     end
   end
@@ -281,34 +281,34 @@ defmodule Mix.Tasks.Tla.CheckTest do
 
   describe "a numeric flag with a value the checker cannot use" do
     # `--fingerprint-bits 7` used to be passed straight through and raise an `ArgumentError`
-    # from inside `TLA.Fingerprint`, MID-SEARCH, with a stack trace through the checker — a
+    # from inside `ExTLA.Fingerprint`, MID-SEARCH, with a stack trace through the checker — a
     # typo in a flag reported as though the library had failed, after the run had begun
     # (#180). `--workers` was already refused at the flag; this is the same treatment.
     test "is refused at the flag, not from inside the search" do
       assert_raise Mix.Error, ~r/--fingerprint-bits must be one of 64, 128, got: 7/, fn ->
-        check(["TLA.TestSpecs.WithDefaults", "--fingerprint-bits", "7"])
+        check(["ExTLA.TestSpecs.WithDefaults", "--fingerprint-bits", "7"])
       end
     end
 
     test "and --workers is refused the same way" do
       assert_raise Mix.Error, ~r/--workers must be a positive integer, got: 0/, fn ->
-        check(["TLA.TestSpecs.WithDefaults", "--workers", "0"])
+        check(["ExTLA.TestSpecs.WithDefaults", "--workers", "0"])
       end
     end
 
     # Anti-vacuity: the permitted widths still work, so the guard is refusing the wrong
     # values rather than all of them.
     test "but a permitted width runs" do
-      for bits <- TLA.Fingerprint.permitted_bits() do
+      for bits <- ExTLA.Fingerprint.permitted_bits() do
         {output, code} =
-          check(["TLA.TestSpecs.WithDefaults", "--fingerprint-bits", to_string(bits)])
+          check(["ExTLA.TestSpecs.WithDefaults", "--fingerprint-bits", to_string(bits)])
 
         assert code == 0
         assert output =~ "— verified"
       end
     end
 
-    # The list is asked for rather than restated, so a width added to `TLA.Fingerprint`
+    # The list is asked for rather than restated, so a width added to `ExTLA.Fingerprint`
     # cannot leave the flag refusing it.
     test "and the flag's list is the one the fingerprint enforces" do
       source =
@@ -316,7 +316,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
         |> Path.join("lib/mix/tasks/tla.check.ex")
         |> File.read!()
 
-      assert source =~ "TLA.Fingerprint.permitted_bits()"
+      assert source =~ "ExTLA.Fingerprint.permitted_bits()"
       refute source =~ "@fingerprint_widths"
     end
   end

@@ -3,7 +3,7 @@
 #     mix run bench/search_profile.exs            # every entry
 #     mix run bench/search_profile.exs buffer     # one, by name
 #
-# `06-architecture.md` §Phase 4 admits `TLA.ModelChecker.Parallel` "only once the
+# `06-architecture.md` §Phase 4 admits `ExTLA.ModelChecker.Parallel` "only once the
 # single-threaded checker is correct and has been profiled". Correct is the differential
 # corpus. This is profiled: a number to beat, and a breakdown saying which phase a parallel
 # implementation would have to speed up to move it.
@@ -37,17 +37,17 @@
 Code.require_file("test/differential/bounded_buffer/spec.ex")
 Code.require_file("test/differential/raft_election/spec.ex")
 
-alias TLA.ModelChecker
-alias TLA.ModelChecker.Safety
-alias TLA.{Coverage, Fingerprint, Spec, State, StateGraph}
+alias ExTLA.ModelChecker
+alias ExTLA.ModelChecker.Safety
+alias ExTLA.{Coverage, Fingerprint, Spec, State, StateGraph}
 
 entries = [
   # The fast one: a smoke check that the bench itself works, in under a second.
-  {"buffer", TLA.Differential.BoundedBuffer, %{}},
+  {"buffer", ExTLA.Differential.BoundedBuffer, %{}},
 
   # The real target, at the constants the corpus checks it under — so the number describes
   # a workload TLC has already agreed with rather than one invented to be profiled.
-  {"raft", TLA.Differential.RaftElection, %{}}
+  {"raft", ExTLA.Differential.RaftElection, %{}}
 ]
 
 # `workers` switches from the phase profile to the worker sweep: the same entries, run at

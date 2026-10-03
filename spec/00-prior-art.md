@@ -248,7 +248,7 @@ Another contract library in the space. Less documented than the others.
 - PropCheck's StateM is conceptually similar to ExTLA Layer 3 simulation
 - PropCheck uses **random** exploration; ExTLA uses **exhaustive** exploration
 - PropCheck models are test-only; ExTLA specs are also design documentation
-- ExTLA's `TLA.PropertyTest` module should **generate PropCheck/StreamData tests** from specs
+- ExTLA's `ExTLA.PropertyTest` module should **generate PropCheck/StreamData tests** from specs
 - PropCheck is the natural complement — ExTLA for exhaustive checking, PropCheck for random exploration of implementation
 
 ---
@@ -285,7 +285,7 @@ end
 ```
 
 **Relevance to ExTLA:**
-- Makina's DSL is the closest existing Elixir DSL to ExTLA's `TLA.Spec`
+- Makina's DSL is the closest existing Elixir DSL to ExTLA's `ExTLA.Spec`
 - Makina focuses on **testing** (generate and run random sequences)
 - ExTLA focuses on **verification** (exhaustive state space + temporal logic)
 - Makina's command structure (pre/args/next/post) maps to ExTLA's action structure
@@ -350,7 +350,7 @@ Several Elixir libraries provide state machine DSLs:
 **Relevance to ExTLA:**
 - These libraries define valid transitions but don't verify system-wide properties
 - No invariant checking, no temporal logic, no model checking
-- ExTLA's `TLA.Spec` actions are more expressive than simple state transitions
+- ExTLA's `ExTLA.Spec` actions are more expressive than simple state transitions
 - ExTLA could potentially be used **alongside** these libraries to verify their configurations
 
 ---

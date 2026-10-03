@@ -1,9 +1,9 @@
-defmodule TLA.ConformanceSimulationTest do
+defmodule ExTLA.ConformanceSimulationTest do
   use ExUnit.Case, async: true
 
-  alias TLA.Conformance.Counter.{Impl, Refinement, Spec}
-  alias TLA.Simulation
-  alias TLA.Simulation.Generator
+  alias ExTLA.Conformance.Counter.{Impl, Refinement, Spec}
+  alias ExTLA.Simulation
+  alias ExTLA.Simulation.Generator
 
   @constants %{max_val: 5}
 
@@ -53,11 +53,11 @@ defmodule TLA.ConformanceSimulationTest do
   describe "an implementation that does not conform" do
     # Found by walking randomly rather than by being told where to look: the mutant's only
     # message is `:increment`, and every generator that sends one finds it.
-    test "is caught, and the finding is a TLA.Trace" do
+    test "is caught, and the finding is a ExTLA.Trace" do
       result = Simulation.run(Impl.CollapsesTwoSteps, %{traces: 5, max_steps: 5, seed: 11})
 
       assert result.status == :violation
-      assert %TLA.Trace{} = result.violation
+      assert %ExTLA.Trace{} = result.violation
       assert result.violation.message =~ "CONFORMANCE: DIVERGED"
       assert :increment in result.violation.actions
 
@@ -69,7 +69,7 @@ defmodule TLA.ConformanceSimulationTest do
     test "and the trace it reports can be replayed against the same server" do
       result = Simulation.run(Impl.CollapsesTwoSteps, %{traces: 5, max_steps: 5, seed: 11})
 
-      report = TLA.Replay.counterexample(Impl.CollapsesTwoSteps, result.violation)
+      report = ExTLA.Replay.counterexample(Impl.CollapsesTwoSteps, result.violation)
 
       assert report.status == :violation
       assert report.violation.kind == :diverged
@@ -161,7 +161,7 @@ defmodule TLA.ConformanceSimulationTest do
     # `Leaky` is the conforming implementation under a name nothing else starts.
     defmodule Leaky do
       use GenServer
-      use TLA.GenServer, spec: Spec, refinement: Refinement
+      use ExTLA.GenServer, spec: Spec, refinement: Refinement
 
       def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -213,7 +213,7 @@ defmodule TLA.ConformanceSimulationTest do
     test "init/1 returning :ignore is an outcome, not a MatchError" do
       defmodule Declines do
         use GenServer
-        use TLA.GenServer, spec: Spec, refinement: Refinement
+        use ExTLA.GenServer, spec: Spec, refinement: Refinement
 
         def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -243,7 +243,7 @@ defmodule TLA.ConformanceSimulationTest do
     test "a stopped server that traps exits gets its terminate/2" do
       defmodule Tidy do
         use GenServer
-        use TLA.GenServer, spec: Spec, refinement: Refinement
+        use ExTLA.GenServer, spec: Spec, refinement: Refinement
 
         def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts)
 
@@ -279,7 +279,7 @@ defmodule TLA.ConformanceSimulationTest do
         end
 
       assert error.message =~ "takes no `constants:`"
-      assert error.message =~ "config :extla, TLA.Conformance.Counter.Spec"
+      assert error.message =~ "config :extla, ExTLA.Conformance.Counter.Spec"
     end
   end
 

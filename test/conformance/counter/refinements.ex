@@ -1,10 +1,10 @@
-defmodule TLA.Conformance.Counter.Refinement do
+defmodule ExTLA.Conformance.Counter.Refinement do
   @moduledoc """
   Example 4's mapping, which conforms. The implementation's `%{value:, status:, max:}`
   becomes the spec's `%{count:, status:}` — `max` is a constant on the spec side and so
   is not a variable of the abstract state.
   """
-  use TLA.Refinement
+  use ExTLA.Refinement
 
   def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -18,7 +18,7 @@ defmodule TLA.Conformance.Counter.Refinement do
   def concrete_message(:reset, _params), do: :reset
 end
 
-defmodule TLA.Conformance.Counter.Mutants do
+defmodule ExTLA.Conformance.Counter.Mutants do
   @moduledoc """
   Refinement mappings that are wrong, each in one way, and the verdict each must produce.
 
@@ -28,7 +28,7 @@ defmodule TLA.Conformance.Counter.Mutants do
   an entry that must fail is what distinguishes a working check from one that says yes to
   everything.
 
-  Every mutant here is a *mapping* fault, which is what `TLA.Refinement.validate!/3` can
+  Every mutant here is a *mapping* fault, which is what `ExTLA.Refinement.validate!/3` can
   decide. The *step* faults — Example 4's own bug, where the implementation collapses two
   abstract steps into one callback — need the runtime engine of slice 3, and are recorded
   in `test/conformance/README.md` until there is something to check them with.
@@ -38,10 +38,10 @@ defmodule TLA.Conformance.Counter.Mutants do
     @moduledoc """
     A mapping that is correct and defines no `concrete_message/2`. Not a fault: the
     callback is optional, and such an implementation can be *checked* as it runs. It
-    cannot be *driven*, and `TLA.Replay` has to say so by name rather than fail with an
+    cannot be *driven*, and `ExTLA.Replay` has to say so by name rather than fail with an
     undefined function.
     """
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -53,7 +53,7 @@ defmodule TLA.Conformance.Counter.Mutants do
 
   defmodule MissingVariable do
     @moduledoc "Maps `count` and forgets `status`. Caught by `abstract!/3`, at runtime."
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v}), do: %{count: v}
     def abstract_action(:increment), do: {:increment, %{}}
@@ -62,7 +62,7 @@ defmodule TLA.Conformance.Counter.Mutants do
 
   defmodule ExtraVariable do
     @moduledoc "Maps a key the spec never declared. Caught by `abstract!/3`, at runtime."
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s, max: 5}
     def abstract_action(:increment), do: {:increment, %{}}
@@ -75,7 +75,7 @@ defmodule TLA.Conformance.Counter.Mutants do
     callback wrapper — a crash in the user's process rather than "the spec does not model
     this message".
     """
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -88,12 +88,12 @@ defmodule TLA.Conformance.Counter.Mutants do
     @moduledoc """
     Total — it *has* the catch-all — but the helper that catch-all calls is not. Not a
     mutant of the mapping so much as a mutant of the diagnosis: the totality probe used to
-    be scoped to the whole of the private `total!/1` in `TLA.Refinement`, so a
+    be scoped to the whole of the private `total!/1` in `ExTLA.Refinement`, so a
     `FunctionClauseError` from anywhere beneath it came back as "`abstract_action/1` is not
     total; add `def abstract_action(_), do: :unmapped`" — advice to add a clause this
     mapping already has, about a partial helper the message never named (#315).
     """
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -114,10 +114,10 @@ defmodule TLA.Conformance.Counter.Mutants do
     @moduledoc """
     `concrete_message/2` and `abstract_action/1` disagree: the message for `increment`
     maps back as `done`. A mapping whose two directions do not compose cannot drive the
-    implementation from the spec, so `TLA.Replay` would run the wrong scenario and report
+    implementation from the spec, so `ExTLA.Replay` would run the wrong scenario and report
     on it as though it were the right one.
     """
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -137,7 +137,7 @@ defmodule TLA.Conformance.Counter.Mutants do
     models something the code does not do, or a clause is missing — and either way a run
     that never exercises it is not evidence about it.
     """
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -161,7 +161,7 @@ defmodule TLA.Conformance.Counter.Mutants do
     than the error naming the action (#299). That is the likelier of the two mistakes for
     someone writing a mapping by hand, and the corpus had no entry for it.
     """
-    use TLA.Refinement
+    use ExTLA.Refinement
 
     def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 
@@ -181,7 +181,7 @@ defmodule TLA.Conformance.Counter.Mutants do
     optional, under which Layer 3 checks invariants on a projection and calls it
     conformance.
 
-    It deliberately does not `use TLA.Refinement`. With the behaviour declared the
+    It deliberately does not `use ExTLA.Refinement`. With the behaviour declared the
     compiler already warns, so the case worth catching is the module that was passed as
     `refinement:` without ever claiming to be one.
     """
@@ -190,7 +190,7 @@ defmodule TLA.Conformance.Counter.Mutants do
   end
 end
 
-defmodule TLA.Conformance.Counter.CastRefinement do
+defmodule ExTLA.Conformance.Counter.CastRefinement do
   @moduledoc """
   The conforming mapping, naming how each message is delivered (#306, for #172).
 
@@ -199,11 +199,11 @@ defmodule TLA.Conformance.Counter.CastRefinement do
   sent `{:"$gen_call", …}` for everything. Every entry in this corpus is `handle_call`-only,
   which is why the gap survived — a corpus that cannot express a case cannot find a bug in it.
 
-  So this is the same mapping as `TLA.Conformance.Counter.Refinement`, with `:done` taken by
+  So this is the same mapping as `ExTLA.Conformance.Counter.Refinement`, with `:done` taken by
   cast and `:reset` by info. `:increment` stays a bare term, which is the assertion that a
   mapping written before D-36 still means what it meant.
   """
-  use TLA.Refinement
+  use ExTLA.Refinement
 
   def abstract(%{value: v, status: s}), do: %{count: v, status: s}
 

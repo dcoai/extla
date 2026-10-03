@@ -14,6 +14,22 @@ does not restate it.
 `mix.exs` reads `0.3.21-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Migrating to 0.4.0
+
+The next release moves every module from `TLA` to `ExTLA` (#337). It is a breaking change, and
+it is mechanical.
+
+- **Modules:** `TLA` → `ExTLA` and `TLA.<Name>` → `ExTLA.<Name>`, everywhere a module is
+  named: `use TLA.Spec` → `use ExTLA.Spec`, `use TLA.Refinement`, `use TLA.GenServer`,
+  `import TLA.Spec.Test`, `alias TLA.{ModelChecker, Trace}`, `%TLA.Trace{}`, and
+  `TLA.ModelChecker.run/2`-style calls. One rewrite covers it, as long as it leaves `TLA+` and
+  prose alone. For example, replace `TLA` with `ExTLA` where it is followed by `.` and a
+  letter or `{`, and is not preceded by a letter, digit, `.` or `:`. Then fix any bare `TLA`
+  module reference by hand.
+- **Unchanged:** the application name `:extla` (your `deps` entry), telemetry event names
+  (already `[:extla, …]`), configuration keys, and every spec you have written. A spec module
+  is yours; only the `use` line names ExTLA.
+
 ### Fixed
 
 - **A refinement mapping missing a `concrete_message/2` clause is named, not crashed on**
@@ -42,6 +58,21 @@ release it merely follows.
   the suite had never exercised this.
 
 ### Changed
+
+- **Every module lives under `ExTLA`** (#338, for #337; `spec/08` D-40). ExTLA defined its
+  modules under `TLA`, a namespace it doesn't own: Elixir's code anti-patterns call that
+  *namespace trespassing*, because the VM loads one module per name and two libraries that
+  define the same one can't both be used. `TLA` is the name any other TLA+ library would
+  reach for first. Files follow the modules (`lib/ex_tla/`, `ledger/ex_tla/`, `test/ex_tla/`),
+  and spec, guides, README, usage rules and every golden name `ExTLA.*`.
+  `test/ex_tla/namespace_test.exs` holds every module under `lib/` and `ledger/` to the
+  namespace. There are no `TLA.*` compatibility modules, since they would be the trespass
+  itself. **Migrating to 0.4.0**, above, is the rewrite a consumer applies.
+  - The rename was worked **test-first**. 48 test files were renamed and run against the
+    unrenamed code: 372 tests went red, and each of the 93 that stayed green was explained.
+    They read documents or source, or reach ExTLA through a Mix task still named `tla.*`;
+    none exercised nothing (#338 records the run). Not recorded as surfex evidence: a test
+    that fails only because a module doesn't exist yet says nothing about its assertions.
 
 - **surfex `~> 0.5.24`** (#335, for #334), up from 0.5.16. Upstream changed only its usage
   rules: `usage-rules.md` is one short agent page pointing to `mix surfex.info`. What ExTLA

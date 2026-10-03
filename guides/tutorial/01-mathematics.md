@@ -194,7 +194,7 @@ on.
 <!-- tla:spec -->
 ```elixir
 defmodule Math.Lock do
-  use TLA.Spec
+  use ExTLA.Spec
 
   constant :clients, default: set([:a, :b, :c, :d, :e, :f])
 

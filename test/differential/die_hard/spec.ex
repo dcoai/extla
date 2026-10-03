@@ -1,4 +1,4 @@
-defmodule TLA.Differential.DieHard do
+defmodule ExTLA.Differential.DieHard do
   @moduledoc """
   `DieHard.tla`, in the ExTLA DSL. The two are checked against each other by
   `test/differential/differential_test.exs`; `expected.json` is what TLC said.
@@ -6,7 +6,7 @@ defmodule TLA.Differential.DieHard do
   Kept as close to the TLA+ module as the two languages allow, so a
   disagreement points at the checker rather than at a translation choice.
   """
-  use TLA.Spec
+  use ExTLA.Spec
 
   # TypeOK in DieHard.tla is `small \in 0..3 /\ big \in 0..5`. Here it is the
   # declaration itself: types are checked as the implicit `:type_ok` invariant in

@@ -1,4 +1,4 @@
-defmodule TLA.PrimerFramingTest do
+defmodule ExTLA.PrimerFramingTest do
   @moduledoc """
   The TLA+ primer says which parts of TLA+ this library implements (#293, for #181).
 
@@ -19,7 +19,7 @@ defmodule TLA.PrimerFramingTest do
   nothing to notice.
 
   The links are already gated: #281 brought `spec/` and `README.md` under the guide harness
-  and `TLA.GuideCheck.Links` resolves every relative link on a page it checks.
+  and `ExTLA.GuideCheck.Links` resolves every relative link on a page it checks.
   """
   use ExUnit.Case, async: true
 

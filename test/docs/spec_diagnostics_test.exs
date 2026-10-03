@@ -1,11 +1,11 @@
-defmodule TLA.SpecDiagnosticsTest do
+defmodule ExTLA.SpecDiagnosticsTest do
   @moduledoc """
   `02-dsl-semantics.md` §7's table, the diagnostics the DSL raises, and the ones the tests
   assert on — held to each other (#273, from #270).
 
   §7 sits under a preamble promising that a spec violating any rule does not compile, and
   tabulates the diagnostics that enforce it. Nothing held the table to the code and nothing
-  could: a row's first column was a name its author gave it, and `TLA.Spec.CompileError`
+  could: a row's first column was a name its author gave it, and `ExTLA.Spec.CompileError`
   carried no identifier to match against. There was no join key. The table was twenty-eight
   kinds short, and one of its rows described §6's term check, which runs at runtime — so the
   preamble was false for exactly that row, which is the class this project keeps finding.
@@ -13,7 +13,7 @@ defmodule TLA.SpecDiagnosticsTest do
   `kind` is the join key. Three of the four sets below are derived from source, and the
   fourth is the document:
 
-    * **raised** — every `kind` at a raise site, from `TLA.Diagnostics`' scan of the AST;
+    * **raised** — every `kind` at a raise site, from `ExTLA.Diagnostics`' scan of the AST;
     * **rendered** — `DIAGNOSTICS.md`, the golden the `surface-drift` job gates;
     * **tabulated** — §7's first column;
     * **tested** — every kind `diagnostics_test.exs` asserts on.
@@ -26,10 +26,10 @@ defmodule TLA.SpecDiagnosticsTest do
   @root Path.expand("../..", __DIR__)
   @spec_file Path.join(@root, "spec/02-dsl-semantics.md")
   @golden Path.join(@root, "DIAGNOSTICS.md")
-  @diagnostics_test Path.join(@root, "test/tla/spec/diagnostics_test.exs")
+  @diagnostics_test Path.join(@root, "test/ex_tla/spec/diagnostics_test.exs")
 
   setup_all do
-    %{raised: TLA.Diagnostics.kinds(TLA.Diagnostics.run(@root))}
+    %{raised: ExTLA.Diagnostics.kinds(ExTLA.Diagnostics.run(@root))}
   end
 
   describe "the three derived sets" do
