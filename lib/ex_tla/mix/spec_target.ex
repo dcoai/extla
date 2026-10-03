@@ -2,10 +2,10 @@ defmodule ExTLA.Mix.SpecTarget do
   @moduledoc false
   # Naming and preparing the `ExTLA.Spec` modules a mix task was pointed at.
   #
-  # Shared by `mix tla.check` and `mix tla.visualize`, which resolve the same thing and
+  # Shared by `mix extla.check` and `mix extla.visualize`, which resolve the same thing and
   # must fail the same way when they cannot: a task that says "no such module" where its
   # sibling says "does not `use ExTLA.Spec`" teaches two different mental models of one
-  # error. `mix tla.simulate` and `mix tla.replay` are deliberately NOT here — they
+  # error. `mix extla.simulate` and `mix extla.replay` are deliberately NOT here — they
   # resolve a `ExTLA.GenServer`, which is a different question with a different diagnostic.
 
   alias ExTLA.Spec

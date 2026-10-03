@@ -93,12 +93,12 @@ GenServer.call(pid, {:acquire, :alice})
 
 ## Simulation: random traces, every step checked
 
-Driving the server by hand finds what you thought to try. `mix tla.simulate` generates messages
+Driving the server by hand finds what you thought to try. `mix extla.simulate` generates messages
 from the spec — those whose action is enabled in the current abstract state, via
 `concrete_message/2` — and runs them against the live server, checking every step as above:
 
 ```sh
-mix tla.simulate Tutorial.CheckedLockServer --seed 1
+mix extla.simulate Tutorial.CheckedLockServer --seed 1
 ```
 
 <!-- tla:simulate module=Tutorial.CheckedLockServer expect=ok -->
@@ -140,7 +140,7 @@ end
 ```
 
 ```sh
-mix tla.simulate Tutorial.LeakyLockServer --seed 1
+mix extla.simulate Tutorial.LeakyLockServer --seed 1
 ```
 
 <!-- tla:simulate module=Tutorial.LeakyLockServer expect=violation match="DIVERGED" -->
@@ -208,15 +208,15 @@ report = ExTLA.Replay.counterexample(Tutorial.LeakyLockServer, simulation.violat
 %{status: :violation, violation: %{kind: :diverged}} = report
 ```
 
-From the shell the counterexample travels as JSON — `mix tla.check --format json` writes it, and
-`mix tla.replay` reads it:
+From the shell the counterexample travels as JSON — `mix extla.check --format json` writes it, and
+`mix extla.replay` reads it:
 
 ```sh
-mix tla.check Tutorial.NamedLock --format json > counterexample.json
-mix tla.replay Tutorial.CheckedLockServer --trace counterexample.json
+mix extla.check Tutorial.NamedLock --format json > counterexample.json
+mix extla.replay Tutorial.CheckedLockServer --trace counterexample.json
 ```
 
-`mix tla.replay` exits 0 when the behaviour was reproduced, 1 on a conformance violation, and 2
+`mix extla.replay` exits 0 when the behaviour was reproduced, 1 on a conformance violation, and 2
 when the implementation *could not follow* the trace — which is not a conformance failure: the spec
 permits a behaviour the code does not take, and which of the two is wrong is not something the tool
 can decide. It says so, rather than guessing.

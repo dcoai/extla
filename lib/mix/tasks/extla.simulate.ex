@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Tla.Simulate do
+defmodule Mix.Tasks.Extla.Simulate do
   @shortdoc "Run random traces of a ExTLA.GenServer against its spec"
 
   @moduledoc """
@@ -6,11 +6,11 @@ defmodule Mix.Tasks.Tla.Simulate do
 
   ## Usage
 
-      mix tla.simulate MyApp.TransferServer
-      mix tla.simulate MyApp.TransferServer --traces 5000 --steps 100
-      mix tla.simulate MyApp.TransferServer --inject-failures --seed 42
+      mix extla.simulate MyApp.TransferServer
+      mix extla.simulate MyApp.TransferServer --traces 5000 --steps 100
+      mix extla.simulate MyApp.TransferServer --inject-failures --seed 42
 
-  Where `mix tla.check` explores every reachable state of the *specification*, this runs
+  Where `mix extla.check` explores every reachable state of the *specification*, this runs
   the *implementation* and checks each transition against the spec with the same
   refinement check the runtime wrapper uses.
 
@@ -316,7 +316,7 @@ defmodule Mix.Tasks.Tla.Simulate do
 
   @doc false
   # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
-  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # option list to each other (#163). `extla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches
 end

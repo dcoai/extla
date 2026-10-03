@@ -5,7 +5,7 @@ defmodule ExTLA.AgainstGraphOptionsTest do
   ## What it was
 
   The flag ran the full simulation and then **another `traces` simulations**, one at a
-  time — so `mix tla.simulate X --traces 10000 --against-graph` ran twenty thousand traces.
+  time — so `mix extla.simulate X --traces 10000 --against-graph` ran twenty thousand traces.
 
   Worse than the cost: the second suite forwarded **two of the five** options. So
   `--unrestricted --against-graph` audited containment with the **restricted** generator
@@ -180,7 +180,7 @@ defmodule ExTLA.AgainstGraphOptionsTest do
     test "and the documented step default is a single number" do
       moduledoc =
         Path.expand("../..", __DIR__)
-        |> Path.join("lib/mix/tasks/tla.simulate.ex")
+        |> Path.join("lib/mix/tasks/extla.simulate.ex")
         |> File.read!()
 
       assert moduledoc =~ "--steps              Maximum steps per trace (default 25)."

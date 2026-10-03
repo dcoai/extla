@@ -107,8 +107,8 @@ defmodule ExTLA.MutationTest do
     ]
 
     test "is sorted by name, so two runs of the same code produce the same bytes" do
-      first = Mix.Tasks.Tla.Mutants.encode(@results)
-      again = Mix.Tasks.Tla.Mutants.encode(Enum.reverse(@results))
+      first = Mix.Tasks.Extla.Mutants.encode(@results)
+      again = Mix.Tasks.Extla.Mutants.encode(Enum.reverse(@results))
 
       assert first == again
 
@@ -120,7 +120,7 @@ defmodule ExTLA.MutationTest do
     # Anything that varies between two runs of the same code makes the drift gate cry
     # wolf, and a gate that cries wolf gets disabled.
     test "carries nothing that varies between identical runs" do
-      encoded = Mix.Tasks.Tla.Mutants.encode(@results)
+      encoded = Mix.Tasks.Extla.Mutants.encode(@results)
 
       refute encoded =~ ~r/\d{4}-\d{2}-\d{2}/, "a date leaked into the artifact"
       refute encoded =~ "ms"
@@ -130,7 +130,7 @@ defmodule ExTLA.MutationTest do
 
     test "counts every outcome, including the two that are not kills" do
       summary =
-        Mix.Tasks.Tla.Mutants.encode(@results)
+        Mix.Tasks.Extla.Mutants.encode(@results)
         |> Jason.decode!()
         |> Map.fetch!("summary")
 
@@ -145,7 +145,7 @@ defmodule ExTLA.MutationTest do
       was = %{"mutants" => [%{"name" => "a", "outcome" => "killed"}]}
       now = %{"mutants" => [%{"name" => "a", "outcome" => "survived"}]}
 
-      message = Mix.Tasks.Tla.Mutants.drift_message(was, now)
+      message = Mix.Tasks.Extla.Mutants.drift_message(was, now)
 
       assert message =~ "REGRESSION"
       assert message =~ "a — now survived"
@@ -156,7 +156,7 @@ defmodule ExTLA.MutationTest do
       was = %{"mutants" => [%{"name" => "a", "outcome" => "survived"}]}
       now = %{"mutants" => [%{"name" => "a", "outcome" => "killed"}]}
 
-      message = Mix.Tasks.Tla.Mutants.drift_message(was, now)
+      message = Mix.Tasks.Extla.Mutants.drift_message(was, now)
 
       assert message =~ "PROGRESS"
       refute message =~ "REGRESSION"
@@ -167,7 +167,7 @@ defmodule ExTLA.MutationTest do
       was = %{"mutants" => [%{"name" => "gone", "outcome" => "killed"}]}
       now = %{"mutants" => [%{"name" => "fresh", "outcome" => "killed"}]}
 
-      message = Mix.Tasks.Tla.Mutants.drift_message(was, now)
+      message = Mix.Tasks.Extla.Mutants.drift_message(was, now)
 
       assert message =~ "new to the catalogue"
       assert message =~ "fresh"

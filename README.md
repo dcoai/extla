@@ -51,12 +51,12 @@ end
 ```
 
 ```
-mix tla.check Specs.Counter        # exhaustive model checking + coverage
-mix tla.simulate MyApp.Counter     # does the implementation conform?
-mix tla.replay   MyApp.Counter     # replay a counterexample against real code
-mix tla.explore  Specs.Counter     # evaluate your own expressions over a counterexample
-mix tla.visualize Specs.Counter    # the state graph as DOT
-mix tla.stamp                      # refinement mappings, against the spec version they were read at
+mix extla.check Specs.Counter        # exhaustive model checking + coverage
+mix extla.simulate MyApp.Counter     # does the implementation conform?
+mix extla.replay   MyApp.Counter     # replay a counterexample against real code
+mix extla.explore  Specs.Counter     # evaluate your own expressions over a counterexample
+mix extla.visualize Specs.Counter    # the state graph as DOT
+mix extla.stamp                      # refinement mappings, against the spec version they were read at
 ```
 
 **New here?** [Getting started](guides/getting-started.md) is install, one specification and
@@ -71,7 +71,7 @@ repository's test suite.
 [spec/06-architecture.md §Implementation Phases](spec/06-architecture.md#implementation-phases),
 which is where what-is-built is recorded.
 
-`mix tla.check MySpec` explores the state space breadth-first, checks the invariants and
+`mix extla.check MySpec` explores the state space breadth-first, checks the invariants and
 the temporal properties, reports the shortest counterexample — or the lasso — when it
 finds one, and prints what the run actually exercised.
 
@@ -148,10 +148,10 @@ four entries were typing a variable *weaker* than the TLA+ they are checked agai
 that `f[x]` outside a function's domain was `nil` rather than an error.
 
 **Phase 3** added Layer 1 invariants on running processes and the Layer 3 conformance
-bridge — `ExTLA.GenServer`, `ExTLA.Refinement`, `mix tla.simulate` and `mix tla.replay`.
+bridge — `ExTLA.GenServer`, `ExTLA.Refinement`, `mix extla.simulate` and `mix extla.replay`.
 **Phase 4** added parallel exploration (**5.40x at 8 workers**; `raft_election` went from
 23.4 s to 1.65 s, with the corpus agreeing with TLC at 1, 2, 4 and 8), `ExTLA.PropertyTest`,
-and `mix tla.visualize`.
+and `mix extla.visualize`.
 
 **What is built** is [`CHANGELOG.md`](CHANGELOG.md), which is gated: `bin/changelog_guard.exs`
 fails any commit touching `lib/` that adds no entry. **What was planned**, phase by phase,

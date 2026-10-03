@@ -240,7 +240,7 @@ defmodule ExTLA.LedgerTest do
   describe "the checked-in golden" do
     test "matches what the code produces", %{rendered: rendered} do
       assert File.read!("TLA_COVERAGE.md") == rendered,
-             "TLA_COVERAGE.md has drifted — regenerate with `MIX_ENV=test mix tla.coverage --write`"
+             "TLA_COVERAGE.md has drifted — regenerate with `MIX_ENV=test mix extla.coverage --write`"
     end
   end
 end

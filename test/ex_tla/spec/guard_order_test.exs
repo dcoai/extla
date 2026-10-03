@@ -253,7 +253,7 @@ defmodule ExTLA.Spec.GuardOrderTest do
     end
 
     # #208. The deadlock skip and the constraint skip were named; the budget skip was not, and
-    # that is the one `mix tla.check --allow-incomplete` turns into exit 0 — a temporal
+    # that is the one `mix extla.check --allow-incomplete` turns into exit 0 — a temporal
     # property nobody checked, unmentioned in a green result.
     test "a run the state budget stopped skips liveness and says so" do
       result = ExTLA.ModelChecker.run(Constrainable, %{check_liveness: true, max_states: 2})

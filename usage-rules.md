@@ -60,7 +60,7 @@ end
 
 A false `require` does not raise and does not fail the check: the action is simply not
 available in that state. An action that is never enabled anywhere is reported by the
-coverage report, not by an error — which is why `mix tla.check` prints one.
+coverage report, not by an error — which is why `mix extla.check` prints one.
 
 ### 4. Guards and `let`s evaluate in source order
 
@@ -91,8 +91,8 @@ and declaring it yourself is `:implicit_invariant_redeclared`.
 
 <!-- tla:skip reason=shell invocations, not Elixir; the refusal they describe is asserted by parallel_test -->
 ```elixir
-mix tla.check MySpec --workers 8           # fine
-mix tla.check MySpec --workers 8 --check-liveness   # REFUSED, with the reason
+mix extla.check MySpec --workers 8           # fine
+mix extla.check MySpec --workers 8 --check-liveness   # REFUSED, with the reason
 ```
 
 Not weakened, not silently ignored — refused, because the combination is unsound. Symmetry
@@ -122,12 +122,12 @@ rather than passing for every state.
 
 | Task | When |
 |---|---|
-| `mix tla.check` | the usual one: explore the state space, check invariants, report coverage |
-| `mix tla.explore` | evaluate your own expressions over a counterexample the checker produced |
-| `mix tla.simulate` | drive a real GenServer against the spec and see whether it conforms |
-| `mix tla.replay` | replay a counterexample against real code |
-| `mix tla.visualize` | the state graph as DOT |
-| `mix tla.stamp` | record which spec version a refinement mapping was read against |
+| `mix extla.check` | the usual one: explore the state space, check invariants, report coverage |
+| `mix extla.explore` | evaluate your own expressions over a counterexample the checker produced |
+| `mix extla.simulate` | drive a real GenServer against the spec and see whether it conforms |
+| `mix extla.replay` | replay a counterexample against real code |
+| `mix extla.visualize` | the state graph as DOT |
+| `mix extla.stamp` | record which spec version a refinement mapping was read against |
 
 ### 9. The set vocabulary is in scope, and two operators are renamed
 
@@ -165,7 +165,7 @@ carry how it arrives. So the mapping says:
 **A bare term is a call.** That is what it has always meant, so no existing mapping changes
 — but it is the trap: map an action to `:process_next` when the server takes it in
 `handle_cast/2`, and the message arrives at `handle_call/3`, which has no clause for it. The
-server dies, and `mix tla.replay` reports `:not_followed` — "the spec permits a behaviour
+server dies, and `mix extla.replay` reports `:not_followed` — "the spec permits a behaviour
 the implementation does not take" — about a server that is correct. Write `{:cast,
 :process_next}`.
 
@@ -178,7 +178,7 @@ not a silent pass (D-36).
 
 ## What a verdict does and does not say
 
-`mix tla.check` exits **2** when the run was bounded — `max_states` was hit, or a
+`mix extla.check` exits **2** when the run was bounded — `max_states` was hit, or a
 `state_constraint` held states back. That is not a pass. A bounded run has verified
 *nothing* about the states it did not reach, and the exit code says so; `allow_incomplete:
 true` turns it into a pass when you have decided a partial answer is worth having (D-10).

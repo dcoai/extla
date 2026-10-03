@@ -6,7 +6,7 @@ defmodule ExTLA.ConformanceReplayTest do
 
   describe "a model-checker counterexample, replayed against the code" do
     # The loop that makes the three layers one tool: `BuggySpec` contradicts itself,
-    # `mix tla.check` finds it before any code exists, and this runs that exact trace
+    # `mix extla.check` finds it before any code exists, and this runs that exact trace
     # against a server that refines the spec faithfully.
     setup do
       result = ModelChecker.run(BuggySpec, %{constants: %{max_val: 5}, check_liveness: false})

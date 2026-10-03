@@ -1,10 +1,10 @@
 defmodule ExTLA.Mix.TraceFile do
   @moduledoc false
-  # Reading a counterexample `mix tla.check --format json` wrote.
+  # Reading a counterexample `mix extla.check --format json` wrote.
   #
-  # Shared by `mix tla.replay` and `mix tla.explore`, which read the same file and must fail
-  # the same way on it. They differ only in how they arrive at the spec name — `tla.replay`
-  # takes a `ExTLA.GenServer` and asks it for `__tla_spec_module__/0`, `tla.explore` is handed
+  # Shared by `mix extla.replay` and `mix extla.explore`, which read the same file and must fail
+  # the same way on it. They differ only in how they arrive at the spec name — `extla.replay`
+  # takes a `ExTLA.GenServer` and asks it for `__tla_spec_module__/0`, `extla.explore` is handed
   # the spec module itself — so that is the argument, and everything downstream of it is one
   # copy rather than two that drift.
   #
@@ -18,7 +18,7 @@ defmodule ExTLA.Mix.TraceFile do
 
   Three shapes are accepted, because three are what a caller plausibly has:
 
-    * the versioned envelope `mix tla.check --format json` writes (#66);
+    * the versioned envelope `mix extla.check --format json` writes (#66);
     * a single trace object lifted out of it, which is what someone who has already found
       the counterexample they care about will have;
     * a lasso, `%{"prefix" => …, "cycle" => …}`.
@@ -37,10 +37,10 @@ defmodule ExTLA.Mix.TraceFile do
       # reader that parses optimistically discovers a shape change by getting a wrong answer
       # from it; refusing an unknown version turns that into a message naming both versions.
       %{"schema_version" => version, "specs" => specs} when is_list(specs) ->
-        unless version == Mix.Tasks.Tla.Check.schema_version() do
+        unless version == Mix.Tasks.Extla.Check.schema_version() do
           Mix.raise(
             "#{path} was written by schema version #{version}; this ExTLA reads version " <>
-              "#{Mix.Tasks.Tla.Check.schema_version()}. Re-run `mix tla.check --format json`."
+              "#{Mix.Tasks.Extla.Check.schema_version()}. Re-run `mix extla.check --format json`."
           )
         end
 
@@ -53,7 +53,7 @@ defmodule ExTLA.Mix.TraceFile do
         )
 
       _other ->
-        Mix.raise("#{path} is not a trace written by `mix tla.check --format json`.")
+        Mix.raise("#{path} is not a trace written by `mix extla.check --format json`.")
     end
   end
 
@@ -74,13 +74,13 @@ defmodule ExTLA.Mix.TraceFile do
       %{"violation" => violation} ->
         Trace.from_json!(violation)
 
-      # An entry with no `violation` key at all is not a result `mix tla.check` wrote; it used
+      # An entry with no `violation` key at all is not a result `mix extla.check` wrote; it used
       # to be a `CaseClauseError` here (#211).
       entry ->
         Mix.raise(
           "#{path}'s entry for #{spec} has no \"violation\" key (it carries: " <>
             "#{entry |> Map.keys() |> Enum.join(", ")}), so it is not a result " <>
-            "`mix tla.check --format json` wrote."
+            "`mix extla.check --format json` wrote."
         )
     end
   end
@@ -89,12 +89,12 @@ defmodule ExTLA.Mix.TraceFile do
 
   defp no_counterexample(%{"status" => "max_states_reached"} = entry) do
     "the search was bounded at #{entry["distinct_states"]} states by the state limit, so " <>
-      "nothing is verified. Re-run `mix tla.check --format json` with a higher --max-states."
+      "nothing is verified. Re-run `mix extla.check --format json` with a higher --max-states."
   end
 
   defp no_counterexample(%{"status" => "constrained"} = entry) do
     "a `state_constraint:` held states back after #{entry["distinct_states"]} states, so " <>
-      "nothing is verified. Re-run `mix tla.check --format json` without the constraint."
+      "nothing is verified. Re-run `mix extla.check --format json` without the constraint."
   end
 
   defp no_counterexample(%{"status" => status}),

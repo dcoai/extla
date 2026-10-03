@@ -79,7 +79,7 @@ defmodule ExTLA.Ledger do
   # being current does not make another one's outdated claim true, and reporting the optimistic
   # answer would hide exactly the mapping that needs re-reading.
   defp freshness_by_spec do
-    Mix.Tasks.Tla.Stamp.states()
+    Mix.Tasks.Extla.Stamp.states()
     |> Enum.reject(&(&1.status == :unstamped))
     |> Enum.group_by(& &1.spec, & &1.status)
     |> Map.new(fn {spec, statuses} ->
@@ -391,7 +391,7 @@ defmodule ExTLA.Ledger do
     %{
       name: "TLA_COVERAGE.md",
       purpose: "Every item each ExTLA.Spec declares, and the verification that covers it.",
-      task: "tla.coverage",
+      task: "extla.coverage",
       gate: "surface-drift",
       hardness: :hard,
       prose: prose(),

@@ -99,7 +99,7 @@ defmodule ExTLA.StateGraph.Export do
   end
 
   @doc false
-  # The size rule, as a message rather than as a raise, so that `mix tla.visualize` can
+  # The size rule, as a message rather than as a raise, so that `mix extla.visualize` can
   # present it as a `Mix.Error` beside its other refusals instead of letting an
   # `ArgumentError` out with a stack trace. One threshold and one wording, two surfaces —
   # the alternative is the task re-implementing the comparison and the two drifting.

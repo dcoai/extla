@@ -9,9 +9,9 @@ defmodule ExTLA.State.Json do
 
   ## Why this exists rather than `inspect/1`
 
-  `mix tla.check --format json` wrote states and bindings with `inspect/1`, which a person
+  `mix extla.check --format json` wrote states and bindings with `inspect/1`, which a person
   can read and a machine cannot parse back. §05's own pipeline is
-  `mix tla.check --format json` into `mix tla.replay --trace counterexample.json`, and a
+  `mix extla.check --format json` into `mix extla.replay --trace counterexample.json`, and a
   format that only goes one way cannot carry it. The human rendering is
   `ExTLA.Trace.format/1` and stays exactly as it was.
 
@@ -49,7 +49,7 @@ defmodule ExTLA.State.Json do
   # JSON strings are Unicode, so a binary is only its own JSON when it is valid UTF-8.
   # Anything else — `<<255, 0>>`, which §6 permits — went to `Jason.encode!/1` as a string
   # and raised `invalid byte`, from inside the report writer, after the search had found a
-  # real violation: `mix tla.check --format json` exited with a stack trace and no document
+  # real violation: `mix extla.check --format json` exited with a stack trace and no document
   # (#198). A found counterexample must never be lost to its own serialisation, so a
   # non-UTF-8 binary carries its own tag and travels as base64.
   def encode(binary) when is_binary(binary) do

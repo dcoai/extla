@@ -16,11 +16,11 @@ defmodule ExTLA do
     * **Layer 2 — the model checker.** `ExTLA.Spec` compiles a specification module;
       `ExTLA.ModelChecker` explores its state space breadth-first, checks invariants and
       temporal properties, and reports the shortest counterexample — or the lasso — when
-      it finds one. `mix tla.check` is the command-line form.
+      it finds one. `mix extla.check` is the command-line form.
 
     * **Layer 3 — conformance.** `ExTLA.GenServer` and `ExTLA.Refinement` map an
-      implementation's state onto a specification's, so `mix tla.simulate` can ask whether
-      the code does what the specification says, and `mix tla.replay` can drive a
+      implementation's state onto a specification's, so `mix extla.simulate` can ask whether
+      the code does what the specification says, and `mix extla.replay` can drive a
       counterexample through the real process.
 
   A specification is ordinary Elixir that looks like this:

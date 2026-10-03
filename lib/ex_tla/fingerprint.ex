@@ -19,7 +19,7 @@ defmodule ExTLA.Fingerprint do
   @doc """
   The widths a fingerprint may be computed at.
 
-  Asked for rather than restated by callers (#180). `mix tla.check --fingerprint-bits`
+  Asked for rather than restated by callers (#180). `mix extla.check --fingerprint-bits`
   validates its flag against this, so a second list cannot fall out of step with the one
   `compute/2` actually enforces.
   """

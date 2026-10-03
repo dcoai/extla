@@ -144,7 +144,7 @@ defmodule ExTLA.Diagnostics do
       purpose:
         "Every compile-time diagnostic the DSL raises, by kind. Held against " <>
           "02-dsl-semantics.md §7 by spec_diagnostics_test.",
-      task: "tla.diagnostics",
+      task: "extla.diagnostics",
       gate: "surface-drift",
       hardness: :hard,
       prose: prose(),

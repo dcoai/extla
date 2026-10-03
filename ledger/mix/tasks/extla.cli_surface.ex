@@ -1,14 +1,14 @@
-defmodule Mix.Tasks.Tla.PackageSurface do
-  @shortdoc "Render every mix tla.* task's switches and exit codes to PACKAGE_SURFACE.md"
+defmodule Mix.Tasks.Extla.CliSurface do
+  @shortdoc "Render every mix extla.* task's switches and exit codes to CLI_SURFACE.md"
 
   @moduledoc """
-  Scan every `mix tla.*` task for its switches, its documented exit codes and the
-  specification section that reproduces it, and render the result to `PACKAGE_SURFACE.md`
+  Scan every `mix extla.*` task for its switches, its documented exit codes and the
+  specification section that reproduces it, and render the result to `CLI_SURFACE.md`
   (#270, #272).
 
-      mix tla.package_surface           # print the golden
-      mix tla.package_surface --write   # regenerate PACKAGE_SURFACE.md
-      mix tla.package_surface --check   # fail if the golden has drifted from the source
+      mix extla.cli_surface           # print the golden
+      mix extla.cli_surface --write   # regenerate CLI_SURFACE.md
+      mix extla.cli_surface --check   # fail if the golden has drifted from the source
 
   ## Why `--check` is HARD
 
@@ -23,16 +23,16 @@ defmodule Mix.Tasks.Tla.PackageSurface do
 
   use Mix.Task
 
-  alias ExTLA.PackageSurface
+  alias ExTLA.CliSurface
 
-  @golden "PACKAGE_SURFACE.md"
+  @golden "CLI_SURFACE.md"
   @switches [write: :boolean, check: :boolean]
 
   @impl Mix.Task
   def run(argv) do
     {opts, _rest} = OptionParser.parse!(argv, strict: @switches)
 
-    rendered = PackageSurface.run() |> PackageSurface.render()
+    rendered = CliSurface.run() |> CliSurface.render()
     path = Path.join(File.cwd!(), @golden)
 
     cond do
@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Tla.PackageSurface do
         Mix.shell().info("wrote #{path}")
 
       opts[:check] ->
-        ExTLA.Surface.check!(@golden, "tla.package_surface", path, rendered)
+        ExTLA.Surface.check!(@golden, "extla.cli_surface", path, rendered)
 
       true ->
         Mix.shell().info(rendered)
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.PackageSurface do
   end
 
   @doc false
-  # Exposed for `ExTLA.SpecOptionsTest` / `PACKAGE_SURFACE.md`, which hold a task's switches and its
+  # Exposed for `ExTLA.SpecOptionsTest` / `CLI_SURFACE.md`, which hold a task's switches and its
   # documentation to each other.
   def switches, do: @switches
 end

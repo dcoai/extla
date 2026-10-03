@@ -40,7 +40,7 @@ defmodule ExTLA.ExamplesTest do
     test "reader skips blocks that are not elixir" do
       markdown = """
       ```
-      $ mix tla.check Specs.NotAFence
+      $ mix extla.check Specs.NotAFence
       defmodule Specs.NotAFence do
       ```
 
@@ -59,7 +59,7 @@ defmodule ExTLA.ExamplesTest do
     test "is byte-identical to the file in the tree" do
       for entry <- Examples.entries(@root) do
         assert File.read!(entry.path) == Examples.render(entry, @root),
-               "#{entry.name} has drifted from the page. Regenerate: mix tla.examples --write"
+               "#{entry.name} has drifted from the page. Regenerate: mix extla.examples --write"
       end
     end
 
@@ -69,7 +69,7 @@ defmodule ExTLA.ExamplesTest do
 
         assert source =~ "Generated from spec/07-examples.md Example #{entry.example}"
         assert source =~ "do not edit"
-        assert source =~ "mix tla.examples --write"
+        assert source =~ "mix extla.examples --write"
       end
     end
 

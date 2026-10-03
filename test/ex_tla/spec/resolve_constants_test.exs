@@ -6,7 +6,7 @@ defmodule ExTLA.Spec.ResolveConstantsTest do
   (#193): `constants: %{maxx: 100}` against `constant :max, default: 3` resolved to
   `%{max: 3, maxx: 100}`, the run used the default, and nothing said so. That is the
   selection defect of #185 through the door it did not cover, and the resolver is the
-  right place to close it because `mix tla.check`, `mix tla.simulate`, Layer 3, the guides
+  right place to close it because `mix extla.check`, `mix extla.simulate`, Layer 3, the guides
   and the ledger all resolve here.
   """
   use ExUnit.Case, async: false

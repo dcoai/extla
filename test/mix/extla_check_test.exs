@@ -1,13 +1,13 @@
-defmodule Mix.Tasks.Tla.CheckTest do
+defmodule Mix.Tasks.Extla.CheckTest do
   @moduledoc """
-  The Phase 1 deliverable: `mix tla.check MySpec` verifies safety, reports what it
+  The Phase 1 deliverable: `mix extla.check MySpec` verifies safety, reports what it
   actually exercised, and says which of those two happened in its exit code.
   """
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Tla.Check
+  alias Mix.Tasks.Extla.Check
 
   setup do
     Mix.shell(Mix.Shell.IO)
@@ -313,7 +313,7 @@ defmodule Mix.Tasks.Tla.CheckTest do
     test "and the flag's list is the one the fingerprint enforces" do
       source =
         Path.expand("../..", __DIR__)
-        |> Path.join("lib/mix/tasks/tla.check.ex")
+        |> Path.join("lib/mix/tasks/extla.check.ex")
         |> File.read!()
 
       assert source =~ "ExTLA.Fingerprint.permitted_bits()"

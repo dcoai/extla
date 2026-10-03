@@ -117,7 +117,7 @@ defmodule ExTLA.Examples do
     """
     # Generated from #{@page} Example #{entry.example} — do not edit.
     #
-    # Regenerate with `mix tla.examples --write`; the `surface-drift` job fails on a
+    # Regenerate with `mix extla.examples --write`; the `surface-drift` job fails on a
     # difference. The specification is the page's fence: editing this file is editing a
     # copy, which is the drift D-21 introduced and #280 closed.
     defmodule #{inspect(entry.module)} do

@@ -40,7 +40,7 @@ defmodule ExTLA.Spec.Temporal do
   # It was enforced nowhere at compile time and three times after it, each in its own words:
   # `Liveness.shape/4` raises (only under `check_liveness: true`),
   # `GenServer.Runtime.verdict/3` has no fallback clause and dies with a
-  # `FunctionClauseError` under `mix tla.simulate`, and `Coverage.walk/3` does the same by
+  # `FunctionClauseError` under `mix extla.simulate`, and `Coverage.walk/3` does the same by
   # default. Four hand-kept copies of one enumeration, which is this project's recurring
   # defect: a list that stops being true without saying so.
   #

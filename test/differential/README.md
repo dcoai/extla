@@ -167,7 +167,7 @@ decoy is doing the work and not the entry's mere presence.
 ## The three entries `spec/07-examples.md` publishes
 
 `distributed_lock`, `raft_election` and `bounded_buffer` are **generated from the page**
-by `mix tla.examples --write`, and the `surface-drift` job fails on a difference. Their
+by `mix extla.examples --write`, and the `surface-drift` job fails on a difference. Their
 `spec.ex` files are artifacts: edit the fence in `spec/07-examples.md` and regenerate.
 
 This is #280's doing, and the reason is a measurement. Those three moduledocs used to say

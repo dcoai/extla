@@ -518,7 +518,7 @@ defmodule ExTLA.ModelChecker do
                                        # predicate admits (default: true)
     # DEFAULT FALSE. Liveness needs the whole state graph retained for SCC analysis, and
     # the graph is not free -- so a caller asking for `run/2` gets what they asked for and
-    # nothing more. `mix tla.check` is the other way round and infers it; see below.
+    # nothing more. `mix extla.check` is the other way round and infers it; see below.
     check_liveness: boolean(),         # check temporal properties (default: false)
     symmetry: [atom()] | nil,          # symmetric CONSTANT names (see §Symmetry)
     verify_symmetry: boolean(),        # also run unreduced and compare (see §Symmetry)
@@ -546,7 +546,7 @@ end
 
 #### The CLI infers `check_liveness`; the API does not
 
-`ExTLA.ModelChecker.run/2` defaults it to `false`. `mix tla.check` sets it to `true` when the
+`ExTLA.ModelChecker.run/2` defaults it to `false`. `mix extla.check` sets it to `true` when the
 spec declares a `temporal` **and** none of the three exclusions applies: `--safety-only`,
 a `symmetry:` declaration (D-22), or `workers:` above one (D-27).
 
@@ -556,7 +556,7 @@ and silently building and retaining a whole state graph for them is not that.
 
 It is worth stating because the transition between the two is where a verdict goes missing.
 `ExTLA.Spec.Test.assert_spec/2` passes its config straight through, so a property that
-`mix tla.check` checks is **not** checked by the same spec under `assert_spec` unless the
+`mix extla.check` checks is **not** checked by the same spec under `assert_spec` unless the
 config says so. A suite can be green over a temporal property nothing evaluated.
 
 **A liveness pass that was asked for and did not run is named.** Liveness runs over a
@@ -565,7 +565,7 @@ the liveness question would answer the wrong one), a `state_constraint:` that he
 back, the state budget stopping the search, and a safety counterexample halting it. Each
 puts one warning in `warnings` — "N temporal properties were not checked: <why, and what
 to do>" — and the run's status is whatever the search produced. The last two were silent
-until #208, and the budget one is the case that mattered: `mix tla.check
+until #208, and the budget one is the case that mattered: `mix extla.check
 --allow-incomplete` turns a bounded run into exit 0, so a temporal property nobody checked
 went unmentioned in a green result. A spec with no temporal property gets no such warning;
 it was not deprived of a check it never asked for.
@@ -577,7 +577,7 @@ defmodule ExTLA.ModelChecker do
     # `:deadlock` rather than `:error`: a reachable state with no successors that
     # no `terminal` admits is a finding about the SPEC, and the run that found it
     # completed. There is no status for a run that failed — a spec that cannot be
-    # checked raises, and `mix tla.check` turns that into its own JSON status
+    # checked raises, and `mix extla.check` turns that into its own JSON status
     # (`unsound_symmetry`), which is the task's vocabulary and not this one's.
     status: :ok | :violation | :max_states_reached | :constrained | :deadlock,
     states_found: non_neg_integer(),
@@ -865,7 +865,7 @@ flows into arbitrary Elixir, and any conservative syntactic check would reject t
 in TLC (08-decisions.md D-17).
 
 What the tool does instead is make a wrong declaration **detectable**:
-`verify_symmetry: true` (`mix tla.check --verify-symmetry`) runs the same model with
+`verify_symmetry: true` (`mix extla.check --verify-symmetry`) runs the same model with
 and without the reduction and fails if any VERDICT differs — status, what was refuted,
 whether it got stuck, which actions were never enabled. Not the counts: a sound
 reduction changes those on purpose, which is the entire point of it, so comparing them
@@ -1267,7 +1267,7 @@ defmodule ExTLA.Profile do
 end
 ```
 
-Enabled by `profile: true` (`mix tla.check --profile`) and **off by default**: `instrument/1`
+Enabled by `profile: true` (`mix extla.check --profile`) and **off by default**: `instrument/1`
 wraps the closures `ExTLA.Spec.Compiled` already holds, so no macro work and no recompilation is
 involved, and an unprofiled run calls the functions the compiled spec holds and pays nothing.
 
@@ -1598,25 +1598,25 @@ end
 
 ## Mix Integration
 
-### Mix Task: `mix tla.check`
+### Mix Task: `mix extla.check`
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Check do
+defmodule Mix.Tasks.Extla.Check do
   @moduledoc """
   Run model checking on ExTLA.Spec modules.
 
   ## Usage
 
-      mix tla.check                                 # every spec in the project
-      mix tla.check Specs.TransferProtocol
-      mix tla.check Specs.TransferProtocol --max-states 100000
-      mix tla.check Specs.TransferProtocol --safety-only
-      mix tla.check Specs.TransferProtocol --workers 8
-      mix tla.check Specs.TransferProtocol --format json
+      mix extla.check                                 # every spec in the project
+      mix extla.check Specs.TransferProtocol
+      mix extla.check Specs.TransferProtocol --max-states 100000
+      mix extla.check Specs.TransferProtocol --safety-only
+      mix extla.check Specs.TransferProtocol --workers 8
+      mix extla.check Specs.TransferProtocol --format json
 
   `--graph`/`--output` are NOT flags of this task. Drawing a graph is
-  `mix tla.visualize`, which owns its own options; `OptionParser` here is strict,
+  `mix extla.visualize`, which owns its own options; `OptionParser` here is strict,
   so either is refused by name rather than accepted and dropped.
 
   ## Where the constants come from
@@ -1633,7 +1633,7 @@ defmodule Mix.Tasks.Tla.Check do
   and the declared constants: `constants: %{maxx: 100}` against `constant :max`
   would otherwise be merged in, read by nothing, and the run would proceed on
   the default while the config said something else. The rule lives in the
-  resolver every path shares -- the task, `mix tla.simulate`, Layer 3
+  resolver every path shares -- the task, `mix extla.simulate`, Layer 3
   conformance, the ledger -- so none of them can drop a name the others refuse.
   The `default:` form is the one that needs no second file, and
   `ExTLA.ModelChecker.run/2` ignores it entirely -- a test that passes its own
@@ -1705,7 +1705,7 @@ since a JSON string cannot carry it. What `ExTLA.State.validate!/1` admits and w
 this encodes are the same set, by construction: a violation the search found must
 never be lost to its own serialisation. An earlier version wrote them with `inspect/1`, which a person can read and
 a machine cannot parse back, and `05-layer3-conformance.md`'s pipeline runs this
-output straight into `mix tla.replay --trace`. The human rendering is
+output straight into `mix extla.replay --trace`. The human rendering is
 `ExTLA.Trace.format/1` and is unchanged.
 
 #### The JSON result schema
@@ -1807,16 +1807,16 @@ than a static gate — exhaustive verification over a bounded model, and
 machine-checked refinement — and a stable schema is all a consumer needs to place
 `model_checked` and `refinement_checked` above its own classes.
 
-### Mix Task: `mix tla.explore`
+### Mix Task: `mix extla.explore`
 
-Explores a counterexample `mix tla.check --format json` already wrote, evaluating expressions
+Explores a counterexample `mix extla.check --format json` already wrote, evaluating expressions
 the caller supplies over the states already in it. **It searches nothing** — `explore` means
 state-space exploration everywhere else in this document, and this is the Toolbox's *Trace
 Explorer*, not TLC. The task's `@shortdoc` is required to say so, because the task name is the
 one place the word appears unqualified.
 
 ```
-mix tla.explore Specs.DistributedLock --trace counterexample.json \
+mix extla.explore Specs.DistributedLock --trace counterexample.json \
   --expr "waiting: length(waiting)" \
   --expr "quorum?: map_size(votes) * 2 > 3" \
   --changed-only
@@ -1827,7 +1827,7 @@ mix tla.explore Specs.DistributedLock --trace counterexample.json \
 **The module argument is load-bearing.** `ExTLA.Trace.from_json!/1` resolves the trace's atoms
 with `String.to_existing_atom/1`, so the spec has to be loaded before its counterexample can
 be decoded; a trace from another spec fails naming the atom that did not resolve rather than
-decoding into something else. `mix tla.replay` takes one for the same reason.
+decoding into something else. `mix extla.replay` takes one for the same reason.
 
 **`--expr` is repeatable and is compiled and evaluated**, which is what the Toolbox does with
 the expressions typed into its panel and the only thing that can work: an expression over a
@@ -1850,13 +1850,13 @@ counterexample for this spec.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Explore do
+defmodule Mix.Tasks.Extla.Explore do
   @moduledoc """
   Evaluate your own expressions over a saved counterexample.
 
   ## Usage
 
-      mix tla.explore Specs.DistributedLock --trace counterexample.json \\
+      mix extla.explore Specs.DistributedLock --trace counterexample.json \\
         --expr "waiting: length(waiting)" \\
         --changed-only
 

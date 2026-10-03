@@ -12,7 +12,7 @@ defmodule ExTLA.CoverageMergeTest do
 
   The report is what a run offers as evidence that it checked anything, so a merge that is
   subtly wrong produces a *plausible* report — which is worse than an obviously missing
-  one, and which `mix tla.check --strict-coverage` turns into a failed build.
+  one, and which `mix extla.check --strict-coverage` turns into a failed build.
   """
 
   use ExUnit.Case, async: true

@@ -8,7 +8,7 @@ System architecture, module dependency graph, and implementation strategy.
 
 ```
                               ┌──────────────┐
-                              │  mix tla.*   │  Mix tasks
+                              │  mix extla.*   │  Mix tasks
                               │  CLI entry   │
                               └──────┬───────┘
                                      │
@@ -384,11 +384,11 @@ correctly.
   (`02-dsl-semantics.md` §5.3) and the implicit `type_ok` invariant (§1.5)
 - `ExTLA.Trace` with replay-based state regeneration
 - `ExTLA.Coverage` — action coverage and vacuity, from the first release
-- `Mix.Tasks.Tla.Check`
+- `Mix.Tasks.Extla.Check`
 - **The differential corpus against TLC** (`04-layer2-model-checker.md` §Differential
   testing), which is the acceptance criterion for this phase, not a follow-up
 
-**Deliverable:** `mix tla.check MySpec` verifies safety, reports what it actually
+**Deliverable:** `mix extla.check MySpec` verifies safety, reports what it actually
 exercised, and agrees with TLC on every spec in the corpus.
 
 ### Phase 2 — Liveness
@@ -424,9 +424,9 @@ rather than ahead of it.
   reporting forms of each `ExTLA.GenServer.Runtime` check that a replay is built from
 - `ExTLA.Simulation`, `ExTLA.Simulation.Generator`, and `ExTLA.GenServer.Driver` — the
   monitored call `ExTLA.Replay` and `ExTLA.Simulation` both drive a server through
-- `Mix.Tasks.Tla.Simulate`, `Mix.Tasks.Tla.Replay`
+- `Mix.Tasks.Extla.Simulate`, `Mix.Tasks.Extla.Replay`
 - `ExTLA.State.Json` — the round-trippable form of a §6 state term, which is what
-  makes `mix tla.check --format json` into `mix tla.replay --trace` a pipeline
+  makes `mix extla.check --format json` into `mix extla.replay --trace` a pipeline
   rather than two commands that print at each other
 
 **Deliverable:** a spec, a counterexample from it, and that counterexample replayed
@@ -444,9 +444,9 @@ against the real GenServer.
   TLC at 1, 2, 4 and 8. Liveness is refused alongside it, as D-22 refuses symmetry.
 - `ExTLA.PropertyTest` — `init_states/2` and `action_sequences/3`, drawing their choices
   from the checker's own `enabled_steps/3` rather than a second implementation.
-  `Mix.Tasks.Tla.Gen.Test` is **not** built: §Deferred removes generated test files from
+  `Mix.Tasks.Extla.Gen.Test` is **not** built: §Deferred removes generated test files from
   v1, and `05-layer3-conformance.md` now says so where it used to specify them.
-- `Mix.Tasks.Tla.Visualize` (DOT only) — over `ExTLA.StateGraph.to_dot/2` and `to_json/1`.
+- `Mix.Tasks.Extla.Visualize` (DOT only) — over `ExTLA.StateGraph.to_dot/2` and `to_json/1`.
   Both require the edge table and refuse to draw the spanning tree of parent pointers as
   though it were the transition relation; both refuse a graph past the cap while naming
   its true count.
@@ -465,7 +465,7 @@ recorded in `CHANGELOG.md` as it lands, under a gate. Nothing below this line is
 | `ExTLA.Supervisor.Spec` | Faithful OTP restart semantics is a research-scale problem; nothing below it needs it |
 | View abstraction | Easy to make unsound; symmetry covers the common case |
 | HTML/D3 visualizer | DOT is enough, and a bespoke viewer is a maintenance sink |
-| Generated test *files* | `mix tla.gen.test` writes code someone then has to maintain; the property helpers give most of the value without that |
+| Generated test *files* | `mix extla.gen.test` writes code someone then has to maintain; the property helpers give most of the value without that |
 | Atomic-bound near-miss probes | `ExTLA.Coverage` derives a near-miss probe only from a top-level `or`, so an invariant written as a bare bound (`count <= max`, `size(s) < k`) reports `nil` — not measured. Pressing such a bound to equality is exactly the near miss the column exists to report, and deriving it means recognising the comparison and its edge rather than negating a disjunct. Deferred, not rejected: the shape is worth having, and reporting `nil` is honest in the meantime |
 
 ---
@@ -492,7 +492,7 @@ Stating these keeps the scope honest, and each has a better tool already:
 ## Dependencies
 
 **The list itself is `PACKAGE_SURFACE.md`**, generated from `mix.exs` by
-`mix tla.package_surface --write` and gated by `surface-drift`. This section carried a copy
+`mix extla.package_surface --write` and gated by `surface-drift`. This section carried a copy
 of the `deps` block from the initial commit until #274 — a fence whose first line was the
 comment `# mix.exs`, so it announced itself as a copy — and by then it listed `dialyxir`,
 which #69 removed, omitted `surfex`, which #64 added, and pinned `ex_doc` three minor

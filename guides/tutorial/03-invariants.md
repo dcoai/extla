@@ -119,7 +119,7 @@ end
 ```
 
 ```sh
-mix tla.check Tutorial.CancelLock
+mix extla.check Tutorial.CancelLock
 ```
 
 <!-- tla:check module=Tutorial.CancelLock expect=ok states=20 never_enabled=cancel -->
@@ -324,9 +324,9 @@ Three things worth knowing:
 A counterexample from a CI run or an incident months ago can be explored from the file:
 
 ```
-mix tla.check Tutorial.AuditedLock --format json > ce.json
+mix extla.check Tutorial.AuditedLock --format json > ce.json
 
-mix tla.explore Tutorial.AuditedLock --trace ce.json \
+mix extla.explore Tutorial.AuditedLock --trace ce.json \
   --expr "logged: length(log)" \
   --expr "held?: holder != :none"
 ```
@@ -393,7 +393,7 @@ end
 Nothing about it is wrong. Every client gets the lock, uses it, and is done. And:
 
 ```sh
-mix tla.check Tutorial.OneShotLock
+mix extla.check Tutorial.OneShotLock
 ```
 
 <!-- tla:check module=Tutorial.OneShotLock expect=deadlock states=15 depth=7 -->

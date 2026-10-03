@@ -11,7 +11,7 @@ defmodule ExTLA.RescueInventoryTest do
 
   So the answer is not a count. Each of the four sites was reviewed on its own and two were
   kept, because for them the exception genuinely is *data about the user's input* rather
-  than about the library — a blanket removal would have made `mix tla.explore` worse than
+  than about the library — a blanket removal would have made `mix extla.explore` worse than
   it was. What a gate can hold is the part judgment cannot: that the list does not grow
   without someone writing down why.
 
@@ -23,7 +23,7 @@ defmodule ExTLA.RescueInventoryTest do
   - Each is preceded by a `# PERMITTED RESCUE` comment, so the justification lives beside
     the code and not only here.
   - Each one's enclosing function body is **one call**. That is the property #315 was
-    about: the private `check/2` in `Mix.Tasks.Tla.Check` and the private `total!/1` in
+    about: the private `check/2` in `Mix.Tasks.Extla.Check` and the private `total!/1` in
     `ExTLA.Refinement` both rescued over several calls, and both were split so the rescue
     covers only the call that can raise.
 
@@ -41,12 +41,12 @@ defmodule ExTLA.RescueInventoryTest do
         "the exception is data about the user's own expression: preserved whole, " <>
           "attributed to the state it happened at, and shown as a marked cell"
     },
-    "lib/mix/tasks/tla.explore.ex" => %{
+    "lib/mix/tasks/extla.explore.ex" => %{
       "attempt/2" =>
         "hands the exception back as data so the caller can sort a deterministic " <>
           "failure from a state-dependent one; it decides nothing itself"
     },
-    "lib/mix/tasks/tla.check.ex" => %{
+    "lib/mix/tasks/extla.check.ex" => %{
       "run/2" =>
         "converts the one exception --verify-symmetry reports by into the one exit " <>
           "status the task reports by; the message travels with it"
@@ -113,7 +113,7 @@ defmodule ExTLA.RescueInventoryTest do
 
       This is the #315 defect itself. A rescue over several calls reports whichever of them
       failed as the one it was written for — `ExTLA.Refinement`'s probe reported a partial
-      helper as a missing catch-all clause, and `mix tla.check` would have reported a second
+      helper as a missing catch-all clause, and `mix extla.check` would have reported a second
       future raise site as an unsound symmetry declaration. Extract the one call that raises
       into its own function and rescue there.
       """

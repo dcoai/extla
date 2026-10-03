@@ -157,7 +157,7 @@ defmodule ExTLA.Spec.Hash do
   @doc """
   The version of `module` as declared in `source`, or `nil` when `source` does not define it.
 
-  `Mix.Tasks.Tla.Stamp` reads specs from disk by path rather than through the loaded module,
+  `Mix.Tasks.Extla.Stamp` reads specs from disk by path rather than through the loaded module,
   and used to derive the version by its own copy of the formula. One formula, here, is what
   keeps the compile-time check and the stamp task from disagreeing about a spec's version.
   """

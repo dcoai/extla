@@ -79,7 +79,7 @@ end
 ```
 
 ```sh
-mix tla.check Tutorial.WeakLock
+mix extla.check Tutorial.WeakLock
 ```
 
 <!-- tla:liveness module=Tutorial.WeakLock expect=violation property=no_starvation -->
@@ -187,7 +187,7 @@ end
 ```
 
 ```sh
-mix tla.check Tutorial.StrongLock
+mix extla.check Tutorial.StrongLock
 ```
 
 <!-- tla:liveness module=Tutorial.StrongLock expect=ok -->

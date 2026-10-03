@@ -125,11 +125,11 @@ defmodule ExTLA.UsageRulesTest do
         @root
         |> Path.join("CLI_SURFACE.md")
         |> File.read!()
-        |> then(&Regex.scan(~r/^## `(mix tla\.[\w.]+)` — ([^\n]*)/m, &1))
+        |> then(&Regex.scan(~r/^## `(mix extla\.[\w.]+)` — ([^\n]*)/m, &1))
         |> Enum.reject(fn [_m, _task, detail] -> String.contains?(detail, "not packaged") end)
         |> Enum.map(fn [_m, task, _detail] -> task end)
 
-      listed = cited(~r/`(mix tla\.[\w.]+)`/)
+      listed = cited(~r/`(mix extla\.[\w.]+)`/)
 
       assert listed != [], "usage-rules.md lists no task"
 

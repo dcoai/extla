@@ -13,7 +13,7 @@ defmodule ExTLA.ResourceLifetimeTest do
 
   Under ExUnit every test is its own process, and a process's exit takes its tables with it.
   So the suite could not see this, however many runs it made. It accumulates where processes
-  are long-lived: `mix tla.check A B C`, `ExTLA.Spec.Test`, `ExTLA.Ledger`'s corpus pass, and any
+  are long-lived: `mix extla.check A B C`, `ExTLA.Spec.Test`, `ExTLA.Ledger`'s corpus pass, and any
   application that model-checks more than once.
 
   ## What is counted, and why not `:ets.all/0` outright
@@ -84,7 +84,7 @@ defmodule ExTLA.ResourceLifetimeTest do
 
     # Isolating the search must not turn a diagnosis into an opaque exit. The exception and
     # the stack it was raised on both have to cross back, which is what keeps
-    # `mix tla.check`'s `rescue error in ExTLA.Symmetry.UnsoundError` matching.
+    # `mix extla.check`'s `rescue error in ExTLA.Symmetry.UnsoundError` matching.
     test "and a failure arrives as the exception it was, on the stack it was raised on" do
       error = assert_raise ExTLA.State.InvalidTermError, fn -> ModelChecker.run(Floating, %{}) end
 

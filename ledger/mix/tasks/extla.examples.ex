@@ -1,13 +1,13 @@
-defmodule Mix.Tasks.Tla.Examples do
+defmodule Mix.Tasks.Extla.Examples do
   @shortdoc "Generate the differential corpus entries that spec/07-examples.md publishes"
 
   @moduledoc """
   Generate `test/differential/<entry>/spec.ex` from `spec/07-examples.md`'s fences, so the
   corpus checks the documentation rather than a copy of it (#280).
 
-      mix tla.examples           # print what would be written
-      mix tla.examples --write   # regenerate the corpus entries
-      mix tla.examples --check   # fail if an entry has drifted from the page
+      mix extla.examples           # print what would be written
+      mix extla.examples --write   # regenerate the corpus entries
+      mix extla.examples --check   # fail if an entry has drifted from the page
 
   ## Why `--check` is HARD
 
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Tla.Examples do
           Mix.shell().info("wrote #{golden}")
 
         opts[:check] ->
-          ExTLA.Surface.check!(golden, "tla.examples", entry.path, rendered)
+          ExTLA.Surface.check!(golden, "extla.examples", entry.path, rendered)
 
         true ->
           Mix.shell().info(rendered)

@@ -45,7 +45,7 @@ defmodule ExTLA.SpecVersionStampTest do
     end
 
     test "and reports itself unstamped rather than fresh" do
-      states = Mix.Tasks.Tla.Stamp.states()
+      states = Mix.Tasks.Extla.Stamp.states()
 
       unstamped = Enum.filter(states, &(&1.status == :unstamped))
 
@@ -98,7 +98,7 @@ defmodule ExTLA.SpecVersionStampTest do
   describe "the corpus exercises the mechanism" do
     test "Conforming carries a stamp, and it is fresh" do
       state =
-        Mix.Tasks.Tla.Stamp.states()
+        Mix.Tasks.Extla.Stamp.states()
         |> Enum.find(&(&1.module == ExTLA.Conformance.Counter.Impl.Conforming))
 
       assert state.status == :fresh
@@ -114,11 +114,11 @@ defmodule ExTLA.SpecVersionStampTest do
     end
   end
 
-  describe "mix tla.stamp reads source, not loaded modules" do
+  describe "mix extla.stamp reads source, not loaded modules" do
     # A stale stamp is a compile error, so a task needing the project to compile before it
     # could report or fix one would be useless in the only situation it is for.
     test "states/0 answers without the project being loaded" do
-      states = Mix.Tasks.Tla.Stamp.states()
+      states = Mix.Tasks.Extla.Stamp.states()
 
       assert states != []
       assert Enum.all?(states, &(&1.status in [:fresh, :stale, :unstamped, :unverifiable]))
@@ -126,7 +126,7 @@ defmodule ExTLA.SpecVersionStampTest do
     end
 
     test "the index resolves nested and dotted module names alike" do
-      index = Mix.Tasks.Tla.Stamp.module_index()
+      index = Mix.Tasks.Extla.Stamp.module_index()
 
       assert Map.has_key?(index, ExTLA.Conformance.Counter.Spec)
       assert Map.has_key?(index, ExTLA.Conformance.Counter.Impl.Conforming)

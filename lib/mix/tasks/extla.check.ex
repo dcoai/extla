@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Tla.Check do
+defmodule Mix.Tasks.Extla.Check do
   @shortdoc "Run model checking on ExTLA.Spec modules"
 
   @moduledoc """
@@ -6,10 +6,10 @@ defmodule Mix.Tasks.Tla.Check do
 
   ## Usage
 
-      mix tla.check                                 # every spec in the project
-      mix tla.check Specs.TransferProtocol
-      mix tla.check Specs.TransferProtocol --max-states 100000
-      mix tla.check Specs.TransferProtocol --format json
+      mix extla.check                                 # every spec in the project
+      mix extla.check Specs.TransferProtocol
+      mix extla.check Specs.TransferProtocol --max-states 100000
+      mix extla.check Specs.TransferProtocol --format json
 
   ## Where the constants come from
 
@@ -316,7 +316,7 @@ defmodule Mix.Tasks.Tla.Check do
   # anything, and this one exists so a reader can refuse a shape it does not know rather than
   # misread it. The cost is bounded and self-repairing -- `ExTLA.Mix.TraceFile` refuses a v1
   # document with a message naming both versions and telling the reader to re-run
-  # `mix tla.check --format json`, which regenerates it.
+  # `mix extla.check --format json`, which regenerates it.
   #
   # Bumped to 3 by #256, which added `coverage.terminals` -- again additive, again bumped.
   @schema_version 3
@@ -427,7 +427,7 @@ defmodule Mix.Tasks.Tla.Check do
   # `ExTLA.Trace.to_json/1` rather than a local encoder: an earlier one wrote states and
   # bindings with `inspect/1`, which reads well and parses back into nothing — and
   # `05-layer3-conformance.md`'s pipeline feeds this output straight into
-  # `mix tla.replay --trace`. The human rendering is `Trace.format/1` and is unchanged.
+  # `mix extla.replay --trace`. The human rendering is `Trace.format/1` and is unchanged.
   defp violation_json(nil), do: nil
   defp violation_json(violation), do: Trace.to_json(violation)
 

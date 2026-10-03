@@ -29,7 +29,7 @@ defmodule ExTLA.ConformanceTest do
       assert R.abstract!(Refinement, compiled(), concrete) == %{count: 2, status: :ready}
     end
 
-    test "resolves the spec's constants the way mix tla.check does when given none" do
+    test "resolves the spec's constants the way mix extla.check does when given none" do
       assert {:ok, _deferred} = R.validate!(Refinement, Spec)
     end
   end
@@ -119,7 +119,7 @@ defmodule ExTLA.ConformanceTest do
 
   describe "the spec side of the entry" do
     # The corpus is only worth having if the specification half is right, so the entry
-    # carries the same assertion `mix tla.check` would make about it.
+    # carries the same assertion `mix extla.check` would make about it.
     test "the specification itself verifies, liveness included" do
       result =
         ExTLA.ModelChecker.run(Spec, %{constants: @constants, check_liveness: true})

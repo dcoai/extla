@@ -1,8 +1,8 @@
-defmodule Mix.Tasks.Tla.Explore do
+defmodule Mix.Tasks.Extla.Explore do
   @shortdoc "Evaluate your own expressions at every state of a SAVED counterexample"
 
   @moduledoc """
-  Explore a counterexample `mix tla.check --format json` already wrote, without running the
+  Explore a counterexample `mix extla.check --format json` already wrote, without running the
   checker again.
 
   > #### Not state-space exploration {: .neutral}
@@ -10,18 +10,18 @@ defmodule Mix.Tasks.Tla.Explore do
   > `explore` means searching the state space everywhere else in this project
   > (`ExTLA.ModelChecker.explore/2`). This task does not search anything. It reads a
   > counterexample off disk and evaluates expressions over the states already in it — the
-  > TLA+ Toolbox's *Trace Explorer*, not TLC. `mix tla.check` is the task that searches.
+  > TLA+ Toolbox's *Trace Explorer*, not TLC. `mix extla.check` is the task that searches.
 
   ## Usage
 
-      mix tla.explore Specs.DistributedLock --trace counterexample.json \\
+      mix extla.explore Specs.DistributedLock --trace counterexample.json \\
         --expr "waiting: length(state.waiting)" \\
         --expr "quorum?: map_size(state.votes) * 2 > 3" \\
         --changed-only
 
       # from a CI run or an incident, months later, with no checker in the loop
-      mix tla.check Specs.DistributedLock --format json > ce.json
-      mix tla.explore Specs.DistributedLock --trace ce.json --expr "len: length(state.log)"
+      mix extla.check Specs.DistributedLock --format json > ce.json
+      mix extla.explore Specs.DistributedLock --trace ce.json --expr "len: length(state.log)"
 
   ## `--expr` evaluates code you typed
 
@@ -44,7 +44,7 @@ defmodule Mix.Tasks.Tla.Explore do
 
   ## The file
 
-  `--trace` takes what `mix tla.check --format json` writes — the whole document, or a single
+  `--trace` takes what `mix extla.check --format json` writes — the whole document, or a single
   trace object lifted out of it — and a lasso as readily as a trace.
 
   The module argument is not decoration: `ExTLA.Trace.from_json!/1` resolves the trace's atoms
@@ -80,7 +80,7 @@ defmodule Mix.Tasks.Tla.Explore do
   end
 
   # `SpecTarget.resolve!([])` means "every spec in the project", which is right for
-  # `mix tla.check` and wrong here: a trace file is a counterexample for ONE spec, and
+  # `mix extla.check` and wrong here: a trace file is a counterexample for ONE spec, and
   # guessing which would decode it against the wrong set of atoms.
   defp module!([name]), do: [name]
   defp module!([]), do: Mix.raise("name the ExTLA.Spec module the trace belongs to.")
@@ -89,7 +89,7 @@ defmodule Mix.Tasks.Tla.Explore do
   defp path!(opts) do
     case Keyword.get(opts, :trace) do
       nil ->
-        Mix.raise("pass --trace <file>, a counterexample `mix tla.check --format json` wrote.")
+        Mix.raise("pass --trace <file>, a counterexample `mix extla.check --format json` wrote.")
 
       path ->
         path
@@ -110,7 +110,7 @@ defmodule Mix.Tasks.Tla.Explore do
         Mix.raise("""
         pass at least one --expr; a table of no rows answers no question.
 
-            mix tla.explore MySpec --trace ce.json --expr "waiting: length(waiting)"
+            mix extla.explore MySpec --trace ce.json --expr "waiting: length(waiting)"
 
         The state is in scope as each variable by name, and as `state`, the whole map.\
         """)
@@ -241,7 +241,7 @@ defmodule Mix.Tasks.Tla.Explore do
 
   @doc false
   # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
-  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # option list to each other (#163). `extla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches
 end

@@ -27,7 +27,7 @@ defmodule ExTLA.Invariant.Test do
 
   An invariant no test has ever seen return `false` is indistinguishable from `true`, and
   a `true` invariant is checked on every transition forever while proving nothing. It is
-  the same vacuity `mix tla.check` reports at Layer 2 (`04-layer2-model-checker.md`
+  the same vacuity `mix extla.check` reports at Layer 2 (`04-layer2-model-checker.md`
   §Coverage and Vacuity), one layer down, and it is not detectable from the passing side.
 
   ## A module compiled `:disabled` cannot be asserted about

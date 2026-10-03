@@ -28,7 +28,7 @@ defmodule ExTLA.Spec.DSL do
 
   ## Options
 
-  - `default:` — the assignment `mix tla.check` uses when nothing else supplies
+  - `default:` — the assignment `mix extla.check` uses when nothing else supplies
     one. `04-layer2-model-checker.md` specified the task without saying where a
     run's constants come from, and a checker cannot start without them; a default
     beside the declaration is the answer that needs no second file. Application

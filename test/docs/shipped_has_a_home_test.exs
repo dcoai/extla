@@ -26,17 +26,17 @@ defmodule ExTLA.ShippedHasAHomeTest do
   @root Path.expand("../..", __DIR__)
 
   # The eight #179 named, each by a string that would have to survive a rewording of the
-  # entry but not a removal of it. A needle naming a module is written without the `Ex`:
-  # CHANGELOG.md is a record, and entries written before the namespace moved under `ExTLA`
-  # (#338) name `TLA.*`. "TLA.Profile" matches both spellings.
+  # entry but not a removal of it. A needle naming a module or a task is written without the
+  # `ex`: CHANGELOG.md is a record, and entries written before the namespace moved (#338,
+  # #339) name `TLA.*` and `mix tla.*`. "TLA.Profile" and "tla.explore" match both spellings.
   @shipped [
     {"ExTLA.Profile and the --profile flag", "TLA.Profile"},
-    {"ExTLA.Trace.explore/3 and mix tla.explore", "tla.explore"},
-    {"mix tla.stamp and spec_version:", "spec_version"},
+    {"ExTLA.Trace.explore/3 and mix extla.explore", "tla.explore"},
+    {"mix extla.stamp and spec_version:", "spec_version"},
     {"the verification ledger", "TLA_COVERAGE.md"},
     {"ExTLA.Conformance.against_graph/3", "against_graph"},
     {"ExTLA.Spec.Deps", "Spec.Deps"},
-    {"mix tla.mutants", "tla.mutants"},
+    {"mix extla.mutants", "tla.mutants"},
     {"JSON schema version 2", "schema_version"}
   ]
 

@@ -1,12 +1,12 @@
-defmodule Mix.Tasks.Tla.Stamp do
+defmodule Mix.Tasks.Extla.Stamp do
   @shortdoc "Report or update `spec_version:` stamps on refinement mappings"
 
   @moduledoc """
   Report the state of every `spec_version:` stamp, and update the stale ones.
 
-      mix tla.stamp             # report every mapping's stamp
-      mix tla.stamp --check     # report, and exit 1 if a stamp is unverified
-      mix tla.stamp --restamp   # rewrite stale stamps in source
+      mix extla.stamp             # report every mapping's stamp
+      mix extla.stamp --check     # report, and exit 1 if a stamp is unverified
+      mix extla.stamp --restamp   # rewrite stale stamps in source
 
   ## It reads source, and that is not an implementation detail
 
@@ -131,7 +131,7 @@ defmodule Mix.Tasks.Tla.Stamp do
   The directories this scans: the project's own `elixirc_paths`, and `lib` as a floor.
 
   It used to append `["lib", "test", "ledger"]` unconditionally. `ledger` is a directory of
-  THIS repository, and a consumer running `mix tla.stamp` got it scanned along with their
+  THIS repository, and a consumer running `mix extla.stamp` got it scanned along with their
   whole `test` tree -- a library reaching for directory names that are not its business.
   `elixirc_paths` is the project's own answer to "where is my code", and for this repository
   it already names `ledger` and the compiled test trees, so nothing is lost by asking it.
@@ -286,7 +286,7 @@ defmodule Mix.Tasks.Tla.Stamp do
 
       if stale > 0 do
         shell.info(
-          "\n#{stale} stale. Re-read each mapping against its spec, then: mix tla.stamp --restamp"
+          "\n#{stale} stale. Re-read each mapping against its spec, then: mix extla.stamp --restamp"
         )
       end
     end
@@ -374,7 +374,7 @@ defmodule Mix.Tasks.Tla.Stamp do
 
   @doc false
   # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
-  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # option list to each other (#163). `extla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches
 end

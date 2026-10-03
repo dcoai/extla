@@ -173,7 +173,7 @@ defmodule ExTLA.GenServer do
               spec: #{inspect(spec)},
               spec_version: "#{current}"
 
-        `mix tla.stamp --restamp` will make that edit once you have made the judgement. It is
+        `mix extla.stamp --restamp` will make that edit once you have made the judgement. It is
         a convenience for a decision already taken, not a way to skip it.
         """
     end

@@ -688,7 +688,7 @@ defmodule ExTLA.Simulation do
     # `%{graph: ExTLA.StateGraph.t(), status: atom()}`, or nil to skip the check.
     #
     # Given here rather than audited by a second suite afterwards.
-    # `mix tla.simulate --against-graph` used to run `traces` MORE simulations,
+    # `mix extla.simulate --against-graph` used to run `traces` MORE simulations,
     # one at a time, forwarding two of the five options -- so
     # `--unrestricted --against-graph` audited containment with the RESTRICTED
     # generator while printing that every state was a node and every step an
@@ -821,7 +821,7 @@ defmodule ExTLA.Simulation.Generator do
   this state -- and most servers are not written to: a `handle_call` clause with
   no guard of its own accepts the message, and `:not_enabled` is the correct
   finding about that pair. It is also a finding about nearly every server ever
-  written, so hunting it is opt-in (`mix tla.simulate --unrestricted`).
+  written, so hunting it is opt-in (`mix extla.simulate --unrestricted`).
   """
   def enabled_only(spec_module, refinement, constants)
 end
@@ -870,8 +870,8 @@ defmodule ExTLA.PropertyTest do
   @doc """
   > **Status: deferred past v1** (`06-architecture.md` §Implementation Phases).
   >
-  > Generated test *files* are deferred with `mix tla.gen.test`, and for the reason
-  > §Deferred gives: "`mix tla.gen.test` writes code someone then has to maintain; the
+  > Generated test *files* are deferred with `mix extla.gen.test`, and for the reason
+  > §Deferred gives: "`mix extla.gen.test` writes code someone then has to maintain; the
   > property helpers give most of the value without that." The two generators above are
   > those helpers, and the usage example below is what they are for — a `check all` the
   > consumer owns, rather than a file ExTLA writes and they inherit.
@@ -1195,7 +1195,7 @@ injection is a crash, and a crash runs no `terminate/2`; that one is a `:kill` o
 `ExTLA.Simulation.run/2` stops at the first finding; `traces_run` counts the traces that ran.
 
 **The constants are resolved by `ExTLA.Spec.Compiled.resolve_constants/1`, the same function
-`mix tla.check` uses.** A specification model checked under one assignment and an
+`mix extla.check` uses.** A specification model checked under one assignment and an
 implementation checked against another are two different specifications, and a verdict
 from each is not a verdict about the same thing.
 
@@ -1206,25 +1206,25 @@ from each is not a verdict about the same thing.
 | Mode | When | What it does |
 |------|------|--------------|
 | **Runtime** | Every transition in dev/test | Step legality + stuttering + invariants + action properties, via the refinement mapping |
-| **Simulation** | `mix tla.simulate`, or in tests | Random walks over the real implementation, all property types including temporal |
-| **Replay** | `mix tla.replay`, or in tests | Drives the implementation through a model-checker counterexample or a captured trace |
-| **Exhaustive** | `mix tla.check` | Model checks the spec itself (Layer 2) |
+| **Simulation** | `mix extla.simulate`, or in tests | Random walks over the real implementation, all property types including temporal |
+| **Replay** | `mix extla.replay`, or in tests | Drives the implementation through a model-checker counterexample or a captured trace |
+| **Exhaustive** | `mix extla.check` | Model checks the spec itself (Layer 2) |
 | **Proof** | Non-goal | ExTLA does not prove refinement; it checks it on observed behaviors |
 
 ### Full verification pipeline
 
 ```bash
 # 1. Model check the spec — design bugs, before any code exists
-mix tla.check Specs.TransferProtocol
+mix extla.check Specs.TransferProtocol
 
 # 2. Check the implementation conforms, over random traces
-mix tla.simulate MyApp.TransferServer --traces 10000
+mix extla.simulate MyApp.TransferServer --traces 10000
 
 # 3. Replay the counterexample from step 1 against the real code
-mix tla.replay MyApp.TransferServer --trace counterexample.json
+mix extla.replay MyApp.TransferServer --trace counterexample.json
 
 # 4. Check a captured production trace against the spec
-mix tla.replay MyApp.TransferServer --captured incident-2026-08-14.json
+mix extla.replay MyApp.TransferServer --captured incident-2026-08-14.json
 
 # 5. Property tests in CI, ongoing
 mix test --only property
@@ -1240,20 +1240,20 @@ system that is actually running.
 
 ## Mix Tasks
 
-### `mix tla.simulate`
+### `mix extla.simulate`
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Simulate do
+defmodule Mix.Tasks.Extla.Simulate do
   @moduledoc """
   Run simulation of a ExTLA.GenServer against its spec.
 
   ## Usage
 
-      mix tla.simulate MyApp.TransferServer
-      mix tla.simulate MyApp.TransferServer --traces 5000 --steps 100
-      mix tla.simulate MyApp.TransferServer --inject-failures --seed 42
-      mix tla.simulate MyApp.TransferServer --against-graph
+      mix extla.simulate MyApp.TransferServer
+      mix extla.simulate MyApp.TransferServer --traces 5000 --steps 100
+      mix extla.simulate MyApp.TransferServer --inject-failures --seed 42
+      mix extla.simulate MyApp.TransferServer --against-graph
 
   ## Options
 
@@ -1321,21 +1321,21 @@ Reporting a bound as a checker finding is the false positive that would get this
 Off by default, and it runs traces one at a time: containment is a question about each
 *behaviour*, and `ExTLA.Simulation.run/2` returns a verdict.
 
-### `mix tla.replay`
+### `mix extla.replay`
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Replay do
+defmodule Mix.Tasks.Extla.Replay do
   @moduledoc """
   Drive a ExTLA.GenServer through a spec-level behavior.
 
   ## Usage
 
-      # Replay a model-checker counterexample (from `mix tla.check --format json`)
-      mix tla.replay MyApp.TransferServer --trace counterexample.json
+      # Replay a model-checker counterexample (from `mix extla.check --format json`)
+      mix extla.replay MyApp.TransferServer --trace counterexample.json
 
       # Check a captured trace from a running system
-      mix tla.replay MyApp.TransferServer --captured incident.json
+      mix extla.replay MyApp.TransferServer --captured incident.json
 
   Requires `concrete_message/2` on the refinement module for `--trace`;
   `--captured` needs only `abstract/1` and `abstract_action/1`.
@@ -1354,7 +1354,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
   ## The file formats
 
-  `--trace` takes what `mix tla.check --format json` writes -- either the whole
+  `--trace` takes what `mix extla.check --format json` writes -- either the whole
   document, an object keyed by spec module, or a single trace object lifted out
   of it.
 
@@ -1404,24 +1404,24 @@ defmodule Mix.Tasks.Tla.Replay do
 end
 ```
 
-### `mix tla.gen.test`
+### `mix extla.gen.test`
 
 > **Status: deferred past v1** (`06-architecture.md` §Implementation Phases).
 >
-> §Deferred gives the reason: "`mix tla.gen.test` writes code someone then has to maintain;
+> §Deferred gives the reason: "`mix extla.gen.test` writes code someone then has to maintain;
 > the property helpers give most of the value without that." `ExTLA.PropertyTest`'s two
 > generators are those helpers, and they are built. Specified here so the design is not
 > painted into a corner, and not built.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Gen.Test do
+defmodule Mix.Tasks.Extla.Gen.Test do
   @moduledoc """
   Generate property-based tests from a ExTLA.Spec.
 
   ## Usage
 
-      mix tla.gen.test Specs.TransferProtocol --server MyApp.TransferServer
+      mix extla.gen.test Specs.TransferProtocol --server MyApp.TransferServer
   """
   use Mix.Task
 
@@ -1430,7 +1430,7 @@ defmodule Mix.Tasks.Tla.Gen.Test do
 end
 ```
 
-### `mix tla.stamp`
+### `mix extla.stamp`
 
 Reports and updates the `spec_version:` stamps that `use ExTLA.GenServer` carries. A stamp
 records which version of a spec a refinement mapping was written against, and a stale one is
@@ -1443,15 +1443,15 @@ exist.
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Stamp do
+defmodule Mix.Tasks.Extla.Stamp do
   @moduledoc """
   Report or update `spec_version:` stamps on refinement mappings.
 
   ## Usage
 
-      mix tla.stamp             # report every mapping's status
-      mix tla.stamp --check     # report, and exit 1 if a stamp is unverified
-      mix tla.stamp --restamp   # rewrite stale stamps in place
+      mix extla.stamp             # report every mapping's status
+      mix extla.stamp --check     # report, and exit 1 if a stamp is unverified
+      mix extla.stamp --restamp   # rewrite stale stamps in place
 
   Each mapping is reported as one of four statuses:
 
@@ -1532,7 +1532,7 @@ and a stamp fresh across a change to the reachable set it was a claim about. `fa
 in deliberately: it moves liveness verdicts and nothing a mapping reads, but a spec under
 strong fairness admits a different set of behaviours from the same spec under weak, and a
 "mapping-relevant" version distinct from a "liveness-relevant" one would be two stamps
-where the second is maintained by nobody. The compile-time check and `mix tla.stamp`
+where the second is maintained by nobody. The compile-time check and `mix extla.stamp`
 compute the version from **one** function, `ExTLA.Spec.Hash.module_version/2`; a version the
 two derive separately is not a version. Not covered: `@moduledoc`, `use ExTLA.Spec`, and
 ordinary `def`s in the module, so a documentation edit does not restamp every mapping.
@@ -1544,10 +1544,10 @@ ordinary `def`s in the module, so a documentation edit does not restamp every ma
 
 ---
 
-### `mix tla.visualize`
+### `mix extla.visualize`
 
 > **DOT only.** This section advertised `--format html` and `--format mermaid` until
-> `mix tla.visualize` was built. `06-architecture.md` §Phase 4 says "DOT only" and
+> `mix extla.visualize` was built. `06-architecture.md` §Phase 4 says "DOT only" and
 > §Deferred defers the HTML/D3 visualizer explicitly — "DOT is enough, and a bespoke
 > viewer is a maintenance sink" — so §06 wins and this is corrected to agree. Both
 > formats are **refused** by the task with a message naming that decision, rather than
@@ -1555,15 +1555,15 @@ ordinary `def`s in the module, so a documentation edit does not restamp every ma
 
 <!-- tla:skip reason=an API sketch: spec_api_test holds these heads to API_SURFACE.md, and the bodies are in lib/ -->
 ```elixir
-defmodule Mix.Tasks.Tla.Visualize do
+defmodule Mix.Tasks.Extla.Visualize do
   @moduledoc """
   Render a spec's state graph as DOT, for Graphviz.
 
   ## Usage
 
-      mix tla.visualize Specs.TransferProtocol
-      mix tla.visualize Specs.TransferProtocol --output graph.dot
-      mix tla.visualize Specs.TransferProtocol --max-states 2000
+      mix extla.visualize Specs.TransferProtocol
+      mix extla.visualize Specs.TransferProtocol --output graph.dot
+      mix extla.visualize Specs.TransferProtocol --max-states 2000
 
   ## Options
 
@@ -1580,11 +1580,11 @@ defmodule Mix.Tasks.Tla.Visualize do
          counterexample emphasised, and it covers only what the search reached
       2  more states than `--max-states`, so nothing was drawn
 
-  `2` is `mix tla.check`'s code for a run that did not see the whole state
+  `2` is `mix extla.check`'s code for a run that did not see the whole state
   space, and it is separate from `1` because "too big to draw" and "the design
   is wrong" are different answers that used to share a number.
 
-  `--max-states` means here what it means in `mix tla.check`: how many states to
+  `--max-states` means here what it means in `mix extla.check`: how many states to
   explore. Exploring past a limit the task will refuse to DRAW is work thrown
   away -- it used to run to the checker's own million-state default in order to
   render none of them, and where that default was reached it drew a truncated

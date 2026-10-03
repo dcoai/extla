@@ -225,7 +225,7 @@ defmodule ExTLA.PropertyTestTest do
       end
     end
 
-    # `mix tla.check` refutes this spec at depth 1. A generator that filtered the state
+    # `mix extla.check` refutes this spec at depth 1. A generator that filtered the state
     # away would leave a property passing over an empty set, which is the shape of a test
     # that looks green and checked nothing.
     test "a spec whose init is outside its declared types, naming the block and the variable" do

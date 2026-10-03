@@ -1,17 +1,17 @@
-defmodule Mix.Tasks.Tla.ExploreTest do
+defmodule Mix.Tasks.Extla.ExploreTest do
   @moduledoc """
-  `mix tla.explore` — a saved counterexample explored without the checker running again
+  `mix extla.explore` — a saved counterexample explored without the checker running again
   (#115, #121).
 
-  The round trip is the point of most of these: `mix tla.check --format json` writes the file
-  and `mix tla.explore` reads it, so the two tasks are held to one format rather than to two
+  The round trip is the point of most of these: `mix extla.check --format json` writes the file
+  and `mix extla.explore` reads it, so the two tasks are held to one format rather than to two
   descriptions of one.
   """
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
-  alias Mix.Tasks.Tla.{Check, Explore}
+  alias Mix.Tasks.Extla.{Check, Explore}
 
   @spec_module "ExTLA.Conformance.Counter.BuggySpec"
 
@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Tla.ExploreTest do
   end
 
   # Both tasks report by exiting, so each runs in a monitored process and the exit arrives as
-  # a message — the same harness `Mix.Tasks.Tla.ReplayTest` uses.
+  # a message — the same harness `Mix.Tasks.Extla.ReplayTest` uses.
   defp task(module, args) do
     parent = self()
 
@@ -62,7 +62,7 @@ defmodule Mix.Tasks.Tla.ExploreTest do
   defp occurrences(text, needle), do: length(String.split(text, needle)) - 1
 
   describe "the round trip" do
-    test "explores what mix tla.check --format json wrote, without re-running the checker",
+    test "explores what mix extla.check --format json wrote, without re-running the checker",
          %{tmp: tmp} do
       path = counterexample_file(tmp)
 

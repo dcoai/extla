@@ -10,7 +10,7 @@ defmodule ExTLA.Spec.TemporalFragmentTest do
   |---|---|
   | `ExTLA.Spec.Temporal`'s `@nesting` | refuses it, at compile time — since #277 |
   | `ExTLA.ModelChecker.Liveness.shape/4` | raised `ArgumentError`, under `check_liveness: true` |
-  | `ExTLA.GenServer.Runtime.verdict/3` | had no clause: `FunctionClauseError` under `mix tla.simulate` |
+  | `ExTLA.GenServer.Runtime.verdict/3` | had no clause: `FunctionClauseError` under `mix extla.simulate` |
   | `ExTLA.Coverage.walk/3` | had no clause: `FunctionClauseError`, under the DEFAULT config |
 
   That is this project's recurring defect — a hand-kept enumeration that stops being true
@@ -127,7 +127,7 @@ defmodule ExTLA.Spec.TemporalFragmentTest do
       assert result.status in [:ok, :violation]
     end
 
-    # The door `mix tla.simulate` and Layer 3 come through. A behaviour, not a state graph.
+    # The door `mix extla.simulate` and Layer 3 come through. A behaviour, not a state graph.
     test "is evaluated by the runtime checker, over a behaviour" do
       # `dropped: 0` is a claim about this list, and it is true: it was written here, not
       # kept in a bounded buffer (#278).

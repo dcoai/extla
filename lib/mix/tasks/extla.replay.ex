@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Tla.Replay do
+defmodule Mix.Tasks.Extla.Replay do
   @shortdoc "Drive a ExTLA.GenServer through a spec-level behaviour"
 
   @moduledoc """
@@ -6,11 +6,11 @@ defmodule Mix.Tasks.Tla.Replay do
 
   ## Usage
 
-      # Replay a model-checker counterexample (from `mix tla.check --format json`)
-      mix tla.replay MyApp.TransferServer --trace counterexample.json
+      # Replay a model-checker counterexample (from `mix extla.check --format json`)
+      mix extla.replay MyApp.TransferServer --trace counterexample.json
 
       # Check a captured trace from a running system
-      mix tla.replay MyApp.TransferServer --captured incident.json
+      mix extla.replay MyApp.TransferServer --captured incident.json
 
   `--trace` needs `concrete_message/2` on the refinement module: it starts from *abstract*
   actions and has to produce the message that causes each. `--captured` needs only
@@ -20,7 +20,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
   ## The file formats
 
-  `--trace` takes what `mix tla.check --format json` writes, either the whole document
+  `--trace` takes what `mix extla.check --format json` writes, either the whole document
   (an object keyed by spec module) or a single trace object lifted out of it.
 
   `--captured` takes an array of `{"message": …, "state": …}` objects, oldest first, where
@@ -108,9 +108,9 @@ defmodule Mix.Tasks.Tla.Replay do
   defp module!([]), do: Mix.raise("name the ExTLA.GenServer module to replay against.")
   defp module!(many), do: Mix.raise("one module at a time; got #{Enum.join(many, ", ")}.")
 
-  # `mix tla.check --format json` writes a versioned envelope; a file holding one lifted-out
+  # `mix extla.check --format json` writes a versioned envelope; a file holding one lifted-out
   # trace is accepted too. `ExTLA.Mix.TraceFile` holds the reading, shared with
-  # `mix tla.explore` so the two cannot drift on what they accept or how they refuse it.
+  # `mix extla.explore` so the two cannot drift on what they accept or how they refuse it.
   defp read_trace!(path, module) do
     ExTLA.Mix.TraceFile.read!(path, inspect(module.__tla_spec_module__()))
   end
@@ -199,7 +199,7 @@ defmodule Mix.Tasks.Tla.Replay do
 
   @doc false
   # Exposed for `ExTLA.SpecOptionsTest`, which holds this and the specification's documented
-  # option list to each other (#163). `tla.check` gained this at #134 and nothing else did, so
+  # option list to each other (#163). `extla.check` gained this at #134 and nothing else did, so
   # for six work items its section was the only flag list in the spec that stayed correct.
   def switches, do: @switches
 end

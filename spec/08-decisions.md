@@ -248,7 +248,7 @@ no tool. The coverage report exists for the same reason one step further out: a 
 whose action is disabled by a typo'd guard verifies easily and means nothing.
 
 **The escape hatch, recorded 2026-09-22 (#176).** `allow_incomplete: true` — and
-`mix tla.check --allow-incomplete` — turns a bounded run's exit 2 into exit 0. It has
+`mix extla.check --allow-incomplete` — turns a bounded run's exit 2 into exit 0. It has
 existed since the day this decision was written and this decision did not mention it,
 which made the decision read as stronger than the code it describes.
 
@@ -923,7 +923,7 @@ pinned by tests.
 
 **Recorded 2026-09-22 (#176); decided and built at #270.**
 
-**Pinned by:** `test/mix/tla_api_surface_test.exs` "runs every golden's --check from one
+**Pinned by:** `test/mix/extla_api_surface_test.exs` "runs every golden's --check from one
 job" — a golden whose task can `--write` and `--check` and is not in `surface-drift` fails
 it, so a sixth cannot be added ungated.
 
@@ -988,7 +988,7 @@ with params cannot answer it (#284).
 - an API sketch, gated by `spec_api_test` — the largest group, and not a gap at all;
 - a fragment: an `action` or `invariant` declaration shown on its own, which is not a
   compilable module and is not meant to be;
-- a deferred design — `ExTLA.Supervisor.Spec`, `Mix.Tasks.Tla.Gen.Test` — skipped with the
+- a deferred design — `ExTLA.Supervisor.Spec`, `Mix.Tasks.Extla.Gen.Test` — skipped with the
   phase that owns it, so the block reads as unbuilt rather than as broken;
 - a block blocked by a defect, naming the issue. Those are the only skips that should
   disappear: when #284 lands, two of them go.
@@ -1097,7 +1097,7 @@ See `05-layer3-conformance.md` §`ExTLA.Refinement` and `usage-rules.md`.
 
 ---
 
-## D-37 — `mix tla.stamp --check` fails on an unverified stamp, and there is no CI job for it
+## D-37 — `mix extla.stamp --check` fails on an unverified stamp, and there is no CI job for it
 
 **Decided.** `--check` exits 1 where a stamp is **stale**, or where its spec's source is not
 on disk so **nothing verifies it**. It is a flag rather than the default, and **no CI job
@@ -1146,12 +1146,12 @@ about not surprising a caller, not about the judgement.
 
 **Recorded and built 2026-09-24 (#311).**
 
-**Pinned by:** `test/mix/tla_stamp_test.exs` — `--check` exits 1 for a stale stamp and for a
+**Pinned by:** `test/mix/extla_stamp_test.exs` — `--check` exits 1 for a stale stamp and for a
 spec with no source, exits 0 for an unstamped mapping and for one whose `spec:` is an
 attribute, and the compile-time behaviour that makes the last row right is asserted rather
 than described.
 
-See `05-layer3-conformance.md` §`mix tla.stamp`.
+See `05-layer3-conformance.md` §`mix extla.stamp`.
 
 ---
 
