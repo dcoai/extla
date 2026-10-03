@@ -183,6 +183,13 @@ elixir ~/Projects/claude-tools/release.exs --tag         # on main, at the merge
 elixir ~/Projects/claude-tools/release.exs --post-bump   # then MR that commit too
 ```
 
+**The `--prepare` commit also moves the install tag.** `guides/getting-started.md`'s
+`tla:deps` block names a literal tag, and the guide harness fails the build once it stops
+matching `CHANGELOG.md`'s newest release. `--prepare` closes the section that makes it stale,
+so the same commit edits the tag to the version being cut. `release.exs` is project-agnostic
+and doesn't know the page exists. v0.4.0's release MR found this the slow way: its pipeline
+went red on the gate.
+
 Opening a new minor line is the same sequence with `--minor` on every invocation.
 
 ## History
