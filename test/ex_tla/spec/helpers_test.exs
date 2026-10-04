@@ -129,11 +129,15 @@ defmodule ExTLA.Spec.HelpersTest do
       assert_raise ExTLA.Spec.DomainError, fn -> H.subseq(MapSet.new([1, 2]), 1, 1) end
     end
 
+    # The index is generated out of domain rather than filtered for (#341). A filter clause
+    # rejects into the generator before it, which gives up after ten rejections in a row;
+    # `m not in 1..length(s)` rejected up to 6 draws in 21, so about one run in 12,000 raised
+    # FilterTooNarrowError (CI seed 796610). These are the same values, below 1 or above the
+    # length, and `length(s) <= 6` keeps the upper range non-empty.
     property "subseq/3 and at/2 agree on every out-of-domain index" do
       check all(
               s <- list_of(integer(), max_length: 6),
-              m <- integer(-8..12),
-              m not in 1..length(s)//1
+              m <- one_of([integer(-8..0), integer((length(s) + 1)..12)])
             ) do
         assert_raise ExTLA.Spec.DomainError, fn -> H.at(s, m) end
         assert_raise ExTLA.Spec.DomainError, fn -> H.subseq(s, m, m) end
