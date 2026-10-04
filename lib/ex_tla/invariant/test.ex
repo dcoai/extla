@@ -131,6 +131,7 @@ defmodule ExTLA.Invariant.Test do
     """
     def valid_states(module, type_invariant_name, base_generator) do
       __ensure_declared__(module, type_invariant_name)
+      # filter: the invariant is the type's only definition; constructing would copy it
       StreamData.filter(base_generator, &__holds__(module, type_invariant_name, &1))
     end
   else

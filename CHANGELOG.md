@@ -14,6 +14,22 @@ does not restate it.
 `mix.exs` reads `0.4.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Fixed
+
+- **A property failed on one run in about 12,000, and a guard now makes generator filters say
+  why** (#343, for #341). `helpers_test.exs`'s out-of-domain property drew an index and then
+  filtered it with `m not in 1..length(s)`. A filter clause in `check all` rejects into the
+  generator before it, which raises `StreamData.FilterTooNarrowError` after ten rejections in
+  a row. With up to 6 of 21 draws rejected, that happened on 5 of 60,000 seeds, including CI's
+  796610 on v0.4.0's release MR. It had been there since #242 (2026-09-11), unseen because CI
+  draws a fresh seed per run. The property now generates the same out-of-domain values
+  directly: 0 failures in the same 60,000 seeds. The guess that StreamData's `integer/1`
+  shrinks its range at small sizes was wrong, since its documentation says the size is
+  ignored. `test/docs/property_filters_test.exs` reads `lib/`, `ledger/` and `test/` and
+  refuses any filter clause in `check all`/`gen all`, or any `StreamData.filter`, without a
+  `# filter: <reason>` above it. The one deliberate filter,
+  `ExTLA.Invariant.Test.valid_states/3`, now carries its reason.
+
 ## [0.4.0] — 2026-10-03
 
 **A minor line, opened by the namespace.** Every module moved from `TLA` to `ExTLA`, and
