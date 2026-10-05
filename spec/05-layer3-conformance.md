@@ -1345,12 +1345,23 @@ defmodule Mix.Tasks.Extla.Replay do
       --trace      A model-checker counterexample to replay (see below).
       --captured   A captured trace from a running system (see below).
       --format     `human` (default) or `json`.
-      --init-arg   Accepted and NOT currently read (#165). `ExTLA.Replay`'s
-                   `:server`, `:init_arg` and `:timeout` options are unreachable
-                   from this task, which passes none of them; the server is
-                   started with `[]`. Documented rather than omitted because it
-                   is in the task's `@switches` and `OptionParser` accepts it,
-                   so a user can pass it today and be silently ignored.
+      --init-arg   With --trace: the argument the server is started with
+                   (`ExTLA.Replay`'s `:init_arg`, default `[]`). A literal
+                   Elixir term only (`[start: 0]`, `%{mode: :strict}`); an
+                   expression is refused, so nothing from the command line runs.
+      --server     With --trace: drive a running process instead of starting
+                   one (`:server`). A registered name (`MyApp.Server` or
+                   `:name`) in this task's VM, which runs after `app.start`;
+                   an unregistered name or a printed pid is refused. A server
+                   the task was handed is not stopped, and a `:restart` step
+                   against it exits 3. Not with --init-arg, which would then
+                   start nothing.
+      --timeout    With --trace: milliseconds to wait for each reply
+                   (`:timeout`, default 5000). A positive integer.
+
+  The last three pass `ExTLA.Replay.counterexample/3`'s options through. Until #165
+  the task accepted `--init-arg` and dropped it, and the other two were unreachable.
+  `--captured` drives no server, so it refuses all three rather than ignoring them.
 
   ## The file formats
 

@@ -245,6 +245,139 @@ defmodule Mix.Tasks.Extla.ReplayTest do
     end
   end
 
+  # A server whose start depends on its init argument, so a test can tell whether
+  # `--init-arg` reached it (#165). It refines `BuggySpec` exactly as
+  # `FaithfulToABuggySpec` does when started with nothing: from 0, replying at once.
+  # `start:` moves where it begins, and `delay:` makes every reply that slow, which is how
+  # `--timeout` is observed.
+  defmodule StartsFromItsInitArg do
+    use GenServer
+
+    use ExTLA.GenServer,
+      spec: ExTLA.Conformance.Counter.BuggySpec,
+      refinement: ExTLA.Conformance.Counter.Refinement
+
+    @impl true
+    def init(opts) do
+      {:ok, %{value: Keyword.get(opts, :start, 0), status: :ready, delay: opts[:delay]}}
+    end
+
+    @impl true
+    def handle_call(:increment, _from, state) do
+      pause(state)
+      {:reply, :ok, %{state | value: state.value + 1, status: :incrementing}}
+    end
+
+    def handle_call(:done, _from, state) do
+      pause(state)
+      {:reply, :ok, %{state | status: :ready}}
+    end
+
+    defp pause(%{delay: nil}), do: :ok
+    defp pause(%{delay: ms}), do: Process.sleep(ms)
+  end
+
+  @starts "Mix.Tasks.Extla.ReplayTest.StartsFromItsInitArg"
+
+  describe "--init-arg, --server and --timeout reach ExTLA.Replay (#165)" do
+    test "with none of them, the server starts from its default and reproduces the trace",
+         %{tmp: tmp} do
+      {_output, code} = task(Replay, [@starts, "--trace", counterexample_file(tmp)])
+
+      assert code == 1
+    end
+
+    test "--init-arg is the argument the server is started with", %{tmp: tmp} do
+      path = counterexample_file(tmp)
+
+      {_output, same} = task(Replay, [@starts, "--trace", path, "--init-arg", "[start: 0]"])
+      {output, moved} = task(Replay, [@starts, "--trace", path, "--init-arg", "[start: 1]"])
+
+      assert same == 1, "an explicit argument equal to the default changes nothing"
+      assert moved == 2, "starting from 1, the server cannot follow a trace that starts at 0"
+      assert output =~ "NOT FOLLOWED"
+    end
+
+    test "--timeout bounds each reply", %{tmp: tmp} do
+      {output, code} =
+        task(Replay, [
+          @starts,
+          "--trace",
+          counterexample_file(tmp),
+          "--init-arg",
+          "[delay: 200]",
+          "--timeout",
+          "20"
+        ])
+
+      assert code == 2
+      assert output =~ "no reply within 20ms"
+    end
+
+    # Handed a server started from 1, the replay cannot follow the trace (2, where a server
+    # the task started itself reproduces it: 1). That is what shows it drove this process.
+    # A replay that ends without the server's own invariant check firing leaves it running:
+    # a server the task was handed is not the task's to stop.
+    test "--server drives the named process, and leaves it running", %{tmp: tmp} do
+      name = :"extla_replay_test_#{System.unique_integer([:positive])}"
+      {:ok, pid} = GenServer.start(StartsFromItsInitArg, [start: 1], name: name)
+      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
+
+      {output, code} =
+        task(Replay, [@starts, "--trace", counterexample_file(tmp), "--server", ":#{name}"])
+
+      assert code == 2
+      assert output =~ "NOT FOLLOWED"
+      assert Process.alive?(pid)
+    end
+  end
+
+  describe "what the three refuse rather than ignore (#165)" do
+    test "an --init-arg that is not a literal term" do
+      assert_raise Mix.Error, ~r/--init-arg must be a literal term/, fn ->
+        Replay.run([@starts, "--trace", "x.json", "--init-arg", "System.halt()"])
+      end
+    end
+
+    test "an --init-arg that does not parse" do
+      assert_raise Mix.Error, ~r/--init-arg .* does not parse/, fn ->
+        Replay.run([@starts, "--trace", "x.json", "--init-arg", "[start:"])
+      end
+    end
+
+    test "a --server name nothing is registered under" do
+      assert_raise Mix.Error, ~r/no process is registered as :nobody_here/, fn ->
+        Replay.run([@starts, "--trace", "x.json", "--server", ":nobody_here"])
+      end
+    end
+
+    test "a --server pid, which means nothing in this VM" do
+      assert_raise Mix.Error, ~r/--server takes a registered name/, fn ->
+        Replay.run([@starts, "--trace", "x.json", "--server", "#PID<0.42.0>"])
+      end
+    end
+
+    test "a --timeout that is not a positive number of milliseconds" do
+      assert_raise Mix.Error, ~r/--timeout must be a positive number of milliseconds/, fn ->
+        Replay.run([@starts, "--trace", "x.json", "--timeout", "0"])
+      end
+    end
+
+    test "--init-arg with --server, where it would start nothing" do
+      assert_raise Mix.Error, ~r/--init-arg starts a server; --server names one/, fn ->
+        Replay.run([@starts, "--trace", "x.json", "--server", ":x", "--init-arg", "[]"])
+      end
+    end
+
+    test "any of them with --captured, which starts and drives nothing" do
+      for flags <- [["--init-arg", "[]"], ["--server", ":x"], ["--timeout", "10"]] do
+        assert_raise Mix.Error, ~r/--captured checks a recording and drives no server/, fn ->
+          Replay.run([@starts, "--captured", "x.json" | flags])
+        end
+      end
+    end
+  end
+
   defp capture(steps) do
     Enum.map(steps, fn {message, value, status} ->
       %{

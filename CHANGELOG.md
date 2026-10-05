@@ -14,6 +14,25 @@ does not restate it.
 `mix.exs` reads `0.4.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Added
+
+- **`mix extla.replay` passes `--init-arg`, `--server` and `--timeout` through** (#165).
+  The task declared `--init-arg`, so it was accepted, and then dropped: `ExTLA.Replay` was
+  called with no options, and its documented `:server` and `:timeout` were unreachable from
+  the command line. Now, with `--trace`:
+  - `--init-arg` is the argument the server starts with, as a literal Elixir term only
+    (`[start: 0]`; an expression is refused, never run);
+  - `--server` drives a running registered process instead of starting one, and leaves it
+    running;
+  - `--timeout` bounds each reply.
+
+  Whatever would otherwise be silently ignored is refused by name: `--init-arg` with
+  `--server`, an unregistered name or a printed pid, a non-positive timeout, and any of the
+  three with `--captured`, which drives nothing. `spec/05`'s holding note ("accepted and not
+  currently read") is replaced. `test/mix/switches_read_test.exs` now holds every task to
+  reading every switch it declares; against the old task it names `--init-arg`, and it finds
+  no other.
+
 ### Changed
 
 - **CI restores dependencies with depdep v0.9.0, and every one now restores** (#346, for

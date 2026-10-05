@@ -12,6 +12,18 @@ defmodule Mix.Tasks.Extla.Replay do
       # Check a captured trace from a running system
       mix extla.replay MyApp.TransferServer --captured incident.json
 
+  ## Driving options (`--trace` only)
+
+      --init-arg TERM   the argument the server is started with (default []): a literal
+                        term such as `[start: 0]`; an expression is refused, never run
+      --server NAME     drive a running, registered process (`MyApp.Server` or `:name`)
+                        instead of starting one; it is not stopped afterwards
+      --timeout MS      milliseconds to wait for each reply (default 5000)
+
+  They are `ExTLA.Replay.counterexample/3`'s `:init_arg`, `:server` and `:timeout`.
+  `--init-arg` with `--server` is refused, since a running server is not started. All
+  three are refused with `--captured`, which drives nothing.
+
   `--trace` needs `concrete_message/2` on the refinement module: it starts from *abstract*
   actions and has to produce the message that causes each. `--captured` needs only
   `abstract/1` and `abstract_action/1`, and starts nothing — it is a pure check over
@@ -61,7 +73,14 @@ defmodule Mix.Tasks.Extla.Replay do
 
   alias ExTLA.{Replay, State}
 
-  @switches [trace: :string, captured: :string, format: :string, init_arg: :string]
+  @switches [
+    trace: :string,
+    captured: :string,
+    format: :string,
+    init_arg: :string,
+    server: :string,
+    timeout: :integer
+  ]
 
   @impl Mix.Task
   def run(args) do
@@ -72,10 +91,19 @@ defmodule Mix.Tasks.Extla.Replay do
 
     result =
       case {Keyword.get(opts, :trace), Keyword.get(opts, :captured)} do
-        {nil, nil} -> Mix.raise("pass --trace <file> or --captured <file>.")
-        {trace, nil} -> Replay.counterexample(module, read_trace!(trace, module))
-        {nil, captured} -> Replay.trace(module, read_capture!(captured))
-        {_both, _files} -> Mix.raise("pass one of --trace or --captured, not both.")
+        {nil, nil} ->
+          Mix.raise("pass --trace <file> or --captured <file>.")
+
+        {trace, nil} ->
+          replay_opts = replay_opts!(opts)
+          Replay.counterexample(module, read_trace!(trace, module), replay_opts)
+
+        {nil, captured} ->
+          drives_nothing!(opts)
+          Replay.trace(module, read_capture!(captured))
+
+        {_both, _files} ->
+          Mix.raise("pass one of --trace or --captured, not both.")
       end
 
     case Keyword.get(opts, :format, "human") do
@@ -107,6 +135,103 @@ defmodule Mix.Tasks.Extla.Replay do
 
   defp module!([]), do: Mix.raise("name the ExTLA.GenServer module to replay against.")
   defp module!(many), do: Mix.raise("one module at a time; got #{Enum.join(many, ", ")}.")
+
+  # `ExTLA.Replay.counterexample/3`'s options, from the command line. They were accepted
+  # here and never passed on (#165): `--init-arg` parsed and dropped, and `:server` and
+  # `:timeout` unreachable. Each is checked before any file is read, so a refusal names the
+  # flag rather than the file.
+  defp replay_opts!(opts) do
+    if Keyword.has_key?(opts, :server) and Keyword.has_key?(opts, :init_arg) do
+      Mix.raise(
+        "--init-arg starts a server; --server names one that is already running, so the " <>
+          "argument would never be used. Pass one or the other."
+      )
+    end
+
+    Enum.flat_map(opts, fn
+      {:server, name} -> [server: server!(name)]
+      {:init_arg, text} -> [init_arg: init_arg!(text)]
+      {:timeout, ms} -> [timeout: timeout!(ms)]
+      _other -> []
+    end)
+  end
+
+  # `--captured` checks a recording: it starts no server and sends nothing, so these would
+  # be accepted and silently mean nothing, which is #165's defect over again.
+  defp drives_nothing!(opts) do
+    case Enum.filter([:init_arg, :server, :timeout], &Keyword.has_key?(opts, &1)) do
+      [] ->
+        :ok
+
+      given ->
+        flags = Enum.map_join(given, ", ", &("--" <> String.replace(to_string(&1), "_", "-")))
+
+        Mix.raise(
+          "--captured checks a recording and drives no server, so #{flags} would have " <>
+            "nothing to act on. Drop them, or replay a counterexample with --trace."
+        )
+    end
+  end
+
+  # A registered name, as an atom (`:name`) or an alias (`MyApp.Server`). The task runs in
+  # its own VM after `app.start`, so the process has to be one the application starts and
+  # registers. A pid printed by another VM names nothing here.
+  defp server!("#PID<" <> _ = text), do: pid_refused!(text)
+  defp server!("<" <> _ = text), do: pid_refused!(text)
+
+  defp server!(text) do
+    name =
+      case text do
+        ":" <> atom -> String.to_atom(atom)
+        alias -> Module.concat([alias])
+      end
+
+    case Process.whereis(name) do
+      nil ->
+        Mix.raise(
+          "no process is registered as #{inspect(name)} in this VM. mix extla.replay runs " <>
+            "in its own VM after app.start, so --server must name a process your " <>
+            "application starts and registers. Without --server the module is started for " <>
+            "the replay."
+        )
+
+      _pid ->
+        name
+    end
+  end
+
+  defp pid_refused!(text) do
+    Mix.raise(
+      "--server takes a registered name (MyApp.Server or :name), not a pid: #{text} was " <>
+        "printed by another VM and names nothing in this one."
+    )
+  end
+
+  # A literal term only. An argument from the command line is data, so nothing in it runs:
+  # a call, a variable or an operator is refused rather than evaluated.
+  defp init_arg!(text) do
+    case Code.string_to_quoted(text) do
+      {:ok, quoted} ->
+        if Macro.quoted_literal?(quoted) do
+          {term, _binding} = Code.eval_quoted(quoted)
+          term
+        else
+          Mix.raise(
+            "--init-arg must be a literal term (atoms, numbers, strings, lists, tuples, " <>
+              "maps); #{inspect(text)} is an expression, and an argument from the command " <>
+              "line is never run."
+          )
+        end
+
+      {:error, _} ->
+        Mix.raise("--init-arg #{inspect(text)} does not parse as an Elixir term.")
+    end
+  end
+
+  defp timeout!(ms) when ms > 0, do: ms
+
+  defp timeout!(ms),
+    do: Mix.raise("--timeout must be a positive number of milliseconds; got #{ms}.")
 
   # `mix extla.check --format json` writes a versioned envelope; a file holding one lifted-out
   # trace is accepted too. `ExTLA.Mix.TraceFile` holds the reading, shared with

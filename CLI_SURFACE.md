@@ -10,7 +10,7 @@ no section says so instead of going unlisted — the list of tasks is the direct
 hand-kept set. Tasks outside `lib/` — this project's ledger tooling and its test-support
 tasks — are excluded from the package, so they have no specification section by design.
 
-**13 tasks · 44 switches** · shipped 6 · specified 6 · exit codes 18
+**13 tasks · 46 switches** · shipped 6 · specified 6 · exit codes 18
 
 ## `mix extla.api_surface` — ledger tooling, not packaged — 2 switches — NO EXIT-CODE TABLE
 
@@ -81,13 +81,15 @@ tasks — are excluded from the package, so they have no specification section b
 |---|---|---|---|
 | `--check` | `:switch` | `:boolean` | `ledger/mix/tasks/extla.package_surface.ex` |
 | `--write` | `:switch` | `:boolean` | `ledger/mix/tasks/extla.package_surface.ex` |
-## `mix extla.replay` — specified in spec/05-layer3-conformance.md — 4 switches — 4 exit codes
+## `mix extla.replay` — specified in spec/05-layer3-conformance.md — 6 switches — 4 exit codes
 
 | Item | Kind | Detail | Locus |
 |---|---|---|---|
 | `--captured` | `:switch` | `:string` | `lib/mix/tasks/extla.replay.ex` |
 | `--format` | `:switch` | `:string` | `lib/mix/tasks/extla.replay.ex` |
 | `--init-arg` | `:switch` | `:string` | `lib/mix/tasks/extla.replay.ex` |
+| `--server` | `:switch` | `:string` | `lib/mix/tasks/extla.replay.ex` |
+| `--timeout` | `:switch` | `:integer` | `lib/mix/tasks/extla.replay.ex` |
 | `--trace` | `:switch` | `:string` | `lib/mix/tasks/extla.replay.ex` |
 | `exit 0` | `:exit` | the behaviour was reproduced, or the capture conforms | `lib/mix/tasks/extla.replay.ex` |
 | `exit 1` | `:exit` | a conformance violation — the step and its finding are printed | `lib/mix/tasks/extla.replay.ex` |
