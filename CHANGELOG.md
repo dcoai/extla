@@ -14,6 +14,17 @@ does not restate it.
 `mix.exs` reads `0.4.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Changed
+
+- **CI restores dependencies with depdep v0.9.0, and every one now restores** (#346, for
+  #342). Under v0.7.0 one dependency, `telemetry`, was restored and then rebuilt on every run
+  as "outdated", and never replaced because the store already held it. The object was fine:
+  its entries carried the build path of the project that pushed it, so it unpacked where this
+  project's Mix never looks (depdep#131, the mechanism behind depdep#110). v0.9.0 moves each
+  restored tree to this project's own build path. The pin's own pipeline read `pulled 7,
+  missing 0` with nothing rebuilt or compiled in every job. Keys are unchanged, so there was no
+  store refill. v0.8.0's `--explain-rebuilt` comes along for the next refusal worth reading.
+
 ### Fixed
 
 - **A property failed on one run in about 12,000, and a guard now makes generator filters say

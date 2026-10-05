@@ -97,10 +97,15 @@
 # their compile time, which is what `depdep.saved` and `depdep.compile_carried` report from.
 # A long run right after such a bump is that refill, not a regression.
 #
-# The one miss was `telemetry`: restored, then rebuilt because Mix called the build outdated,
-# while `--push` read `already stored 7, uploaded 0` -- so the stale object stays and every run
-# rebuilds it (~1.5s). That is depdep's to fix (dco-tek/depdep#110, where #329 added this
-# evidence); a `rebuilt 1` on the summary line is that, not this project.
+# Under v0.7.0 the one miss was `telemetry`: restored, then rebuilt because Mix called the
+# build outdated, on every run, while `--push` read `already stored 7` and never replaced it.
+# The object was fine. Its entries carried the pushing project's build path (metresis builds at
+# `_build/sqlite/test`), so it unpacked where this project's Mix never looks (depdep#131, behind
+# #110, where #329 added this evidence). v0.9.0 (#346) moves each restored tree to this
+# project's own build path, and the pin's own pipeline (4000, at 43e92bb7) read
+# `pulled 7, missing 0` with no `rebuilt` in compile, test and surface-drift: every dependency
+# restored and nothing compiled. A `rebuilt N` on the summary line now means a refusal worth
+# reading; `--explain-rebuilt` prints why Mix refused it.
 
 stages:
   - check
