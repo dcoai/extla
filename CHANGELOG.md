@@ -46,6 +46,27 @@ release it merely follows.
 
 ### Fixed
 
+- **`ExTLA.Set.cross_many/1` no longer names a caller that does not exist, and docstrings
+  that name a caller are checked** (#347, for #324). Its docstring and `spec/01` justified
+  the empty product being `{{}}` as "the answer the DSL needs" for an action with no
+  parameters. Nothing in `lib/` calls it. The DSL binds parameters with
+  `ExTLA.ModelChecker.bindings/3`, a *dependent* product (each parameter's values may depend
+  on the state and on earlier parameters), which `cross_many/1`'s fixed list of sets cannot
+  express. The two are different operations, so the rationale now stands on its own: the
+  empty tuple is the identity of the product. `test/docs/caller_claims_test.exs` reads every
+  `lib/` `@doc` and `@moduledoc` from the AST. A backticked project function named in a
+  caller claim must exist, and in a function's doc a named caller (called from, used by)
+  must reach the documented function, directly or through its own module's helpers. Its
+  first run found `ExTLA.Profile`'s moduledoc naming `take_action/6` and
+  `enabled_bindings/3` as though they were in `ExTLA.ModelChecker.Safety`; they are in
+  `ExTLA.ModelChecker`, which the sentence now names. The gate also refuses a *qualified*
+  reference to a private function: ex_doc links it, and the docs job's
+  `--warnings-as-errors` refuses the link, which is how this MR's first pipeline failed. A
+  claim that names no function, like the old
+  "the DSL needs", is not refused, because `lib/` uses the same phrasing for concepts
+  ("what Layer 3 needs"). Three more copies of the independent product (`record_set/1`,
+  `function_set/2`, `Symmetry.mappings/2`) are #350.
+
 - **`ExTLA.Invariant.Test.valid_states/3` now says what a broad base generator costs**
   (#348, for #344). It filters the base generator through the type invariant, and
   `StreamData.filter/3` raises `FilterTooNarrowError` after 25 rejections in a row, but

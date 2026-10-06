@@ -339,8 +339,14 @@ defmodule ExTLA.Set do
   TLA+ equivalent: S1 \\X S2 \\X ... \\X Sn
 
   The product of NO sets is the set containing the empty tuple, not the empty set.
-  That is the answer the DSL needs when an action has no parameters: one binding,
-  binding nothing. The empty set would mean the action can never fire.
+  The empty tuple is the identity of the product: appending the factors one at a
+  time has to start from one empty combination, or nothing is ever built. The
+  empty set is what any empty factor gives.
+
+  This is the independent product of a fixed list of sets. The model checker's
+  parameter bindings (`ExTLA.ModelChecker.bindings/3`) are a different operation,
+  a dependent product: each parameter's values may depend on the state and on
+  the parameters bound before it. That is why they are not built from this.
   """
   def cross_many(sets)
 

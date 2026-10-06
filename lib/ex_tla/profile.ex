@@ -91,10 +91,10 @@ defmodule ExTLA.Profile do
 
   ## Why the process dictionary
 
-  The closures are called from inside `ExTLA.ModelChecker.Safety.check_invariants/4`,
-  `take_action/6` and `enabled_bindings/3`, and they return only their value — there is nothing to
-  thread an accumulator back through, short of changing the signature of every call site in the
-  hot path to carry one.
+  The closures are called from inside `ExTLA.ModelChecker.Safety.check_invariants/4`, and
+  from `ExTLA.ModelChecker`'s `enabled_bindings/3` and private `take_action/6`, and they
+  return only their value — there is nothing to thread an accumulator back through, short of
+  changing the signature of every call site in the hot path to carry one.
 
   The dictionary is not merely the convenient answer, it is the *correct* boundary: it is
   per-process, which is exactly what `ExTLA.ModelChecker.Parallel` already calls a worker's
