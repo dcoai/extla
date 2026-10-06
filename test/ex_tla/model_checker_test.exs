@@ -82,6 +82,10 @@ defmodule ExTLA.ModelCheckerTest do
     # states, ending with `pending` emptied and the money gone. Nothing asserted it. A
     # "fix" to `fail_transfer` — which is what #280 was originally scoped to do — would
     # have left that printed trace describing a run that no longer happens, silently.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`/Example Trace Output"
+         ]
     test "and the worked example is refuted exactly as §04's trace output shows" do
       result =
         ModelChecker.run(Transfer, %{
@@ -122,8 +126,10 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "invariant violations" do
-    @tag verifies:
-           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`"
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
+         ]
     test "report the shortest counterexample" do
       result = ModelChecker.run(Broken, %{})
 
@@ -518,12 +524,16 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "traces" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     setup do
       %{trace: ModelChecker.run(Broken, %{}).violation}
     end
 
-    @tag verifies:
-           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
+         ]
     test "regenerate the states by replay", %{trace: trace} do
       assert trace.states == [%{n: 0}, %{n: 1}, %{n: 2}, %{n: 3}]
       assert trace.length == length(trace.states)
@@ -541,6 +551,10 @@ defmodule ExTLA.ModelCheckerTest do
       assert Enum.any?(trace.bindings, &(map_size(&1) > 0))
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`/Example Trace Output"
+         ]
     test "format/1 marks what each step changed", %{trace: trace} do
       output = Trace.format(trace)
 
@@ -555,6 +569,10 @@ defmodule ExTLA.ModelCheckerTest do
     # `format/1` printed the banner, which is the property's NAME, and dropped the sentence
     # saying what about it failed (#176). `:type_ok` is the clearest case — its message names
     # the variable, its value and the type it was declared with, and the banner says `type_ok`.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`/Example Trace Output"
+         ]
     test "format/1 prints the message the finding wrote, not just the property's name" do
       trace = %ExTLA.Trace{
         type: :safety,
@@ -567,6 +585,10 @@ defmodule ExTLA.ModelCheckerTest do
       assert Trace.format(trace) =~ "type_ok: n = 4 is not in 0..3"
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`/Example Trace Output"
+         ]
     test "format/1 shows a binding as a call" do
       trace =
         ModelChecker.run(Transfer, %{

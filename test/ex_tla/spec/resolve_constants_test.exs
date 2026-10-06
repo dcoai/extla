@@ -11,6 +11,9 @@ defmodule ExTLA.Spec.ResolveConstantsTest do
   """
   use ExUnit.Case, async: false
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`"
+
   alias ExTLA.Spec.Compiled
   alias ExTLA.TestSpecs.WithDefaults
 

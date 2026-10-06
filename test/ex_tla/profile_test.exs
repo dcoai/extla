@@ -134,6 +134,8 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "the window is the search, whatever stopped it" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`"
     # Each case is an axis on which the identity could fail for a reason that is NOT #133 —
     # a count that aggregates differently, a search that halts mid-expansion, a second run whose
     # profile could be paired with the first run's graph. Every one of them holds; where a case
@@ -209,6 +211,10 @@ defmodule ExTLA.ProfileTest do
       assert result.coverage.bounded_by == :none
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Under `--workers`"
+         ]
     test "a parallel run, where the workers' contributions are summed" do
       # `Parallel.merge/2` sums per-worker profiles while `graph.transition_count` accumulates in
       # the coordinator. Nothing forces those two to aggregate alike, so it is asserted rather
@@ -253,6 +259,8 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "the measurement" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`"
     test "an unprofiled run reports no profile at all" do
       assert ModelChecker.run(@spec_module, @constants).profile == nil
     end
@@ -383,6 +391,8 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "what it ranks" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`"
     test "the expensive invariant outranks the cheap one, by about the ratio of the work" do
       profile = run().profile
 
@@ -398,6 +408,8 @@ defmodule ExTLA.ProfileTest do
                "expensive"
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps"
     test "the calibration is subtracted, so a trivial declaration reports about nothing" do
       profile = run().profile
 
@@ -411,6 +423,8 @@ defmodule ExTLA.ProfileTest do
                "evaluations — the calibration is not being subtracted"
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps"
     test "the share of the run is reported, and the declarations are a part of it" do
       profile = run().profile
 
@@ -428,6 +442,8 @@ defmodule ExTLA.ProfileTest do
     # none of the work. The numerator counted the workers and the denominator excluded them:
     # the same spec read 12% at one worker and 91% at eight, and the advice inverted. The
     # guarding test ran at one worker, where the two brackets coincide.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Under `--workers`"
     test "the share of the run does not depend on the worker count" do
       # Bounded buffer rather than this file's chain spec, deliberately. The chain has ONE
       # state per BFS level, so a parallel run of it is a task per level per state and the
@@ -465,6 +481,8 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "stability — the property the unit was chosen for" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps"
     # The bound is ABSOLUTE — two reductions per evaluation — and that is the whole claim.
     #
     # A floor can only be pushed UP, by an evaluation that never ran uninterrupted, so under
@@ -530,6 +548,10 @@ defmodule ExTLA.ProfileTest do
       end
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/The unit is reductions, and that is the point"
+         ]
     test "the count does not move under machine load, which is why it is not milliseconds" do
       quiet = run().profile
 
@@ -558,6 +580,8 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "merge" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Under `--workers`"
     # `merge/2` combines RAW contributions — what `collect/1` reads out of a worker's process
     # dictionary — and `finalize/2` runs once over the result. Built by hand rather than from
     # two runs, because two runs give finalized profiles and finalizing twice would subtract
@@ -619,6 +643,8 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "calibration" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps"
     test "is stable across calls, which is what makes subtracting it sound" do
       constants = for _ <- 1..5, do: Profile.calibrate()
 
@@ -652,6 +678,13 @@ defmodule ExTLA.ProfileTest do
   end
 
   describe "the rendered report" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Example profile output"
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Example profile output",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/The unit is reductions, and that is the point"
+         ]
     test "carries exactly one wall-time figure and no per-declaration milliseconds" do
       report = Profile.format(run().profile)
 
@@ -670,6 +703,10 @@ defmodule ExTLA.ProfileTest do
     # checker's own machinery dominates. This spec is small enough that its declarations really
     # are about half the run, so the line correctly does NOT appear for it, and testing both
     # branches means constructing the shares rather than hoping a fixture lands on each side.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Example profile output",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps"
+         ]
     test "sends the reader to the guide only when the declarations are a thin slice of the run" do
       profile = run().profile
 

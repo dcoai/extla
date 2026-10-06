@@ -8,6 +8,8 @@ defmodule ExTLA.State.JsonTest do
     do: term |> Json.encode() |> Jason.encode!() |> Jason.decode!() |> Json.decode!()
 
   describe "every term 02-dsl-semantics.md §6 permits" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`"
     test "survives a round trip through JSON" do
       terms = [
         0,

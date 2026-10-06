@@ -252,6 +252,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
       assert List.last(result.violation.prefix.states) == %{phase: :stuck}
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     test "the formatted counterexample says the behaviour stutters rather than ending" do
       output = Trace.format(check(Stalls, %{}, [:eventually_done]).violation)
 
@@ -267,6 +269,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
     # message field it lands in was itself unrendered until this work item, so a test that
     # read `violation.prefix.message` would have passed over a counterexample that showed the
     # reader nothing. Every hop is load-bearing; cut any one and this goes red.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     test "a refuted property's counterexample carries the description its author wrote" do
       output = Trace.format(check(IdlingUnfair, %{}, [:eventually_two]).violation)
 
@@ -275,6 +279,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
 
     # `desc:` is optional and stored as `""` when it is absent (#160), so the line has to read
     # the same as it did before there was a description to add to it.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     test "and a property declared without one reads exactly as it did before" do
       output = Trace.format(check(Stalls, %{}, [:eventually_done]).violation)
 
@@ -282,6 +288,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
       refute output =~ "behaviour —"
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     test "a real cycle is formatted as a loop back to where it started" do
       output = Trace.format(check(IdlingUnfair, %{}, [:eventually_two]).violation)
 
@@ -294,6 +302,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
       assert output =~ ~r/State \d+ \(= state 1, the cycle head\):/
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     test "a lasso's length counts states, sharing the cycle head once" do
       violation = check(IdlingUnfair, %{}, [:eventually_two]).violation
       {joined, _} = Trace.join(violation)
@@ -382,6 +392,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
       assert StateGraph.liveness?(graph)
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`"
     test "a refuted property does not make the coverage report claim a bounded run" do
       result = check(IdlingUnfair, %{}, [:eventually_two])
 
@@ -408,6 +420,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   end
 
   describe "the counterexample as a behaviour" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     test "a plain trace is a prefix, with no cycle to return to" do
       trace = ModelChecker.run(ExTLA.TestSpecs.Broken, %{constants: %{}}).violation
 

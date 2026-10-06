@@ -35,6 +35,18 @@ release it merely follows.
 
 ### Changed
 
+- **spec/04 §§ Coverage → end say which tests verify them too** (#353, for #336). The other
+  17 sections were read the same way: Coverage, Profile, Trace, Parallel, `mix
+  extla.check` and its JSON schema, `mix extla.explore`, ExUnit Integration, and
+  Differential testing. With #352's half, spec/04 now carries 539 test → section claims
+  across 33 files, and every section with a claim has at least one, except the six claims
+  in #356 (two of them found here). The bare "Mix Integration" heading has no text of its
+  own to verify. Of the 18 suggested `implements` relations in range, five were retired
+  with a reason: each names a module only as context (an analogy, a contrast, deferred
+  work, an aside). surfex sees `test` but not ExUnitProperties' `property`, so the 26
+  properties' tags declare nothing to it yet (surfex#141); they are kept, because they
+  are correct.
+
 - **spec/04 §§ Overview → Liveness say which tests verify them** (#352, for #336). Each of
   the 18 sections up to Coverage and Vacuity was read against its tests. The ones that
   show a section's claims carry `@tag verifies: "<section id>"`: 253 test → section

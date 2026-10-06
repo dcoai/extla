@@ -11,6 +11,9 @@ defmodule ExTLA.ActionPropertyTraceTest do
   """
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
+
   alias ExTLA.{ModelChecker, Spec, Trace}
   alias ExTLA.ModelChecker.Safety
 

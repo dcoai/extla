@@ -16,6 +16,11 @@
 defmodule ExTLA.Differential.ParallelAgreementTest do
   use ExUnit.Case, async: false
 
+  @moduletag verifies: [
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Differential testing against TLC",
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Parallel`"
+             ]
+
   alias ExTLA.ModelChecker
 
   @worker_counts [2, 4, 8]

@@ -10,6 +10,9 @@ defmodule ExTLA.CheckJsonSchemaTest do
 
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`/The JSON result schema"
+
   @envelope_keys ~w(schema_version specs)
   @entry_keys ~w(
     spec status message distinct_states states_found transitions diameter deadlock

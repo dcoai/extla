@@ -149,6 +149,8 @@ defmodule ExTLA.Spec.TemporalFragmentTest do
 
     # The door that opens by default: coverage builds a probe per predicate position on
     # every run, whether or not liveness was asked for.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`"
     test "is walked by the coverage probes" do
       spec = Spec.Compiled.from_module(EveryShape)
       coverage = Coverage.init(spec, %{procs: [:p1, :p2]}, spec.invariants)

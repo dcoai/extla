@@ -60,6 +60,8 @@ defmodule ExTLA.GeneratedModelsTest do
   @runs 40
 
   describe "workers" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Parallel`"
     # D-27's claim, at unbounded extent. Level-synchronous BFS exists to preserve the
     # counterexample's LENGTH, which is what D-9's corpus compares — so length is asserted
     # here and not merely the counts.
@@ -110,6 +112,8 @@ defmodule ExTLA.GeneratedModelsTest do
   end
 
   describe "counterexamples" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`"
     # #47's checks, on whatever the generator finds rather than on the one corpus entry
     # that has a violated invariant.
     property "every counterexample is a behaviour the spec admits" do
@@ -147,6 +151,8 @@ defmodule ExTLA.GeneratedModelsTest do
   end
 
   describe "max_states" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     # A bound must change what a run REACHED, never what it concluded about what it
     # reached. A truncated run that flipped a verdict would be the worst failure the tool
     # has, and `:max_states_reached` exists so that "we ran out of budget" is never
@@ -190,6 +196,8 @@ defmodule ExTLA.GeneratedModelsTest do
   end
 
   describe "the graph the search builds" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
     property "records exactly the successors the spec admits" do
       check all(description <- SpecGenerator.description(), max_runs: @runs) do
         spec = SpecGenerator.compile(description)

@@ -5,6 +5,9 @@ defmodule ExTLA.Spec.TestTest do
   """
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/ExUnit Integration"
+
   import ExTLA.Spec.Test
 
   test "passes and returns the result for a verified spec" do

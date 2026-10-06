@@ -5,6 +5,9 @@ defmodule ExTLA.CoverageTest do
   """
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`"
+
   alias ExTLA.{Coverage, ModelChecker}
 
   defmodule Typo do
@@ -534,8 +537,10 @@ defmodule ExTLA.CoverageTest do
       assert coverage(ExTLA.TestSpecs.Terminating, %{constants: %{max: 2}}).bounded_by == :none
     end
 
-    @tag verifies:
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`",
            "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/State constraints"
+         ]
     test "names the state constraint" do
       coverage =
         coverage(ExTLA.TestSpecs.Unbounded, %{state_constraint: fn s -> s.n <= 5 end})
@@ -577,6 +582,10 @@ defmodule ExTLA.CoverageTest do
   end
 
   describe "format/2" do
+    @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`/Example coverage output"
+                 ]
     test "is quiet when everything was exercised" do
       coverage = coverage(ExTLA.TestSpecs.Terminating, %{constants: %{max: 3}})
 
