@@ -34,6 +34,9 @@ defmodule ExTLA.BoundedAccusationTest do
 
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`"
+
   alias ExTLA.{Coverage, ModelChecker}
 
   @root Path.expand("../..", __DIR__)
@@ -191,6 +194,10 @@ defmodule ExTLA.BoundedAccusationTest do
   # ── The specification's own example, as a gate ──────────────────────────────
 
   describe "spec/04's worked coverage example" do
+    @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`/Example coverage output"
+                 ]
     # The example's shape, transcribed: five actions of which one was never enabled, three
     # invariants of which one has zero near misses, one property checked and one vacuous.
     defp worked_example do

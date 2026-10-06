@@ -40,6 +40,10 @@ defmodule ExTLA.StrictArgvTest do
     """
   end
 
+  @tag verifies: [
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.explore`"
+       ]
   test "every task parses argv strictly" do
     lenient =
       for task <- tla_tasks(),

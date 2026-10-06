@@ -9,6 +9,9 @@ defmodule Mix.Tasks.Extla.ExploreTest do
   """
   use ExUnit.Case, async: false
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.explore`"
+
   import ExUnit.CaptureIO
 
   alias Mix.Tasks.Extla.{Check, Explore}

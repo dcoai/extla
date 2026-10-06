@@ -5,6 +5,9 @@ defmodule Mix.Tasks.Extla.CheckTest do
   """
   use ExUnit.Case, async: false
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`"
+
   import ExUnit.CaptureIO
 
   alias Mix.Tasks.Extla.Check
@@ -60,8 +63,10 @@ defmodule Mix.Tasks.Extla.CheckTest do
 
     # A spec that declares a `temporal` is asking for it to be checked, so the task
     # checks it — and prints a lasso rather than a trace when one is refuted.
-    @tag verifies:
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
            "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+         ]
     test "a refuted temporal property exits 1 and prints the lasso" do
       {output, code} = check(["ExTLA.TestSpecs.IdlingUnfair"])
 
@@ -70,8 +75,10 @@ defmodule Mix.Tasks.Extla.CheckTest do
       assert output =~ "↺ back to state 1"
     end
 
-    @tag verifies:
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
            "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+         ]
     test "--safety-only leaves the temporal properties unchecked, and says so" do
       {output, code} = check(["ExTLA.TestSpecs.IdlingUnfair", "--safety-only"])
 
@@ -85,8 +92,10 @@ defmodule Mix.Tasks.Extla.CheckTest do
     # refusal as a trailing line. A CI consumer reading the exit code saw a verified run. The
     # test that pinned the API behaviour asserted only the warning text, so nothing here saw
     # the exit code; this does.
-    @tag verifies:
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
            "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/Symmetry"
+         ]
     test "--verify-symmetry that could not verify does not exit 0 or say verified" do
       Application.put_env(:extla, ExTLA.TestSpecs.PerBinding,
         constants: %{processes: MapSet.new([:p1, :p2])},
@@ -104,8 +113,10 @@ defmodule Mix.Tasks.Extla.CheckTest do
       assert output =~ "could not be verified"
     end
 
-    @tag verifies:
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
            "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/Symmetry"
+         ]
     test "--verify-symmetry catches a declaration the spec does not deserve" do
       Application.put_env(:extla, ExTLA.TestSpecs.Asymmetric,
         constants: %{processes: MapSet.new([:p1, :p2])},
@@ -166,8 +177,10 @@ defmodule Mix.Tasks.Extla.CheckTest do
     # #208. The budget skip was the one unnamed liveness skip, and this flag is where it bit:
     # exit 0, and a temporal property nobody checked went unmentioned. `Idling` declares two
     # and is stopped at two states here.
-    @tag verifies:
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
            "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+         ]
     test "--allow-incomplete still says which temporal properties were not checked" do
       {output, code} =
         check(["ExTLA.TestSpecs.Idling", "--max-states", "2", "--allow-incomplete"])

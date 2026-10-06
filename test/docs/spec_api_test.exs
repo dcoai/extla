@@ -79,14 +79,21 @@ defmodule ExTLA.SpecApiTest do
 
   describe "layer 1 — every head the spec publishes, the code declares" do
     @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/ExUnit Integration",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.explore`",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Parallel`",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference",
-                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`"
                  ]
     test "with the arity the spec gives it", %{blocks: blocks, surface: surface} do
       missing =
@@ -128,11 +135,14 @@ defmodule ExTLA.SpecApiTest do
 
   describe "layer 2 — every type the spec publishes, the code declares" do
     @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Coverage and Vacuity — `ExTLA.Coverage`",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not",
                    "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph",
-                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`"
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Trace`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`"
                  ]
     test "by name, and with the same keys where it is a record", %{
       blocks: blocks,

@@ -48,6 +48,9 @@ defmodule ExTLA.ProfileParallelTest do
   """
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Under `--workers`"
+
   alias ExTLA.ModelChecker
 
   @spec_module ExTLA.ProfileParallelTest.Spec

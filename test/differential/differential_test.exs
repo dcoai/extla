@@ -118,6 +118,9 @@ defmodule ExTLA.DifferentialTest.DeclarationKinds do
   """
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Differential testing against TLC"
+
   @entries entries
   @corpus Path.expand(".", __DIR__)
 

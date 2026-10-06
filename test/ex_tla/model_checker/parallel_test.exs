@@ -6,6 +6,9 @@ defmodule ExTLA.ModelChecker.ParallelTest do
 
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Parallel`"
+
   alias ExTLA.{ModelChecker, TestSpecs}
   alias ExTLA.ModelChecker.Parallel
 
