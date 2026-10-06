@@ -46,6 +46,19 @@ release it merely follows.
 
 ### Fixed
 
+- **`ExTLA.Invariant.Test.valid_states/3` now says what a broad base generator costs**
+  (#348, for #344). It filters the base generator through the type invariant, and
+  `StreamData.filter/3` raises `FilterTooNarrowError` after 25 rejections in a row, but
+  nothing told a consumer that. Measured on a real type invariant over 2,000 seeds, 100-run
+  properties raised in none of the runs at about 50% acceptance, in 1 in 90 at about 30%,
+  and in 3 in 4 at about 15%. The 30% band is the dangerous one: it passes locally and goes
+  red on a rare seed. The docstring and `spec/03` §`valid_states` now say the base generator
+  should have the type's shape and be accepted at least about half the time, with a good and
+  a bad example, both held by a test. Another test reads the limit from the exception and
+  checks that the docstring and the spec state the number StreamData enforces. There is no
+  new `max_consecutive_failures:` option: raising the limit would move the failing band, not
+  remove it.
+
 - **A property failed on one run in about 12,000, and a guard now makes generator filters say
   why** (#343, for #341). `helpers_test.exs`'s out-of-domain property drew an index and then
   filtered it with `m not in 1..length(s)`. A filter clause in `check all` rejects into the

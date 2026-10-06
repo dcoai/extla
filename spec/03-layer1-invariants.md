@@ -534,6 +534,15 @@ defmodule ExTLA.Invariant.Test do
   only definition of the type the module actually enforces, and a generator built
   to mirror it is a copy that can disagree with it.
 
+  The cost of filtering falls on the base generator. Each rejected candidate is
+  redrawn, and 25 rejections in a row raise `StreamData.FilterTooNarrowError`, so a
+  base generator the invariant mostly rejects gives a property that fails on some
+  seeds and not others. At about 30% acceptance that is roughly one 100-run property
+  in 90. The base generator should already have the type's shape (keys, tags, the
+  members of a closed set) and be accepted at least about half the time. Raising the
+  rejection limit would move the failing band, not remove it, so `valid_states/3`
+  takes no such option.
+
   `stream_data` is a dev/test-only dependency, so this function has a body only
   where it is loaded, decided when ExTLA compiles — the same absent-tolerance
   `jason` and `telemetry` get.
