@@ -36,8 +36,13 @@ defmodule ExTLA.Set do
   N-ary Cartesian product: `S1 \\X S2 \\X ... \\X Sn`.
 
   The product of no sets is the set containing the empty tuple, not the empty
-  set — which is the answer the DSL needs when an action has no parameters: one
-  binding, binding nothing.
+  set. The empty tuple is the identity of the product: appending the factors one
+  at a time has to start from one empty combination, or nothing is ever built.
+  The empty set is what any *empty factor* gives.
+
+  This is the independent product, a fixed list of sets.
+  `ExTLA.ModelChecker.bindings/3` is a different operation: each parameter's
+  values may depend on the state and on the parameters bound before it (#324).
 
       iex> ExTLA.Set.cross_many([MapSet.new([1, 2]), MapSet.new([:a, :b])]) |> MapSet.size()
       4
