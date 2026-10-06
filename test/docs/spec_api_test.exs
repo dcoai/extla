@@ -78,6 +78,16 @@ defmodule ExTLA.SpecApiTest do
   end
 
   describe "layer 1 — every head the spec publishes, the code declares" do
+    @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
+                 ]
     test "with the arity the spec gives it", %{blocks: blocks, surface: surface} do
       missing =
         for block <- checkable(blocks),
@@ -117,6 +127,13 @@ defmodule ExTLA.SpecApiTest do
   end
 
   describe "layer 2 — every type the spec publishes, the code declares" do
+    @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`"
+                 ]
     test "by name, and with the same keys where it is a record", %{
       blocks: blocks,
       surface: surface

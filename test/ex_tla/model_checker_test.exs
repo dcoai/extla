@@ -17,6 +17,8 @@ defmodule ExTLA.ModelCheckerTest do
   }
 
   describe "exhaustive search" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`"
     test "finds every reachable state and no more" do
       result = ModelChecker.run(Counter, %{constants: %{max: 2}})
 
@@ -27,6 +29,10 @@ defmodule ExTLA.ModelCheckerTest do
       assert result.diameter == 4
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
+         ]
     test "counts generated states separately from distinct ones" do
       result = ModelChecker.run(Counter, %{constants: %{max: 2}})
 
@@ -54,6 +60,10 @@ defmodule ExTLA.ModelCheckerTest do
     # run check nothing at all, and the documented violation was pinned by no test
     # anywhere. `:type_ok` holds over the whole constrained space, so the run reaches its
     # bound while still checking something, and the violation is pinned below.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/State constraints"
+         ]
     test "explores a spec with params, under a constraint that bounds its log" do
       result =
         ModelChecker.run(Transfer, %{
@@ -95,6 +105,10 @@ defmodule ExTLA.ModelCheckerTest do
       assert total(last) < total(initial)
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
+         ]
     test "reports the fingerprint width and the soundness margin it implies" do
       result = ModelChecker.run(Counter, %{constants: %{max: 2}})
 
@@ -108,6 +122,8 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "invariant violations" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`"
     test "report the shortest counterexample" do
       result = ModelChecker.run(Broken, %{})
 
@@ -122,6 +138,8 @@ defmodule ExTLA.ModelCheckerTest do
       assert result.violation.actions == [:tick, :tick, :tick]
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`"
     test "stop the search at the violation" do
       result = ModelChecker.run(Broken, %{})
 
@@ -129,6 +147,10 @@ defmodule ExTLA.ModelCheckerTest do
       assert result.distinct_states == 4
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
+         ]
     test "can be restricted to named invariants, as a TLC .cfg selects them" do
       # `Broken` stops at n = 5, which is a deadlock — so with no invariants
       # selected the run still fails, on the other check.
@@ -142,6 +164,8 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "action properties" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`"
     test "are checked over every transition" do
       defmodule Decreasing do
         use ExTLA.Spec
@@ -170,6 +194,10 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "deadlock and terminal states" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
+         ]
     test "a successor-less state is a deadlock by default" do
       result = ModelChecker.run(Deadlocking, %{constants: %{max: 2}})
 
@@ -179,6 +207,8 @@ defmodule ExTLA.ModelCheckerTest do
       assert List.last(result.violation.states) == %{produced: 2}
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "the deadlock message points at `terminal` rather than at a flag" do
       result = ModelChecker.run(Deadlocking, %{constants: %{max: 2}})
 
@@ -187,6 +217,8 @@ defmodule ExTLA.ModelCheckerTest do
 
     # `check_deadlock: false` is the blunt instrument: it silences the check for
     # every other state in the spec at the same time.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "check_deadlock: false silences it" do
       result = ModelChecker.run(Deadlocking, %{constants: %{max: 2}, check_deadlock: false})
 
@@ -194,6 +226,11 @@ defmodule ExTLA.ModelCheckerTest do
       assert result.deadlock
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Safety`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "a declared terminal state is not a deadlock" do
       result = ModelChecker.run(Terminating, %{constants: %{max: 3}})
 
@@ -202,6 +239,10 @@ defmodule ExTLA.ModelCheckerTest do
       assert result.distinct_states == 4
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "declaring the end state keeps deadlock detection on everywhere else" do
       {_result, graph} = ModelChecker.explore(Terminating, %{constants: %{max: 3}})
 
@@ -211,6 +252,8 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "bounded runs" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/State constraints"
     test "a state constraint bounds an unbounded spec and says so" do
       result =
         ModelChecker.run(Unbounded, %{state_constraint: fn s -> s.n <= 10 end})
@@ -220,6 +263,8 @@ defmodule ExTLA.ModelCheckerTest do
       assert Enum.any?(result.warnings, &(&1 =~ "not an exhaustive search"))
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "max_states stops the search and reports that it did" do
       result = ModelChecker.run(Unbounded, %{max_states: 25})
 
@@ -228,6 +273,8 @@ defmodule ExTLA.ModelCheckerTest do
     end
 
     # A run that stopped early and a run that finished must never look alike.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "a bounded run never reports plain :ok" do
       for config <- [%{state_constraint: fn s -> s.n <= 3 end}, %{max_states: 10}] do
         refute ModelChecker.run(Unbounded, config).status == :ok
@@ -236,6 +283,8 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "phase boundaries" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "asking for liveness now checks it, and builds the graph to do so" do
       {result, graph} =
         ModelChecker.explore(Counter, %{constants: %{max: 2}, check_liveness: true})
@@ -254,6 +303,8 @@ defmodule ExTLA.ModelCheckerTest do
     # still raises. The rest of parallel exploration is
     # `test/ex_tla/model_checker/parallel_test.exs` and
     # `test/differential/parallel_agreement_test.exs`.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "parallel exploration is honoured, and refused only alongside liveness" do
       result = ModelChecker.run(Counter, %{constants: %{max: 2}, workers: 4})
       assert result.status == :ok
@@ -277,6 +328,8 @@ defmodule ExTLA.ModelCheckerTest do
     # Everything but `duration_ms`, which is a measurement of the run rather than a fact
     # about the model — comparing whole results made this test pass only when the two runs
     # landed in the same millisecond.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "and one worker is what the checker does, so it is not refused" do
       config = %{constants: %{max: 2}}
 
@@ -286,6 +339,8 @@ defmodule ExTLA.ModelCheckerTest do
       assert Map.delete(one, :duration_ms) == Map.delete(none, :duration_ms)
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
     test "a spec with unchecked temporal properties says so in the warnings" do
       result = ModelChecker.run(Counter, %{constants: %{max: 2}})
 
@@ -293,6 +348,8 @@ defmodule ExTLA.ModelCheckerTest do
       assert Enum.any?(result.warnings, &(&1 =~ "check_liveness: true"))
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
     test "a spec with no temporal properties warns about nothing" do
       assert ModelChecker.run(Unbounded, %{max_states: 5}).warnings == []
     end
@@ -357,6 +414,8 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "the state graph, as a thing a second process could write to" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
     # #31. Not parallel exploration — that is Phase 4 — but the three things that make it
     # impossible: a protected table a worker cannot write to at all, a lookup-then-insert
     # that two writers both win, and an id allocated from a field of an immutable struct.
@@ -463,6 +522,8 @@ defmodule ExTLA.ModelCheckerTest do
       %{trace: ModelChecker.run(Broken, %{}).violation}
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
     test "regenerate the states by replay", %{trace: trace} do
       assert trace.states == [%{n: 0}, %{n: 1}, %{n: 2}, %{n: 3}]
       assert trace.length == length(trace.states)
@@ -525,8 +586,14 @@ defmodule ExTLA.ModelCheckerTest do
   end
 
   describe "the liveness graph" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
     @processes %{processes: MapSet.new([:p1, :p2])}
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
+         ]
     test "is absent unless asked for, and says so rather than guessing" do
       {_result, graph} = ModelChecker.explore(Counter, %{constants: %{max: 2}})
 

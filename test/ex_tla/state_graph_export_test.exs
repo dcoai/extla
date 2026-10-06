@@ -10,6 +10,9 @@ defmodule ExTLA.StateGraphExportTest do
 
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph"
+
   alias ExTLA.{ModelChecker, StateGraph, TestSpecs}
 
   # Both exports need the edge table, so every fixture here asks for it.

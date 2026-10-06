@@ -60,6 +60,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
 
     # The likeliest typo in the whole DSL, so it gets its own message rather than
     # falling through to "undeclared variable".
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview"
     test "a constant referenced without the pin says so" do
       error =
         refuse(
@@ -77,6 +79,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
       assert error =~ "Write `^limit`"
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview"
     test "assigning to a constant is caught" do
       assert refuse(
                """
@@ -526,6 +530,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
       refute error =~ "assignment to variable"
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "a bare variable in an action_property names old. and new." do
       error =
         refuse(
@@ -548,6 +554,10 @@ defmodule ExTLA.Spec.DiagnosticsTest do
   end
 
   describe "params" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "a param that draws from neither a set, a literal nor a function is rejected" do
       error =
         refuse(
@@ -674,6 +684,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
   end
 
   describe "temporal formulas" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "a conjunction of formulas is rejected, naming the operator" do
       error =
         refuse(
@@ -698,6 +710,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
     # enforced at run time, by `Liveness.shape/4`, only under `check_liveness: true`, in an
     # `ArgumentError` carrying no module, declaration or line. Under the default configuration
     # the formula was never looked at and the run reported `:ok`.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
     test "a nesting deeper than the fragment evaluates is refused, at compile time" do
       nested = fn formula ->
         refuse(
@@ -720,6 +734,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
       assert nested.("eventually((x == 0) ~> (x == 1))") =~ "`~>` directly inside"
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
     test "and the refusal names the declaration and the line, as §7 requires" do
       error =
         refuse(
@@ -871,6 +887,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
   end
 
   describe "fairness" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "an unknown action lists the declared ones" do
       error =
         refuse(
@@ -891,6 +909,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
       assert error =~ "Declared actions: :bump."
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "params that are not a leading prefix are rejected" do
       assert refuse(
                """
@@ -910,6 +930,8 @@ defmodule ExTLA.Spec.DiagnosticsTest do
 
     # A state function returns a different set in every state, so there is no
     # fixed collection of bindings to attach one constraint each to.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "a state-drawn param cannot be quantified over" do
       assert refuse(
                """

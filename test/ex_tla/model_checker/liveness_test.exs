@@ -117,6 +117,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   end
 
   describe "strong fairness is not weak fairness" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`"
     test "an action enabled intermittently and never taken is fair to WF" do
       result = check(IntermittentWeak, %{}, [:eventually_grabbed])
 
@@ -135,6 +137,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   end
 
   describe "verdicts" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`"
     test "a property that holds leaves the run verified" do
       assert check(Idling, %{}, [:eventually_two]).status == :ok
       assert check(Counter, %{max: 2}, [:eventually_done]).status == :ok
@@ -174,6 +178,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   end
 
   describe "fairness" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`"
     # §5.2's whole point. `Idling` and `IdlingUnfair` are the same spec; one declares
     # WF(advance) and the other declares nothing, and the verdict differs.
     test "weak fairness rules out a cycle that sits beside a continuously enabled action" do
@@ -195,6 +201,10 @@ defmodule ExTLA.ModelChecker.LivenessTest do
     # A counterexample the spec's own assumptions forbid is not a counterexample. The
     # cycle it prints has to be one every fairness constraint permits, which means
     # visiting the states where each constraint is disabled.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The counterexample"
+         ]
     test "the cycle it prints is one the fairness constraints permit" do
       result = check(WeaklyFair, @processes, [:no_starvation])
       {_result, graph} = explore_live(WeaklyFair, @processes)
@@ -232,6 +242,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   describe "terminal states" do
     # §5.3: a state with no successors stutters there forever, which is a legal
     # behaviour — and it refutes anything still waiting for something to happen.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`"
     test "a spec that ends before its goal is refuted by the end state" do
       result = check(Stalls, %{}, [:eventually_done])
 
@@ -292,6 +304,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   end
 
   describe "what it refuses" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`"
     test "a graph with no liveness structure" do
       {_result, graph} = ModelChecker.explore(Counter, %{constants: %{max: 2}})
       spec = Spec.Compiled.from_module(Counter)
@@ -304,6 +318,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
     # A verdict about every behaviour needs every behaviour. A bounded run explored part
     # of the state space, and an unexpanded state is indistinguishable from one that ends
     # the spec — which is exactly the shape that refutes a liveness property.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`"
     test "a graph whose search was bounded before it finished" do
       spec = Spec.Compiled.from_module(Unbounded)
 
@@ -328,6 +344,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
     # ExTLA rather than the author of a spec — because a shape reaching the checker unchecked
     # is a hole in the front end, and carrying on with a weaker shape is the one thing the
     # checker must not do.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
     test "a nesting of operators it does not evaluate" do
       spec = Spec.Compiled.from_module(Counter)
 
@@ -355,6 +373,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
   end
 
   describe "the run" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     test "asking for liveness builds the graph it needs" do
       {_result, graph} =
         ModelChecker.explore(Idling, %{constants: %{}, check_liveness: true})
@@ -369,6 +389,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
       assert result.coverage.bounded_by == :none
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
     test "not asking still says the properties went unchecked" do
       result = ModelChecker.run(Idling, %{constants: %{}})
 
@@ -376,6 +398,8 @@ defmodule ExTLA.ModelChecker.LivenessTest do
       assert Enum.any?(result.warnings, &(&1 =~ "declared and not checked"))
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
     test "asking stops the warning" do
       result = check(Idling, %{}, [:eventually_two])
 

@@ -283,6 +283,8 @@ defmodule ExTLA.Spec.TypeTest do
   end
 
   describe "the implicit type_ok invariant" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "is checked in every reachable state, ahead of the declared invariants" do
       spec = ExTLA.Spec.Compiled.from_module(ExTLA.TestSpecs.Counter)
       [first | _] = ModelChecker.checked_invariants(spec, %{max: 2})
@@ -296,6 +298,8 @@ defmodule ExTLA.Spec.TypeTest do
       refute Enum.any?(ModelChecker.checked_invariants(spec, %{}), &(&1.name == :type_ok))
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "reports a state outside its type rather than pruning it" do
       defmodule Overflows do
         use ExTLA.Spec

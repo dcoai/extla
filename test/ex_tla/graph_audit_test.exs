@@ -37,6 +37,10 @@ defmodule ExTLA.GraphAuditTest do
       assert GraphAudit.audit(spec, constants, graph) == :ok
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/State Graph",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "and one with more than one initial state" do
       {spec, constants, graph} = graph_for(TestSpecs.TwoStarts)
 
