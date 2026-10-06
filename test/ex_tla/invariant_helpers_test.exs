@@ -3,7 +3,7 @@ defmodule ExTLA.InvariantHelpersTest do
   use ExUnitProperties
   use ExTLA.Invariant.Test
 
-  alias ExTLA.TestServers.{Account, CounterRules}
+  alias ExTLA.TestServers.{Account, CounterRules, TrafficLight}
 
   @good %{count: 1, ceiling: 10}
   @doubly_bad %{count: -1, ceiling: 0}
@@ -144,6 +144,47 @@ defmodule ExTLA.InvariantHelpersTest do
       end
     end
 
+    # The docstring's two examples (#344): a base generator with the type's shape is
+    # accepted about half the time and passes; one of the wrong shape is rejected nearly
+    # always and raises. Fixed seeds, so neither depends on the draw.
+    test "the documented good base generator passes and the bad one raises" do
+      colour_data = StreamData.map(StreamData.integer(), &%{cycles: &1})
+      good = StreamData.tuple({StreamData.member_of([:red, :yellow, :green]), colour_data})
+      bad = StreamData.tuple({StreamData.atom(:alphanumeric), colour_data})
+      options = [initial_seed: {0, 0, 344}, max_runs: 100]
+
+      assert {:ok, _} =
+               StreamData.check_all(valid_traffic_light_states(good), options, &{:ok, &1})
+
+      assert_raise StreamData.FilterTooNarrowError, fn ->
+        StreamData.check_all(valid_traffic_light_states(bad), options, &{:ok, &1})
+      end
+    end
+
+    # The number the docs promise is the one `StreamData.filter/3` enforces. It is
+    # stream_data's default, not ours, so an upgrade that changes it fails here
+    # instead of leaving the docstring and spec/03 wrong.
+    test "the rejection limit the docs state is the one StreamData enforces" do
+      never = StreamData.tuple({StreamData.constant(:blue), StreamData.constant(%{cycles: 0})})
+
+      error =
+        assert_raise StreamData.FilterTooNarrowError, fn ->
+          Enum.take(valid_traffic_light_states(never), 1)
+        end
+
+      limit = error.max_consecutive_failures
+      {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(ExTLA.Invariant.Test)
+
+      [doc] =
+        for {{:function, :valid_states, 3}, _, _, %{"en" => doc}, _} <- docs, do: doc
+
+      spec = File.read!(Path.expand("../../spec/03-layer1-invariants.md", __DIR__))
+
+      assert doc =~ "#{limit} rejections in a row raise"
+
+      assert spec =~ "#{limit} rejections in a row raise"
+    end
+
     test "refuses a name the module does not declare" do
       assert_raise ArgumentError, fn ->
         ExTLA.Invariant.Test.valid_states(CounterRules, :nonexistent, StreamData.constant(@good))
@@ -159,4 +200,7 @@ defmodule ExTLA.InvariantHelpersTest do
       refute_invariant(Account, :audited, %{balance: 0, deposits: 0, movements: 9, log: []})
     end
   end
+
+  defp valid_traffic_light_states(base),
+    do: ExTLA.Invariant.Test.valid_states(TrafficLight, :valid_state, base)
 end
