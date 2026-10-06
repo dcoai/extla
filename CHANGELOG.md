@@ -35,6 +35,18 @@ release it merely follows.
 
 ### Changed
 
+- **surfex's relation log is wired up for spec/04, not yet gating** (#351, for #336).
+  `.surfex.exs` points surfex at `spec/04-layer2-model-checker.md` with `adoption: :trust`,
+  and `.surfex/` holds the (still empty) log. `Surfex.ExUnitFormatter` records every test
+  result at its version; the full suite took 192 s with it, against 200–224 s before. The
+  `test`, `mutation` and `docs` jobs keep their evidence as artifacts under their own names,
+  and a new `relation-evidence` job checks the log against all three together. It is
+  `allow_failure` until spec/04 is tagged and baselined (#352–#354). `namespace: "ExTLA"` is
+  required, because surfex's default camelizes the app name to `Extla`. A type citation
+  (`ExTLA.State.t()`) is read as its module until surfex resolves types itself
+  (surfex#137). On current main, `mix surfex.suggest` proposes 30 `implements` and 2,466
+  `tests` relations. `CONTRIBUTING.md` is new and states the per-MR loop.
+
 - **CI restores dependencies with depdep v0.9.0, and every one now restores** (#346, for
   #342). Under v0.7.0 one dependency, `telemetry`, was restored and then rebuilt on every run
   as "outdated", and never replaced because the store already held it. The object was fine:

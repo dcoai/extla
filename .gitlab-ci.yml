@@ -250,6 +250,13 @@ test:
     GIT_DEPTH: 0
   script:
     - mix test
+    # The relation log's evidence from this job's run (#336, #351), under the job's own name
+    # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
+    - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/test.jsonl
+  artifacts:
+    paths:
+      - surfex-evidence/
+    expire_in: 1 week
 
 # The library as a CONSUMER gets it, which is not how anything else here builds it.
 #
@@ -291,10 +298,16 @@ consumer-compile:
 mutation:
   extends: .elixir
   stage: verify
+  # Its archive is its own evidence only. By default a verify job downloads `test`'s artifacts,
+  # and they would ride along into this archive as a stale second `test.jsonl` (#351).
+  dependencies: []
   script:
     # The runner's own behaviour first -- a broken runner would make every mutant look
     # like a survivor, so the sweep below is only meaningful if these pass.
     - mix test --only mutation
+    # The relation log's evidence from this job's run (#336, #351), under the job's own name
+    # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
+    - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/mutation.jsonl
     # Then the measurement itself. Drift fails in both directions: a mutant that newly
     # survives is a regression in the gates, and one that newly dies is progress that has
     # to be recorded or it can be lost again with nothing noticing.
@@ -304,6 +317,10 @@ mutation:
     # whole corpus. The timeout below is that measurement plus room, not a guess.
     - mix extla.mutants --check
   timeout: 40 minutes
+  artifacts:
+    paths:
+      - surfex-evidence/
+    expire_in: 1 week
 
 # The oracle side of the corpus. This job is the reason expected.json can be
 # trusted as a fixture: it is regenerated from TLC on every pipeline and diffed
@@ -366,6 +383,9 @@ surface-drift:
 docs:
   extends: .elixir
   stage: verify
+  # Its archive is its own evidence only. By default a verify job downloads `test`'s artifacts,
+  # and they would ride along into this archive as a stale second `test.jsonl` (#351).
+  dependencies: []
   script:
     # `--warnings-as-errors` since #291. The build emitted 34 unresolved references and
     # exited 0, and `ExTLA.DocLinks` cannot see them: it scans `@href` in the built HTML, and
@@ -373,6 +393,33 @@ docs:
     # cannot see the surface the defect lives on, which is #102's shape one door over.
     - MIX_ENV=dev mix docs --warnings-as-errors
     - mix test test/docs --include needs_built_docs
+    # The relation log's evidence from this job's run (#336, #351), under the job's own name
+    # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
+    - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/docs.jsonl
+  artifacts:
+    paths:
+      - surfex-evidence/
+    expire_in: 1 week
+
+# spec/04's relation log, checked against the evidence of every job that runs tests (#336).
+# Each of `test`, `mutation` and `docs` runs a different slice of the suite and records the
+# rest as excluded, so no one file can validate every relation. `--merge` reads the three
+# together, and a claim no job ran stays unchecked rather than passing.
+#
+# NOT YET A GATE (#351): no relation is recorded until spec/04 is tagged (#352, #353) and
+# baselined (#354), so a pass here would be vacuous. #354 removes `allow_failure`.
+relation-evidence:
+  extends: .elixir
+  stage: verify
+  needs: [test, mutation, docs]
+  allow_failure: true
+  script:
+    - mix compile
+    - >-
+      mix surfex.status --evidence
+      --merge surfex-evidence/test.jsonl
+      --merge surfex-evidence/mutation.jsonl
+      --merge surfex-evidence/docs.jsonl
 
 tlc-corpus:
   stage: verify

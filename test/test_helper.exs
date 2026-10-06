@@ -10,4 +10,10 @@
 # artifact, and failing loudly there when it does not.
 #
 #     MIX_ENV=dev mix docs && mix test test/docs --include needs_built_docs
-ExUnit.start(exclude: [:mutation, :needs_built_docs])
+#
+# `Surfex.ExUnitFormatter` records each test's result at its exact version in
+# `_build/surfex/evidence.jsonl`, which is what validates spec/04's relations (#336).
+ExUnit.start(
+  exclude: [:mutation, :needs_built_docs],
+  formatters: [ExUnit.CLIFormatter, Surfex.ExUnitFormatter]
+)
