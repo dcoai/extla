@@ -3,7 +3,10 @@
   # `test/docs/formatter_inputs_test.exs` (#317). `bin/` and `ledger/` were outside this
   # list while holding real Elixir — the surface-drift ledger, its six Mix tasks and the
   # CHANGELOG guard — and one of those files was unformatted while the `format` job passed.
-  inputs: ["{mix,.formatter}.exs", "{bench,bin,config,ledger,lib,scripts,test}/**/*.{ex,exs}"],
+  inputs: [
+    "{mix,.formatter,.surfex}.exs",
+    "{bench,bin,config,ledger,lib,scripts,test}/**/*.{ex,exs}"
+  ],
   locals_without_parens: [
     constant: 1,
     constant: 2,

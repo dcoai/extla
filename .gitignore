@@ -30,3 +30,6 @@ erl_crash.dump
 # Editor backups
 *~
 .*.swp
+
+# CI-only: each test-running job copies its relation evidence here for `relation-evidence` (#351).
+/surfex-evidence/
