@@ -534,6 +534,8 @@ defmodule ExTLA.CoverageTest do
       assert coverage(ExTLA.TestSpecs.Terminating, %{constants: %{max: 2}}).bounded_by == :none
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/State constraints"
     test "names the state constraint" do
       coverage =
         coverage(ExTLA.TestSpecs.Unbounded, %{state_constraint: fn s -> s.n <= 5 end})

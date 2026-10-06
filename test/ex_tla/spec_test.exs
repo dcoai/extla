@@ -5,10 +5,14 @@ defmodule ExTLA.SpecTest do
   alias ExTLA.TestSpecs.{Counter, LetScopes, PerBinding, Swap, Transfer}
 
   describe "from_module/1" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`"
     test "returns the compiled spec" do
       assert %Compiled{module: Counter} = Compiled.from_module(Counter)
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`"
     test "says so, rather than failing three frames down, for a module that is not a spec" do
       assert_raise ArgumentError, ~r/is not a TLA spec/, fn ->
         Compiled.from_module(Enum)
@@ -33,6 +37,10 @@ defmodule ExTLA.SpecTest do
 
     # D-19: a type mentioning a constant has no value at compile time, so the
     # only honest representation is the expression itself.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "store types quoted, unevaluated" do
       spec = Compiled.from_module(Transfer)
       balances = Enum.find(spec.variables, &(&1.name == :balances))
@@ -45,6 +53,8 @@ defmodule ExTLA.SpecTest do
       assert Enum.all?(spec.variables, &is_nil(&1.type))
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`"
     test "carry desc: through to the compiled invariant" do
       spec = Compiled.from_module(Counter)
       invariant = Enum.find(spec.invariants, &(&1.name == :within_bounds))
@@ -54,12 +64,18 @@ defmodule ExTLA.SpecTest do
   end
 
   describe "init" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "builds the initial state from constants" do
       spec = Compiled.from_module(Counter)
       assert [init] = spec.init
       assert init.(%{max: 3}) == %{n: 0, done: false}
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "resolves ^constants and helpers" do
       spec = Compiled.from_module(Transfer)
       constants = %{accounts: MapSet.new([:alice, :bob]), max_balance: 3}
@@ -78,6 +94,10 @@ defmodule ExTLA.SpecTest do
       %{spec: Compiled.from_module(Counter), constants: %{max: 2}}
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "guards read the pre-state", %{spec: spec, constants: constants} do
       increment = Compiled.action(spec, :increment)
 
@@ -87,12 +107,20 @@ defmodule ExTLA.SpecTest do
       refute increment.guard.(constants, %{n: 0, done: true}, %{})
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "transitions produce the post-state", %{spec: spec, constants: constants} do
       increment = Compiled.action(spec, :increment)
 
       assert increment.transition.(constants, %{n: 0, done: false}, %{}) == %{n: 1, done: false}
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "a variable the action does not assign is UNCHANGED", %{spec: spec, constants: c} do
       increment = Compiled.action(spec, :increment)
 
@@ -102,6 +130,10 @@ defmodule ExTLA.SpecTest do
     # 02-dsl-semantics.md §2, the rule most likely to surprise an Elixir
     # programmer: `x = y; y = x` swaps. Every RHS reads the pre-state, so there
     # is no intermediate state for the second line to observe.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "an action body is a conjunction, not a sequence" do
       swap = Swap |> Compiled.from_module() |> Compiled.action(:swap)
 
@@ -119,11 +151,15 @@ defmodule ExTLA.SpecTest do
     # keep what it reads and drop what it does not -- a binding nothing reads is
     # dead code in a pure block, and emitting it costs a warning the spec author
     # cannot silence.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "a binding only the guard reads still guards", %{action: bump} do
       assert bump.guard.(%{}, %{n: 0, log: []}, %{})
       refute bump.guard.(%{}, %{n: 3, log: []}, %{})
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "a binding only an assignment reads is still available to it", %{action: bump} do
       assert bump.transition.(%{}, %{n: 1, log: []}, %{}) == %{n: 2, log: [%{was: 1}]}
     end
@@ -169,6 +205,8 @@ defmodule ExTLA.SpecTest do
       %{spec: spec, constants: constants, init: hd(spec.init).(constants)}
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`"
     test "record where each one draws from", %{spec: spec} do
       assert Compiled.action(spec, :begin_transfer).param_sources == [
                from: :constant,
@@ -180,6 +218,10 @@ defmodule ExTLA.SpecTest do
       assert Compiled.action(spec, :fail_transfer).param_sources == []
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "generate from a constant and from a literal range", ctx do
       [{:from, from}, {:to, _}, {:amount, amount}] =
         Compiled.action(ctx.spec, :begin_transfer).params
@@ -190,6 +232,10 @@ defmodule ExTLA.SpecTest do
 
     # The mechanism that replaced `choose`: `\E t \in pending` is a param drawn
     # from the pre-state, so the body stays a deterministic function of it.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "generate from the pre-state", ctx do
       [{:t, generator}] = Compiled.action(ctx.spec, :complete_transfer).params
       state = %{ctx.init | pending: MapSet.new([{:bob, 2}])}
@@ -219,6 +265,10 @@ defmodule ExTLA.SpecTest do
   end
 
   describe "invariants and action properties" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "an invariant reads constants as well as state" do
       spec = Compiled.from_module(Counter)
       within = Enum.find(spec.invariants, &(&1.name == :within_bounds))
@@ -227,6 +277,10 @@ defmodule ExTLA.SpecTest do
       refute within.predicate.(%{max: 2}, %{n: 3, done: false})
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "an action property sees both states" do
       spec = Compiled.from_module(Counter)
       never_jumps = Enum.find(spec.action_properties, &(&1.name == :never_jumps))
@@ -260,6 +314,10 @@ defmodule ExTLA.SpecTest do
   end
 
   describe "terminals" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "compile to a state predicate" do
       spec = Compiled.from_module(Counter)
       assert [%{name: :nothing_left, predicate: predicate}] = spec.terminals
@@ -269,6 +327,10 @@ defmodule ExTLA.SpecTest do
   end
 
   describe "temporal formulas" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "are built from the constants, and land in the bounded fragment" do
       spec = Compiled.from_module(Counter)
       assert [%{name: :eventually_done, formula: formula}] = spec.temporals
@@ -278,6 +340,8 @@ defmodule ExTLA.SpecTest do
       refute predicate.(%{n: 0, done: false})
     end
 
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
     test "leads-to keeps both operands as state predicates" do
       spec = Compiled.from_module(Transfer)
       [%{name: :no_stuck_pending, formula: formula}] = spec.temporals
@@ -290,6 +354,10 @@ defmodule ExTLA.SpecTest do
 
     # `always(P ~> Q)` means the same thing as `P ~> Q`, so it is collapsed
     # rather than rejected -- TLA+ users write it out of habit.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "always(P ~> Q) collapses to leads_to" do
       defmodule Collapse do
         use ExTLA.Spec
@@ -308,6 +376,10 @@ defmodule ExTLA.SpecTest do
       assert {:leads_to, _, _} = formula.(%{})
     end
 
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "quantifies over a constant with for_all" do
       spec = Compiled.from_module(PerBinding)
       [%{name: :no_starvation, formula: formula}] = spec.temporals
@@ -324,6 +396,10 @@ defmodule ExTLA.SpecTest do
   end
 
   describe "fairness" do
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "whole-action form has no params" do
       spec = Compiled.from_module(Counter)
 
@@ -335,6 +411,10 @@ defmodule ExTLA.SpecTest do
 
     # Whole-action WF guarantees only that SOME binding fires, which is
     # consistent with one process starving while the others take turns.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.Spec.Compiled`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+         ]
     test "per-binding form records the quantified params" do
       spec = Compiled.from_module(PerBinding)
 

@@ -7,6 +7,8 @@ defmodule ExTLA.Spec.HelpersTest do
   alias ExTLA.Spec.Helpers, as: H
 
   describe "at/2 — function application" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "applies a function and a sequence" do
       assert H.at(%{alice: 3, bob: 0}, :bob) == 0
       assert H.at([:a, :b, :c], 1) == :a
@@ -46,6 +48,8 @@ defmodule ExTLA.Spec.HelpersTest do
   end
 
   describe "set operations" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "build and query sets" do
       assert H.set() == MapSet.new()
       assert H.set([1, 2, 2]) == MapSet.new([1, 2])
@@ -83,6 +87,8 @@ defmodule ExTLA.Spec.HelpersTest do
   end
 
   describe "sequence operations" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "build and query sequences" do
       assert H.seq() == []
       assert H.seq([1, 2]) == [1, 2]
@@ -165,6 +171,8 @@ defmodule ExTLA.Spec.HelpersTest do
   end
 
   describe "function operations" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "for_each/2 builds a total function over the domain" do
       assert H.for_each(MapSet.new([:a, :b]), &Atom.to_string/1) == %{a: "a", b: "b"}
       assert H.for_each(MapSet.new(), & &1) == %{}
@@ -207,6 +215,8 @@ defmodule ExTLA.Spec.HelpersTest do
   end
 
   describe "arithmetic" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "sum/1 is zero over an empty enumerable" do
       assert H.sum([]) == 0
       assert H.sum([1, 2, 3]) == 6
@@ -220,6 +230,8 @@ defmodule ExTLA.Spec.HelpersTest do
   end
 
   describe "choose/2" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     # The point of the delegation: there is one CHOOSE, and it is deterministic.
     # A second implementation here that happened to branch would reintroduce the
     # nondeterminism mechanism 02-dsl-semantics.md §3 removed.

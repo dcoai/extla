@@ -118,6 +118,10 @@ defmodule ExTLA.Spec.GuardOrderTest do
   #
   # The documented value now has an executable counterpart, so it cannot drift back silently.
   describe "the documented config defaults" do
+    @describetag verifies: [
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API",
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+                 ]
     test "a refutable temporal property is not checked unless asked for" do
       result = ExTLA.ModelChecker.run(WithTemporal, %{})
 
@@ -139,6 +143,8 @@ defmodule ExTLA.Spec.GuardOrderTest do
   # Two rules settle them: a found violation is never discarded, and a check that did not
   # run is named.
   describe "the verdict says what was checked (#167)" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
     defmodule Deadlocks do
       use ExTLA.Spec
 
@@ -311,6 +317,8 @@ defmodule ExTLA.Spec.GuardOrderTest do
   # with TLC the acceptance gate — so a misspelled name in a fixture made
   # `assert result.status == :ok` pass having compared nothing.
   describe "a selection that matched nothing (#166)" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API"
     defmodule Selectable do
       use ExTLA.Spec
 

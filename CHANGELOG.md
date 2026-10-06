@@ -35,6 +35,17 @@ release it merely follows.
 
 ### Changed
 
+- **spec/04 §§ Overview → Liveness say which tests verify them** (#352, for #336). Each of
+  the 18 sections up to Coverage and Vacuity was read against its tests. The ones that
+  show a section's claims carry `@tag verifies: "<section id>"`: 253 test → section
+  claims across 17 files, as a test's tag, a `describe`'s or a module's. Every section with
+  a claim has at least one, except four claims no test shows, now #356. Three sections need
+  none: the Architecture diagram and the State-space reduction introduction describe
+  rather than claim, and View abstraction is deferred past v1. Of the 12 suggested
+  `implements` relations in range, the Overview's four were retired in `.surfex/` with a
+  reason: it only lists Layer 2's components, each of which has its own section. Tags
+  change no test's behaviour, and no relation is recorded yet: the baseline is #354.
+
 - **surfex's relation log is wired up for spec/04, not yet gating** (#351, for #336).
   `.surfex.exs` points surfex at `spec/04-layer2-model-checker.md` with `adoption: :trust`,
   and `.surfex/` holds the (still empty) log. `Surfex.ExUnitFormatter` records every test

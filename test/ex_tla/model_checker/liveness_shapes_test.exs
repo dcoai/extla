@@ -22,6 +22,9 @@ defmodule ExTLA.ModelChecker.LivenessShapesTest do
   """
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
+
   alias ExTLA.ModelChecker
 
   # `n` starts at 1, so a bare `n == 0` is false in the initial state. A bare predicate is
@@ -165,6 +168,10 @@ defmodule ExTLA.ModelChecker.LivenessShapesTest do
     assert %{prefix: _, cycle: _} = result.violation
   end
 
+  @tag verifies: [
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`",
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
+       ]
   test "strong fairness refutes only after the split restricts to disabled states" do
     result = verdict(StrongSplit)
 

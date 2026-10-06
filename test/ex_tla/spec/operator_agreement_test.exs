@@ -205,6 +205,8 @@ defmodule ExTLA.Spec.OperatorAgreementTest do
   # ── What a spec body can reach ──────────────────────────────────────────────
 
   describe "the reachable vocabulary, derived from ExTLA.Spec's imports" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "a spec body imports ExTLA.Spec.Helpers whole, and neither foundation module" do
       imports = using_imports()
       modules = Enum.map(imports, &elem(&1, 0))
@@ -296,6 +298,8 @@ defmodule ExTLA.Spec.OperatorAgreementTest do
   # ── The façade holds no second implementation ───────────────────────────────
 
   describe "ExTLA.Spec.Helpers as a façade (D-38)" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/Helper Functions Available in DSL Blocks"
     test "reads as a mixture of both forms, so neither branch below is vacuous" do
       definitions = helpers_definitions()
 

@@ -1,6 +1,9 @@
 defmodule ExTLA.SymmetryTest do
   use ExUnit.Case, async: true
 
+  @moduletag verifies:
+               "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/Symmetry"
+
   alias ExTLA.{ModelChecker, Symmetry, Trace}
   alias ExTLA.TestSpecs.{Asymmetric, Counter, PerBinding}
 

@@ -6,6 +6,8 @@ defmodule ExTLA.FingerprintTest do
   alias ExTLA.Fingerprint
 
   describe "canonical/1" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/Symmetry"
     # The whole reason `:deterministic` is passed. A map large enough to be stored
     # as a hashmap rather than a flatmap encodes in internal order without it, so
     # two equal states built by different insertion orders would encode differently

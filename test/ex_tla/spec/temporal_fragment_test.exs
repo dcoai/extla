@@ -108,6 +108,8 @@ defmodule ExTLA.Spec.TemporalFragmentTest do
   ]
 
   describe "every shape of the fragment" do
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
     test "compiles" do
       names = Spec.Compiled.from_module(EveryShape).temporals |> Enum.map(& &1.name)
 
@@ -116,6 +118,8 @@ defmodule ExTLA.Spec.TemporalFragmentTest do
 
     # `Liveness.shape/4` is reached only with `check_liveness: true`, which is why its raise
     # was invisible for so long: the default configuration never looked at the formula.
+    @tag verifies:
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
     test "is evaluated by the model checker, and reaches a verdict" do
       result =
         ModelChecker.run(EveryShape, %{
@@ -167,6 +171,8 @@ defmodule ExTLA.Spec.TemporalFragmentTest do
   end
 
   describe "the fragment's bound" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker.Liveness`/The fragment, shape by shape"
     # The assertion that keeps this file honest. `nesting/0` is what the parser enforces;
     # the shapes are the paths through it, and every path needs a property above. Widen the
     # table without widening this file and the two disagree, here, at test time — rather
