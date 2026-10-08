@@ -122,6 +122,13 @@ variables:
   # Pinned to the versions in .tool-versions, so CI and a developer's asdf
   # install cannot disagree about what "it compiles" means.
   ELIXIR_IMAGE: hexpm/elixir:1.20.4-erlang-29.0.5-debian-bookworm-20260824-slim
+  # What every Elixir job runs in (#309, #365): ELIXIR_IMAGE plus `git`, Hex and Rebar, built
+  # by `ci-base-image` from `ci/base.Dockerfile`. Pinned by DIGEST, because a tag can be pushed
+  # over and builds are not bit-reproducible: the same inputs built twice gave two digests
+  # (#364). The tag is the hash of those inputs, kept beside the digest so
+  # `test/docs/ci_pipeline_test.exs` can check it still matches: bumping ELIXIR_IMAGE or the
+  # Dockerfile without rebuilding and re-pinning fails there, not as an old image in use.
+  CI_BASE_IMAGE: gitlab.conet.yarina.org:5005/dco-tek/extla/ci-base:3031987913a98d5b@sha256:54d086475a5d7b4d8b61cc90477e33cec1b1710aba414337bb592f59ac088a07
 
 default:
   tags:
@@ -129,12 +136,15 @@ default:
   interruptible: true
 
 .elixir:
-  image: $ELIXIR_IMAGE
+  image: $CI_BASE_IMAGE
   variables:
     MIX_ENV: test
+  # No `apt-get` and no `mix local.hex`/`local.rebar` here any more (#309, #365). Each job
+  # fetched `git` from an unpinned Debian archive and Hex and Rebar from builds.hex.pm before
+  # running a line of this project's code, and the archive call failed whole pipelines on a
+  # runner that could not reach it. All three are in CI_BASE_IMAGE now, fetched once per image
+  # build. `test/docs/ci_pipeline_test.exs` refuses an `apt-get` in any job.
   before_script:
-    - apt-get update -qq
-    - apt-get install -y -qq --no-install-recommends git
     # The memory ceiling this job runs under (#85, #86). `main` #950 was OOM-killed --
     # `Killed  mix test`, which GitLab reports as `script_failure` and reads exactly like a
     # failing test -- and every measurement up to that point had been of the numerator only:
@@ -159,8 +169,7 @@ default:
     # has the pair of lines and why the second needs `--add`, plus the per-project job-token
     # allowlist it depends on. depdep's own fetch builds its token URL in
     # scripts/depdep.exs and never relied on the rewrite.
-    - mix local.hex --force
-    - mix local.rebar --force
+    #
     # One line does three things, in an order that matters (#245, depdep v0.4.0): restore
     # compiled dependencies from the shared depdep store, run `mix deps.get` to fetch only
     # what the store did not have, then decide again over the units the first pass could

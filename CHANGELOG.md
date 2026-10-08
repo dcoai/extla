@@ -35,6 +35,18 @@ release it merely follows.
 
 ### Changed
 
+- **Every Elixir CI job runs in the pinned base image, and no job runs `apt-get`** (#365,
+  for #309). `.elixir` uses `CI_BASE_IMAGE`, pinned as `ci-base:<input hash>@sha256:<digest>`.
+  The per-job `apt-get update`/`install git` and `mix local.hex`/`local.rebar` are gone; the
+  memory and load diagnostics stay. `test/docs/ci_pipeline_test.exs` gates three things:
+  - no job runs `apt-get`;
+  - the pin is a digest, under a tag equal to the hash of `ELIXIR_IMAGE` and
+    `ci/base.Dockerfile`, so bumping either without rebuilding fails a test;
+  - every job rule names `$CI_PIPELINE_SOURCE`, since a bare `changes:` rule opened a
+    one-job MR pipeline that stood as !236's head pipeline.
+
+  Each is shown red against a bad fixture and against `main`'s pipeline.
+
 - **A CI base image with `git`, Hex and Rebar baked in** (#364, for #309).
   `ci/base.Dockerfile` builds it from `ELIXIR_IMAGE`, and the new `ci-base-image` job pushes
   it to the project registry, only when the Dockerfile changes or when run by hand. Its tag is
