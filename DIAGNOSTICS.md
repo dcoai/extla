@@ -20,7 +20,7 @@ each other, and to the kinds the tests assert on.
 | `:binder_shadows_constant` | … binds …, which is a declared constant | `lib/ex_tla/spec/block.ex:550` |
 | `:binder_shadows_variable` | … binds …, which is a declared variable | `lib/ex_tla/spec/block.ex:538` |
 | `:collection_type_arity` | …/… takes exactly one element type | `lib/ex_tla/spec/type.ex:128` |
-| `:constant_without_pin` | constant … referenced without `^` | `lib/ex_tla/spec/rewriter.ex:138` |
+| `:constant_without_pin` | constant … referenced without `^` | `lib/ex_tla/spec/rewriter.ex:159` |
 | `:declaration_name_not_an_atom` | … name must be a literal atom, got: … | `lib/ex_tla/spec/dsl.ex:529` |
 | `:declaration_without_a_block` | … needs a `do` block | `lib/ex_tla/spec/dsl.ex:658` |
 | `:destructuring_without_let` | destructuring assignment without `let`: … | `lib/ex_tla/spec/block.ex:60` |
@@ -60,10 +60,10 @@ each other, and to the kinds the tests assert on.
 | `:type_range_bound` | a range bound must be an integer or ^constant, got:… | `lib/ex_tla/spec/type.ex:221` |
 | `:type_range_step_zero` | a range step of 0 is not a range | `lib/ex_tla/spec/type.ex:91` |
 | `:undeclared_constant` | undeclared constant: ^… | `lib/ex_tla/spec/rewriter.ex:72` |
-| `:undeclared_variable` | undeclared variable: … | `lib/ex_tla/spec/rewriter.ex:146` |
+| `:undeclared_variable` | undeclared variable: … | `lib/ex_tla/spec/rewriter.ex:167` |
 | `:unexpected_statement` | unexpected statement: … | `lib/ex_tla/spec/block.ex:72` |
 | `:unknown_action_in_fairness` | unknown action in fairness: … | `lib/ex_tla/spec.ex:279` |
 | `:unknown_option` | unknown option…: … | `lib/ex_tla/spec/dsl.ex:747` |
 | `:unsupported_temporal_operator` | unsupported temporal operator: … | `lib/ex_tla/spec/temporal.ex:178` |
 | `:variable_assigned_twice` | variable … assigned … times | `lib/ex_tla/spec/block.ex:125` |
-| `:variable_not_readable_here` | … | `lib/ex_tla/spec/rewriter.ex:160` |
+| `:variable_not_readable_here` | … | `lib/ex_tla/spec/rewriter.ex:181` |
