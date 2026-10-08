@@ -106,6 +106,13 @@
 # `pulled 7, missing 0` with no `rebuilt` in compile, test and surface-drift: every dependency
 # restored and nothing compiled. A `rebuilt N` on the summary line now means a refusal worth
 # reading; `--explain-rebuilt` prints why Mix refused it.
+#
+# v0.10.0 (#363, for #349) fixes the second cause of a refused restore. A git dependency's
+# stored object kept the pusher's `origin`, and Mix compares the lock's URL with it as a
+# string, so `git@…` against `https://…` read as out of date. The address is now corrected on
+# restore. Keys and schema are unchanged, so nothing in the store is refilled. extla has no git
+# dependency of its own; the fix matters to peers that restore extla, whose objects exist in
+# the store under both spellings.
 
 stages:
   - check
