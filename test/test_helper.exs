@@ -13,7 +13,13 @@
 #
 # `Surfex.ExUnitFormatter` records each test's result at its exact version in
 # `_build/surfex/evidence.jsonl`, which is what validates spec/04's relations (#336).
+#
+# `assert_receive_timeout` is 5 s rather than ExUnit's 100 ms (#366). A passing `assert_receive`
+# returns the moment its message arrives, so the bound only matters when it never comes, and a
+# long one costs a passing test nothing. A short one fails a correct test on an oversubscribed
+# host. `refute_receive` keeps its default, since a refute always waits its whole window.
 ExUnit.start(
   exclude: [:mutation, :needs_built_docs],
+  assert_receive_timeout: 5_000,
   formatters: [ExUnit.CLIFormatter, Surfex.ExUnitFormatter]
 )

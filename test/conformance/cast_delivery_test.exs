@@ -142,7 +142,10 @@ defmodule ExTLA.CastDeliveryTest do
       inert = spawn(fn -> Process.sleep(:infinity) end)
       on_exit(fn -> Process.exit(inert, :kill) end)
 
+      # deadline: the timeout IS the outcome asserted. A silent server is given 200 ms, and
+      # load can only make it more silent, never less, so a short bound cannot flake.
       assert {:timeout, 200} = Driver.deliver(inert, {:cast, :done}, 200)
+      # deadline: as above, the timeout is the asserted outcome.
       assert {:timeout, 200} = Driver.deliver(inert, {:info, :reset}, 200)
     end
 
@@ -151,7 +154,14 @@ defmodule ExTLA.CastDeliveryTest do
 
       # `handle_info/2` has only `:reset`, so the server dies rather than answering, and
       # the monitor carries that back as a value instead of raising here.
-      assert {:stopped, _reason} = Driver.deliver(server, {:info, :nothing_matches_this}, 1_000)
+      #
+      # The death is the outcome, so the bound only stops a hang: a passing run returns at the
+      # `:DOWN`. It was 1_000 until #366, and a run on an oversubscribed host missed it, because a
+      # crashing server writes its crash report before it exits, and under log pressure that
+      # takes two to three orders of magnitude longer than idle (measured: median 0.3 ms idle,
+      # 51 ms and up to 188 ms under CPU load and a log flood, more on a host short of CPU).
+      assert {:stopped, _reason} =
+               Driver.deliver(server, {:info, :nothing_matches_this}, :timer.seconds(30))
     end
 
     test "and a dead server is reported rather than raising" do

@@ -35,6 +35,21 @@ release it merely follows.
 
 ### Changed
 
+- **Tests that wait for an event no longer have a short deadline, and a short one must say
+  why** (#366, for #362). `cast_delivery_test`'s "a server that dies on the message is
+  reported" waited 1 s and missed it once on an oversubscribed host. A crashing server writes
+  its crash report before its `:DOWN`; measured, that takes a 0.3 ms median idle against 51 ms
+  (up to 188 ms) under CPU load and a log flood, and more on a host short of CPU.
+  - **Outcome waits are long.** The death case waits up to 30 s, and three more
+    death-waiting `assert_receive …, 1_000` drop their bound.
+  - **The default is long.** `test_helper.exs` sets `assert_receive_timeout: 5_000`, since
+    ExUnit's 100 ms default applied to every unbounded `assert_receive`. A passing wait
+    returns at its message, so a long bound costs nothing.
+  - **Short deadlines are justified.** `test/docs/deadlines_test.exs` requires a
+    `# deadline: <reason>` above any literal deadline under 5 s in `assert_receive`,
+    `refute_receive` or `Driver.deliver`. The three left are a timeout that is itself the
+    asserted outcome (×2) and a refute. It is shown red with a reason removed.
+
 - **Every Elixir CI job runs in the pinned base image, and no job runs `apt-get`** (#365,
   for #309). `.elixir` uses `CI_BASE_IMAGE`, pinned as `ci-base:<input hash>@sha256:<digest>`.
   The per-job `apt-get update`/`install git` and `mix local.hex`/`local.rebar` are gone; the

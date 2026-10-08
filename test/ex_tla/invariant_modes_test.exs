@@ -393,8 +393,7 @@ defmodule ExTLA.InvariantModesTest do
 
       GenServer.cast(pid, :skim)
 
-      assert_receive {:DOWN, ^ref, :process, ^pid, {%ExTLA.Invariant.Violation{} = violation, _}},
-                     1_000
+      assert_receive {:DOWN, ^ref, :process, ^pid, {%ExTLA.Invariant.Violation{} = violation, _}}
 
       # Both invariants are broken by `:skim`. `audited` is declared first and would be
       # reported first if `callbacks:` were ignored, so the NAME is the whole assertion.
@@ -418,8 +417,7 @@ defmodule ExTLA.InvariantModesTest do
 
       GenServer.cast(pid, :skim)
 
-      assert_receive {:DOWN, ^ref, :process, ^pid, {%ExTLA.Invariant.Violation{} = violation, _}},
-                     1_000
+      assert_receive {:DOWN, ^ref, :process, ^pid, {%ExTLA.Invariant.Violation{} = violation, _}}
 
       assert violation.name == :audited
     end
