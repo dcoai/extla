@@ -87,6 +87,42 @@ defmodule Mix.Tasks.Extla.CheckTest do
       assert output =~ "declared and not checked"
     end
 
+    # The other two exclusions from inferring liveness (#358). IdlingUnfair's temporal property
+    # is refuted whenever it is checked, which is the test above's exit 1. So exit 0 here is
+    # the proof it was not checked, and the line says which flag decided that.
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+         ]
+    test "--workers above one leaves the temporal properties unchecked, and says why" do
+      {output, code} = check(["ExTLA.TestSpecs.IdlingUnfair", "--workers", "2"])
+
+      assert code == 0
+      refute output =~ "LIVENESS:"
+      assert output =~ "liveness was not checked: `--workers 2` and liveness are refused together"
+    end
+
+    @tag verifies: [
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`",
+           "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+         ]
+    test "a symmetry declaration leaves the temporal properties unchecked, and says why" do
+      Application.put_env(:extla, ExTLA.TestSpecs.PerBinding,
+        constants: %{processes: MapSet.new([:p1, :p2])},
+        symmetry: [:processes]
+      )
+
+      on_exit(fn -> Application.delete_env(:extla, ExTLA.TestSpecs.PerBinding) end)
+
+      {output, code} = check(["ExTLA.TestSpecs.PerBinding"])
+
+      assert code == 0
+      refute output =~ "LIVENESS:"
+
+      assert output =~
+               "liveness was not checked: symmetry reduction and liveness are not sound together"
+    end
+
     # #170. The first fix for the bounded comparison appended "could not be verified" to
     # `warnings` and left `status: :ok` — so this printed `— verified` and exited 0, with the
     # refusal as a trailing line. A CI consumer reading the exit code saw a verified run. The

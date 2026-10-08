@@ -35,6 +35,26 @@ release it merely follows.
 
 ### Changed
 
+- **The six spec/04 claims no test verified now each have one** (#358, for #356). Each
+  claim held; none needed a code change:
+  - the keyword form `invariant :x, desc: "…", do: expr` (and likewise for
+    `action_property`, `terminal`, `temporal`) compiles to the same declarations and
+    model-checks to the same verdict as the block form;
+  - `ExTLA.Spec.DSL` defines no `spec` macro;
+  - `mix extla.check` declines liveness under `--workers 2` and under a `symmetry:`
+    declaration, and says why, where the same refutable property otherwise exits 1;
+  - `assert_spec` passes a refutable temporal property it was not asked to check, warns,
+    and flunks when `check_liveness: true`;
+  - a predicate cheap on most states and costly on a few is marked
+    `<-- varies by state`, while a uniform one is not. The test is deterministic by
+    construction and passed 50 of 50 repeats;
+  - `mix extla.explore`'s shortdoc names a saved counterexample rather than describing a
+    search.
+
+  Each test carries `@tag verifies:` for its section, so every section of spec/04 with
+  a claim now has a verifying test. Found while writing them: a bare capture (`&abs/1`,
+  `&+/2`) in a spec body is refused as an undeclared variable (#359).
+
 - **spec/04 §§ Coverage → end say which tests verify them too** (#353, for #336). The other
   17 sections were read the same way: Coverage, Profile, Trace, Parallel, `mix
   extla.check` and its JSON schema, `mix extla.explore`, ExUnit Integration, and

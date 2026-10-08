@@ -239,6 +239,16 @@ defmodule Mix.Tasks.Extla.ExploreTest do
     end
   end
 
+  # spec/04 §Mix Task: `mix extla.explore`: "It searches nothing — `explore` means state-space
+  # exploration everywhere else in this document [...] The task's `@shortdoc` is required to
+  # say so, because the task name is the one place the word appears unqualified" (#358).
+  test "its shortdoc says it reads a saved counterexample, not that it explores a state space" do
+    shortdoc = Mix.Task.shortdoc(Explore)
+
+    assert shortdoc =~ "SAVED counterexample"
+    refute shortdoc =~ ~r/\b(explor|search|model.check)/i
+  end
+
   describe "what it refuses" do
     test "no module", %{tmp: tmp} do
       path = counterexample_file(tmp)
