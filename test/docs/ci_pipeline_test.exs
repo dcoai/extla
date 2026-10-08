@@ -18,6 +18,9 @@ defmodule ExTLA.CiPipelineTest do
     condition also matches merge-request events. On !236 that made GitLab open a second, MR
     pipeline holding only that job, which stood as the MR's head pipeline, green on one job
     while the real pipeline still ran (pipeline 4645).
+  - **Every `changes:` rule compares against `main`** (`compare_to:`). Without it, a branch's
+    first push has no previous push to compare with, GitLab counts every file as changed, and
+    the job runs on every new branch (#373).
 
   Read as text, line by line, like `ci_coverage_test.exs`: the project has no YAML parser,
   and these are claims about the file as written.
@@ -48,6 +51,14 @@ defmodule ExTLA.CiPipelineTest do
       # Anti-vacuity: ci-base-image has two rules, so a reader that found none is broken.
       assert length(Map.get(rules, "ci-base-image", [])) == 2
       assert unsourced_rules(ci) == []
+    end
+
+    test "every changes: rule compares against main" do
+      ci = File.read!(@ci)
+
+      # Anti-vacuity: ci-base-image has the one changes: rule today.
+      assert ci |> rules() |> Map.get("ci-base-image", []) |> Enum.count(&(&1 =~ "changes:")) == 1
+      assert uncompared_changes(ci) == []
     end
   end
 
@@ -85,6 +96,26 @@ defmodule ExTLA.CiPipelineTest do
 
       assert [{"build", rule}] = unsourced_rules(ci)
       assert rule =~ "changes:"
+    end
+
+    test "flag a changes: rule with no compare_to" do
+      ci = """
+      build:
+        rules:
+          - if: $CI_PIPELINE_SOURCE == "push"
+            changes:
+              - ci/base.Dockerfile
+          - if: $CI_PIPELINE_SOURCE == "push"
+            changes:
+              paths:
+                - other
+              compare_to: refs/heads/main
+        script:
+          - true
+      """
+
+      assert [{"build", rule}] = uncompared_changes(ci)
+      assert rule =~ "ci/base.Dockerfile"
     end
   end
 
@@ -165,6 +196,14 @@ defmodule ExTLA.CiPipelineTest do
 
       {name, rules}
     end
+  end
+
+  defp uncompared_changes(ci) do
+    for {job, rules} <- rules(ci),
+        rule <- rules,
+        String.contains?(rule, "changes:"),
+        not String.contains?(rule, "compare_to:"),
+        do: {job, rule}
   end
 
   defp unsourced_rules(ci) do

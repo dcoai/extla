@@ -35,6 +35,12 @@ release it merely follows.
 
 ### Changed
 
+- **`ci-base-image` no longer runs on every new branch** (#374, for #373). Its `changes:`
+  rule had nothing to compare a branch's first push with, so GitLab counted every file as
+  changed and the job took a privileged runner on each work-item branch, only to find the
+  image already built. It now compares against `main` (`compare_to: refs/heads/main`), and
+  `ci_pipeline_test.exs` requires `compare_to:` on every `changes:` rule.
+
 - **Tests that wait for an event no longer have a short deadline, and a short one must say
   why** (#366, for #362). `cast_delivery_test`'s "a server that dies on the message is
   reported" waited 1 s and missed it once on an oversubscribed host. A crashing server writes
