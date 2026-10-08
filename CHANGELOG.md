@@ -35,6 +35,16 @@ release it merely follows.
 
 ### Changed
 
+- **surfex is pinned at `~> 0.6.1`, and the type-citation stopgap is gone** (#361, for
+  #357). 0.6.0 makes each public `@type` an item (surfex#137, filed from #351), so
+  `ExTLA.State.t()` in spec/04 resolves as `t:ExTLA.State.t/0`, and the `normalise` rewrite
+  `.surfex.exs` carried for it is removed. 0.6.1 counts an ExUnitProperties `property` as a
+  test (surfex#141, filed from #353), so the 11 tagged properties now declare `verifies`,
+  including generated_models_test's D-27 worker agreement. Nothing is recorded yet: relating
+  the type citation and adopting the properties' claims are part of the baseline (#354).
+  `PACKAGE_SURFACE.md` records the new requirement. extla has no `require:`, so 0.6's
+  upgrade step doesn't apply.
+
 - **The six spec/04 claims no test verified now each have one** (#358, for #356). Each
   claim held; none needed a code change:
   - the keyword form `invariant :x, desc: "…", do: expr` (and likewise for
