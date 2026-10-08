@@ -171,6 +171,16 @@ release it merely follows.
 
 ### Fixed
 
+- **A function capture in a spec body compiles** (#369, for #359). `&abs/1`, `&+/2` or
+  `&member?/2` in any block was refused as "undeclared variable: abs", with advice to declare
+  `variable :abs`. The capture's name node has a variable's shape, and the rewriter resolved
+  it as one. A capture now names a function, even where a declared variable shares the name
+  (`variable :size` beside `&size/1`), and a capture of a function that doesn't exist is
+  still refused, by Elixir's compiler, naming it. `spec/02` §1 states the rule.
+  `test/ex_tla/spec/captures_test.exs` uses bare, operator, helper, qualified and `&(&1 …)`
+  captures in every block kind, including `let` and a `params:` generator, and model-checks
+  the result.
+
 - **`ExTLA.Set.cross_many/1` no longer names a caller that does not exist, and docstrings
   that name a caller are checked** (#347, for #324). Its docstring and `spec/01` justified
   the empty product being `{{}}` as "the answer the DSL needs" for an action with no

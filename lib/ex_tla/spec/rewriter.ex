@@ -106,6 +106,27 @@ defmodule ExTLA.Spec.Rewriter do
     end
   end
 
+  # `&name/arity` names a FUNCTION, never a state variable (#359). The name node
+  # `{name, meta, nil}` has a variable's shape, so the generic clauses below resolved it as
+  # one: `&abs/1` and `&+/2` failed as "undeclared variable", advising `variable :abs`. A
+  # capture's name is left alone, even where a declared variable shares it, because that is
+  # what Elixir means by it (02-dsl-semantics.md §1). A qualified `&Mod.name/arity` already
+  # compiled; it takes this clause too, so the module part is still walked (it can be a
+  # local holding a module). `&(&1 + n)` is not this shape and is walked as any expression,
+  # so `n` there is still a variable.
+  defp walk({:&, meta, [{:/, slash_meta, [{name, _, var_ctx} = function, arity]}]}, _ctx)
+       when is_atom(name) and is_atom(var_ctx) and is_integer(arity) do
+    {:&, meta, [{:/, slash_meta, [function, arity]}]}
+  end
+
+  defp walk(
+         {:&, meta, [{:/, slash_meta, [{{:., _, [_module, _name]}, _, []} = remote, arity]}]},
+         ctx
+       )
+       when is_integer(arity) do
+    {:&, meta, [{:/, slash_meta, [walk(remote, ctx), arity]}]}
+  end
+
   defp walk({form, meta, args}, ctx) when is_list(args) do
     {walk(form, ctx), meta, Enum.map(args, &walk(&1, ctx))}
   end

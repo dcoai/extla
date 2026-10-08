@@ -26,6 +26,13 @@ determined syntactically, never by inference:
 Anything else — a function call, an atom literal, a number — is ordinary Elixir and
 is left untouched by the macro.
 
+That includes a **function capture**. In `&abs/1`, `&+/2` or `&member?/2` the name is a
+function's, never a state variable's, even where a declared `variable` shares it: with
+`variable :size`, a bare `size` reads the state and `&size/1` is `ExTLA.Spec.Helpers.size/1`,
+because that is what Elixir means by the capture. `&Mod.name/arity` is the same. A capture
+of a function that does not exist is refused by Elixir's own compiler, naming it. The
+shorthand `&(&1 + n)` is an expression like any other, so `n` inside it is a variable.
+
 ### 1.1 Constants use the pin operator
 
 An earlier draft of this DSL wrote constants as bare atoms (`:accounts`), which made
