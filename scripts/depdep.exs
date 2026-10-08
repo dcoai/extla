@@ -14,6 +14,6 @@ url =
     token -> "https://gitlab-ci-token:#{token}@gitlab.conet.yarina.org/dco-tek/depdep.git"
   end
 
-Mix.install([{:depdep, git: url, tag: "v0.9.0"}])
+Mix.install([{:depdep, git: url, tag: "v0.10.0"}])
 
 Depdep.CLI.main(System.argv())

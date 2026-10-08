@@ -35,6 +35,13 @@ release it merely follows.
 
 ### Changed
 
+- **CI restores dependencies with depdep v0.10.0** (#363, for #349). It corrects a git
+  dependency's `origin` on restore, the second cause of `restored, but Mix would rebuild it`:
+  Mix compares the lock's URL with the restored checkout's `origin` as strings. Keys and the
+  schema are unchanged, so the store needs no refill. extla's own figure was already 0 under
+  v0.9.0; the fix is for peers restoring extla, whose objects are stored under both
+  `git@…` and `https://…` spellings.
+
 - **surfex is pinned at `~> 0.6.1`, and the type-citation stopgap is gone** (#361, for
   #357). 0.6.0 makes each public `@type` an item (surfex#137, filed from #351), so
   `ExTLA.State.t()` in spec/04 resolves as `t:ExTLA.State.t/0`, and the `normalise` rewrite
