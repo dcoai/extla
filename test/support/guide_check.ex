@@ -526,10 +526,16 @@ defmodule ExTLA.GuideCheck do
   defp isolated(fun) do
     parent = self()
 
+    # Two guide blocks may define the same module name, and redefinition warns rather than
+    # fails. `Code.with_diagnostics/1` collects those warnings in this process instead of
+    # printing them. It replaces `Code.put_compiler_option(:ignore_module_conflict, true)`,
+    # which set the option for the whole VM (#367, as #325 did for moduledoc examples). A
+    # module under `test/support/` cannot know whether its caller runs async, so it may not
+    # touch VM-global state at all (`test/docs/async_isolation_test.exs`).
     {_pid, ref} =
       spawn_monitor(fn ->
-        Code.put_compiler_option(:ignore_module_conflict, true)
-        send(parent, {:result, fun.()})
+        {value, _diagnostics} = Code.with_diagnostics(fun)
+        send(parent, {:result, value})
       end)
 
     receive do

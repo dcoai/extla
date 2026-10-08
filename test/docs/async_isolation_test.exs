@@ -53,6 +53,26 @@ defmodule ExTLA.AsyncIsolationTest do
 
   The boundary of the list — what is in, what is out, and what to do on finding a fifth —
   is stated at `@global` itself, where the reader adding one is looking.
+
+  ## Shared helpers write nothing global at all (#326, #367)
+
+  The walk above reads `test/**/*_test.exs`, each file's own AST. A write a test makes
+  *through a helper* in `test/support/` was invisible to it: `ExTLA.GuideCheck` set
+  `:ignore_module_conflict` one frame down, and the gate's claim held only because both of
+  its callers happened to be `async: false`. Flipping either to `async: true` would have set
+  a compiler option for the whole VM with nothing to say so.
+
+  A module under `test/support/` is shared by construction and cannot know whether its
+  caller runs async, so it may not make a VM-global write at all. That is checked over
+  `test/support/**/*.ex` with the same walk and no call graph. It is stricter than tracing
+  which async test reaches which helper, and needs no approximation of calls through
+  function values or variable modules. So this gate covers what a test file writes itself,
+  and what any shared helper writes. It does not cover a write reached through a dependency
+  outside `test/`.
+
+  Calls are matched with their **arity** where it decides the meaning: `Mix.shell/1` sets the
+  shell, `Mix.shell/0` reads it. `extla.mutants`, a task under `test/support/`, reads it to
+  print, and a read is not a write.
   """
   use ExUnit.Case, async: true
 
@@ -85,18 +105,23 @@ defmodule ExTLA.AsyncIsolationTest do
   # day anything calls it; nothing does, and an entry with no possible offender is an entry
   # nothing exercises.
   #
-  # **Finding a fifth.** Add the `{module, function}` pair AND a call to it in `@fixture`
+  # **Arity.** An entry is `{module, function, arity}`, with `:any` where every arity writes.
+  # `Mix.shell/0` reads the shell and `Mix.shell/1` sets it, so only arity 1 is a write; a
+  # `{module, function}` match flagged every read, which `test/support/`'s rule below would
+  # have turned into false failures (#367).
+  #
+  # **Finding a fifth.** Add the `{module, function, arity}` entry AND a call to it in `@fixture`
   # below — the anti-vacuity test asserts the two agree in both directions, so an entry
   # without a fixture call fails, and so does a fixture call without an entry. Then run: if
   # a file goes red, fix the file, never the list. The one thing not to do is delete the
   # entry because nothing calls it today.
   @global [
-    {Application, :put_env},
-    {Application, :delete_env},
-    {:persistent_term, :put},
-    {:persistent_term, :erase},
-    {Mix, :shell},
-    {Code, :put_compiler_option}
+    {Application, :put_env, :any},
+    {Application, :delete_env, :any},
+    {:persistent_term, :put, :any},
+    {:persistent_term, :erase, :any},
+    {Mix, :shell, 1},
+    {Code, :put_compiler_option, :any}
   ]
 
   # One real call per `@global` entry, written out by hand rather than generated from
@@ -141,6 +166,33 @@ defmodule ExTLA.AsyncIsolationTest do
     end
   end
 
+  describe "a shared helper under test/support/" do
+    test "writes no VM-global state, whoever calls it" do
+      offenders =
+        for path <- support_files(),
+            {module, function, line} <- global_writes(path),
+            do: "#{relative(path)}:#{line} — #{inspect(module)}.#{function}"
+
+      assert offenders == [], """
+      #{length(offenders)} shared helper(s) write state every other test can see:
+
+        #{Enum.join(offenders, "\n  ")}
+
+      A module under test/support/ cannot know whether its caller is async, so a write
+      here is a write from every test that reaches it. Reach the behaviour without the
+      global: `ExTLA.GuideCheck` collects redefinition warnings with
+      `Code.with_diagnostics/1` instead of setting `:ignore_module_conflict` (#367).
+      """
+    end
+
+    test "and the walk reads the support tree, subdirectories included" do
+      files = Enum.map(support_files(), &relative/1)
+
+      assert "test/support/guide_check.ex" in files
+      assert "test/support/mix/tasks/extla.mutants.ex" in files
+    end
+  end
+
   describe "the gate itself" do
     # Anti-vacuity: the walk must find the writes where they DO exist, or the assertion
     # above passes by reading nothing. The `async: false` files are the fixture — they are
@@ -167,13 +219,16 @@ defmodule ExTLA.AsyncIsolationTest do
     # shown the detector can see, and a fixture call with no entry is a write the gate would
     # walk straight past.
     test "sees every call it lists, and lists every call it sees" do
-      written = for {module, function, _line} <- calls_in(@fixture), do: {module, function}
+      written =
+        for {module, function, _arity, _line} <- calls_in(@fixture), do: {module, function}
 
-      assert Enum.sort(written) == Enum.sort(@global), """
+      listed = for {module, function, _arity} <- @global, do: {module, function}
+
+      assert Enum.sort(written) == Enum.sort(listed), """
       `@fixture` and `@global` disagree about what a VM-global write is.
 
-        listed, but no call in `@fixture`: #{inspect(@global -- written)}
-        called in `@fixture`, but not listed: #{inspect(written -- @global)}
+        listed, but no call in `@fixture`: #{inspect(listed -- written)}
+        called in `@fixture`, but not listed: #{inspect(written -- listed)}
 
       An entry with no fixture call is one nobody has shown the detector can see — a
       misspelled function name would sit there inert, failing no file whatever that file
@@ -185,7 +240,13 @@ defmodule ExTLA.AsyncIsolationTest do
       detected =
         for {module, function, _line} <- global_writes_in(@fixture), do: {module, function}
 
-      assert Enum.sort(detected) == Enum.sort(@global)
+      assert Enum.sort(detected) == Enum.sort(listed)
+    end
+
+    # Arity decides: reading the shell is not setting it.
+    test "does not count a read of the shell as a write" do
+      assert global_writes_in("Mix.shell().info(\"hi\")") == []
+      assert [{Mix, :shell, _}] = global_writes_in("Mix.shell(Mix.Shell.Quiet)")
     end
 
     # And the reason it reads the AST rather than the text.
@@ -206,6 +267,8 @@ defmodule ExTLA.AsyncIsolationTest do
   # ── Reading the tree ────────────────────────────────────────────────────────
 
   defp test_files, do: @root |> Path.join("test/**/*_test.exs") |> Path.wildcard()
+
+  defp support_files, do: @root |> Path.join("test/support/**/*.ex") |> Path.wildcard()
 
   defp relative(path), do: Path.relative_to(path, @root)
 
@@ -229,8 +292,10 @@ defmodule ExTLA.AsyncIsolationTest do
   defp global_writes(path), do: path |> File.read!() |> global_writes_in()
 
   defp global_writes_in(source) do
-    for {module, function, line} <- calls_in(source),
-        {module, function} in @global,
+    for {module, function, arity, line} <- calls_in(source),
+        Enum.any?(@global, fn {m, f, a} ->
+          m == module and f == function and a in [:any, arity]
+        end),
         do: {module, function, line}
   end
 
@@ -242,10 +307,13 @@ defmodule ExTLA.AsyncIsolationTest do
   defp calls_in(source) do
     {_ast, found} =
       Macro.prewalk(Code.string_to_quoted!(source), [], fn
-        {{:., meta, [target, function]}, _call_meta, _args} = node, acc ->
+        {{:., meta, [target, function]}, _call_meta, args} = node, acc when is_list(args) ->
           case module_of(target) do
-            nil -> {node, acc}
-            module -> {node, [{module, function, Keyword.get(meta, :line, 0)} | acc]}
+            nil ->
+              {node, acc}
+
+            module ->
+              {node, [{module, function, length(args), Keyword.get(meta, :line, 0)} | acc]}
           end
 
         node, acc ->
