@@ -423,4 +423,123 @@ defmodule ExTLA.SpecTest do
       assert %{kind: :weak, action: :request, per: [:p]} in spec.fairness
     end
   end
+
+  # spec/04 §DSL Macro Reference: "Every block macro takes `(name, opts \\ [], block)`
+  # [...] The macros merge the two and pop `:do`, so both call forms work." Nothing used
+  # the keyword form until #358, so the claim was held by no test.
+  defmodule BlockForm do
+    use ExTLA.Spec
+
+    variable :n, type: 0..2
+
+    init do
+      n = 0
+    end
+
+    action :step do
+      require n < 2
+      n = n + 1
+    end
+
+    invariant :bounded, desc: "n stays in range" do
+      n <= 2
+    end
+
+    action_property :rises, desc: "n never falls" do
+      new.n >= old.n
+    end
+
+    terminal :at_top, desc: "two is where it ends" do
+      n == 2
+    end
+
+    temporal :reaches_two, desc: "n gets to two" do
+      eventually(n == 2)
+    end
+
+    fairness :weak, [:step]
+  end
+
+  defmodule KeywordForm do
+    use ExTLA.Spec
+
+    variable :n, type: 0..2
+
+    init do
+      n = 0
+    end
+
+    action :step do
+      require n < 2
+      n = n + 1
+    end
+
+    invariant :bounded, desc: "n stays in range", do: n <= 2
+    action_property :rises, desc: "n never falls", do: new.n >= old.n
+    terminal :at_top, desc: "two is where it ends", do: n == 2
+    temporal :reaches_two, desc: "n gets to two", do: eventually(n == 2)
+
+    fairness :weak, [:step]
+  end
+
+  describe "the two call forms of a block macro" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/DSL Macro Reference"
+
+    setup do
+      %{block: Compiled.from_module(BlockForm), keyword: Compiled.from_module(KeywordForm)}
+    end
+
+    test "declare the same names and descriptions", %{block: block, keyword: keyword} do
+      for field <- [:invariants, :action_properties, :terminals, :temporals] do
+        shape = &Enum.map(Map.fetch!(&1, field), fn d -> {d.name, Map.get(d, :description)} end)
+
+        assert shape.(keyword) == shape.(block), "#{field} differ between the two forms"
+        assert shape.(block) != [], "#{field} is empty, so the comparison checks nothing"
+      end
+    end
+
+    # Equal names would also hold if the keyword form compiled to `true`. Each predicate is
+    # asked a question it must answer `false` to, in both forms.
+    test "compile to predicates that answer alike", %{block: block, keyword: keyword} do
+      for spec <- [block, keyword] do
+        [invariant] = spec.invariants
+        [property] = spec.action_properties
+        [terminal] = spec.terminals
+
+        assert invariant.predicate.(%{}, %{n: 1})
+        refute invariant.predicate.(%{}, %{n: 3})
+        assert property.predicate.(%{}, %{n: 1}, %{n: 2})
+        refute property.predicate.(%{}, %{n: 2}, %{n: 1})
+        assert terminal.predicate.(%{}, %{n: 2})
+        refute terminal.predicate.(%{}, %{n: 1})
+      end
+    end
+
+    test "and model-check to the same verdict, liveness included" do
+      config = %{check_liveness: true}
+      block = ExTLA.ModelChecker.run(BlockForm, config)
+      keyword = ExTLA.ModelChecker.run(KeywordForm, config)
+
+      assert block.status == :ok
+
+      assert {keyword.status, keyword.distinct_states, keyword.deadlock, keyword.warnings} ==
+               {block.status, block.distinct_states, block.deadlock, block.warnings}
+    end
+  end
+
+  # spec/04 §There is no `spec do ... end` block: the specification formula is implicit,
+  # and a construct that can only restate the declarations is ceremony. A `spec` macro
+  # appearing in the DSL would be that construct.
+  @tag verifies:
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Overview/There is no `spec do ... end` block"
+  test "the DSL defines no spec block" do
+    Code.ensure_loaded!(ExTLA.Spec.DSL)
+    macros = ExTLA.Spec.DSL.__info__(:macros)
+
+    assert {:invariant, 3} in macros,
+           "the DSL's macros were not read, so the refutation is vacuous"
+
+    refute Enum.any?(macros, fn {name, _arity} -> name == :spec end)
+  end
 end

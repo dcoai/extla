@@ -82,6 +82,42 @@ defmodule ExTLA.ProfileTest.LiveSpec do
   end
 end
 
+defmodule ExTLA.ProfileTest.SpikySpec do
+  @moduledoc """
+  One invariant that is cheap in every state but the last, where it does tens of thousands
+  of reductions of work, beside one that does the same moderate work everywhere (#358). The
+  difference is orders of magnitude by construction, so the `varies by state` threshold is
+  crossed or not regardless of load.
+  """
+  use ExTLA.Spec
+
+  constant :max
+
+  variable :n, type: 0..^max
+
+  init do
+    n = 0
+  end
+
+  action :tick do
+    require n < ^max
+
+    n = n + 1
+  end
+
+  invariant :spiky do
+    n < ^max or Enum.reduce(1..50_000, 0, fn i, acc -> i + acc end) > 0
+  end
+
+  invariant :uniform do
+    Enum.all?(1..200, fn i -> i > 0 or n < 0 end)
+  end
+
+  terminal :at_max do
+    n == ^max
+  end
+end
+
 defmodule ExTLA.ProfileTest do
   @moduledoc """
   `ExTLA.Profile` — what each of the user's declarations cost, in reductions (#116, #130).
@@ -639,6 +675,41 @@ defmodule ExTLA.ProfileTest do
       # reached this declaration would silently zero its cost.
       assert Map.fetch!(Profile.merge(seen, idle).declarations, {:invariant, :x}).per_eval == 51
       assert Map.fetch!(Profile.merge(idle, seen).declarations, {:invariant, :x}).per_eval == 51
+    end
+  end
+
+  # spec/04 §Four properties the measurement keeps, property 3: "A state-dependent predicate is
+  # flagged, not averaged." The floor cannot see a predicate that does its work on a few
+  # states, so the row is marked where `observed` runs well past the attributed cost (#358).
+  describe "a state-dependent predicate" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Per-declaration cost — `ExTLA.Profile`/Four properties the measurement keeps"
+
+    setup do
+      result =
+        ModelChecker.run(ExTLA.ProfileTest.SpikySpec, %{constants: %{max: 40}, profile: true})
+
+      %{profile: result.profile, rows: Profile.format(result.profile) |> String.split("\n")}
+    end
+
+    test "is flagged on its row", %{profile: profile, rows: rows} do
+      spiky = cost(profile, {:invariant, :spiky})
+
+      # The premise, so a pass is about the flag: the work landed on few states, far past
+      # what the floor attributes.
+      assert spiky.observed > spiky.reductions * 10
+
+      assert Enum.find(rows, &(&1 =~ ~r/^\s+spiky\s/)) =~ "<-- varies by state"
+    end
+
+    test "and a predicate that does the same work everywhere is not", %{
+      profile: profile,
+      rows: rows
+    } do
+      uniform = cost(profile, {:invariant, :uniform})
+
+      assert uniform.reductions > 0, "the uniform invariant was not measured"
+      refute Enum.find(rows, &(&1 =~ ~r/^\s+uniform\s/)) =~ "varies by state"
     end
   end
 

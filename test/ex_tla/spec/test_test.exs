@@ -17,6 +17,28 @@ defmodule ExTLA.Spec.TestTest do
     assert result.distinct_states == 4
   end
 
+  # spec/04 §The CLI infers `check_liveness`; the API does not: "`assert_spec/2` passes its
+  # config straight through, so a property that `mix extla.check` checks is not checked by
+  # the same spec under `assert_spec` unless the config says so" (#358). IdlingUnfair's
+  # temporal property is refuted whenever it is checked (the task exits 1 on it).
+  @tag verifies: [
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/ExUnit Integration",
+         "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Module: `ExTLA.ModelChecker`/API/The CLI infers `check_liveness`; the API does not"
+       ]
+  test "passes a refutable temporal property it was not asked to check, and the result says so" do
+    unchecked = assert_spec(ExTLA.TestSpecs.IdlingUnfair, %{})
+
+    assert unchecked.status == :ok
+    assert Enum.any?(unchecked.warnings, &(&1 =~ "declared and not checked"))
+
+    error =
+      assert_raise ExUnit.AssertionError, fn ->
+        assert_spec(ExTLA.TestSpecs.IdlingUnfair, %{check_liveness: true})
+      end
+
+    assert error.message =~ "eventually_two"
+  end
+
   test "flunks on a violation, printing the counterexample" do
     error =
       assert_raise ExUnit.AssertionError, fn ->
