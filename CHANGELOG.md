@@ -35,6 +35,19 @@ release it merely follows.
 
 ### Changed
 
+- **No shared test helper writes VM-global state, and the async-isolation gate checks them**
+  (#367, for #326). `test/docs/async_isolation_test.exs` read only each test file's own AST,
+  so a write one frame down in `test/support/` was invisible to it. `ExTLA.GuideCheck` set
+  `:ignore_module_conflict` for the whole VM, and the gate's claim held only because its two
+  callers were `async: false`.
+  - **The helper:** `GuideCheck` collects redefinition warnings with `Code.with_diagnostics/1`
+    instead, as #325 did for moduledoc examples.
+  - **The rule:** a module under `test/support/` cannot know whether its caller runs async, so
+    the gate now refuses any VM-global write there at all. That needs no call graph. It was
+    shown red on the old `GuideCheck`.
+  - **Arity:** entries carry it, because `Mix.shell/0` reads the shell and only
+    `Mix.shell/1` sets it. Matching by name alone would have flagged `extla.mutants`'s reads.
+
 - **`ci-base-image` no longer runs on every new branch** (#374, for #373). Its `changes:`
   rule had nothing to compare a branch's first push with, so GitLab counted every file as
   changed and the job took a privileged runner on each work-item branch, only to find the
