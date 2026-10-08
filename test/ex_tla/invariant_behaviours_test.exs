@@ -183,7 +183,7 @@ defmodule ExTLA.InvariantBehavioursTest do
 
       assert Agent.cast(CounterRules, agent, &%{&1 | count: &1.count - 5}) == :ok
 
-      assert_receive {:DOWN, ^ref, :process, ^agent, reason}, 1_000
+      assert_receive {:DOWN, ^ref, :process, ^agent, reason}
 
       violation = violation_of(reason)
       assert violation.name == :never_negative
@@ -195,6 +195,9 @@ defmodule ExTLA.InvariantBehavioursTest do
 
       assert Agent.cast(CounterRules, agent, &%{&1 | count: &1.count + 1}) == :ok
 
+      # deadline: an absence is the outcome asserted. A refute waits its whole window either
+      # way, so a long one would only slow every run, and load cannot turn a crash that did not
+      # happen into one that did.
       refute_receive {:DOWN, ^ref, :process, ^agent, _reason}, 200
       assert Agent.get(CounterRules, agent, & &1.count) == 1
     end
