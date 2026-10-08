@@ -497,8 +497,12 @@ ci-base-image:
   rules:
     - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"
     - if: $CI_PIPELINE_SOURCE == "push"
+      # Against main, not the previous push: a branch's first push has no previous push, and
+      # GitLab then counts every file as changed, so this ran on every new branch (#373).
       changes:
-        - ci/base.Dockerfile
+        paths:
+          - ci/base.Dockerfile
+        compare_to: refs/heads/main
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
     DOCKER_HOST: tcp://docker:2376
