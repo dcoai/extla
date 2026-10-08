@@ -464,3 +464,57 @@ tlc-corpus:
   # quietly reintroduce an archive round-trip on every pipeline.
   script:
     - bin/tlc-expected --check
+
+# The image every Elixir job will run in (#309, #364): `$ELIXIR_IMAGE` plus `git`, Hex and
+# Rebar, which each job used to fetch over the network before running a line of project code.
+# Built only when `ci/base.Dockerfile` changes or when run by hand, so the archive is reached
+# once per image rather than once per job. Its tag is a hash of its inputs (the Dockerfile and
+# `ELIXIR_IMAGE`), as exio's tool image does, so it builds nothing when the registry already
+# has it. It prints the pushed DIGEST, which is what `.elixir` pins (#365), because a tag can
+# be pushed over and a digest cannot.
+ci-base-image:
+  stage: check
+  needs: []
+  tags:
+    - dind
+  image: docker:28-cli
+  services:
+    - docker:28-dind
+  interruptible: false
+  # Branch pushes only, never merge-request events. A `changes:` rule with no source condition
+  # also matches an MR event, which made GitLab open a second, MR pipeline holding only this
+  # job. That pipeline then stood as the MR's head pipeline, green on this job alone, and it
+  # raced the branch pipeline's build of the same tag (#364).
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api"
+    - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - ci/base.Dockerfile
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "/certs/client"
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
+    - docker info >/dev/null
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - |
+      tag=$( { echo "$ELIXIR_IMAGE"; cat ci/base.Dockerfile; } | sha256sum | cut -c1-16 )
+      image="$CI_REGISTRY_IMAGE/ci-base:$tag"
+      if docker manifest inspect "$image" >/dev/null 2>&1; then
+        echo "$image is already in the registry"
+        docker pull -q "$image" >/dev/null
+      else
+        docker build -f ci/base.Dockerfile --build-arg ELIXIR_IMAGE="$ELIXIR_IMAGE" -t "$image" .
+        docker push "$image"
+      fi
+      digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+      echo "CI base image: $digest"
+      echo "$digest" > ci-base-image.txt
+  artifacts:
+    paths:
+      - ci-base-image.txt
+    expire_in: 30 days

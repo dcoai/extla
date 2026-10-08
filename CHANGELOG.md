@@ -35,6 +35,13 @@ release it merely follows.
 
 ### Changed
 
+- **A CI base image with `git`, Hex and Rebar baked in** (#364, for #309).
+  `ci/base.Dockerfile` builds it from `ELIXIR_IMAGE`, and the new `ci-base-image` job pushes
+  it to the project registry, only when the Dockerfile changes or when run by hand. Its tag is
+  a hash of its inputs, so an unchanged image builds nothing, and it reports the pushed digest.
+  No job uses it yet: #365 pins `.elixir` to that digest and removes the per-job `apt-get`,
+  which failed whole pipelines on a runner that cannot reach the Debian archive.
+
 - **CI restores dependencies with depdep v0.10.0** (#363, for #349). It corrects a git
   dependency's `origin` on restore, the second cause of `restored, but Mix would rebuild it`:
   Mix compares the lock's URL with the restored checkout's `origin` as strings. Keys and the
