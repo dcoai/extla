@@ -265,7 +265,11 @@ test:
     # changed. Any merge would have done it; the next would have taken the one after that.
     GIT_DEPTH: 0
   script:
-    - mix test
+    # With coverage exported, and EXERCISE.md checked against it in the same job: the golden is
+    # what this run exercised, so nothing is carried between jobs (#323, #370). Exporting skips
+    # `mix test --cover`'s summary threshold; the golden is the record, not a percentage.
+    - mix test --cover --export-coverage test
+    - mix extla.exercise --check
     # The relation log's evidence from this job's run (#336, #351), under the job's own name
     # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
     - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/test.jsonl

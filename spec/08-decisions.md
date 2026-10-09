@@ -907,8 +907,12 @@ See `02-dsl-semantics.md` §7, `API_SURFACE.md`.
 
 **Decided.** A document that lists what the code declares — its functions, its switches,
 its diagnostics, its dependencies — is **generated from source and byte-compared in CI**,
-never maintained by hand. Five exist: `TLA_COVERAGE.md`, `API_SURFACE.md`,
-`CLI_SURFACE.md`, `DIAGNOSTICS.md`, `PACKAGE_SURFACE.md`, all gated HARD by `surface-drift`.
+never maintained by hand. Six exist. Five are gated HARD by `surface-drift`:
+`TLA_COVERAGE.md`, `API_SURFACE.md`, `CLI_SURFACE.md`, `DIAGNOSTICS.md` and
+`PACKAGE_SURFACE.md`. The sixth, `EXERCISE.md` (#370), enumerates what the suite
+exercises, and is gated HARD by `test`: it is that job's own coverage run, and checking it
+elsewhere would mean carrying the data between jobs or running the suite twice. Each
+golden's header names its gate, and the gate is the job that runs its `--check`.
 
 **Why.** Every one of them replaced a hand-kept list that was wrong, and in each case the
 list's wrongness was invisible: `spec/02` §7 was twenty-eight of fifty diagnostics short;
@@ -923,9 +927,9 @@ pinned by tests.
 
 **Recorded 2026-09-22 (#176); decided and built at #270.**
 
-**Pinned by:** `test/mix/extla_api_surface_test.exs` "runs every golden's --check from one
-job" — a golden whose task can `--write` and `--check` and is not in `surface-drift` fails
-it, so a sixth cannot be added ungated.
+**Pinned by:** `test/mix/extla_api_surface_test.exs` "runs every golden's --check from the
+job its header names" — a golden whose task can `--write` and `--check`, and whose `--check`
+the job named in its header does not run, fails it, so another cannot be added ungated.
 
 See `06-architecture.md` §Dependencies, `02-dsl-semantics.md` §7.
 
