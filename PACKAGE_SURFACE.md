@@ -10,7 +10,7 @@ and the package is `lib/` only, so a module can be documented to a consumer who 
 call it. `mix.exs` filters the published docs on this same rule, and
 `test/docs/package_docs_test.exs` holds the built pages to these rows.
 
-**6 dependencies · 76 modules** · packaged 63 · not packaged 13 · required at runtime 0
+**6 dependencies · 77 modules** · packaged 64 · not packaged 13 · required at runtime 0
 
 ## Dependencies — as `mix.exs` declares them
 
@@ -54,6 +54,7 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `ExTLA.ModelChecker.Run` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker.ex` |
 | `ExTLA.ModelChecker.Safety` | `:packaged` | ships to a consumer | `lib/ex_tla/model_checker/safety.ex` |
 | `ExTLA.PackageSurface` | `:not_packaged` | this project only | `ledger/ex_tla/package_surface.ex` |
+| `ExTLA.Product` | `:packaged` | ships to a consumer | `lib/ex_tla/product.ex` |
 | `ExTLA.Profile` | `:packaged` | ships to a consumer | `lib/ex_tla/profile.ex` |
 | `ExTLA.PropertyTest` | `:packaged` | ships to a consumer | `lib/ex_tla/property_test.ex` |
 | `ExTLA.Refinement` | `:packaged` | ships to a consumer | `lib/ex_tla/refinement.ex` |

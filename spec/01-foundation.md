@@ -347,6 +347,11 @@ defmodule ExTLA.Set do
   parameter bindings (`ExTLA.ModelChecker.bindings/3`) are a different operation,
   a dependent product: each parameter's values may depend on the state and on
   the parameters bound before it. That is why they are not built from this.
+
+  `function_set/2` and `record_set/1` below are this same product, keyed by name rather
+  than by position. So is the symmetry reduction's set of substitutions. All four run on
+  one implementation, and a fifth written out by hand fails
+  `test/docs/product_shape_test.exs`.
   """
   def cross_many(sets)
 

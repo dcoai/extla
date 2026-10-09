@@ -56,13 +56,7 @@ defmodule ExTLA.Function do
       iex> ExTLA.Function.function_set(MapSet.new([]), MapSet.new([0, 1]))
       MapSet.new([%{}])
   """
-  def function_set(domain, range) do
-    domain
-    |> Enum.reduce([%{}], fn key, functions ->
-      for f <- functions, value <- range, do: Map.put(f, key, value)
-    end)
-    |> MapSet.new()
-  end
+  def function_set(domain, range), do: record_set(for key <- domain, do: {key, range})
 
   @doc """
   `DOMAIN f` — the domain of a function, as a set.
@@ -121,9 +115,8 @@ defmodule ExTLA.Function do
   """
   def record_set(field_specs) do
     field_specs
-    |> Enum.reduce([%{}], fn {field, set}, records ->
-      for record <- records, value <- set, do: Map.put(record, field, value)
-    end)
+    |> Enum.map(fn {field, set} -> Enum.map(set, &{field, &1}) end)
+    |> ExTLA.Product.fold(%{}, fn record, {field, value} -> Map.put(record, field, value) end)
     |> MapSet.new()
   end
 end
