@@ -113,6 +113,11 @@
 # restore. Keys and schema are unchanged, so nothing in the store is refilled. extla has no git
 # dependency of its own; the fix matters to peers that restore extla, whose objects exist in
 # the store under both spellings.
+#
+# v0.11.0 (#375, for #372) stops refusing a correct restore when a project's config sets a
+# value a dependency read at compile time (depdep#161): the restore now compares against the
+# project's own config, not an empty one. Keys and schema unchanged again, so no refill. Its
+# git-source restore does nothing here, since nothing in the lock is a git dependency.
 
 stages:
   - check
