@@ -10,7 +10,7 @@ and the package is `lib/` only, so a module can be documented to a consumer who 
 call it. `mix.exs` filters the published docs on this same rule, and
 `test/docs/package_docs_test.exs` holds the built pages to these rows.
 
-**6 dependencies · 77 modules** · packaged 64 · not packaged 13 · required at runtime 0
+**6 dependencies · 79 modules** · packaged 64 · not packaged 15 · required at runtime 0
 
 ## Dependencies — as `mix.exs` declares them
 
@@ -34,6 +34,7 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `ExTLA.Coverage` | `:packaged` | ships to a consumer | `lib/ex_tla/coverage.ex` |
 | `ExTLA.Diagnostics` | `:not_packaged` | this project only | `ledger/ex_tla/diagnostics.ex` |
 | `ExTLA.Examples` | `:not_packaged` | this project only | `ledger/ex_tla/examples.ex` |
+| `ExTLA.Exercise` | `:not_packaged` | this project only | `ledger/ex_tla/exercise.ex` |
 | `ExTLA.Fingerprint` | `:packaged` | ships to a consumer | `lib/ex_tla/fingerprint.ex` |
 | `ExTLA.Function` | `:packaged` | ships to a consumer | `lib/ex_tla/function.ex` |
 | `ExTLA.GenServer` | `:packaged` | ships to a consumer | `lib/ex_tla/gen_server.ex` |
@@ -97,6 +98,7 @@ call it. `mix.exs` filters the published docs on this same rule, and
 | `Mix.Tasks.Extla.Coverage` | `:not_packaged` | this project only | `ledger/mix/tasks/extla.coverage.ex` |
 | `Mix.Tasks.Extla.Diagnostics` | `:not_packaged` | this project only | `ledger/mix/tasks/extla.diagnostics.ex` |
 | `Mix.Tasks.Extla.Examples` | `:not_packaged` | this project only | `ledger/mix/tasks/extla.examples.ex` |
+| `Mix.Tasks.Extla.Exercise` | `:not_packaged` | this project only | `ledger/mix/tasks/extla.exercise.ex` |
 | `Mix.Tasks.Extla.Explore` | `:packaged` | ships to a consumer | `lib/mix/tasks/extla.explore.ex` |
 | `Mix.Tasks.Extla.PackageSurface` | `:not_packaged` | this project only | `ledger/mix/tasks/extla.package_surface.ex` |
 | `Mix.Tasks.Extla.Replay` | `:packaged` | ships to a consumer | `lib/mix/tasks/extla.replay.ex` |

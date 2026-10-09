@@ -10,7 +10,7 @@ no section says so instead of going unlisted — the list of tasks is the direct
 hand-kept set. Tasks outside `lib/` — this project's ledger tooling and its test-support
 tasks — are excluded from the package, so they have no specification section by design.
 
-**13 tasks · 46 switches** · shipped 6 · specified 6 · exit codes 18
+**14 tasks · 49 switches** · shipped 6 · specified 6 · exit codes 18
 
 ## `mix extla.api_surface` — ledger tooling, not packaged — 2 switches — NO EXIT-CODE TABLE
 
@@ -59,6 +59,13 @@ tasks — are excluded from the package, so they have no specification section b
 |---|---|---|---|
 | `--check` | `:switch` | `:boolean` | `ledger/mix/tasks/extla.examples.ex` |
 | `--write` | `:switch` | `:boolean` | `ledger/mix/tasks/extla.examples.ex` |
+## `mix extla.exercise` — ledger tooling, not packaged — 3 switches — NO EXIT-CODE TABLE
+
+| Item | Kind | Detail | Locus |
+|---|---|---|---|
+| `--check` | `:switch` | `:boolean` | `ledger/mix/tasks/extla.exercise.ex` |
+| `--coverdata` | `:switch` | `:string` | `ledger/mix/tasks/extla.exercise.ex` |
+| `--write` | `:switch` | `:boolean` | `ledger/mix/tasks/extla.exercise.ex` |
 ## `mix extla.explore` — specified in spec/04-layer2-model-checker.md — 3 switches — 2 exit codes
 
 | Item | Kind | Detail | Locus |

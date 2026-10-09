@@ -35,6 +35,22 @@ release it merely follows.
 
 ### Changed
 
+- **`EXERCISE.md` records what `mix test` exercises in each shipped module** (#370, for #323).
+  Nothing in the project could say whether a line ever ran; #323 found four that never had,
+  each by reading code. The `test` job now runs `mix test --cover --export-coverage test`,
+  and `mix extla.exercise --check` holds the new golden to that run in the same job, so
+  nothing is carried between jobs.
+  - **A row** is one module from `API_SURFACE.md`'s list: executable lines, unhit lines, and
+    the functions never entered.
+  - **The first run:** 310 of 3,892 lines unhit; the never-entered functions include
+    `ModelChecker.check_safety/1,2` and `Simulation.run/1` (listed on #323).
+  - **Stable:** three full runs gave identical coverage.
+  - **Accurate:** "never called" comes from per-function *line* coverage, because `:cover`'s
+    call counts miss a function that opens with `receive`. Macros, which run at their
+    caller's compile time, are excluded.
+  - **Gate ownership:** the rule that a golden's gate runs its `--check` now reads each
+    golden's own header, so `EXERCISE.md`'s `test` gate is enforced like `surface-drift`'s.
+
 - **The n-ary product is written once** (#368, for #350). `ExTLA.Set.cross_many/1`,
   `ExTLA.Function.record_set/1`, `function_set/2` and `ExTLA.Symmetry.mappings/2` each wrote
   out the same fold, differing only in a seed and a combiner. They now call
