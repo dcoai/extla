@@ -35,6 +35,21 @@ release it merely follows.
 
 ### Changed
 
+- **The n-ary product is written once** (#368, for #350). `ExTLA.Set.cross_many/1`,
+  `ExTLA.Function.record_set/1`, `function_set/2` and `ExTLA.Symmetry.mappings/2` each wrote
+  out the same fold, differing only in a seed and a combiner. They now call
+  `ExTLA.Product.fold/3`. `function_set(d, r)` is `record_set` with one range per key.
+  `ModelChecker.bindings/3` keeps its own: its later choices depend on earlier bindings.
+  - **Cost:** cheaper in every case, measured in reductions because the host's load makes
+    wall time noise. `function_set` is 13–26% fewer, `record_set` 21%, `cross_many` 23% (it
+    now folds the sets in reverse, so no tuple needs reversing), and `mappings` 8%. The
+    differential corpus, timed interleaved with `main`, shows no regression through that
+    noise.
+  - **Tests:** `test/ex_tla/product_test.exs` holds all four against a plain recursive
+    oracle, including the empty cases and `mappings`' order.
+  - **Guard:** `test/docs/product_shape_test.exs` refuses the fold's shape anywhere in `lib/`
+    but the two allowed sites. It was shown red on the old `ExTLA.Function`.
+
 - **No shared test helper writes VM-global state, and the async-isolation gate checks them**
   (#367, for #326). `test/docs/async_isolation_test.exs` read only each test file's own AST,
   so a write one frame down in `test/support/` was invisible to it. `ExTLA.GuideCheck` set

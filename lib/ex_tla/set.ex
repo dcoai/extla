@@ -51,9 +51,13 @@ defmodule ExTLA.Set do
       MapSet.new([{}])
   """
   def cross_many(sets) do
+    # Folded from the last set to the first, so consing builds each element list in order and
+    # nothing needs reversing. Only the order the combinations are produced in changes, and a
+    # MapSet has none.
     sets
-    |> Enum.reduce([[]], fn set, acc -> for tail <- acc, x <- set, do: [x | tail] end)
-    |> Enum.map(&(&1 |> Enum.reverse() |> List.to_tuple()))
+    |> Enum.reverse()
+    |> ExTLA.Product.fold([], &[&2 | &1])
+    |> Enum.map(&List.to_tuple/1)
     |> MapSet.new()
   end
 

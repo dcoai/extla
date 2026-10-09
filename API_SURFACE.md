@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**59 modules · 407 items** · functions 345 · arities 425 · types 62
+**60 modules · 408 items** · functions 346 · arities 426 · types 62
 
 ## ExTLA.Config — 3 items
 
@@ -70,8 +70,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `domain/1` | `:def` | (f) | `c639248d` | `lib/ex_tla/function.ex` |
 | `except/2` | `:def` | (f, updates) | `fe27f97b` | `lib/ex_tla/function.ex` |
 | `except_with/3` | `:def` | (f, key, update_fn) | `d1277250` | `lib/ex_tla/function.ex` |
-| `function_set/2` | `:def` | (domain, range) | `e1c60c3d` | `lib/ex_tla/function.ex` |
-| `record_set/1` | `:def` | (field_specs) | `812c877d` | `lib/ex_tla/function.ex` |
+| `function_set/2` | `:def` | (domain, range) | `d5e076bc` | `lib/ex_tla/function.ex` |
+| `record_set/1` | `:def` | (field_specs) | `1a4cccf5` | `lib/ex_tla/function.ex` |
 ## ExTLA.GenServer — 2 items
 
 | Item | Kind | Shape | Version | Locus |
@@ -252,6 +252,11 @@ key whose value is a union of atoms; any other type is shown as written.
 | `classify_stuck/3` | `:def` | (spec, constants, state) | `22cb7cdb` | `lib/ex_tla/model_checker/safety.ex` |
 | `reject_unmatched!/2` | `:def` | (declarations, names) | `9afa6b2f` | `lib/ex_tla/model_checker/safety.ex` |
 | `selected/2` | `:def` | (declarations, _) | `03002951` | `lib/ex_tla/model_checker/safety.ex` |
+## ExTLA.Product — 1 items
+
+| Item | Kind | Shape | Version | Locus |
+|---|---|---|---|---|
+| `fold/3` | `:def` | (choices, seed, combine) | `77637e56` | `lib/ex_tla/product.ex` |
 ## ExTLA.Profile — 14 items
 
 | Item | Kind | Shape | Version | Locus |
@@ -306,7 +311,7 @@ key whose value is a union of atoms; any other type is shown as written.
 | `choose/1` | `:def` | (set, predicate \\ …) | `08d88a72` | `lib/ex_tla/set.ex` |
 | `choose/2` | `:def` | (set, predicate \\ …) | `08d88a72` | `lib/ex_tla/set.ex` |
 | `cross/2` | `:def` | (s1, s2) | `9ffd9b93` | `lib/ex_tla/set.ex` |
-| `cross_many/1` | `:def` | (sets) | `06398bd0` | `lib/ex_tla/set.ex` |
+| `cross_many/1` | `:def` | (sets) | `5d48df02` | `lib/ex_tla/set.ex` |
 | `distributed_union/1` | `:def` | (set_of_sets) | `d0bb4339` | `lib/ex_tla/set.ex` |
 | `exists?/2` | `:def` | (set, predicate) | `534c8942` | `lib/ex_tla/set.ex` |
 | `filter/2` | `:def` | (set, predicate) | `4b65777f` | `lib/ex_tla/set.ex` |
@@ -608,7 +613,7 @@ key whose value is a union of atoms; any other type is shown as written.
 |---|---|---|---|---|
 | `canonical/2` | `:def` | (state, mappings) | `5f1f6102` | `lib/ex_tla/symmetry.ex` |
 | `mapping()` | `:type` | %{term() => term()} | `4140cc3b` | `lib/ex_tla/symmetry.ex` |
-| `mappings/2` | `:def` | (constants, names) | `f93b70e9` | `lib/ex_tla/symmetry.ex` |
+| `mappings/2` | `:def` | (constants, names) | `02cc53aa` | `lib/ex_tla/symmetry.ex` |
 | `permute/2` | `:def` | (term, mapping) | `23ffb652` | `lib/ex_tla/symmetry.ex` |
 | `verdict/1` | `:def` | (result) | `8c97afc6` | `lib/ex_tla/symmetry.ex` |
 | `verify!/3` | `:def` | (reduced, full, names) | `27ebd83e` | `lib/ex_tla/symmetry.ex` |

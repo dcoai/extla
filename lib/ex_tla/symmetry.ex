@@ -62,9 +62,7 @@ defmodule ExTLA.Symmetry do
     names
     |> Enum.map(&elements!(constants, &1))
     |> Enum.map(&substitutions/1)
-    |> Enum.reduce([%{}], fn per_set, acc ->
-      for base <- acc, one <- per_set, do: Map.merge(base, one)
-    end)
+    |> ExTLA.Product.fold(%{}, &Map.merge/2)
   end
 
   defp elements!(constants, name) do
