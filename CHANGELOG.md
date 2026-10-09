@@ -35,6 +35,11 @@ release it merely follows.
 
 ### Changed
 
+- **CI restores dependencies with depdep v0.11.0** (#375, for #372). A correct restore is no
+  longer refused when a project's config sets a value a dependency read at compile time, and
+  `--explain-rebuilt` names the differing entry. Keys and schema are unchanged, so the store
+  needs no refill. The git-source restore it adds does nothing here: no dependency is git.
+
 - **`EXERCISE.md` records what `mix test` exercises in each shipped module** (#370, for #323).
   Nothing in the project could say whether a line ever ran; #323 found four that never had,
   each by reading code. The `test` job now runs `mix test --cover --export-coverage test`,
