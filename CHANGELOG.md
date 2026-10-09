@@ -35,6 +35,13 @@ release it merely follows.
 
 ### Changed
 
+- **surfex is pinned at `~> 0.6.2`** (#377, for #376). It makes `Surfex.Golden` and
+  `Surfex.SourceScan` supported, documented library API with a promise that their shapes and
+  `definition_hash/1` stay stable. All seven of extla's goldens are built on them, and none
+  changed but `PACKAGE_SURFACE.md`'s requirement row. For the spec/04 baseline (#354), it adds
+  recording that reads CI's evidence files (`--merge`), batched `confirm`/`validate` with a
+  distinct note per relation, and `suggest` in a deterministic order. No upgrade step.
+
 - **CI restores dependencies with depdep v0.11.0** (#375, for #372). A correct restore is no
   longer refused when a project's config sets a value a dependency read at compile time, and
   `--explain-rebuilt` names the differing entry. Keys and schema are unchanged, so the store
