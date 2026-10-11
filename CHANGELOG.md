@@ -214,6 +214,17 @@ release it merely follows.
 
 ### Fixed
 
+- **A mutation kill has to be the mutant's doing** (#379, for #378). Any failing gate used to
+  count as a kill, so main pipeline 4744 recorded `weakens_a_type_domain`, the catalogue's
+  one expected survivor, as killed. A failing gate is now re-run twice over only the tests
+  that failed, once with the mutant and once without it. It counts as a kill only if the
+  failure comes back with the mutant and goes away without it. Otherwise the result is
+  `inconclusive`, with the reason. `--check` keeps the recorded outcome for an inconclusive
+  mutant rather than reporting PROGRESS or REGRESSION, and recording refuses one. The job log
+  now names the failing tests of every kill and prints the output of every other non-survival.
+  The likely cause of 4744 was in the workspace: it lacked `.surfex.exs`, so the evidence
+  formatter (#336) crashed in every gate, and depending on timing that made a passing run
+  exit 1. The workspace now copies it, and a test asserts that a passing gate there survives.
 - **A function capture in a spec body compiles** (#369, for #359). `&abs/1`, `&+/2` or
   `&member?/2` in any block was refused as "undeclared variable: abs", with advice to declare
   `variable :abs`. The capture's name node has a variable's shape, and the rewriter resolved
