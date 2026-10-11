@@ -176,6 +176,85 @@ defmodule ExTLA.MutationTest do
     end
   end
 
+  # #378: main pipeline 4744 read a flake under load as a kill of the catalogue's one
+  # expected survivor. The rule is on exit statuses, so it is tested on statuses.
+  describe "attributing a failed gate" do
+    test "a passing gate is a survival, and a gate out of time is a timeout" do
+      assert Mutation.outcome(0, nil, nil) == :survived
+      assert Mutation.outcome(124, nil, nil) == :timeout
+      assert Mutation.outcome(137, nil, nil) == :timeout
+    end
+
+    test "a failure that does not reproduce on the mutant is never a kill" do
+      assert Mutation.outcome(2, 0, nil) == {:inconclusive, :not_reproduced}
+    end
+
+    test "a failure that recurs without the mutant is never a kill" do
+      assert Mutation.outcome(2, 2, 2) == {:inconclusive, :fails_unmutated}
+    end
+
+    test "a rerun out of time decides nothing" do
+      assert Mutation.outcome(2, 124, nil) == {:inconclusive, :rerun_timed_out}
+      assert Mutation.outcome(2, 2, 137) == {:inconclusive, :rerun_timed_out}
+    end
+
+    test "only a failure that reproduces and goes away with the mutant is a kill" do
+      assert Mutation.outcome(2, 2, 0) == :killed
+    end
+
+    test "failures/1 names the tests ExUnit reported as failing" do
+      output = """
+      ..
+
+        1) test raft_election agrees with TLC (ExTLA.DifferentialTest)
+           test/differential/corpus_test.exs:41
+           Assertion with == failed
+
+        2) property states are canonical (ExTLA.SymmetryTest)
+           test/ex_tla/symmetry_test.exs:9
+
+      Finished in 1.2 seconds
+      """
+
+      assert Mutation.failures(output) == [
+               "test raft_election agrees with TLC (ExTLA.DifferentialTest)",
+               "property states are canonical (ExTLA.SymmetryTest)"
+             ]
+    end
+  end
+
+  describe "--check with an inconclusive mutant" do
+    @recorded %{
+      "mutants" => [
+        %{"name" => "weakens_a_type_domain", "outcome" => "survived"},
+        %{"name" => "drops_an_action", "outcome" => "killed"}
+      ]
+    }
+
+    # Unmeasured is not drift: the recorded outcome stands, so the flake 4744 hit is
+    # neither PROGRESS nor REGRESSION.
+    test "keeps the recorded outcome for it and leaves the measured ones alone" do
+      results = [
+        %{name: :weakens_a_type_domain, outcome: :inconclusive, reason: :not_reproduced},
+        %{name: :drops_an_action, outcome: :killed, reason: nil}
+      ]
+
+      assert {:ok, measured} = Mix.Tasks.Extla.Mutants.keep_recorded(results, @recorded)
+
+      assert Map.new(measured, &{&1.name, &1.outcome}) == %{
+               weakens_a_type_domain: :survived,
+               drops_an_action: :killed
+             }
+    end
+
+    test "names a mutant with no recorded outcome to stand in for it" do
+      results = [%{name: :drops_a_binding, outcome: :inconclusive, reason: :fails_unmutated}]
+
+      assert Mix.Tasks.Extla.Mutants.keep_recorded(results, @recorded) ==
+               {:error, [:drops_a_binding]}
+    end
+  end
+
   defp anchored(anchor, replacement) do
     %Mutant{
       name: :t,
@@ -265,6 +344,67 @@ defmodule ExTLA.MutationGateTest do
     assert result.outcome == :timeout
   end
 
+  # The recurrence guard of #378, against a real gate: a gate that fails for a reason that
+  # is not the mutant's. The mutant only adds a comment, and the gate is a probe test the
+  # test controls, so whatever fails is by construction not the mutant's doing.
+  @harmless %Mutant{
+    name: :harmless,
+    models: "a comment, so the tree is changed and nothing it does is",
+    file: "lib/ex_tla/model_checker.ex",
+    anchor: "  defp expand(run, id, state) do",
+    replacement: "  defp expand(run, id, state) do\n    # mutated",
+    kills: :corpus
+  }
+
+  # The workspace must run a passing test as passing. A file `mix test` reads and the copy
+  # lacks fails every gate; `.surfex.exs` was one (#378), and the crash it caused exited a
+  # short passing run 1, which the sweep scored as a kill.
+  test "a gate whose tests pass is a survival in the copied workspace",
+       %{workspace: workspace} do
+    gates = probe(workspace, "passes", ~S|test "passes", do: :ok|)
+
+    result = Mutation.run_one(workspace, @harmless, gates: gates)
+
+    assert result.outcome == :survived, result.output
+  end
+
+  test "a gate that fails without the mutant too is inconclusive, never a kill",
+       %{workspace: workspace} do
+    gates =
+      probe(workspace, "always", """
+      test "fails whatever the tree" do
+        flunk("this probe always fails")
+      end
+      """)
+
+    result = Mutation.run_one(workspace, @harmless, gates: gates)
+
+    assert {result.outcome, result.reason} == {:inconclusive, :fails_unmutated}
+    assert result.output =~ "this probe always fails"
+  end
+
+  test "a gate failure that does not reproduce is inconclusive, never a kill",
+       %{workspace: workspace} do
+    marker = Path.join(workspace, "probe-failed-once")
+
+    gates =
+      probe(workspace, "once", """
+      test "fails the first time only" do
+        if File.exists?(#{inspect(marker)}) do
+          :ok
+        else
+          File.write!(#{inspect(marker)}, "")
+          flunk("this probe fails once")
+        end
+      end
+      """)
+
+    result = Mutation.run_one(workspace, @harmless, gates: gates)
+
+    assert {result.outcome, result.reason} == {:inconclusive, :not_reproduced}
+    assert result.failures == ["test fails the first time only (ExTLA.MutationProbe.OnceTest)"]
+  end
+
   test "sweep/2 runs a catalogue and leaves no workspace behind" do
     # Compared against a snapshot rather than against the empty set: `setup_all`'s own
     # workspace is alive for the whole module, so an absolute assertion would fail on a
@@ -277,6 +417,25 @@ defmodule ExTLA.MutationGateTest do
 
     leftovers = MapSet.difference(workspaces(), before)
     assert MapSet.size(leftovers) == 0, "left behind: #{inspect(MapSet.to_list(leftovers))}"
+  end
+
+  # A one-test gate in its own directory of the workspace, removed when the test ends so
+  # the shared workspace's corpus gate never runs it.
+  defp probe(workspace, name, body) do
+    dir = Path.join(workspace, "test/mutation_probe_#{name}")
+    module = "ExTLA.MutationProbe.#{Macro.camelize(name)}Test"
+    File.mkdir_p!(dir)
+
+    File.write!(Path.join(dir, "probe_test.exs"), """
+    defmodule #{module} do
+      use ExUnit.Case, async: false
+
+    #{body}
+    end
+    """)
+
+    on_exit(fn -> File.rm_rf!(dir) end)
+    %{corpus: ["test", Path.relative_to(dir, workspace)]}
   end
 
   defp workspaces do

@@ -28,16 +28,35 @@ defmodule ExTLA.Mutation do
       has.
     * **the anchor appears more than once**, so which occurrence is meant is a guess.
 
-  ## Four outcomes, and two of them are not kills
+  ## Five outcomes, and three of them are not kills
 
-      killed       a gate failed -- the defect is caught
-      survived     every gate passed -- the defect is invisible to the gates
-      build_error  the mutated source did not compile
-      timeout      it did not finish
+      killed        a gate failed because of the mutant -- the defect is caught
+      survived      every gate passed -- the defect is invisible to the gates
+      build_error   the mutated source did not compile
+      timeout       it did not finish
+      inconclusive  a gate failed, but the failure is not the mutant's
 
   `build_error` and `timeout` are **not** kills. A mutant that never ran says nothing
   about the gates, and counting it as caught is how a harness comes to report a kill rate
   it has not earned.
+
+  ## A kill is attributed, not assumed (#378)
+
+  A failing gate is not yet a kill. A test that flakes under host load fails the gate
+  just as well, and main pipeline 4744 recorded the catalogue's one expected survivor as
+  killed that way. So a failing gate is run twice more, each time over only the tests
+  that just failed (`mix test --failed`):
+
+    1. **with the mutant still applied.** Nothing fails again: the failure did not
+       reproduce, which is a flake, not a kill.
+    2. **with the mutant removed.** Something still fails: the tree fails without the
+       mutant, so the mutant did not cause it.
+
+  Only a failure that reproduces and goes away with the mutant is a kill; anything else is
+  `inconclusive`, with the reason. Neither half alone is enough: re-running the unmutated
+  tree misses a one-off flake, which passes there too, and re-running the mutant misses a
+  test that fails regardless. The reruns cost only the failing tests, and only on the
+  path where a gate failed.
 
   ## Out of process
 
@@ -52,6 +71,11 @@ defmodule ExTLA.Mutation do
   once. Each mutant then patches one file, recompiles just that file, runs its gate, and
   restores the file. Copying per mutant would be correct and would spend most of the
   sweep on `cp`.
+
+  The copy is of everything `mix test` reads, which is more than what it compiles: a file
+  the test run needs and the workspace lacks fails every gate, mutant or not. The
+  attribution rule reports that as `inconclusive (fails_unmutated)`, where it used to be
+  a kill.
   """
 
   defmodule Mutant do
@@ -86,13 +110,18 @@ defmodule ExTLA.Mutation do
           }
   end
 
-  @type outcome :: :killed | :survived | :build_error | :timeout
+  @type outcome :: :killed | :survived | :build_error | :timeout | :inconclusive
+
+  @typedoc "Why a failing gate was not counted as a kill."
+  @type reason :: :not_reproduced | :fails_unmutated | :rerun_timed_out | :unmutated_build_failed
 
   @type result :: %{
           name: atom(),
           outcome: outcome(),
+          reason: reason() | nil,
           gate: Mutant.gate(),
           expected: Mutant.gate(),
+          failures: [String.t()],
           output: String.t()
         }
 
@@ -104,7 +133,15 @@ defmodule ExTLA.Mutation do
   }
 
   @default_timeout 300
-  @copied ~w(lib test bin mix.exs mix.lock .formatter.exs deps _build)
+  # What `timeout(1)` exits with: 124 when the budget ran out, 137 when `--kill-after` had
+  # to SIGKILL a process that ignored the TERM.
+  @timed_out [124, 137]
+  # Everything `mix test` reads, not only what it compiles. `.surfex.exs` is read by the
+  # evidence formatter `test_helper.exs` starts (#336). Without it the formatter crashes,
+  # and whether that crash makes a run exit non-zero depends on timing: a short passing
+  # run exits 1 every time, while the 77-second corpus gate exited 0. A passing gate that
+  # exits 1 is a kill, so the crash turned load into kills (#378).
+  @copied ~w(lib test bin mix.exs mix.lock .formatter.exs .surfex.exs deps _build)
 
   @doc """
   Copy the project into a temporary directory and compile it once.
@@ -147,6 +184,10 @@ defmodule ExTLA.Mutation do
   The file is restored whether or not the gate passed, so the next mutant starts from a
   pristine tree — and restoring is a plain write of the text read before patching rather
   than an undo, so a mutant cannot leave the workspace subtly different.
+
+  Options: `:timeout` and `:compile_timeout` in seconds, and `:gates`, which replaces the
+  map from gate name to `mix` arguments. That last one exists for the harness's own tests,
+  which need a gate whose failure they control.
   """
   @spec run_one(Path.t(), Mutant.t(), keyword()) :: result()
   def run_one(workspace, %Mutant{} = mutant, opts \\ []) do
@@ -159,10 +200,20 @@ defmodule ExTLA.Mutation do
 
     File.write!(path, patch(pristine, mutant))
 
+    # The attribution's second rerun needs the mutant gone. Restoring here is the same
+    # plain write as below, so the tree it runs is the tree every other mutant starts from.
+    unmutate = fn ->
+      File.write!(path, pristine)
+      compile(workspace, compile_timeout)
+    end
+
     result =
       case compile(workspace, compile_timeout) do
-        {output, 0} -> gate(workspace, mutant, timeout, output)
-        {output, status} -> classify_failed_build(mutant, output, status)
+        {_output, 0} ->
+          gate(workspace, mutant, timeout, Keyword.get(opts, :gates, @gates), unmutate)
+
+        {output, status} ->
+          classify_failed_build(mutant, output, status)
       end
 
     File.write!(path, pristine)
@@ -245,42 +296,108 @@ defmodule ExTLA.Mutation do
     run(workspace, ["compile"], timeout)
   end
 
-  defp gate(workspace, %Mutant{kills: :nothing} = mutant, timeout, _compile_output) do
+  defp gate(workspace, %Mutant{kills: :nothing} = mutant, timeout, gates, unmutate) do
     # A mutant expected to survive is still run — the measurement is the point, and a
     # mutant nobody ran cannot be reported as surviving.
-    gate(workspace, %{mutant | kills: :corpus}, timeout, nil)
+    gate(workspace, %{mutant | kills: :corpus}, timeout, gates, unmutate)
     |> Map.put(:expected, :nothing)
   end
 
-  defp gate(workspace, mutant, timeout, _compile_output) do
-    {output, status} = run(workspace, Map.fetch!(@gates, mutant.kills), timeout)
+  defp gate(workspace, mutant, timeout, gates, unmutate) do
+    args = Map.fetch!(gates, mutant.kills)
+    {output, status} = run(workspace, args, timeout)
 
-    outcome =
-      case status do
-        0 -> :survived
-        s when s in [124, 137] -> :timeout
-        _ -> :killed
+    {verdict, evidence} =
+      if status == 0 or status in @timed_out do
+        {outcome(status, nil, nil), output}
+      else
+        attribute(workspace, args, timeout, status, output, unmutate)
+      end
+
+    {outcome, reason} =
+      case verdict do
+        {:inconclusive, reason} -> {:inconclusive, reason}
+        outcome -> {outcome, nil}
       end
 
     %{
       name: mutant.name,
       outcome: outcome,
+      reason: reason,
       gate: mutant.kills,
       expected: mutant.kills,
-      output: tail(output)
+      failures: failures(evidence),
+      output: tail(evidence)
     }
+  end
+
+  # The two reruns of #378. `--failed` reads the manifest the previous `mix test` in this
+  # workspace wrote, so each rerun is exactly the tests the run before it failed. The
+  # evidence kept is the run that decided: the failures that reproduced for a kill, the
+  # first run for a flake, the unmutated run for a tree that fails on its own.
+  defp attribute(workspace, args, timeout, status, output, unmutate) do
+    {again, reproduced} = run(workspace, args ++ ["--failed"], timeout)
+
+    if reproduced == 0 or reproduced in @timed_out do
+      {outcome(status, reproduced, nil), output}
+    else
+      case unmutate.() do
+        {_build, 0} ->
+          {plain, unmutated} = run(workspace, args ++ ["--failed"], timeout)
+          verdict = outcome(status, reproduced, unmutated)
+          {verdict, if(verdict == :killed, do: again, else: plain)}
+
+        {build, _status} ->
+          {{:inconclusive, :unmutated_build_failed}, build}
+      end
+    end
+  end
+
+  @doc """
+  The outcome of a gate from its exit statuses: the gate's own, the rerun with the mutant,
+  and the rerun without it. A rerun that did not happen is `nil`.
+
+  Pure, so the attribution rule is tested on statuses rather than behind a sweep: a gate
+  failure that does not reproduce, or that recurs unmutated, is never a kill.
+  """
+  @spec outcome(integer(), integer() | nil, integer() | nil) ::
+          :survived | :timeout | :killed | {:inconclusive, reason()}
+  def outcome(0, nil, nil), do: :survived
+  def outcome(gate, nil, nil) when gate in @timed_out, do: :timeout
+  def outcome(_gate, rerun, _) when rerun in @timed_out, do: {:inconclusive, :rerun_timed_out}
+  def outcome(_gate, 0, nil), do: {:inconclusive, :not_reproduced}
+
+  def outcome(_gate, _rerun, plain) when plain in @timed_out,
+    do: {:inconclusive, :rerun_timed_out}
+
+  def outcome(_gate, _rerun, 0), do: :killed
+  def outcome(_gate, _rerun, plain) when is_integer(plain), do: {:inconclusive, :fails_unmutated}
+
+  @doc """
+  The failing tests ExUnit named in `output`, as `"test name (Module)"`.
+
+  What a reader of the job log needs to tell a real kill from a flake: the corpus entry a
+  defect broke, or the unrelated test that happened to fail.
+  """
+  @spec failures(String.t()) :: [String.t()]
+  def failures(output) do
+    ~r/^\s+\d+\) ((?:test|property|doctest) .+)$/m
+    |> Regex.scan(output, capture: :all_but_first)
+    |> Enum.map(fn [name] -> String.trim_trailing(name) end)
   end
 
   # A mutated source that does not compile is not a caught defect. It is a mutant that
   # never ran, and the two must not render as the same thing.
   defp classify_failed_build(mutant, output, status) do
-    outcome = if status in [124, 137], do: :timeout, else: :build_error
+    outcome = if status in @timed_out, do: :timeout, else: :build_error
 
     %{
       name: mutant.name,
       outcome: outcome,
+      reason: nil,
       gate: mutant.kills,
       expected: mutant.kills,
+      failures: [],
       output: tail(output)
     }
   end
