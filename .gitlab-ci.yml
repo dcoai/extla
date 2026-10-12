@@ -275,8 +275,8 @@ test:
     # `mix test --cover`'s summary threshold; the golden is the record, not a percentage.
     - mix test --cover --export-coverage test
     - mix extla.exercise --check
-    # The relation log's evidence from this job's run (#336, #351), under the job's own name
-    # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
+    # The relation log's evidence from this job's run (#336, #351): what `relation-status-drift`
+    # checks spec/04's relations against (#354). A retry replaces its own file.
     - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/test.jsonl
   artifacts:
     paths:
@@ -330,8 +330,9 @@ mutation:
     # The runner's own behaviour first -- a broken runner would make every mutant look
     # like a survivor, so the sweep below is only meaningful if these pass.
     - mix test --only mutation
-    # The relation log's evidence from this job's run (#336, #351), under the job's own name
-    # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
+    # The relation log's evidence from this job's run (#336, #351). No relation needs it today
+    # (see `relation-status-drift`); it is here for `mix surfex.confirm --merge` the day a test
+    # only this job runs verifies a spec unit.
     - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/mutation.jsonl
     # Then the measurement itself. Drift fails in both directions: a mutant that newly
     # survives is a regression in the gates, and one that newly dies is progress that has
@@ -418,33 +419,39 @@ docs:
     # cannot see the surface the defect lives on, which is #102's shape one door over.
     - MIX_ENV=dev mix docs --warnings-as-errors
     - mix test test/docs --include needs_built_docs
-    # The relation log's evidence from this job's run (#336, #351), under the job's own name
-    # so `relation-evidence` downloads all three side by side. A retry replaces its own file.
+    # The relation log's evidence from this job's run (#336, #351). No relation needs it today
+    # (see `relation-status-drift`); it is here for `mix surfex.confirm --merge` the day a test
+    # only this job runs verifies a spec unit.
     - mkdir -p surfex-evidence && cp _build/surfex/evidence.jsonl surfex-evidence/docs.jsonl
   artifacts:
     paths:
       - surfex-evidence/
     expire_in: 1 week
 
-# spec/04's relation log, checked against the evidence of every job that runs tests (#336).
-# Each of `test`, `mutation` and `docs` runs a different slice of the suite and records the
-# rest as excluded, so no one file can validate every relation. `--merge` reads the three
-# together, and a claim no job ran stays unchecked rather than passing.
+# spec/04's relation log (#336), a HARD gate since the baseline (#354). Three checks, one job,
+# because RELATIONS.md's header names `relation-status-drift` as its gate (surfex fixes the
+# name) and a golden's header has to name a job that runs it:
 #
-# NOT YET A GATE (#351): no relation is recorded until spec/04 is tagged (#352, #353) and
-# baselined (#354), so a pass here would be vacuous. #354 removes `allow_failure`.
-relation-evidence:
+#   * `--verify`: the log itself, so an edited, removed or truncated entry fails;
+#   * `mix surfex.goldens`: RELATIONS.md is what the log and the scan say now;
+#   * `--merge test.jsonl`: every relation confirmed by evidence is borne out by `test`'s run
+#     at the current versions, and a claim no run exercised fails rather than passing.
+#
+# Only `test`'s evidence, by measurement rather than convenience. Every spec/04 `verifies` tag is
+# on a test the `test` job runs; the tests only `mutation` and `docs` run verify nothing in
+# spec/04, and status against `test.jsonl` alone passes. Reading the other two made this gate
+# hostage to GitLab losing their archives on its NFS mount (#355), for evidence no relation
+# uses. If a test only those jobs run is ever tagged, this fails naming the claim no run
+# exercised, and that is when to add its `--merge` back.
+relation-status-drift:
   extends: .elixir
   stage: verify
-  needs: [test, mutation, docs]
-  allow_failure: true
+  needs: [test]
   script:
     - mix compile
-    - >-
-      mix surfex.status --evidence
-      --merge surfex-evidence/test.jsonl
-      --merge surfex-evidence/mutation.jsonl
-      --merge surfex-evidence/docs.jsonl
+    - mix surfex.status --verify
+    - mix surfex.goldens
+    - mix surfex.status --evidence --merge surfex-evidence/test.jsonl
 
 tlc-corpus:
   stage: verify

@@ -39,8 +39,14 @@ so the evidence for the commands below is whatever `mix test` last ran.
 | A test's name, or split a test module | `mix surfex.suggest --accept --note "…"`, which carries the moved tests' records |
 | A spec/04 heading | `mix surfex.suggest` proposes the section move; or `mix surfex.move OLD NEW --note "…"` |
 | Something removed | `mix surfex.retire FROM TO --type T --note "…"` |
+| A section implemented by code its verifying tests reach only through another item | relate the item they call (`implements`), and `mix surfex.relate CALLER ITEM --type depends_on --note "…"`; surfex counts only direct calls as a test exercising code, so an `implements` on the inner item can never be validated |
 
-Then commit `.surfex/` with the change.
+Then `mix surfex.goldens --write` and commit `.surfex/` and `RELATIONS.md` with the change.
+
+CI's `relation-status-drift` job is the gate, and a HARD one since the baseline (#354). It
+runs `mix surfex.status --verify` (the log, and every relation current), `mix surfex.goldens`
+(`RELATIONS.md` is up to date) and `mix surfex.status --evidence` against the `test` job's
+evidence (every relation confirmed by evidence still holds in that run).
 
 A section id is the heading path, such as
 `spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/State-space reduction/Symmetry`.
