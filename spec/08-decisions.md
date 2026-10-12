@@ -907,12 +907,15 @@ See `02-dsl-semantics.md` §7, `API_SURFACE.md`.
 
 **Decided.** A document that lists what the code declares — its functions, its switches,
 its diagnostics, its dependencies — is **generated from source and byte-compared in CI**,
-never maintained by hand. Six exist. Five are gated HARD by `surface-drift`:
+never maintained by hand. Seven exist. Five are gated HARD by `surface-drift`:
 `TLA_COVERAGE.md`, `API_SURFACE.md`, `CLI_SURFACE.md`, `DIAGNOSTICS.md` and
 `PACKAGE_SURFACE.md`. The sixth, `EXERCISE.md` (#370), enumerates what the suite
 exercises, and is gated HARD by `test`: it is that job's own coverage run, and checking it
-elsewhere would mean carrying the data between jobs or running the suite twice. Each
-golden's header names its gate, and the gate is the job that runs its `--check`.
+elsewhere would mean carrying the data between jobs or running the suite twice. The
+seventh, `RELATIONS.md` (#354), is surfex's: every relation in spec/04's relation log and
+its state. surfex writes its header and fixes its gate's name, so it is gated HARD by a job
+of that name, `relation-status-drift`, which also checks the log and its evidence. Each
+golden's header names its gate, and the gate is the job that runs its check.
 
 **Why.** Every one of them replaced a hand-kept list that was wrong, and in each case the
 list's wrongness was invisible: `spec/02` §7 was twenty-eight of fifty diagnostics short;
@@ -930,6 +933,8 @@ pinned by tests.
 **Pinned by:** `test/mix/extla_api_surface_test.exs` "runs every golden's --check from the
 job its header names" — a golden whose task can `--write` and `--check`, and whose `--check`
 the job named in its header does not run, fails it, so another cannot be added ungated.
+"every golden's header names a job that exists and runs its task" covers the goldens
+another tool writes, such as `RELATIONS.md`, which the first test never reads.
 
 See `06-architecture.md` §Dependencies, `02-dsl-semantics.md` §7.
 

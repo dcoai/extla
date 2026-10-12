@@ -35,6 +35,20 @@ release it merely follows.
 
 ### Changed
 
+- **spec/04's relation log is baselined and gated** (#354, for #336). After green runs of all
+  three CI test slices, the baseline trusted 1,458 test versions and adopted 563 `verifies`
+  tags. 5 spec units have none. Every suggested `implements` citation was judged one at a
+  time and recorded with a note:
+  - 15 are confirmed by evidence, and one, the type `t:ExTLA.State.t/0`, by judgement;
+  - surfex counts only a direct call as a test exercising code. So 8 items reached only
+    through an entry point (a Mix task, or `ModelChecker.run/2`) are recorded as the entry
+    point implementing the section, plus a judged `depends_on`.
+
+  The new `relation-status-drift` job replaces the advisory `relation-evidence`. It is HARD,
+  and runs `mix surfex.status --verify`, the `RELATIONS.md` golden, and the evidence check.
+  It reads only the `test` job's evidence: no spec/04 tag is on a test only `docs` or
+  `mutation` runs, and GitLab intermittently loses those archives (#355). A test checks that
+  every golden's header, surfex's included, names a job that runs it.
 - **surfex is pinned at `~> 0.6.2`** (#377, for #376). It makes `Surfex.Golden` and
   `Surfex.SourceScan` supported, documented library API with a promise that their shapes and
   `definition_hash/1` stay stable. All seven of extla's goldens are built on them, and none

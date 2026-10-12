@@ -108,6 +108,27 @@ defmodule Mix.Tasks.Extla.ApiSurfaceTest do
       assert gates["extla.exercise"] == "test"
     end
 
+    # The other direction, for every golden in the repository rather than only extla's own:
+    # a header naming a gate is a claim that the job exists and runs that golden's task.
+    # RELATIONS.md is surfex's, its header names `relation-status-drift` and surfex fixes that
+    # name (#354), so the loop above, which starts from extla's tasks, never reads it.
+    test "every golden's header names a job that exists and runs its task" do
+      ci = File.read!(Path.expand("../../.gitlab-ci.yml", __DIR__))
+      gates = golden_gates()
+
+      assert gates["surfex.goldens"] == "relation-status-drift",
+             "RELATIONS.md's header was not read; this assertion would be vacuous"
+
+      for {task, gate} <- gates do
+        [job] =
+          Regex.run(~r/^#{Regex.escape(gate)}:\n(?:  .*\n|\s*\n)+/m, ci) ||
+            flunk("#{task}'s golden names `#{gate}` as its gate, and there is no such job")
+
+        assert job =~ ~r/^    - mix #{Regex.escape(task)}( --check)?$/m,
+               "the `#{gate}` job does not run `mix #{task}`, though its golden names it as the gate"
+      end
+    end
+
     test "and the golden's header names that job" do
       header =
         Path.expand("../../API_SURFACE.md", __DIR__) |> File.read!() |> String.slice(0, 400)
