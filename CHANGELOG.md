@@ -23,6 +23,12 @@ release it merely follows.
   at the release tag, and the package declares its links (GitHub, Changelog). The version
   links at the end of this file point at GitHub. The guide harness's `tla:deps` check now
   holds the install URL to `source_url`, as it already held the tag to the release record.
+- **The README is a short front door** (#403, for #395). It says what ExTLA does in one
+  line, then why it matters when an LLM writes your concurrent code, then installation, one
+  example, the task list and links to everything else. The package description and the
+  `ExTLA` module docs open with the same line. The TLC agreement tables and benchmarks that
+  filled half the old README now sit beside the corpus they measure, in
+  `test/differential/README.md`.
 
 ## [0.5.0] — 2026-10-13
 

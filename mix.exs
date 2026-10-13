@@ -13,7 +13,8 @@ defmodule ExTLA.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "ExTLA",
-      description: "TLA+-inspired formal verification for Elixir/OTP systems",
+      description:
+        "Describe your system's states, find the invalid ones automatically, and check that your GenServers behave as described.",
       # GitHub is the public home (#402). Day-to-day work happens on a private GitLab
       # instance that a reader of the docs or the package can't reach, so nothing that ships
       # names it: "View source", the package links and the install instruction (held to

@@ -6,8 +6,9 @@ This is for working **on** ExTLA. `usage-rules.md` is for projects that use it, 
 ## Every merge request
 
 - `mix format`, `mix compile --warnings-as-errors` and `mix test` pass.
-- A change under `lib/` carries a `CHANGELOG.md` entry. The `changelog` job checks the
-  committed state, so add the entry before pushing.
+- A change under `lib/` carries a `CHANGELOG.md` entry. The `changelog` job
+  (`bin/changelog_guard.exs`) checks the committed state, so add the entry before pushing.
+  The CHANGELOG is the record of what is built; nothing else restates it.
 - The six surface goldens are current. Run them as CI does, under the test environment.
   In dev the specs under `test/` aren't compiled, and `mix extla.coverage --check` fails
   even on a clean `main`:

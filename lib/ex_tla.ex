@@ -1,9 +1,10 @@
 defmodule ExTLA do
   @moduledoc """
-  TLA+-inspired formal verification for Elixir/OTP systems.
+  Describe your system's states, find the invalid ones automatically, and check that your
+  GenServers behave as described.
 
-  Write a specification as Elixir code, model-check it exhaustively, and check that a
-  running GenServer conforms to it. Start with
+  A specification is Elixir code. The model checker explores every state it reaches, and the
+  conformance layer checks a running GenServer against it. Start with
   [Getting started](guides/getting-started.md); the tutorial that follows it builds one
   system across eleven pages.
 
