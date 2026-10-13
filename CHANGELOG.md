@@ -35,6 +35,22 @@ release it merely follows.
 
 ### Fixed
 
+- **`wrong_init_index` was killed only on a lucky seed** (#393, for #392). The one test that
+  caught it was a generated property, which fails only when the generator builds a spec
+  with two `init` blocks that is refuted from the second. Measured: it survived 10 seeds of
+  100, and failed the mutation job of pipeline 5315, whose change touched no code. No fixed
+  test read `init_index`, the field a replay starts from: `TestSpecs.TwoStarts` has two
+  starts and no property, so nothing asked it for a counterexample.
+  `test/ex_tla/second_start_replay_test.exs` now does, deterministically, with a fixture
+  refuted only from its second start:
+  - an invariant's and an action property's counterexamples start at the second start and
+    pass `Trace.validate/3`;
+  - every state of `TwoStarts` regenerates (`StateGraph.state_at/2`) to the state its id
+    names.
+
+  All three tests fail under the mutant, which is now gated on that file. The `:tests` gate
+  also runs its files with `--exclude property`. A kill that rests on generated input is
+  now a survivor the first time it is swept, not a red pipeline later.
 - **The mutation sweep's `:suite` gate measured nothing** (#389, for #380). It ran the whole of
   `mix test` in the sweep's workspace, which copies `lib`, `test` and the build but not
   `README.md`, `guides/` or `spec/`. The suite failed there with no mutant applied, so its

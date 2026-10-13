@@ -12,6 +12,7 @@ defmodule ExTLA.MutationTest do
   """
 
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias ExTLA.Mutation
   alias ExTLA.Mutation.Catalogue
@@ -104,6 +105,21 @@ defmodule ExTLA.MutationTest do
 
       assert Enum.any?(Catalogue.all(), &(&1.kills == :tests)),
              "no mutant uses :tests; this assertion would be vacuous"
+    end
+
+    # A property draws new input on every seed, so a kill resting on one holds on some
+    # seeds: `wrong_init_index` survived 10 of 100 that way (#392). The gate runs its files
+    # without them, which makes a seed-dependent kill a survivor the first time it is swept.
+    test "a :tests gate runs its files without their generated properties" do
+      for %{kills: :tests} = mutant <- Catalogue.all() do
+        assert Mutation.gate_args(mutant, %{}) ==
+                 ["test" | mutant.tests] ++ ["--exclude", "property"]
+      end
+    end
+
+    # The exclusion is only as good as the tag it names, and the tag is ExUnitProperties'.
+    property "and `property` is the tag a generated property carries", context do
+      assert context.property == true
     end
 
     test "names are unique — they are the keys in survivors.json" do

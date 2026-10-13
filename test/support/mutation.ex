@@ -94,7 +94,8 @@ defmodule ExTLA.Mutation do
       * `:kills` — the gate expected to catch it, or `:nothing` where the mutant is
         expected to survive and the survival is the finding.
       * `:tests` — for `kills: :tests`, the test files that gate runs: the ones measured
-        to catch this mutant, named so a reader sees which tests do the work.
+        to catch this mutant, named so a reader sees which tests do the work. Their
+        generated properties are excluded, so the kill is one every seed reproduces (#392).
       * `:timeout` — seconds for this mutant's gate, overriding the sweep's. For a
         defect that makes the search non-terminating, where the sweep's budget would be
         spent waiting for something that is never going to finish.
@@ -307,11 +308,22 @@ defmodule ExTLA.Mutation do
     run(workspace, ["compile"], timeout)
   end
 
+  @doc false
   # An empty `:tests` list does not match, on purpose: `mix test` with no paths is the whole
   # suite, which is exactly the gate `:tests` replaced, and a missing list would bring it
   # back silently.
-  defp gate_args(%Mutant{kills: :tests, tests: [_ | _] = tests}, _gates), do: ["test" | tests]
-  defp gate_args(%Mutant{kills: kills}, gates) when kills != :tests, do: Map.fetch!(gates, kills)
+  #
+  # Generated properties are excluded (#392). A property draws new input on every seed, so
+  # a kill that rests on one is a kill on some seeds: `wrong_init_index` was killed only by
+  # a property, survived 10 seeds of 100, and failed a pipeline that changed nothing. With
+  # properties out, a `:tests` kill is one every run reproduces, and a gate that needs one
+  # is a survivor the sweep reports the first time it is measured.
+  #
+  # Public so the arguments are tested without a sweep.
+  def gate_args(%Mutant{kills: :tests, tests: [_ | _] = tests}, _gates),
+    do: ["test" | tests] ++ ["--exclude", "property"]
+
+  def gate_args(%Mutant{kills: kills}, gates) when kills != :tests, do: Map.fetch!(gates, kills)
 
   defp gate(workspace, %Mutant{kills: :nothing} = mutant, timeout, gates, unmutate) do
     # A mutant expected to survive is still run — the measurement is the point, and a

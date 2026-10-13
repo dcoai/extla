@@ -201,11 +201,13 @@ defmodule ExTLA.Mutation.Catalogue do
         replacement: "        {0, steps}",
 
         # `:tests`: every corpus entry has exactly one `init`, so the corpus cannot tell.
-        # `TestSpecs.TwoStarts` is the only fixture with two. Measured over the whole suite
-        # (#380), exactly one test catches this: generated_models_test.exs's "every
-        # counterexample is a behaviour the spec admits", on ten seeds out of ten.
+        # Measured over the whole suite (#380), one test caught it: a generated property in
+        # generated_models_test.exs, and only on the seeds that built a two-`init` spec
+        # refuted from its second block. It survived 10 seeds of 100 and failed pipeline
+        # 5315 (#392). second_start_replay_test.exs is that shape, fixed: all three of its
+        # tests fail under this mutant, on every run.
         kills: :tests,
-        tests: ["test/ex_tla/generated_models_test.exs"]
+        tests: ["test/ex_tla/second_start_replay_test.exs"]
       },
       %Mutant{
         name: :drops_a_worker_contribution,
