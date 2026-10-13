@@ -8,7 +8,7 @@ never reached; `Never called` names the functions it never entered, compiler-gen
 ones excluded. A module never loaded by any test reads `—`. A row that grows is coverage
 lost; one that shrinks is coverage gained, recorded so it cannot be lost again quietly.
 
-**60 modules · 3892 lines** · unhit 310 · modules with an unhit line 45 · never loaded 0
+**60 modules · 3892 lines** · unhit 298 · modules with an unhit line 45 · never loaded 0
 
 | Module | Lines | Unhit | Never called |
 |---|---|---|---|
@@ -66,7 +66,7 @@ lost; one that shrinks is coverage gained, recorded so it cannot be lost again q
 | `ExTLA.Temporal.Fairness` | 32 | 2 | — |
 | `ExTLA.Trace` | 186 | 16 | `from/3` |
 | `ExTLA.Trace.Explore` | 80 | 2 | `explore/2` |
-| `Mix.Tasks.Extla.Check` | 122 | 18 | — |
+| `Mix.Tasks.Extla.Check` | 122 | 6 | — |
 | `Mix.Tasks.Extla.Explore` | 49 | 4 | — |
 | `Mix.Tasks.Extla.Replay` | 93 | 25 | `json/2` |
 | `Mix.Tasks.Extla.Simulate` | 88 | 15 | — |

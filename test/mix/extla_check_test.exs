@@ -328,6 +328,57 @@ defmodule Mix.Tasks.Extla.CheckTest do
     end
   end
 
+  # The schema's blocks that other modules produce: the coverage block is `ExTLA.Coverage`'s
+  # report and the profile block `ExTLA.Profile`'s. `ExTLA.CheckJsonSchemaTest` holds the
+  # envelope from a separate OS process; these run the task in this one, so the code the task
+  # hands the work to is reached from here. The exit code is the verdict, which these do not
+  # judge: `NoBranch` deadlocks, and its coverage block is still the schema's.
+  defp json_entry(spec \\ "ExTLA.TestSpecs.WithDefaults", args) do
+    {output, _code} = check([spec, "--format", "json" | args])
+    output |> Jason.decode!() |> Map.fetch!("specs") |> hd()
+  end
+
+  describe "the JSON result schema's coverage and profile blocks" do
+    @describetag verifies:
+                   "spec/04-layer2-model-checker.md#Layer 2: Specification DSL + Model Checker/Mix Integration/Mix Task: `mix extla.check`/The JSON result schema"
+
+    test "an unmeasured near-miss count is null, never 0" do
+      # `non_negative` has no top-level `or`, so no branch to measure: its count is not
+      # measured, which is a different fact from a measured zero ("never at risk").
+      coverage = json_entry("ExTLA.TestSpecs.NoBranch", [])["coverage"]
+
+      assert Map.fetch!(coverage["invariants"]["non_negative"], "near_misses") == nil
+    end
+
+    test "profile is null unless --profile asked for one" do
+      assert Map.fetch!(json_entry([]), "profile") == nil
+    end
+
+    test "a profile carries its documented keys, and each declaration describes itself" do
+      profile = json_entry(["--profile"])["profile"]
+
+      assert Enum.sort(Map.keys(profile)) ==
+               ~w(calibration declarations otp_version run_reductions)
+
+      assert profile["declarations"] != [], "the spec should declare something to profile"
+
+      for entry <- profile["declarations"] do
+        assert Enum.sort(Map.keys(entry)) ==
+                 ~w(evaluations kind name observed per_eval reductions)
+      end
+
+      keys = Enum.map(profile["declarations"], &{&1["kind"], &1["name"]})
+      assert keys == Enum.sort(keys)
+    end
+
+    test "reductions is the floor times the evaluations, with observed kept beside it" do
+      for entry <- json_entry(["--profile"])["profile"]["declarations"] do
+        assert entry["reductions"] == entry["per_eval"] * entry["evaluations"]
+        assert is_integer(entry["observed"])
+      end
+    end
+  end
+
   describe "module resolution" do
     test "a module that is not a spec is refused by name" do
       assert_raise Mix.Error, ~r/is not a TLA spec/, fn ->
