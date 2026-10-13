@@ -9,10 +9,22 @@ All notable changes to ExTLA are recorded here, following
 which is the single source of truth for that. This file records what *changed* and when, and
 does not restate it.
 
-## [Unreleased]
+## [0.5.0] — 2026-10-13
 
-`mix.exs` reads `0.4.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
-release it merely follows.
+**A minor line, opened by `mix extla.replay`.** It gains `--server` and `--timeout`, and
+`--init-arg`, which was accepted and then dropped, now reaches the server (#165). That adds to
+the command line, which is why this is 0.5.0 rather than 0.4.61. Nothing is removed or
+renamed: a 0.4.0 project upgrades by changing the tag.
+
+Two fixes reach spec authors. A function capture (`&abs/1`) in a spec body compiles (#369),
+and `ExTLA.Invariant.Test.valid_states/3` says when a base generator is too broad to filter
+(#348). The rest is how the project holds itself to its specification:
+- spec/04's relation log ties each section to the tests that verify it and the code they
+  exercise, and gates CI (#336, now on surfex 0.7.1);
+- `EXERCISE.md` records what the suite exercises in each shipped module (#370);
+- the mutation sweep's kills are attributed to the mutant and reproduce on every seed (#378,
+  #380, #392);
+- every CI job starts from a pinned base image and restores its dependencies from the store.
 
 ### Added
 
@@ -32,49 +44,6 @@ release it merely follows.
   currently read") is replaced. `test/mix/switches_read_test.exs` now holds every task to
   reading every switch it declares; against the old task it names `--init-arg`, and it finds
   no other.
-
-### Fixed
-
-- **`wrong_init_index` was killed only on a lucky seed** (#393, for #392). The one test that
-  caught it was a generated property, which fails only when the generator builds a spec
-  with two `init` blocks that is refuted from the second. Measured: it survived 10 seeds of
-  100, and failed the mutation job of pipeline 5315, whose change touched no code. No fixed
-  test read `init_index`, the field a replay starts from: `TestSpecs.TwoStarts` has two
-  starts and no property, so nothing asked it for a counterexample.
-  `test/ex_tla/second_start_replay_test.exs` now does, deterministically, with a fixture
-  refuted only from its second start:
-  - an invariant's and an action property's counterexamples start at the second start and
-    pass `Trace.validate/3`;
-  - every state of `TwoStarts` regenerates (`StateGraph.state_at/2`) to the state its id
-    names.
-
-  All three tests fail under the mutant, which is now gated on that file. The `:tests` gate
-  also runs its files with `--exclude property`. A kill that rests on generated input is
-  now a survivor the first time it is swept, not a red pipeline later.
-- **The mutation sweep's `:suite` gate measured nothing** (#389, for #380). It ran the whole of
-  `mix test` in the sweep's workspace, which copies `lib`, `test` and the build but not
-  `README.md`, `guides/` or `spec/`. The suite failed there with no mutant applied, so its
-  three kills (`skips_symmetry_canonicalization`, `wrong_init_index`,
-  `param_universe_from_the_right`) were never measured. After #379, `--check` kept their
-  recorded outcomes and stayed green.
-  - **`:tests` replaces `:suite`:** each such mutant names the test files that catch it. These
-    were found by running the whole suite with each mutant applied: `symmetry_test`,
-    `generated_models_test` (one property, killed on ten seeds of ten), and `coverage_merge_test`
-    with the parallel checker's tests. The gate runs those files only.
-  - **`mix extla.mutants --check` now fails on `inconclusive (fails_unmutated)`.** A gate that
-    fails without the mutant is broken, not flaky. A failure that didn't reproduce, and a rerun
-    that timed out, are still tolerated.
-  - **A catalogue test checks the lists:** every `:tests` mutant must name existing test files,
-    and an empty list matches no gate rather than running the whole suite.
-
-- **A parallel-profile test named the denominator rule #239 replaced** (#388, for #386).
-  `profile_parallel_test.exs` said `run_reductions` "is the coordinator's" and asserted `> 0`,
-  which passes under either rule, so nothing failed when #239 changed the rule.
-  - **What it checks now:** that the denominator sums every worker's batch, as spec/04 Under
-    `--workers` says. An 8-worker run's `run_reductions` is at least a 1-worker run's; measured,
-    it is about 2.4 times.
-  - **Proven to fail under the old rule:** with each worker's bracket zeroed, the coordinator
-    alone reads about 0.6 times, and the test fails.
 
 ### Changed
 
@@ -299,6 +268,46 @@ release it merely follows.
 
 ### Fixed
 
+- **`wrong_init_index` was killed only on a lucky seed** (#393, for #392). The one test that
+  caught it was a generated property, which fails only when the generator builds a spec
+  with two `init` blocks that is refuted from the second. Measured: it survived 10 seeds of
+  100, and failed the mutation job of pipeline 5315, whose change touched no code. No fixed
+  test read `init_index`, the field a replay starts from: `TestSpecs.TwoStarts` has two
+  starts and no property, so nothing asked it for a counterexample.
+  `test/ex_tla/second_start_replay_test.exs` now does, deterministically, with a fixture
+  refuted only from its second start:
+  - an invariant's and an action property's counterexamples start at the second start and
+    pass `Trace.validate/3`;
+  - every state of `TwoStarts` regenerates (`StateGraph.state_at/2`) to the state its id
+    names.
+
+  All three tests fail under the mutant, which is now gated on that file. The `:tests` gate
+  also runs its files with `--exclude property`. A kill that rests on generated input is
+  now a survivor the first time it is swept, not a red pipeline later.
+- **The mutation sweep's `:suite` gate measured nothing** (#389, for #380). It ran the whole of
+  `mix test` in the sweep's workspace, which copies `lib`, `test` and the build but not
+  `README.md`, `guides/` or `spec/`. The suite failed there with no mutant applied, so its
+  three kills (`skips_symmetry_canonicalization`, `wrong_init_index`,
+  `param_universe_from_the_right`) were never measured. After #379, `--check` kept their
+  recorded outcomes and stayed green.
+  - **`:tests` replaces `:suite`:** each such mutant names the test files that catch it. These
+    were found by running the whole suite with each mutant applied: `symmetry_test`,
+    `generated_models_test` (one property, killed on ten seeds of ten), and `coverage_merge_test`
+    with the parallel checker's tests. The gate runs those files only.
+  - **`mix extla.mutants --check` now fails on `inconclusive (fails_unmutated)`.** A gate that
+    fails without the mutant is broken, not flaky. A failure that didn't reproduce, and a rerun
+    that timed out, are still tolerated.
+  - **A catalogue test checks the lists:** every `:tests` mutant must name existing test files,
+    and an empty list matches no gate rather than running the whole suite.
+
+- **A parallel-profile test named the denominator rule #239 replaced** (#388, for #386).
+  `profile_parallel_test.exs` said `run_reductions` "is the coordinator's" and asserted `> 0`,
+  which passes under either rule, so nothing failed when #239 changed the rule.
+  - **What it checks now:** that the denominator sums every worker's batch, as spec/04 Under
+    `--workers` says. An 8-worker run's `run_reductions` is at least a 1-worker run's; measured,
+    it is about 2.4 times.
+  - **Proven to fail under the old rule:** with each worker's bracket zeroed, the coordinator
+    alone reads about 0.6 times, and the test fails.
 - **A mutation kill has to be the mutant's doing** (#379, for #378). Any failing gate used to
   count as a kill, so main pipeline 4744 recorded `weakens_a_type_domain`, the catalogue's
   one expected survivor, as killed. A failing gate is now re-run twice over only the tests
@@ -2507,7 +2516,7 @@ compatibility promise.
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view
   abstraction are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
-[Unreleased]: https://gitlab.conet.yarina.org/dco-tek/extla/-/compare/v0.4.0...main
+[0.5.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.5.0
 [0.4.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.4.0
 [0.3.20]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.3.20
 [0.2.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.2.0
