@@ -72,11 +72,15 @@ defmodule ExTLA.ShippedHasAHomeTest do
       assert architecture =~ "There is no Phase 5, deliberately"
     end
 
+    # The README is a front door since #403 and lists the CHANGELOG among its resources; the
+    # rule that makes the CHANGELOG the gated record is a contributor's, so it lives there.
     test "and the README sends a reader to the gated record" do
       readme = @root |> Path.join("README.md") |> File.read!()
+      contributing = @root |> Path.join("CONTRIBUTING.md") |> File.read!()
 
-      assert readme =~ "**What is built** is [`CHANGELOG.md`](CHANGELOG.md)"
-      assert readme =~ "changelog_guard"
+      assert readme =~ "[Changelog](CHANGELOG.md)"
+      assert contributing =~ "bin/changelog_guard.exs"
+      assert contributing =~ "The CHANGELOG is the record of what is built"
     end
 
     # The guard is what makes the CHANGELOG a record rather than a habit, so the prose

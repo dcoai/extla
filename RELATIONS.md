@@ -3791,7 +3791,7 @@ A row per relation. **dangling**: an end changed since it was confirmed (`mix su
 | `test ExTLA.ReadmeEntryTest: the command list: and mentions no task that does not ship` |
 | `test ExTLA.ReadmeEntryTest: the command list: and the task list it is checked against is the real one` |
 | `test ExTLA.ReadmeEntryTest: the command list: names every mix task that ships` |
-| `test ExTLA.ReadmeEntryTest: the front page: and lists guides/ in the repository layout` |
+| `test ExTLA.ReadmeEntryTest: the front page: and lists the guides first among its resources` |
 | `test ExTLA.ReadmeEntryTest: the front page: leads to the guides` |
 | `test ExTLA.RescueInventoryTest: the gate itself: and the single-call detector counts more than one when there is more than one` |
 | `test ExTLA.RescueInventoryTest: the gate itself: it does not see a rescue that is only talked about` |

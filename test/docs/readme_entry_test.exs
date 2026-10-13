@@ -25,10 +25,9 @@ defmodule ExTLA.ReadmeEntryTest do
   relative link on this page, and #281 brought `README.md` under that harness. What this
   adds is that the links a reader needs are *present*, which no link checker can tell you.
 
-  The README's **proportions** are deliberately untouched — its Status section runs half
-  the file, sits above the reasons to use the library, and "who is this for" is never
-  stated. #155 left that for a separate decision on the grounds that bundling a rewrite
-  with a navigation fix would stall the fix, and this file does not quietly adopt it.
+  #155 left the README's proportions for a separate decision, and #403 made it: the README is
+  a front door (description, install, one example, resources), and the measurements its
+  Status section held moved beside the corpus they measure, `test/differential/README.md`.
   """
   use ExUnit.Case, async: true
 
@@ -47,11 +46,13 @@ defmodule ExTLA.ReadmeEntryTest do
              "the README does not link the tutorial"
     end
 
-    test "and lists guides/ in the repository layout" do
-      [_match, table] = Regex.run(~r/## Repository layout\n(.*?)\n## /s, readme())
+    test "and lists the guides first among its resources" do
+      [_match, resources] = Regex.run(~r/## Resources\n(.*)\z/s, readme())
+      [first, second | _] = Regex.scan(~r/^- \[[^\]]+\]\(([^)]+)\)/m, resources)
 
-      assert table =~ "`guides/`",
-             "the repository layout table omits guides/, which is where a reader starts"
+      assert Enum.map([first, second], &List.last/1) ==
+               ["guides/getting-started.md", "guides/tutorial/00-introduction.md"],
+             "the resources list should start where a reader starts: getting started, then the tutorial"
     end
   end
 
