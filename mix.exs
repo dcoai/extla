@@ -175,7 +175,7 @@ defmodule ExTLA.MixProject do
       # (c)'s objection that consumers would inherit a documentation framework.
       #
       # From Hex since #333; it was a GitLab git dependency before, and the only one.
-      {:surfex, "~> 0.7.0", only: [:dev, :test], runtime: false},
+      {:surfex, "~> 0.8.0", only: [:dev, :test], runtime: false},
       {:jason, "~> 1.4", optional: true},
       # Layer 1's violation events. Optional for the same reason jason is: a consumer
       # who attaches no handler should not be made to carry it, and whether it was
