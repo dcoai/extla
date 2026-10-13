@@ -795,6 +795,45 @@ defmodule ExTLA.TestSpecs do
     end
   end
 
+  defmodule WrongFromTheSecondStart do
+    @moduledoc """
+    `TwoStarts` with a property refuted only on a path from the second `init` block (#392).
+
+    `TwoStarts` has no property, so nothing asks it for a counterexample, and a replay that
+    starts every path from block 0 went unnoticed except by a generated property, on the
+    seeds that happened to build this shape. Here both properties are refuted from
+    `side: :right` and hold from `side: :left`, so a trace replayed from the wrong block
+    ends in a state that refutes nothing.
+    """
+    use ExTLA.Spec
+
+    variable :side, type: [:left, :right]
+    variable :steps, type: 0..2
+
+    init do
+      side = :left
+      steps = 0
+    end
+
+    init do
+      side = :right
+      steps = 0
+    end
+
+    action :step do
+      require steps < 2
+      steps = steps + 1
+    end
+
+    invariant :right_never_reaches_two do
+      side == :left or steps < 2
+    end
+
+    action_property :right_never_steps_to_two do
+      old.side == :left or new.steps < 2
+    end
+  end
+
   defmodule RawBytes do
     @moduledoc """
     A violation whose state holds a binary that is not valid UTF-8 (#198). §6 permits the

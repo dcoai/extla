@@ -32,9 +32,9 @@ No durations, dates, seeds or machine names appear here. A golden is a stable fu
 source; anything varying independently makes it drift against itself on a quiet day.
 
 
-**34 specs · 143 items** · model_checked 96 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 43
+**35 specs · 146 items** · model_checked 99 · refuted 4 · refinement_checked 0 · simulated 0 · property 0 · unit_test 0 · nothing 43
 
-**freshness** · fresh 5 · stale 0 · unstamped 138
+**freshness** · fresh 5 · stale 0 · unstamped 141
 
 ## ExTLA.Conformance.Counter.BuggySpec — 3 items · gap 0 · LOWER BOUNDS (violation)
 
@@ -315,3 +315,10 @@ source; anything varying independently makes it drift against itself on a quiet 
 | `done` | `:terminal` | `c03c5c9b` | `:model_checked` | `:unstamped` | admitted 1 end state | `test/support/specs.ex` |
 | `impossible` | `:action` | `2dcaf6d3` | `:nothing` | `:unstamped` | never enabled | `test/support/specs.ex` |
 | `tick` | `:action` | `bbe98200` | `:model_checked` | `:unstamped` | enabled in 3 | `test/support/specs.ex` |
+## ExTLA.TestSpecs.WrongFromTheSecondStart — 3 items · gap 0 · LOWER BOUNDS (violation)
+
+| Item | Kind | Version | Evidence | Fresh | Exercised | Locus |
+|---|---|---|---|---|---|---|
+| `right_never_reaches_two` | `:invariant` | `ddadd948` | `:model_checked` | `:unstamped` | ≥ 2 near-miss | `test/support/specs.ex` |
+| `right_never_steps_to_two` | `:action_property` | `80c48f89` | `:model_checked` | `:unstamped` | ≥ on 3 transitions | `test/support/specs.ex` |
+| `step` | `:action` | `754f31a5` | `:model_checked` | `:unstamped` | ≥ enabled in 4 | `test/support/specs.ex` |
