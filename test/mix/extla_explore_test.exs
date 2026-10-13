@@ -64,15 +64,19 @@ defmodule Mix.Tasks.Extla.ExploreTest do
 
   defp occurrences(text, needle), do: length(String.split(text, needle)) - 1
 
+  # A run expected to succeed, called by name rather than through `task/2`'s module argument:
+  # the relation log follows calls as the source states them, so a test written this way
+  # reaches what `run/1` hands the work to (`ExTLA.Trace.explore/3`, `from_json!/1`). An exit
+  # here is an unexpected failure and fails the test.
+  defp explore(args), do: capture_io(fn -> Explore.run(args) end)
+
   describe "the round trip" do
     test "explores what mix extla.check --format json wrote, without re-running the checker",
          %{tmp: tmp} do
       path = counterexample_file(tmp)
 
-      {output, code} =
-        task(Explore, [@spec_module, "--trace", path, "--expr", "count: state.count"])
+      output = explore([@spec_module, "--trace", path, "--expr", "count: state.count"])
 
-      assert code == 0
       assert output =~ "═══ EXPLORE"
       assert output =~ ~r/\n\s+count\s+0/
       # The checker's own report is absent: nothing searched anything.
@@ -102,8 +106,7 @@ defmodule Mix.Tasks.Extla.ExploreTest do
          %{tmp: tmp} do
       path = counterexample_file(tmp)
 
-      {output, 0} =
-        task(Explore, [@spec_module, "--trace", path, "--expr", "doubled: state.count * 2"])
+      output = explore([@spec_module, "--trace", path, "--expr", "doubled: state.count * 2"])
 
       assert output =~ ~r/\n\s+doubled\s+0/
     end
