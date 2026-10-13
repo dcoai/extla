@@ -33,6 +33,17 @@ release it merely follows.
   reading every switch it declares; against the old task it names `--init-arg`, and it finds
   no other.
 
+### Fixed
+
+- **A parallel-profile test named the denominator rule #239 replaced** (#388, for #386).
+  `profile_parallel_test.exs` said `run_reductions` "is the coordinator's" and asserted `> 0`,
+  which passes under either rule, so nothing failed when #239 changed the rule.
+  - **What it checks now:** that the denominator sums every worker's batch, as spec/04 Under
+    `--workers` says. An 8-worker run's `run_reductions` is at least a 1-worker run's; measured,
+    it is about 2.4 times.
+  - **Proven to fail under the old rule:** with each worker's bracket zeroed, the coordinator
+    alone reads about 0.6 times, and the test fails.
+
 ### Changed
 
 - **surfex 0.7.0** (#384, for #383). `verifies` tags now combine the way ExUnit merges them:

@@ -157,11 +157,16 @@ defmodule ExTLA.ProfileParallelTest do
       assert many.otp_version == one.otp_version
     end
 
-    test "run_reductions is the coordinator's, and does not pretend to be the workers'" do
-      # Honest rather than clever: `Profile.reductions/0` is per-process, so a parallel run's
-      # denominator is what the coordinator spent. The share it produces is therefore a share of
-      # the coordinator's work, and the report says the number it actually measured.
-      assert profile(8).run_reductions > 0
+    test "run_reductions sums every worker's batch, not just the coordinator's bracket" do
+      # spec/04 §Under `--workers`: each worker brackets its own batch and reports the span,
+      # and the coordinator adds its own bracket at `finalize/2` (#239). Eight workers expand
+      # the same states one worker does, and scheduling only adds work, so the summed
+      # denominator cannot fall below one worker's. Measured: about 2.4 times it.
+      #
+      # The coordinator-only rule this replaced reads about 0.6 times on this spec, because
+      # under `workers: 8` the coordinator only seeds and waits. Until #386 this test was named
+      # for that rule and asserted `> 0`, which both rules pass.
+      assert profile(8).run_reductions >= profile(1).run_reductions
     end
   end
 
