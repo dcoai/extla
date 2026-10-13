@@ -211,18 +211,15 @@ defmodule ExTLA.GuideCheck do
   # reasons: it is in the tree, so a shallow CI clone with no tags still checks it; and
   # #282 established the changelog as the project's record of what is built, so tying the
   # install instruction to it means one place goes stale instead of two.
+  #
+  # The `git:` URL is held to `mix.exs`'s `source_url`, the repository the package names as
+  # its public home (#402). An install line pointing anywhere else, such as the private
+  # instance where day-to-day work happens, is one a public reader can't follow.
   defp verify(%{kind: :deps}, code) do
-    with {:ok, tag} <- documented_tag(code),
-         {:ok, release} <- newest_release() do
-      if tag == "v" <> release do
-        :ok
-      else
-        {:error,
-         "tla:deps documents #{inspect(tag)}, and the newest release in CHANGELOG.md is " <>
-           "v#{release}. A reader follows this block and gets a version the rest of the " <>
-           "page does not describe — which is how v0.1.0 came to be the published install " <>
-           "instruction for v0.3.20 (#154). Update the tag with the release."}
-      end
+    with {:ok, opts} <- documented_dep(code),
+         {:ok, release} <- newest_release(),
+         :ok <- deps_tag(opts[:tag], release) do
+      deps_url(opts[:git])
     end
   end
 
@@ -613,11 +610,37 @@ defmodule ExTLA.GuideCheck do
   defp unquote_value(<<?", rest::binary>>), do: String.trim_trailing(rest, "\"")
   defp unquote_value(value), do: value
 
-  # The `tag:` of the `:extla` dependency, wherever in the snippet it sits.
-  defp documented_tag(code) do
+  defp deps_tag(tag, release) do
+    if tag == "v" <> release do
+      :ok
+    else
+      {:error,
+       "tla:deps documents #{inspect(tag)}, and the newest release in CHANGELOG.md is " <>
+         "v#{release}. A reader follows this block and gets a version the rest of the " <>
+         "page does not describe — which is how v0.1.0 came to be the published install " <>
+         "instruction for v0.3.20 (#154). Update the tag with the release."}
+    end
+  end
+
+  defp deps_url(git) do
+    expected = Mix.Project.config()[:source_url] <> ".git"
+
+    if git == expected do
+      :ok
+    else
+      {:error,
+       "tla:deps installs from #{inspect(git)}, and mix.exs's source_url says the public " <>
+         "repository is #{inspect(expected)}. A reader who can't reach the first can't " <>
+         "install (#402)."}
+    end
+  end
+
+  # The `:extla` dependency's options, wherever in the snippet it sits.
+  defp documented_dep(code) do
     with {:ok, ast} <- Code.string_to_quoted(code),
-         {_ast, tag} when is_binary(tag) <- Macro.prewalk(ast, nil, &extla_tag/2) |> elem_pair() do
-      {:ok, tag}
+         {_ast, opts} when is_list(opts) <- Macro.prewalk(ast, nil, &extla_dep/2) |> elem_pair(),
+         tag when is_binary(tag) <- Keyword.get(opts, :tag) do
+      {:ok, opts}
     else
       {:error, {meta, message, token}} ->
         {:error, "tla:deps does not parse: #{message}#{token} (line #{meta[:line]})"}
@@ -632,11 +655,8 @@ defmodule ExTLA.GuideCheck do
 
   defp elem_pair({ast, acc}), do: {ast, acc}
 
-  defp extla_tag({:extla, opts} = node, nil) when is_list(opts) do
-    {node, Keyword.get(opts, :tag)}
-  end
-
-  defp extla_tag(node, acc), do: {node, acc}
+  defp extla_dep({:extla, opts} = node, nil) when is_list(opts), do: {node, opts}
+  defp extla_dep(node, acc), do: {node, acc}
 
   # The newest `## [x.y.z] — date` heading. `[Unreleased]` is deliberately not a release:
   # what a reader can install is what has been tagged.

@@ -17,7 +17,7 @@ ExTLA is not on Hex. Point a Mix project at the repository and its tag:
 ```elixir
 def deps do
   [
-    {:extla, git: "https://gitlab.conet.yarina.org/dco-tek/extla.git", tag: "v0.5.0"}
+    {:extla, git: "https://github.com/dcoai/extla.git", tag: "v0.5.0"}
   ]
 end
 ```
