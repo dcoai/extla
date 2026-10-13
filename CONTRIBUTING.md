@@ -31,6 +31,11 @@ why.
 `test/test_helper.exs` records every test run's results in `_build/surfex/evidence.jsonl`,
 so the evidence for the commands below is whatever `mix test` last ran.
 
+A `verifies` tag combines as ExUnit merges tags: a test's own `@tag verifies:` replaces its
+`@describetag` and `@moduletag`, as it does for `mix test --only verifies:<id>`. So a test with
+its own tag lists every section it verifies, inherited ones included. Leave one out and
+`mix surfex.status` reports the relation as Undeclared.
+
 | You changed | Then |
 |---|---|
 | Behaviour, test first | write the test and tag it `@tag verifies: "<section id>"`; `mix test` (red); `mix surfex.suggest --accept --note "…"`; write the code; `mix test && mix surfex.confirm --evidence` |

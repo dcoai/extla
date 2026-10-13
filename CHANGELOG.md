@@ -35,6 +35,16 @@ release it merely follows.
 
 ### Changed
 
+- **surfex 0.7.0** (#384, for #383). `verifies` tags now combine the way ExUnit merges them:
+  a test's own `@tag` replaces its describe's and module's, where surfex used to take their
+  union.
+  - **No relation changed.** Every test-level tag in spec/04's tests already repeated the
+    section it inherits, so `mix surfex.status` lists no Undeclared relations. With one
+    repeated id removed, status names that relation and fails.
+  - **Triangle gaps fall from 200 to 110.** The triangle now reads what a test calls from
+    source.
+  - `RELATIONS.md` and `PACKAGE_SURFACE.md` are regenerated.
+
 - **spec/04's relation log is baselined and gated** (#354, for #336). After green runs of all
   three CI test slices, the baseline trusted 1,458 test versions and adopted 563 `verifies`
   tags. 5 spec units have none. Every suggested `implements` citation was judged one at a
