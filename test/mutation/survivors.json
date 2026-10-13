@@ -50,8 +50,8 @@
       "outcome": "killed"
     },
     {
-      "expected": "suite",
-      "gate": "suite",
+      "expected": "tests",
+      "gate": "tests",
       "models": "a coverage merge taking `param_universe` from the worker rather than the coordinator. D-27 names this asymmetry. The CORPUS does not catch it — `finalize/2` drops `param_universe` from the report, so a wrong one shows only where a run has unreached params to name — and #39's unit tests do",
       "name": "param_universe_from_the_right",
       "outcome": "killed"
@@ -64,8 +64,8 @@
       "outcome": "killed"
     },
     {
-      "expected": "suite",
-      "gate": "suite",
+      "expected": "tests",
+      "gate": "tests",
       "models": "a symmetric state that is not put in canonical form, so an orbit is explored twice",
       "name": "skips_symmetry_canonicalization",
       "outcome": "killed"
@@ -85,8 +85,8 @@
       "outcome": "survived"
     },
     {
-      "expected": "suite",
-      "gate": "suite",
+      "expected": "tests",
+      "gate": "tests",
       "models": "replay starting from the wrong `init` block, which only a spec with more than one can expose",
       "name": "wrong_init_index",
       "outcome": "killed"

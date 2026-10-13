@@ -41,6 +41,9 @@ defmodule Mix.Tasks.Extla.Mutants do
     * `--check` keeps the outcome `survivors.json` records for it, compares the rest, and
       prints why it was inconclusive and what failed. It is neither PROGRESS nor
       REGRESSION, which is how one flake under load once failed `main` as "progress";
+    * except `fails_unmutated`, which `--check` fails on. The gate fails with no mutant, so
+      it measures nothing on any run, and keeping the recorded outcome hid exactly that
+      for three mutants (#380);
     * recording refuses: an inconclusive mutant has no outcome to write. Re-run.
   """
 
@@ -162,7 +165,14 @@ defmodule Mix.Tasks.Extla.Mutants do
         {:ok, measured} ->
           measured
 
-        {:error, names} ->
+        {:error, {:fails_unmutated, names}} ->
+          Mix.raise(
+            "#{Enum.join(names, ", ")}: the gate fails with the mutant removed, so it measures " <>
+              "nothing. That is a defect in the harness or the workspace (a test that cannot " <>
+              "pass in the copy), not a flake: fix the gate, then re-run (#380)."
+          )
+
+        {:error, {:unrecorded, names}} ->
           Mix.raise(
             "#{Enum.join(names, ", ")} came out inconclusive and #{@artifact} records no " <>
               "outcome for it, so there is nothing to compare. Re-run `mix extla.mutants --check`."
@@ -180,25 +190,35 @@ defmodule Mix.Tasks.Extla.Mutants do
 
   @doc false
   # An inconclusive result is unmeasured, so the recorded outcome stands for it and the
-  # comparison is over the rest. A mutant with no recorded outcome cannot stand in that
-  # way, and is returned by name.
+  # comparison is over the rest. Two cases cannot stand in that way, and are returned by
+  # name:
+  #
+  #   * `fails_unmutated`: the gate fails with no mutant, so it measures nothing on any
+  #     run. Tolerating it is how three kills stayed recorded while the gate behind them
+  #     failed every time (#380). A flake (`not_reproduced`) or a slow rerun stays
+  #     tolerated, because those say something about one run and not about the gate;
+  #   * a mutant with no recorded outcome.
   #
   # Public so the substitution is tested on plain data rather than behind a sweep.
   def keep_recorded(results, recorded) do
     was = Map.new(recorded["mutants"], &{&1["name"], &1["outcome"]})
     {unmeasured, measured} = Enum.split_with(results, &(&1.outcome == :inconclusive))
+    broken = for %{reason: :fails_unmutated, name: name} <- unmeasured, do: name
 
-    case Enum.reject(unmeasured, &Map.has_key?(was, Atom.to_string(&1.name))) do
-      [] ->
+    case {broken, Enum.reject(unmeasured, &Map.has_key?(was, Atom.to_string(&1.name)))} do
+      {[_ | _], _} ->
+        {:error, {:fails_unmutated, broken}}
+
+      {[], [_ | _] = missing} ->
+        {:error, {:unrecorded, Enum.map(missing, & &1.name)}}
+
+      {[], []} ->
         kept =
           Enum.map(unmeasured, fn result ->
             %{result | outcome: String.to_existing_atom(was[Atom.to_string(result.name)])}
           end)
 
         {:ok, measured ++ kept}
-
-      missing ->
-        {:error, Enum.map(missing, & &1.name)}
     end
   end
 

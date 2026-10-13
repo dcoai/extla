@@ -72,10 +72,13 @@ defmodule ExTLA.Mutation do
   restores the file. Copying per mutant would be correct and would spend most of the
   sweep on `cp`.
 
-  The copy is of everything `mix test` reads, which is more than what it compiles: a file
-  the test run needs and the workspace lacks fails every gate, mutant or not. The
-  attribution rule reports that as `inconclusive (fails_unmutated)`, where it used to be
-  a kill.
+  The copy holds everything the gates' tests read, which is more than what they compile. A
+  file a gate needs and the workspace lacks fails that gate whether or not a mutant is
+  applied. The attribution rule reports that as `inconclusive (fails_unmutated)`, where it
+  used to be a kill, and `mix extla.mutants --check` fails on it (#380): a gate that fails
+  unmutated is a harness defect, not a flake. The copy is not the whole tree, so a gate
+  runs named tests (`:corpus`, or a mutant's `:tests`) and never the whole suite, which
+  reads README.md, guides/ and spec/.
   """
 
   defmodule Mutant do
@@ -90,15 +93,17 @@ defmodule ExTLA.Mutation do
       * `:replacement` — what to put there.
       * `:kills` — the gate expected to catch it, or `:nothing` where the mutant is
         expected to survive and the survival is the finding.
+      * `:tests` — for `kills: :tests`, the test files that gate runs: the ones measured
+        to catch this mutant, named so a reader sees which tests do the work.
       * `:timeout` — seconds for this mutant's gate, overriding the sweep's. For a
         defect that makes the search non-terminating, where the sweep's budget would be
         spent waiting for something that is never going to finish.
     """
 
     @enforce_keys [:name, :models, :file, :anchor, :replacement, :kills]
-    defstruct [:name, :models, :file, :anchor, :replacement, :kills, timeout: nil]
+    defstruct [:name, :models, :file, :anchor, :replacement, :kills, tests: [], timeout: nil]
 
-    @type gate :: :corpus | :suite | :nothing
+    @type gate :: :corpus | :tests | :nothing
     @type t :: %__MODULE__{
             name: atom(),
             models: String.t(),
@@ -106,6 +111,7 @@ defmodule ExTLA.Mutation do
             anchor: String.t(),
             replacement: String.t(),
             kills: gate(),
+            tests: [Path.t()],
             timeout: pos_integer() | nil
           }
   end
@@ -126,10 +132,15 @@ defmodule ExTLA.Mutation do
         }
 
   # What each gate actually runs. `:corpus` is the D-9 acceptance gate and is what most
-  # mutants are aimed at; `:suite` is everything, for defects no corpus entry exercises.
+  # mutants are aimed at. `:tests` is for defects no corpus entry exercises, and runs the
+  # test files the mutant names (`Mutant` `:tests`).
+  #
+  # It replaced `:suite`, which ran the whole of `mix test` (#380). The whole suite reads
+  # README.md, guides/ and spec/ and failed in the workspace with no mutant applied, so
+  # all three of its kills were unmeasured. Naming the files that catch each mutant
+  # measures something specific, in seconds rather than a full suite per mutant.
   @gates %{
-    corpus: ["test", "test/differential"],
-    suite: ["test"]
+    corpus: ["test", "test/differential"]
   }
 
   @default_timeout 300
@@ -296,6 +307,12 @@ defmodule ExTLA.Mutation do
     run(workspace, ["compile"], timeout)
   end
 
+  # An empty `:tests` list does not match, on purpose: `mix test` with no paths is the whole
+  # suite, which is exactly the gate `:tests` replaced, and a missing list would bring it
+  # back silently.
+  defp gate_args(%Mutant{kills: :tests, tests: [_ | _] = tests}, _gates), do: ["test" | tests]
+  defp gate_args(%Mutant{kills: kills}, gates) when kills != :tests, do: Map.fetch!(gates, kills)
+
   defp gate(workspace, %Mutant{kills: :nothing} = mutant, timeout, gates, unmutate) do
     # A mutant expected to survive is still run — the measurement is the point, and a
     # mutant nobody ran cannot be reported as surviving.
@@ -304,7 +321,7 @@ defmodule ExTLA.Mutation do
   end
 
   defp gate(workspace, mutant, timeout, gates, unmutate) do
-    args = Map.fetch!(gates, mutant.kills)
+    args = gate_args(mutant, gates)
     {output, status} = run(workspace, args, timeout)
 
     {verdict, evidence} =
