@@ -14,6 +14,16 @@ does not restate it.
 `mix.exs` reads `0.5.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
 release it merely follows.
 
+### Changed
+
+- **The repository's public home is GitHub, and everything that ships says so** (#402, for
+  #396). The install instruction reads `git: "https://github.com/dcoai/extla.git"`, so a
+  reader who can't reach the GitLab instance where work happens can still install. `mix.exs`
+  declares `source_url` and `homepage_url`, so the docs' "View source" links work and point
+  at the release tag, and the package declares its links (GitHub, Changelog). The version
+  links at the end of this file point at GitHub. The guide harness's `tla:deps` check now
+  holds the install URL to `source_url`, as it already held the tag to the release record.
+
 ## [0.5.0] — 2026-10-13
 
 **A minor line, opened by `mix extla.replay`.** It gains `--server` and `--timeout`, and
@@ -2521,9 +2531,9 @@ compatibility promise.
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view
   abstraction are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
-[Unreleased]: https://gitlab.conet.yarina.org/dco-tek/extla/-/compare/v0.5.0...main
-[0.5.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.5.0
-[0.4.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.4.0
-[0.3.20]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.3.20
-[0.2.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.2.0
-[0.1.0]: https://gitlab.conet.yarina.org/dco-tek/extla/-/tags/v0.1.0
+[Unreleased]: https://github.com/dcoai/extla/compare/v0.5.0...main
+[0.5.0]: https://github.com/dcoai/extla/releases/tag/v0.5.0
+[0.4.0]: https://github.com/dcoai/extla/releases/tag/v0.4.0
+[0.3.20]: https://github.com/dcoai/extla/releases/tag/v0.3.20
+[0.2.0]: https://github.com/dcoai/extla/releases/tag/v0.2.0
+[0.1.0]: https://github.com/dcoai/extla/releases/tag/v0.1.0

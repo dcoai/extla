@@ -2,6 +2,7 @@ defmodule ExTLA.MixProject do
   use Mix.Project
 
   @version "0.5.1-dev"
+  @source_url "https://github.com/dcoai/extla"
 
   def project do
     [
@@ -13,8 +14,18 @@ defmodule ExTLA.MixProject do
       deps: deps(),
       name: "ExTLA",
       description: "TLA+-inspired formal verification for Elixir/OTP systems",
+      # GitHub is the public home (#402). Day-to-day work happens on a private GitLab
+      # instance that a reader of the docs or the package can't reach, so nothing that ships
+      # names it: "View source", the package links and the install instruction (held to
+      # `source_url` by the guide harness's `tla:deps`) all point here.
+      source_url: @source_url,
+      homepage_url: @source_url,
       package: [
         licenses: ["MIT"],
+        links: %{
+          "GitHub" => @source_url,
+          "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
+        },
         files: packaged_files()
       ],
       # `guides/` ships and renders beside `spec/` (#94): the guides teach, the spec is the
@@ -23,6 +34,9 @@ defmodule ExTLA.MixProject do
       # build rather than teaching an API that does not exist.
       docs: [
         main: "readme",
+        # "View source" links resolve at the release the docs describe. A `-dev` version has
+        # no tag, so docs built between releases link `main`.
+        source_ref: if(String.ends_with?(@version, "-dev"), do: "main", else: "v#{@version}"),
         # The published docs advertise only what the package ships (#274).
         #
         # `mix docs` runs under `MIX_ENV=dev`, because `ex_doc` is a dev dependency, and

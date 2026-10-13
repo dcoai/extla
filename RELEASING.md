@@ -167,21 +167,39 @@ has ever mentioned the CHANGELOG. So this rule is new, and the gate is what make
 - **Minor versus patch.** `--minor` is always explicit.
 - **A minor's tag message.** v0.1.0 and v0.2.0 are hand-written prose. Patch tags take the
   changelog section automatically.
-- **Publishing to Hex.** Out of every release so far, and still undecided. Publishing claims
-  the `extla` name on hex.pm permanently — unpublish is possible only within an hour — so it
-  is a decision about being a public library, not about marking a point in history.
-  `MIX_ENV=prod mix hex.build` stops at `Missing metadata fields: links`, and that gap is left
-  unfixed **on purpose**: fixing it would look like preparing for a decision nobody has made.
-  Ask before acting on it.
+- **Publishing to Hex.** Out of every release so far. It is decided in principle, to follow
+  the documentation review after v0.5.0, but each publish still needs an explicit go.
+  Publishing claims the `extla` name on hex.pm permanently (unpublish is possible only within
+  an hour). `MIX_ENV=prod mix hex.build` now passes its metadata check. Before running
+  `mix hex.publish`, push the release's commit and tag to GitHub (above), so the package's
+  `source_url` and source links resolve.
 
 ## A release, end to end
 
 ```bash
-elixir ~/Projects/claude-tools/release.exs               # says v0.2.<n>, checks the gates
-elixir ~/Projects/claude-tools/release.exs --prepare     # then MR that commit and merge it
-elixir ~/Projects/claude-tools/release.exs --tag         # on main, at the merge commit
-elixir ~/Projects/claude-tools/release.exs --post-bump   # then MR that commit too
+elixir ~/Projects/claude-tools/release.exs                                  # says v0.2.<n>, checks the gates
+elixir ~/Projects/claude-tools/release.exs --prepare --link-remote github   # then MR that commit and merge it
+elixir ~/Projects/claude-tools/release.exs --tag                            # on main, at the merge commit
+elixir ~/Projects/claude-tools/release.exs --post-bump --link-remote github # then MR that commit too
 ```
+
+**GitHub is the public home, and GitLab is where the work happens.** `--link-remote github`
+writes `CHANGELOG.md`'s version links against the `github` remote
+(`git@github.com:dcoai/extla.git`), because the CHANGELOG ships and a reader can't reach the
+GitLab instance. Without it the links point at `origin`. Add the remote once with
+`git remote add github git@github.com:dcoai/extla.git`.
+
+GitHub is pushed by hand; there is no mirror. After `--tag`, and always before a Hex publish,
+send `main` and the new tag there:
+
+```bash
+git push github main
+git push github v<version>
+```
+
+Work branches stay on GitLab. Between releases GitHub's `main` lags GitLab's, which is
+accepted: the public install pins a tag. The GitLab release page is created by `--tag`.
+GitHub shows the tag, and has no release page unless one is made there.
 
 **The `--prepare` commit also moves the install tag.** `guides/getting-started.md`'s
 `tla:deps` block names a literal tag, and the guide harness fails the build once it stops

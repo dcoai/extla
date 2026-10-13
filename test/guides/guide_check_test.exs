@@ -463,11 +463,13 @@ defmodule ExTLA.GuideCheckTest do
     # The install snippet was `tla:skip reason=a mix.exs fragment, not a spec` — true, and
     # taken to mean not checkable, and it then read `tag: "v0.1.0"` against a release of
     # v0.3.20 for a fortnight, in documentation that ships in the package.
-    defp deps_block(tag) do
+    @public_git Mix.Project.config()[:source_url] <> ".git"
+
+    defp deps_block(tag, url \\ @public_git) do
       block("tla:deps", """
       def deps do
         [
-          {:extla, git: "https://gitlab.conet.yarina.org/dco-tek/extla.git", tag: "#{tag}"}
+          {:extla, git: "#{url}", tag: "#{tag}"}
         ]
       end
       """)
@@ -498,6 +500,17 @@ defmodule ExTLA.GuideCheckTest do
 
       assert [failure] = GuideCheck.check(path)
       assert failure =~ ~s(documents "v99.0.0")
+    end
+
+    # The install line has to be one a public reader can follow (#402). It pointed at the
+    # private instance where day-to-day work happens until v0.5.0.
+    test "rejects an install URL other than the package's source_url", %{tmp_dir: tmp} do
+      private = "https://gitlab.conet.yarina.org/dco-tek/extla.git"
+      path = guide(tmp, deps_block("v" <> newest_release(), private))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ ~s(installs from "#{private}")
+      assert failure =~ @public_git
     end
 
     test "a block with no extla dependency says so rather than passing", %{tmp_dir: tmp} do
