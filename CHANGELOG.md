@@ -45,6 +45,15 @@ release it merely follows.
     source.
   - `RELATIONS.md` and `PACKAGE_SURFACE.md` are regenerated.
 
+- **Two of #354's stand-ins now use surfex reach** (#385, for #383). `ExTLA.ModelChecker.Safety`
+  implements its own section, and `ExTLA.ModelChecker.Parallel` implements Under `--workers`.
+  - **Evidence:** both are confirmed by evidence through `ModelChecker.run/2`, which their
+    tests drive, and each was reviewed with `mix surfex.validate`. The `run/2` `depends_on`
+    stand-ins, and `run/2`'s `implements` of the Safety section, are retired.
+  - **The other six keep their stand-ins.** They are reached only through a Mix task's
+    `run/1`, an undocumented `@impl` callback that reach doesn't follow (dco-tek/surfex#193).
+    CONTRIBUTING's row says so.
+
 - **spec/04's relation log is baselined and gated** (#354, for #336). After green runs of all
   three CI test slices, the baseline trusted 1,458 test versions and adopted 563 `verifies`
   tags. 5 spec units have none. Every suggested `implements` citation was judged one at a

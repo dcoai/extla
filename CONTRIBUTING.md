@@ -44,7 +44,7 @@ its own tag lists every section it verifies, inherited ones included. Leave one 
 | A test's name, or split a test module | `mix surfex.suggest --accept --note "…"`, which carries the moved tests' records |
 | A spec/04 heading | `mix surfex.suggest` proposes the section move; or `mix surfex.move OLD NEW --note "…"` |
 | Something removed | `mix surfex.retire FROM TO --type T --note "…"` |
-| A section implemented by code its verifying tests reach only through another item | relate the item they call (`implements`), and `mix surfex.relate CALLER ITEM --type depends_on --note "…"`; surfex counts only direct calls as a test exercising code, so an `implements` on the inner item can never be validated |
+| A section implemented by code its verifying tests reach through an entry point | relate the code that does the work (`implements`) and `mix test && mix surfex.confirm --evidence`: since surfex 0.7.0 a test is credited for what the code it calls calls; then review it with `mix surfex.validate TEST SECTION --note "…"`. **Except** through a Mix task's `run/1`: an undocumented `@impl` callback stops reach (surfex#193), so there relate the task (`implements`) and `mix surfex.relate TASK ITEM --type depends_on --note "…"` |
 
 Then `mix surfex.goldens --write` and commit `.surfex/` and `RELATIONS.md` with the change.
 
