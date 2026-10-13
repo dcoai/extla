@@ -32,9 +32,16 @@ why.
 so the evidence for the commands below is whatever `mix test` last ran.
 
 A `verifies` tag combines as ExUnit merges tags: a test's own `@tag verifies:` replaces its
-`@describetag` and `@moduletag`, as it does for `mix test --only verifies:<id>`. So a test with
-its own tag lists every section it verifies, inherited ones included. Leave one out and
-`mix surfex.status` reports the relation as Undeclared.
+`@describetag` and `@moduletag`. So a test with its own tag lists every section it verifies,
+inherited ones included. Leave one out and `mix surfex.status` reports the relation as
+Undeclared.
+
+To run a section's tests, use `mix surfex.test "<section id>"`, adding `--within` for the
+sections under it. Don't rely on `mix test --only verifies:<id>`: ExUnit compares a list tag
+as one string, so a test tagged `verifies: ["a", "b"]` matches neither `--only verifies:a` nor
+`verifies:b`. A list is still the honest tag for a test that verifies several sections.
+`mix surfex.status` counts the tests `--only` can't select (66 at surfex 0.7.1), and for
+`mix extla.check`'s section, `--only` runs 29 of its 39 tests.
 
 | You changed | Then |
 |---|---|
@@ -44,7 +51,7 @@ its own tag lists every section it verifies, inherited ones included. Leave one 
 | A test's name, or split a test module | `mix surfex.suggest --accept --note "…"`, which carries the moved tests' records |
 | A spec/04 heading | `mix surfex.suggest` proposes the section move; or `mix surfex.move OLD NEW --note "…"` |
 | Something removed | `mix surfex.retire FROM TO --type T --note "…"` |
-| A section implemented by code its verifying tests reach through an entry point | relate the code that does the work (`implements`) and `mix test && mix surfex.confirm --evidence`: since surfex 0.7.0 a test is credited for what the code it calls calls; then review it with `mix surfex.validate TEST SECTION --note "…"`. **Except** through a Mix task's `run/1`: an undocumented `@impl` callback stops reach (surfex#193), so there relate the task (`implements`) and `mix surfex.relate TASK ITEM --type depends_on --note "…"` |
+| A section implemented by code its verifying tests reach through an entry point | relate the code that does the work (`implements`) and `mix test && mix surfex.confirm --evidence`: since surfex 0.7.0 a test is credited for what the code it calls calls; then review it with `mix surfex.validate TEST SECTION --code ITEM --note "…"`, naming the reached code you read (since surfex 0.7.1 a review credits only what the test calls directly, plus the code you name). **Except** through a Mix task's `run/1`: an undocumented `@impl` callback stops reach (surfex#193), so there relate the task (`implements`) and `mix surfex.relate TASK ITEM --type depends_on --note "…"` |
 
 Then `mix surfex.goldens --write` and commit `.surfex/` and `RELATIONS.md` with the change.
 
