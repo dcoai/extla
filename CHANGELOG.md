@@ -78,6 +78,15 @@ release it merely follows.
 
 ### Changed
 
+- **surfex 0.7.1** (#391, for #390). No upgrade step and no relation changed. Two lines in
+  CONTRIBUTING are corrected:
+  - **Running a section's tests:** `mix test --only verifies:<id>` doesn't select a test whose
+    tag is a list, because ExUnit compares a list as one string. `mix surfex.status` now counts
+    66 such tests, and for `mix extla.check`'s section `--only` runs 29 of its 39 tests.
+    CONTRIBUTING points to `mix surfex.test "<section id>"` instead.
+  - **Reviewing reached code:** a review now credits only the code the test calls, so the
+    review step for code reached through an entry point names that code with `--code`.
+
 - **surfex 0.7.0** (#384, for #383). `verifies` tags now combine the way ExUnit merges them:
   a test's own `@tag` replaces its describe's and module's, where surfex used to take their
   union.
