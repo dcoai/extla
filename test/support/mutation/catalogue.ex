@@ -34,10 +34,12 @@ defmodule ExTLA.Mutation.Catalogue do
       auditing the edge table against the successors the spec admits (#59) — a check
       nobody would have written without the sweep saying it was needed.
 
-  Three mutants are killed only by `:suite` and not by the corpus — `skips_symmetry_-
+  Three mutants are killed only by `:tests` and not by the corpus — `skips_symmetry_-
   canonicalization`, `wrong_init_index`, `param_universe_from_the_right`. That is not a
   gap; it is the catalogue recording *which* gate does the work, which is the thing a
-  kill-count alone cannot say.
+  kill-count alone cannot say. Each names the test files that catch it, measured by
+  running the whole suite with the mutant applied (#380). The gate used to be `:suite`,
+  which in the sweep's workspace failed with no mutant at all.
   """
 
   alias ExTLA.Mutation.Mutant
@@ -159,9 +161,11 @@ defmodule ExTLA.Mutation.Catalogue do
           end\
         """,
 
-        # `:suite` rather than `:corpus`: no differential entry declares `symmetry:`, so
-        # the corpus cannot see this one at all. `verify_symmetry:` (D-17) is what should.
-        kills: :suite
+        # `:tests` rather than `:corpus`: no differential entry declares `symmetry:`, so
+        # the corpus cannot see this one at all. Measured over the whole suite (#380):
+        # symmetry_test.exs fails six ways, and is the file whose subject this is.
+        kills: :tests,
+        tests: ["test/ex_tla/symmetry_test.exs"]
       },
       %Mutant{
         name: :inverts_a_weak_fairness_bit,
@@ -196,10 +200,12 @@ defmodule ExTLA.Mutation.Catalogue do
         anchor: "        {index, steps}",
         replacement: "        {0, steps}",
 
-        # `:suite`: every corpus entry has exactly one `init`, so the corpus cannot tell.
-        # `TestSpecs.TwoStarts` is the only fixture with two, and whether anything replays
-        # through it is what this measures.
-        kills: :suite
+        # `:tests`: every corpus entry has exactly one `init`, so the corpus cannot tell.
+        # `TestSpecs.TwoStarts` is the only fixture with two. Measured over the whole suite
+        # (#380), exactly one test catches this: generated_models_test.exs's "every
+        # counterexample is a behaviour the spec admits", on ten seeds out of ten.
+        kills: :tests,
+        tests: ["test/ex_tla/generated_models_test.exs"]
       },
       %Mutant{
         name: :drops_a_worker_contribution,
@@ -222,12 +228,17 @@ defmodule ExTLA.Mutation.Catalogue do
           "        live_terminals: MapSet.union(into.live_terminals, from.live_terminals),\n" <>
             "        param_universe: from.param_universe",
 
-        # `:suite`, not `:corpus`. The corpus cannot see it: `finalize/2` drops
+        # `:tests`, not `:corpus`. The corpus cannot see it: `finalize/2` drops
         # `param_universe` from the report, so a wrong one surfaces only through
         # `unreached_params`, and only where a run has unreached params to name. #39's
-        # `coverage_merge_test.exs` asserts the asymmetry directly, and that is in the
-        # suite.
-        kills: :suite
+        # `coverage_merge_test.exs` asserts the asymmetry directly (three failures, measured
+        # over the whole suite in #380), and the parallel checker's coverage-agreement test
+        # catches it too.
+        kills: :tests,
+        tests: [
+          "test/ex_tla/coverage_merge_test.exs",
+          "test/ex_tla/model_checker/parallel_test.exs"
+        ]
       }
     ]
   end

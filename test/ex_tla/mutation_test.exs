@@ -84,6 +84,28 @@ defmodule ExTLA.MutationTest do
       end
     end
 
+    # `:tests` runs the files a mutant names, so a missing file would make the gate fail
+    # unmutated, which is the defect #380 removed. An empty list matches no `gate_args/2`
+    # clause rather than running the whole suite, which was that gate.
+    test "a :tests mutant names test files that exist, and only a :tests mutant names any" do
+      for mutant <- Catalogue.all() do
+        if mutant.kills == :tests do
+          assert mutant.tests != [], "#{mutant.name} is gated by :tests and names no tests"
+
+          for path <- mutant.tests do
+            assert String.ends_with?(path, "_test.exs") and File.exists?(path),
+                   "#{mutant.name} names #{path}, which is not an existing test file"
+          end
+        else
+          assert mutant.tests == [],
+                 "#{mutant.name} names tests, but its gate is #{mutant.kills}, which ignores them"
+        end
+      end
+
+      assert Enum.any?(Catalogue.all(), &(&1.kills == :tests)),
+             "no mutant uses :tests; this assertion would be vacuous"
+    end
+
     test "names are unique — they are the keys in survivors.json" do
       names = Enum.map(Catalogue.all(), & &1.name)
       assert names == Enum.uniq(names)
@@ -248,10 +270,30 @@ defmodule ExTLA.MutationTest do
     end
 
     test "names a mutant with no recorded outcome to stand in for it" do
-      results = [%{name: :drops_a_binding, outcome: :inconclusive, reason: :fails_unmutated}]
+      results = [%{name: :drops_a_binding, outcome: :inconclusive, reason: :not_reproduced}]
 
       assert Mix.Tasks.Extla.Mutants.keep_recorded(results, @recorded) ==
-               {:error, [:drops_a_binding]}
+               {:error, {:unrecorded, [:drops_a_binding]}}
+    end
+
+    # #380: three kills stayed recorded for weeks while their gate failed on every run,
+    # because a gate that fails unmutated was treated as a flake. It is a broken gate, so it
+    # fails --check even when survivors.json has an outcome that could stand in.
+    test "refuses fails_unmutated even where an outcome is recorded" do
+      results = [
+        %{name: :drops_an_action, outcome: :inconclusive, reason: :fails_unmutated},
+        %{name: :weakens_a_type_domain, outcome: :inconclusive, reason: :not_reproduced}
+      ]
+
+      assert Mix.Tasks.Extla.Mutants.keep_recorded(results, @recorded) ==
+               {:error, {:fails_unmutated, [:drops_an_action]}}
+    end
+
+    test "still tolerates a rerun that timed out, which says nothing about the gate" do
+      results = [%{name: :drops_an_action, outcome: :inconclusive, reason: :rerun_timed_out}]
+
+      assert {:ok, [%{outcome: :killed}]} =
+               Mix.Tasks.Extla.Mutants.keep_recorded(results, @recorded)
     end
   end
 

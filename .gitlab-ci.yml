@@ -338,9 +338,11 @@ mutation:
     # survives is a regression in the gates, and one that newly dies is progress that has
     # to be recorded or it can be lost again with nothing noticing.
     #
-    # ~8.5 minutes for 13 mutants, measured rather than estimated: each one compiles the
-    # tree and runs a gate, and a killed mutant is fast while a surviving one pays for the
-    # whole corpus. The timeout below is that measurement plus room, not a guess.
+    # Each of the 13 mutants compiles the tree and runs a gate. A killed mutant is fast, while a
+    # surviving one pays for the whole corpus. The job measured ~8.5 minutes when #46 wrote this,
+    # and 1,495 s (pipeline 5270) once three mutants ran the whole suite as their gate and
+    # re-ran its failures (#379). #380 replaced that gate with the few test files that catch
+    # each one. The timeout below allows for the larger figure.
     - mix extla.mutants --check
   timeout: 40 minutes
   artifacts:

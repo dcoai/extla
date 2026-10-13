@@ -35,6 +35,22 @@ release it merely follows.
 
 ### Fixed
 
+- **The mutation sweep's `:suite` gate measured nothing** (#389, for #380). It ran the whole of
+  `mix test` in the sweep's workspace, which copies `lib`, `test` and the build but not
+  `README.md`, `guides/` or `spec/`. The suite failed there with no mutant applied, so its
+  three kills (`skips_symmetry_canonicalization`, `wrong_init_index`,
+  `param_universe_from_the_right`) were never measured. After #379, `--check` kept their
+  recorded outcomes and stayed green.
+  - **`:tests` replaces `:suite`:** each such mutant names the test files that catch it. These
+    were found by running the whole suite with each mutant applied: `symmetry_test`,
+    `generated_models_test` (one property, killed on ten seeds of ten), and `coverage_merge_test`
+    with the parallel checker's tests. The gate runs those files only.
+  - **`mix extla.mutants --check` now fails on `inconclusive (fails_unmutated)`.** A gate that
+    fails without the mutant is broken, not flaky. A failure that didn't reproduce, and a rerun
+    that timed out, are still tolerated.
+  - **A catalogue test checks the lists:** every `:tests` mutant must name existing test files,
+    and an empty list matches no gate rather than running the whole suite.
+
 - **A parallel-profile test named the denominator rule #239 replaced** (#388, for #386).
   `profile_parallel_test.exs` said `run_reductions` "is the coordinator's" and asserted `> 0`,
   which passes under either rule, so nothing failed when #239 changed the rule.
