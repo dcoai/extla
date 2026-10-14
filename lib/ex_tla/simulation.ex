@@ -28,8 +28,7 @@ defmodule ExTLA.Simulation do
 
   It is sampling, not proof. A run that finds nothing has checked the traces it drew, and
   `coverage` says which actions those were — a green result over a generator that never
-  produced `reset` says nothing about `reset`. `05-layer3-conformance.md` §Conformance
-  Checking Modes puts exhaustive checking and simulation side by side for this reason.
+  produced `reset` says nothing about `reset`.
 
   ## The counterexample it produces is a `ExTLA.Trace`
 
@@ -107,6 +106,10 @@ defmodule ExTLA.Simulation do
     against_graph: nil
   }
 
+  # `run/2`'s `## Options` lists these, and `options_doc_test.exs` holds the two together.
+  @doc false
+  def __defaults__, do: @defaults
+
   @doc """
   Run `config.traces` random traces against `module`, stopping at the first finding.
 
@@ -114,6 +117,31 @@ defmodule ExTLA.Simulation do
 
   The seed is always in the result, generated when none was given: a random run that finds
   something and cannot be run again has found nothing anybody can act on.
+
+  ## Options
+
+    * `traces:` — how many traces to run. Default `100`.
+    * `max_steps:` — messages per trace. Default `25`.
+    * `seed:` — the random seed. Default `nil`, meaning one is generated and reported.
+    * `concurrency:` — traces run at once, each against its own server. Default `1`.
+    * `init_arg:` — the argument each server starts with, `GenServer.start_link(module,
+      init_arg)`. Default `[]`.
+    * `timeout:` — how long each message may take to be answered, in milliseconds. Default
+      `5_000`.
+    * `inject_failures:` — crash and restart the server at random steps, to check recovery.
+      Default `false`.
+    * `failure_rate:` — the chance of a crash at each step, where `inject_failures:` is on.
+      Default `0.1`.
+    * `message_generator:` — a function from the abstract state to the next message, or
+      `nil` to end the trace. Default: `ExTLA.Simulation.Generator.enabled_only/3`, which
+      offers only actions the spec enables; `ExTLA.Simulation.Generator.from_spec/3` offers
+      every action.
+    * `against_graph:` — `%{graph: graph, status: status}` from `ExTLA.ModelChecker.explore/2`,
+      to check that every behaviour stays inside the checker's graph. Default `nil`.
+
+  Constants are not an option: the server resolves them from
+  `config :extla, Spec, constants: %{…}`, and the generator uses the same ones, so passing
+  `constants:` raises.
   """
   def run(module, config \\ %{}) do
     config = configure(module, config)

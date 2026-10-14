@@ -8,7 +8,7 @@ never reached; `Never called` names the functions it never entered, compiler-gen
 ones excluded. A module never loaded by any test reads `—`. A row that grows is coverage
 lost; one that shrinks is coverage gained, recorded so it cannot be lost again quietly.
 
-**60 modules · 3892 lines** · unhit 298 · modules with an unhit line 45 · never loaded 0
+**60 modules · 3894 lines** · unhit 298 · modules with an unhit line 45 · never loaded 0
 
 | Module | Lines | Unhit | Never called |
 |---|---|---|---|
@@ -28,7 +28,7 @@ lost; one that shrinks is coverage gained, recorded so it cannot be lost again q
 | `ExTLA.Invariant.Violation` | 32 | 5 | `exception/1`, `report!/1` |
 | `ExTLA.Mix.SpecTarget` | 14 | 1 | — |
 | `ExTLA.Mix.TraceFile` | 28 | 5 | — |
-| `ExTLA.ModelChecker` | 259 | 11 | `check_safety/1`, `check_safety/2`, `explore/1`, `run/1` |
+| `ExTLA.ModelChecker` | 260 | 11 | `check_safety/1`, `check_safety/2`, `explore/1`, `run/1` |
 | `ExTLA.ModelChecker.Liveness` | 209 | 12 | `taking_edge/4` |
 | `ExTLA.ModelChecker.Parallel` | 53 | 1 | — |
 | `ExTLA.ModelChecker.Run` | 0 | 0 | — |
@@ -39,7 +39,7 @@ lost; one that shrinks is coverage gained, recorded so it cannot be lost again q
 | `ExTLA.Refinement` | 110 | 7 | — |
 | `ExTLA.Replay` | 95 | 5 | — |
 | `ExTLA.Set` | 15 | 0 | — |
-| `ExTLA.Simulation` | 141 | 16 | `run/1`, `run_trace/1` |
+| `ExTLA.Simulation` | 142 | 16 | `run/1`, `run_trace/1` |
 | `ExTLA.Simulation.Generator` | 7 | 0 | — |
 | `ExTLA.Spec` | 76 | 1 | — |
 | `ExTLA.Spec.Block` | 125 | 9 | — |

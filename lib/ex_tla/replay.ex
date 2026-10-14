@@ -23,8 +23,9 @@ defmodule ExTLA.Replay do
 
   ## What drives the server
 
-  `c:TLA.Refinement.concrete_message/2` — the inverse of `c:TLA.Refinement.abstract_action/1`, and the
-  callback `validate!/3` round-trips at compile time. A refinement that does not define it
+  `c:ExTLA.Refinement.concrete_message/2` — the inverse of
+  `c:ExTLA.Refinement.abstract_action/1`, and the callback `validate!/3` round-trips at
+  compile time. A refinement that does not define it
   can be *checked* as it runs and cannot be *driven*, which is most of what this module is
   for; `counterexample/3` says so by name rather than failing with an undefined function.
   """

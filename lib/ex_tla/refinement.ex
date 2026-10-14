@@ -24,9 +24,9 @@ defmodule ExTLA.Refinement do
   it runs, but it cannot be *driven* from the spec, which forgoes `ExTLA.Replay` and most of
   what Layer 3 is for.
 
-  ## What `validate!/2` establishes, and what it does not
+  ## What `validate!/3` establishes, and what it does not
 
-  §05 lists five rules. Three are decidable where `validate!/2` runs and two are not, and
+  §05 lists five rules. Three are decidable where `validate!/3` runs and two are not, and
   saying which is which is the point — a validator that claims a check it cannot perform
   is worse than one that states its limits (the same shape as `08-decisions.md` D-17).
 
@@ -58,7 +58,7 @@ defmodule ExTLA.Refinement do
   - `abstract/1` returns exactly the spec's variables, and
   - every value it returns is a permitted state term (`02-dsl-semantics.md` §6).
 
-  `abstract!/2` checks both on every mapping. It is a `Map.keys` comparison and a
+  `abstract!/3` checks both on every mapping. It is a `Map.keys` comparison and a
   `ExTLA.State.validate!/1`, cheaper than the invariants evaluated beside it.
 
   Purity of `abstract/1` is **not** checked. An earlier draft of §05 claimed it was; that
@@ -85,8 +85,8 @@ defmodule ExTLA.Refinement do
 
   defmodule Error do
     @moduledoc """
-    A refinement mapping that does not hold up: at compile time from `validate!/2`, or at
-    runtime from `abstract!/2` when a mapping produces something that is not a state of
+    A refinement mapping that does not hold up: at compile time from `validate!/3`, or at
+    runtime from `abstract!/3` when a mapping produces something that is not a state of
     the spec.
     """
     defexception [:message]

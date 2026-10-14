@@ -21,6 +21,15 @@ defmodule Mix.Tasks.Extla.Check do
 
   A constant with neither is an error naming both places it could be supplied.
 
+  ## Symmetry is configured per spec
+
+      config :extla, Specs.X, symmetry: [:procs]
+
+  names constants whose elements are interchangeable, and the run checks under that
+  reduction. Liveness is then skipped, with a warning saying so, because symmetry reduction
+  and liveness are not sound together; check the temporal properties in a run without
+  `symmetry:`. `--verify-symmetry` checks the declaration.
+
   ## Options affecting the VERDICT
 
       --strict-coverage    Treat a never-enabled action or a vacuous property as a
@@ -41,7 +50,7 @@ defmodule Mix.Tasks.Extla.Check do
       --verify-symmetry    Run the model with and without the `symmetry:` reduction
                            and fail if any verdict differs. Nothing can establish a
                            symmetry declaration's soundness statically, so this is
-                           the check that catches a wrong one (08-decisions.md D-17).
+                           the check that catches a wrong one.
       --profile            Report what each of YOUR declarations cost, in reductions
                            (`ExTLA.Profile`). Off by default and free when off. In
                            reductions rather than milliseconds because a reduction is

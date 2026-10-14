@@ -6,7 +6,12 @@ defmodule ExTLA.Spec.Test do
   @doc """
   Assert that a spec passes model checking with the given configuration.
 
-  ## Options, beyond `t:TLA.ModelChecker.config/0`
+  The config is passed to `ExTLA.ModelChecker.run/2`, whose options it takes. One of them
+  matters here more than anywhere: **liveness is off by default.** `run/2` defaults
+  `check_liveness:` to `false`, and so does this, so a temporal property `mix extla.check`
+  checks is not checked by `assert_spec/2` unless the config says `check_liveness: true`.
+
+  ## Options, beyond `t:ExTLA.ModelChecker.config/0`
 
   - `allow_incomplete: true` — pass even if the state limit was reached or a
     state constraint bounded the run. Default `false`.

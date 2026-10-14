@@ -32,8 +32,10 @@ defmodule Mix.Tasks.Extla.Replay do
 
   ## The file formats
 
-  `--trace` takes what `mix extla.check --format json` writes, either the whole document
-  (an object keyed by spec module) or a single trace object lifted out of it.
+  `--trace` takes what `mix extla.check --format json` writes: either the whole document —
+  `{"schema_version": …, "specs": [...]}`, from which the entry for the server's spec is
+  used — or a single trace object lifted out of it. A document written by a different schema
+  version is refused, naming both versions; re-run `mix extla.check --format json`.
 
   `--captured` takes an array of `{"message": …, "state": …}` objects, oldest first, where
   `state` is the CONCRETE state the implementation was in *after* that message. Both
@@ -45,17 +47,20 @@ defmodule Mix.Tasks.Extla.Replay do
   A trace's actions are not all actions of the spec. `ExTLA.Simulation` writes `:unmapped`
   for a message the refinement mapping does not model — its *normal* answer, not an error —
   and `:restart` for a crash injected by `--inject-failures`. `concrete_message/2` has no
-  clause for either, and calling it regardless is what this used to do (#168).
+  clause for either.
 
   `:unmapped` is **skipped**, and listed in the report and in `skipped` under `--format
   json`. The claim `:unmapped` makes is that the message does not move the abstract state,
-  so the behaviour is unchanged by it; the trace's post-state is still checked. A replay
-  that skipped a step and then exited `0` would report more than it did.
+  so the behaviour is unchanged by it; the trace's post-state is still checked.
 
-  `:restart` is **reproduced**: the server is killed and started again, and recovery is
-  checked to land where the trace says it did — all `ExTLA.Simulation` checks about a restart
-  either. `:kill` rather than a polite stop, because a crash runs no `terminate/2`. Only
-  for a server this task started.
+  `:restart` is **reproduced**: the server is killed with `:kill`, not stopped politely,
+  because a crash runs no `terminate/2`. It is then started again, and the replay checks
+  that recovery lands in the state the trace records. This is possible only for a server
+  this task started; against `--server` a restart exits 3.
+
+  ## Output
+
+      --format human|json   the report as text (default) or as a JSON document
 
   ## Exit codes
 

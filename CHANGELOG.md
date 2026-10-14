@@ -42,6 +42,16 @@ release it merely follows.
 - **The API docs group modules by what you do with them** (#405, for #397): specifications,
   model checking, Layer 1, Layer 3, and Internals last for the engine modules a user never
   calls, such as `ExTLA.Invariant.Runtime`. `ExTLA` heads the list.
+- **The module docs and usage rules say what the code does, and list the options** (#407, for
+  #399). `ExTLA.ModelChecker.run/2` and `ExTLA.Simulation.run/2` document every option with
+  its default; before, they were only in typespec comments. `usage-rules.md` no longer shows
+  a `--check-liveness` flag that does not exist. It now says the CLI skips liveness with a
+  warning under symmetry or `--workers`, while the API raises. It also names the right
+  diagnostic for assigning a variable twice, and covers `config :extla`, `use` ordering and
+  the optional `jason`. `assert_spec/2` says liveness is off unless asked for, and
+  `mix extla.check` documents per-spec `symmetry:`. `mix extla.simulate` says how its
+  server starts, and `mix extla.replay` describes its trace file correctly and lists
+  `--format`. Stale `TLA.` names and arities are fixed.
 - **This changelog is written for users** (#406, for #397). Entries for CI, test tooling and
   other work only the repository sees are gone, and the remaining entries are shorter.
 

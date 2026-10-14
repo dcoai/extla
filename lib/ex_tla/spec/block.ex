@@ -1,7 +1,7 @@
 defmodule ExTLA.Spec.Block do
   @moduledoc """
   Compiles an `init` or `action` body into the guard and transition functions of
-  `t:TLA.Spec.Compiled.action_def/0`.
+  `t:ExTLA.Spec.Compiled.action_def/0`.
 
   ## An action body is a conjunction, not a sequence
 

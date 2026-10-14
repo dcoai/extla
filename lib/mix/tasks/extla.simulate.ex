@@ -38,11 +38,17 @@ defmodule Mix.Tasks.Extla.Simulate do
                            simulation target has.
 
                            The graph is built once and each behaviour is held
-                           against it AS THAT BEHAVIOUR FINISHES, so this runs
+                           against it as that behaviour finishes, so this runs
                            the traces you asked for and no others, under the
-                           options you asked for. It used to run a second suite
-                           of `--traces` simulations afterwards that forwarded
-                           two of the five options (#180).
+                           options you asked for.
+
+  ## How the server starts
+
+  Each trace starts its own server with `GenServer.start_link(module, [])`. There is no
+  `--init-arg`: a server that needs a different argument is simulated from a test with
+  `ExTLA.Simulation.run/2`, whose `init_arg:` option takes one. The spec's constants come
+  from `config :extla, Spec, constants: %{…}` or the `default:` beside each declaration,
+  the same place the server under Layer 3 reads them.
 
   ## Exit codes
 

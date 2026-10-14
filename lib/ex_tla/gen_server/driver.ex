@@ -37,7 +37,7 @@ defmodule ExTLA.GenServer.Driver do
   def call(server, message, timeout \\ 5_000), do: deliver(server, {:call, message}, timeout)
 
   @doc """
-  Deliver whatever `c:TLA.Refinement.concrete_message/2` returned, by the route it names.
+  Deliver whatever `c:ExTLA.Refinement.concrete_message/2` returned, by the route it names.
 
       {:call, msg}   {:"$gen_call", from, msg}   handle_call/3
       {:cast, msg}   {:"$gen_cast", msg}         handle_cast/2
