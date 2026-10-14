@@ -154,10 +154,12 @@ defmodule ChangelogGuard do
     What changed and why it matters is not derivable from the diff (RELEASING.md), which is
     why the entry is written now rather than reconstructed at release time.
 
-    Add an entry to the [Unreleased] section of #{@entry}.
+    Add an entry to the [Unreleased] section of #{@entry}, written for someone who uses
+    ExTLA: what they can now do, or what behaves differently.
 
     If this change genuinely has nothing to say to anyone outside the repository — a pure
-    refactor, an internal rename — say so in a commit message trailer:
+    refactor, an internal rename, a change only the tests can see — say so in a commit
+    message trailer:
 
         #{@trailer} internal rename, no behaviour or API change
 

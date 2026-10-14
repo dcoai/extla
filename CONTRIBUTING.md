@@ -9,6 +9,10 @@ This is for working **on** ExTLA. `usage-rules.md` is for projects that use it, 
 - A change under `lib/` carries a `CHANGELOG.md` entry. The `changelog` job
   (`bin/changelog_guard.exs`) checks the committed state, so add the entry before pushing.
   The CHANGELOG is the record of what is built; nothing else restates it.
+- An entry is written for someone who uses ExTLA, because the CHANGELOG ships and HexDocs
+  renders it. A `lib/` change no user can observe answers the guard with a
+  `Changelog-none: <reason>` commit trailer instead, and work outside `lib/` (CI, goldens,
+  the relation log, test tooling) gets no entry at all. `RELEASING.md` has the rule in full.
 - The six surface goldens are current. Run them as CI does, under the test environment.
   In dev the specs under `test/` aren't compiled, and `mix extla.coverage --check` fails
   even on a clean `main`:

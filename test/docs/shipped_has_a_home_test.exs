@@ -16,16 +16,20 @@ defmodule ExTLA.ShippedHasAHomeTest do
 
   ## What this file asserts
 
-  That the withdrawal is real, and that the record it points at actually holds the eight
-  items the withdrawal was about. The *ongoing* guarantee is the changelog guard, which
-  runs per commit in the `check` stage; this is the one-time evidence that the eight
-  orphans found a home, which is the criterion #179 set for withdrawing the claim.
+  That the withdrawal is real, and that the record it points at actually holds the
+  user-facing items the withdrawal was about. The *ongoing* guarantee is the changelog guard,
+  which runs per commit in the `check` stage; this is the evidence that those orphans found a
+  home, which is the criterion #179 set for withdrawing the claim.
+
+  Two of #179's eight are not here: the verification ledger and `mix extla.mutants` are this
+  repository's own tooling, and since #406 the CHANGELOG records only what a user can observe.
+  Their record is the history.
   """
   use ExUnit.Case, async: true
 
   @root Path.expand("../..", __DIR__)
 
-  # The eight #179 named, each by a string that would have to survive a rewording of the
+  # Six of the eight #179 named, each by a string that would have to survive a rewording of the
   # entry but not a removal of it. A needle naming a module or a task is written without the
   # `ex`: CHANGELOG.md is a record, and entries written before the namespace moved (#338,
   # #339) name `TLA.*` and `mix tla.*`. "TLA.Profile" and "tla.explore" match both spellings.
@@ -33,16 +37,14 @@ defmodule ExTLA.ShippedHasAHomeTest do
     {"ExTLA.Profile and the --profile flag", "TLA.Profile"},
     {"ExTLA.Trace.explore/3 and mix extla.explore", "tla.explore"},
     {"mix extla.stamp and spec_version:", "spec_version"},
-    {"the verification ledger", "TLA_COVERAGE.md"},
     {"ExTLA.Conformance.against_graph/3", "against_graph"},
     {"ExTLA.Spec.Deps", "Spec.Deps"},
-    {"mix extla.mutants", "tla.mutants"},
     {"JSON schema version 2", "schema_version"}
   ]
 
   defp changelog, do: @root |> Path.join("CHANGELOG.md") |> File.read!()
 
-  describe "the eight features that shipped after Phase 4" do
+  describe "the user-facing features that shipped after Phase 4" do
     test "each have an entry in the gated record" do
       homeless =
         for {what, needle} <- @shipped,
@@ -50,7 +52,7 @@ defmodule ExTLA.ShippedHasAHomeTest do
             do: "#{what} (searched for #{inspect(needle)})"
 
       assert homeless == [], """
-      #{length(homeless)} of the eight shipped features have no CHANGELOG entry:
+      #{length(homeless)} of the shipped features have no CHANGELOG entry:
 
         #{Enum.join(homeless, "\n  ")}
 

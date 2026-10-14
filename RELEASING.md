@@ -140,8 +140,17 @@ enforces it — the `changelog` job in the `check` stage runs `bin/changelog_gua
 compares the merge base against the branch and fails when `lib/` moved and `CHANGELOG.md` did
 not.
 
-If the change genuinely has nothing to say to anyone outside the repository — a pure refactor,
-an internal rename — answer the check instead of obeying it, with a trailer in a commit message:
+**An entry is for someone who uses ExTLA.** The CHANGELOG ships, and HexDocs renders it, so it
+records what a user can observe: a new feature, option or flag, a behaviour change, a fix to a
+wrong verdict, a crash or a misleading message, a change to what the docs teach. Work that only
+the repository sees gets no entry: CI, the surface goldens, the relation log, the mutation
+harness, test tooling, benchmarks, refactors and maintenance of `spec/` and the decision log.
+Its record is the commit, the merge request and the issue. Entries before 0.5.1 were condensed
+to this rule in #406; the full text is the `CHANGELOG.md` at the `v0.5.0` tag.
+
+If a change under `lib/` genuinely has nothing to say to anyone outside the repository — a pure
+refactor, an internal rename, a change only the tests can see — answer the check instead of
+obeying it, with a trailer in a commit message:
 
 ```
 Changelog-none: internal rename, no behaviour or API change
