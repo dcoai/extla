@@ -29,10 +29,9 @@ defmodule ExTLA.Spec.DSL do
   ## Options
 
   - `default:` — the assignment `mix extla.check` uses when nothing else supplies
-    one. `04-layer2-model-checker.md` specified the task without saying where a
-    run's constants come from, and a checker cannot start without them; a default
-    beside the declaration is the answer that needs no second file. Application
-    config still overrides it, and `ExTLA.ModelChecker.run/2` ignores it entirely.
+    one. A checker cannot start without a value for every constant, and a default
+    beside the declaration supplies one without a second file. Application config
+    still overrides it, and `ExTLA.ModelChecker.run/2` ignores it entirely.
   """
   defmacro constant(name, opts \\ []) do
     caller = __CALLER__
@@ -49,7 +48,7 @@ defmodule ExTLA.Spec.DSL do
   Referenced in blocks as a bare `name`.
 
   The type is stored quoted and resolved at model-check time, because nearly
-  every useful type mentions a constant (`02-dsl-semantics.md` §1.5, D-19). It
+  every useful type mentions a constant (`02-dsl-semantics.md` §1.5). It
   is checked as the implicit invariant `:type_ok` in every reachable state; it
   does NOT restrict exploration, so a state outside its type is a reported
   violation rather than a pruned branch.
@@ -212,7 +211,7 @@ defmodule ExTLA.Spec.DSL do
 
   The block is a bare boolean expression over variables and `^constants`.
   `desc:` carries a description; it is an option rather than a positional string
-  because two trailing optional positionals cannot be told apart (D-18).
+  because two trailing optional positionals cannot be told apart.
   """
   defmacro invariant(name, opts \\ [], block) do
     caller = __CALLER__

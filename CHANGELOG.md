@@ -52,6 +52,12 @@ release it merely follows.
   `mix extla.check` documents per-spec `symmetry:`. `mix extla.simulate` says how its
   server starts, and `mix extla.replay` describes its trace file correctly and lists
   `--format`. Stale `TLA.` names and arities are fixed.
+- **The module docs are about the library, not its history** (#408, for #399). About 40
+  modules carried how a behaviour was found and fixed: issue numbers, test paths, CI, the
+  differential corpus, mutation testing, decision-log numbers, and pointers into
+  specification files the docs no longer publish. Each is rewritten to say what the code
+  does and why. Where a doc pointed at an unpublished reason, it now states the reason or
+  links the reference guide.
 - **This changelog is written for users** (#406, for #397). Entries for CI, test tooling and
   other work only the repository sees are gone, and the remaining entries are shorter.
 

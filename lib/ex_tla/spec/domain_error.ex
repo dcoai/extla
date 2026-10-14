@@ -1,11 +1,13 @@
 defmodule ExTLA.Spec.DomainError do
   @moduledoc """
   Raised by `f[x]` where `x` is outside the domain of `f`
-  (`02-dsl-semantics.md` §1.6, D-20).
+  (`02-dsl-semantics.md` §1.6).
 
   TLA+ leaves `f[x]` undefined there, and `ExTLA.Spec.Helpers.at/3` — what `f[x]`
-  compiles to inside a spec block — raises rather than returning `nil`, for the
-  reason `01-foundation.md` gives for reading a variable that is not there.
+  compiles to inside a spec block — raises rather than returning `nil`. A `nil`
+  compares unequal to whatever a guard expected, so the action would look
+  disabled and the checker would explore a smaller state space and report
+  success.
   """
 
   defexception [:collection, :key, :where]

@@ -19,12 +19,14 @@ defmodule ExTLA.Coverage do
 
   ## Collected during the run, not computed after it
 
-  `04-layer2-model-checker.md` says coverage is "computed from the completed
-  state graph; no additional exploration". The second half is right and the first
-  is not: the graph deliberately retains neither states nor per-action counts
-  (D-5), so there is nothing in it to compute these from. They are accumulated
-  while the search runs, which costs no additional exploration — the intent of
-  the sentence — and is the only way to have them at all.
+  Coverage costs no additional exploration, but it is not computed from the
+  finished state graph: the graph deliberately retains neither states nor
+  per-action counts (`ExTLA.StateGraph`), so there is nothing in it to compute
+  these from. They are accumulated while the search runs, which is the only way
+  to have them at all.
+
+  See "Reading the coverage report" in `guides/reference.md` for what each line
+  of the report means.
   """
 
   @type action_coverage :: %{
@@ -157,17 +159,12 @@ defmodule ExTLA.Coverage do
   @doc """
   Record that this action was enabled in a state, and with which bindings.
 
-  Called *before* the successors are generated, and that is the whole point (#128). Enablement is
+  Called *before* the successors are generated, and that is the whole point. Enablement is
   established the moment the guard admits a binding: it is true before any successor exists, and
-  it stays true whether or not the expansion finishes. Recording it at the end instead meant a
-  violation that halted the expansion lost the enablement of the action that caused it — so a run
-  reported `never_enabled: [:compact]` while naming `compact` in its counterexample, and warned
-  the user that the offending action had a broken guard.
-
-  It was invisible for as long as it was because every earlier case had another witness:
-  `die_hard`'s actions are enabled in eleven or twelve states each, so losing one leaves eleven
-  and nothing looks wrong. It becomes a false claim rather than an undercount only when the true
-  count is one, which no corpus entry was small enough to produce until `audit_log`.
+  it stays true whether or not the expansion finishes. Recorded at the end instead, a violation
+  that halted the expansion would lose the enablement of the action that caused it — and an
+  action enabled in exactly one state would then be reported `never_enabled` while being named in
+  the counterexample, warning the user that the offending action had a broken guard.
 
   `seen_bindings` belongs here too: it is a fact about the bindings the guard admitted, not about
   what expanding them produced.
@@ -331,7 +328,7 @@ defmodule ExTLA.Coverage do
 
   Counted where the constraint is applied rather than inferred from the config, because
   "a constraint was configured" and "a constraint bound this run" are different facts and
-  only the second is a reason to call the result partial (#167).
+  only the second is a reason to call the result partial.
   """
   def observe_held_back(%__MODULE__{} = coverage),
     do: %{coverage | held_back: coverage.held_back + 1}
@@ -510,8 +507,7 @@ defmodule ExTLA.Coverage do
   thing it exists to surface.
 
   `--strict-coverage` asks a different question, and `strict_failures/1` is where it is
-  asked. Conflating the two is what made `--strict-coverage` fail on conditions the
-  specification does not give it (#167).
+  asked: a report can be worth printing without being worth failing a build over.
   """
   def clean?(coverage) do
     accusing(coverage) == [] and coverage.terminal_but_live == [] and
@@ -522,11 +518,9 @@ defmodule ExTLA.Coverage do
   What `--strict-coverage` may fail a build on: **a never-enabled action or a vacuous
   property**, and only where this run is in a position to accuse.
 
-  `04-layer2-model-checker.md` scopes the flag to exactly those two (§Options affecting the
-  VERDICT, §`assert_spec`), and says of `terminal_but_live` that it is "not an error --
-  nothing is cut". The code failed on that and on an invariant with no near misses, which
-  broke the specification's own worked example: it renders `type_ok … <-- never at risk` and
-  then counts **2 warnings**, where the code counted three and failed the build on them.
+  The other two warnings are not failures. A `terminal` that admitted a live state is not an
+  error — nothing is cut — and an invariant never at risk says the run did not press on it,
+  not that the spec is wrong. Both are still printed (`clean?/1`); neither fails the build.
 
   Returns a list of `{kind, name}`, so a caller can say which.
   """

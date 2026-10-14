@@ -6,7 +6,7 @@ defmodule ExTLA.Refinement do
   abstract behaviour obtained by mapping each concrete state satisfies the abstract spec.
   It is the mathematical content of implementation verification — but only when the
   **steps** are checked against the spec's actions, not merely the states against its
-  invariants (`05-layer3-conformance.md` §What conformance means here).
+  invariants (see "What conformance checks" in `guides/reference.md`).
 
   ## The three callbacks
 
@@ -26,9 +26,9 @@ defmodule ExTLA.Refinement do
 
   ## What `validate!/3` establishes, and what it does not
 
-  §05 lists five rules. Three are decidable where `validate!/3` runs and two are not, and
-  saying which is which is the point — a validator that claims a check it cannot perform
-  is worse than one that states its limits (the same shape as `08-decisions.md` D-17).
+  A mapping is held to five rules. Three are decidable where `validate!/3` runs and two are
+  not, and saying which is which is the point — a validator that claims a check it cannot
+  perform is worse than one that states its limits.
 
   Decided at compile time:
 
@@ -50,8 +50,8 @@ defmodule ExTLA.Refinement do
 
   A clause whose first argument is a variable covers every action and is read that way. And
   `concrete_message/2` is optional: a mapping that defines **none** is legal and reported as
-  such, one that defines **all** passes, and one that defines **some** is the finding
-  (`08-decisions.md` D-39).
+  such, one that defines **all** passes, and one that defines **some** is the finding: the
+  actions it leaves out can be checked as they happen but never driven.
 
   Left to runtime, because there is no concrete state at compile time to map:
 
@@ -61,9 +61,8 @@ defmodule ExTLA.Refinement do
   `abstract!/3` checks both on every mapping. It is a `Map.keys` comparison and a
   `ExTLA.State.validate!/1`, cheaper than the invariants evaluated beside it.
 
-  Purity of `abstract/1` is **not** checked. An earlier draft of §05 claimed it was; that
-  is not decidable, and an impure mapping surfaces as a `:diverged` step instead. It is a
-  documented obligation on the author.
+  Purity of `abstract/1` is **not** checked: it is not decidable, and an impure mapping
+  surfaces as a `:diverged` step instead. It is a documented obligation on the author.
   """
 
   alias ExTLA.{Spec, State}

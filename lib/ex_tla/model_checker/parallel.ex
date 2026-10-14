@@ -1,23 +1,21 @@
 defmodule ExTLA.ModelChecker.Parallel do
   @moduledoc """
-  Parallel state exploration: one coordinator, N workers, one shared graph.
-
-  `06-architecture.md` §Concurrency Architecture draws it, and §Phase 4 admits it "only
-  once the single-threaded checker is correct and has been profiled" — the differential
-  corpus establishes the first and `bench/search_profile.baseline.md` the second.
+  Parallel state exploration: one coordinator, N workers, one shared graph. Selected by
+  `workers: n` on `ExTLA.ModelChecker.run/2`; see "Parallel exploration" in
+  `guides/reference.md`.
 
   ## Level-synchronous BFS, and why it is not negotiable
 
   Each round expands **one whole BFS level** across the workers, and no worker starts on
   level *k+1* until every worker has finished level *k*.
 
-  That costs a barrier per level, and it buys the project's acceptance criterion. D-9's
-  differential corpus compares the **length** of the shortest counterexample against
-  TLC's. Length, not route: two searches may return different traces of the same length
-  and the corpus still holds. A free-running frontier — workers taking whatever is queued,
-  in whatever order they get to it — does not preserve length, because a violating state
-  can be reached along a longer path before the shorter one has been expanded. Trading
-  that for throughput would be trading away the thing that says the checker is right.
+  That costs a barrier per level, and it buys the guarantee a breadth-first checker makes:
+  a reported counterexample is a **shortest** one, the same length TLC reports. Length,
+  not route: two searches may return different traces of the same length. A free-running
+  frontier — workers taking whatever is queued, in whatever order they get to it — does
+  not preserve length, because a violating state can be reached along a longer path
+  before the shorter one has been expanded. Trading that for throughput would trade away
+  the shortest-counterexample guarantee.
 
   Level-synchrony also makes the answer *deterministic* in the ways that are checked:
   every state discovered while expanding level *k* has depth *k+1*, so whichever worker
@@ -26,27 +24,27 @@ defmodule ExTLA.ModelChecker.Parallel do
   ## Work sharing, not stealing
 
   The coordinator pushes a batch to each worker and waits. Workers never take work from
-  one another, so the only structure two processes touch at once is ETS — which #31 made
-  `:public` and race-free, and which `bench/search_profile.baseline.md` measures at a
-  fraction of a percent of the search.
+  one another, so the only structure two processes touch at once is the graph's ETS
+  fingerprint table, which is `:public` and race-free.
 
   ## Why the workers, and not the coordinator, register states
 
   A worker computes its states' successors *and* calls `StateGraph.add_state/5` on them.
   It would be simpler to send successors back and have the coordinator register them, and
-  it would also be nearly pointless: since #33 that function performs fingerprinting and
-  §6 validation as well as the ETS write, and the three together are 77% of the `raft`
-  search. Registering centrally would leave about a quarter of the work parallel, which
-  Amdahl caps near 1.3x however many cores are added.
+  it would also be nearly pointless: that function fingerprints the state, validates it
+  (rejecting pids, references, ports, funs and floats), and writes it to ETS, and those
+  three are about three quarters of the cost of a search on a large model. Registering
+  centrally would leave only the remaining quarter parallel, and Amdahl's law would cap the
+  speed-up near 1.3x however many cores are added.
 
-  What makes it safe is #31: `insert_new/2` is atomic, so of two workers that discover the
+  What makes it safe is that ETS `insert_new/2` is atomic, so of two workers that discover the
   same state in the same level exactly one claims it and the other reads back the winner's
   id. That is also what makes the accumulators *summable* — see `merge/2`.
 
   ## What is refused
 
   Liveness. `workers: n > 1` with `check_liveness: true` (or `liveness_graph: true`)
-  raises in `ExTLA.ModelChecker`, beside D-22's symmetry-with-liveness refusal and for a
+  raises in `ExTLA.ModelChecker`, beside the refusal of symmetry with liveness and for a
   similar reason: the edge table and ENABLED bits are per-struct maps, so a parallel run
   would answer from a graph missing the edges other workers found.
 
@@ -60,8 +58,8 @@ defmodule ExTLA.ModelChecker.Parallel do
 
   The overshoot is what the other workers had in flight at that moment, bounded by the
   batch. Checking once per level instead would have been simpler and would have made the
-  overshoot a whole BFS level — thousands of states on `raft` — and a budget that can be
-  exceeded twentyfold is not a budget.
+  overshoot a whole BFS level — thousands of states on a large model — and a budget that
+  can be exceeded many times over is not a budget.
 
   ## What comes back, and why summing it is exact
 

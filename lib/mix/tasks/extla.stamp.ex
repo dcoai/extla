@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Extla.Stamp do
 
   Run it after the review, never instead of it.
 
-  ## What `--check` fails on, and why it is not a CI job
+  ## What `--check` fails on, and when to use it
 
   One question: **is this stamp verified by something?**
 
@@ -46,11 +46,11 @@ defmodule Mix.Tasks.Extla.Stamp do
   `spec:` and a wrong stamp raises `ExTLA.Spec.CompileError` exactly as a literal one does.
   Failing a build on it would be a false finding about a mapping that is fully checked.
 
-  **And there is deliberately no CI job for this task.** A stale stamp is already a compile
-  error, and a spec whose source is not on disk already emits a compile warning — so on any
-  project whose CI compiles with `--warnings-as-errors`, both failures arrive from the
-  `compile` job, earlier and with better messages. A job here would add a second way to
-  learn the same thing and two places to keep in step (D-37).
+  **A build that compiles does not need it.** A stale stamp is already a compile error, and
+  a spec whose source is not on disk already emits a compile warning — so on any project
+  that compiles with `--warnings-as-errors`, both failures arrive from the compile step,
+  earlier and with better messages. Running `--check` there as well adds a second way to
+  learn the same thing.
 
   `--check` is for the workflow the compiler cannot serve: the project **does not compile**,
   and a script wants the list of mappings to re-read rather than one error at a time. That
@@ -130,11 +130,8 @@ defmodule Mix.Tasks.Extla.Stamp do
   @doc """
   The directories this scans: the project's own `elixirc_paths`, and `lib` as a floor.
 
-  It used to append `["lib", "test", "ledger"]` unconditionally. `ledger` is a directory of
-  THIS repository, and a consumer running `mix extla.stamp` got it scanned along with their
-  whole `test` tree -- a library reaching for directory names that are not its business.
-  `elixirc_paths` is the project's own answer to "where is my code", and for this repository
-  it already names `ledger` and the compiled test trees, so nothing is lost by asking it.
+  `elixirc_paths` is the project's own answer to "where is my code", so no other directory
+  name is assumed and nothing outside the compiled trees is scanned.
   """
   def roots do
     Mix.Project.config()

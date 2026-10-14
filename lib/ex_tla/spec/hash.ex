@@ -1,35 +1,20 @@
 defmodule ExTLA.Spec.Hash do
   @moduledoc """
-  Content versions for spec items and for a spec as a whole (#67).
+  Content versions for spec items and for a spec as a whole.
 
   A verification result, and a refinement mapping, are claims about a *specific version* of a
-  spec. `Refinement.abstract/1` is written against a set of spec variables; rename one or
-  change an action's post-state and `abstract_action/1` still compiles and still returns an
-  action name. The mapping is now wrong, and the only symptom is `:diverged` at runtime, on a
-  path that may not be exercised for months (#1, failure mode 2). A content version turns that
+  spec. `c:ExTLA.Refinement.abstract/1` is written against a set of spec variables; rename one
+  or change an action's post-state and `c:ExTLA.Refinement.abstract_action/1` still compiles and
+  still returns an action name. The mapping is now wrong, and the only symptom is `:diverged`
+  at runtime, on a path that may not be exercised for months. A content version turns that
   into a compile error.
 
-  ## Why the algorithm is implemented here rather than taken from surfex
+  ## The algorithm
 
-  The algorithm is `Surfex.SourceScan.definition_hash/1`'s — agentronic, extc and ExTLA all
-  stamp rows with a "content version", and the value of that word depends on the three meaning
-  the same thing by it. But `use ExTLA.GenServer, spec_version: …` is written by a CONSUMER, so
-  the check runs at their compile — and surfex is `only: [:dev, :test]`, which is not
-  transitive. A check that called it would fail for exactly the people it protects.
-
-  So the algorithm is implemented here and ships. It is written down rather than shared:
-  **strip all AST metadata, `Macro.to_string`, sha256, first 8 hex.**
-
-  **The agreement is tested, not assumed.** `ExTLA.Spec.HashTest` asserts this module and
-  `Surfex.SourceScan.definition_hash/1` produce identical output for every item in the corpus.
-  If that test is deleted or excluded from the default run, the decision recorded on #67 is
-  void — two implementations that agree only because both were written from the same paragraph
-  will drift, and the symptom is a stamp that is wrong for no visible reason.
-
-  This is also the ledger's `Version` column. There used to be a second module for that,
-  `ExTLA.Spec.Version` in `ledger/`, delegating to surfex and scanning the whole *file* — so
-  every `tick` in `test/support/specs.ex` showed the last one's hash, seven rows sharing one
-  cell (#201). One implementation, module-scoped, rather than a test proving two agree.
+  **Strip all AST metadata, `Macro.to_string`, sha256, first 8 hex.** It ships with ExTLA
+  rather than coming from a dev-only dependency because the check it serves runs at the
+  consumer's compile: `use ExTLA.GenServer, spec_version: …` is written in the consumer's code,
+  so the algorithm must be available wherever that code compiles.
 
   ## Metadata stripping is the point
 
@@ -84,11 +69,11 @@ defmodule ExTLA.Spec.Hash do
   @doc """
   Every versionable item `module` declares within `source`.
 
-  Scoped to that module's own `defmodule`, NOT the whole file. One file routinely holds several
-  specs — `ExTLA.Conformance.Counter.Spec` and `.BuggySpec` are neighbours — and a file-wide scan
-  gives them the same version, so editing one would mark every mapping stamped against the
-  other stale. A stamp going stale for something that did not change is the same "cries wolf"
-  failure position-insensitivity exists to prevent, arriving by a different route.
+  Scoped to that module's own `defmodule`, NOT the whole file. One file may hold several specs,
+  and a file-wide scan would give them the same version, so editing one would mark every
+  mapping stamped against the other stale. A stamp going stale for something that did not
+  change is the same "cries wolf" failure position-insensitivity exists to prevent, arriving
+  by a different route.
   """
   def scan(source, module) do
     case source |> Code.string_to_quoted!() |> module_body(Module.split(module), []) do
@@ -121,27 +106,21 @@ defmodule ExTLA.Spec.Hash do
 
   ## Every declaration, not only the items
 
-  The first version hashed the item kinds alone, on the reasoning that `variable`, `constant`,
-  `init` and `fairness` are "not independently verified, so there is nothing for a verdict to
-  go stale against". That was wrong about what the number is for (#194). A stamp does not
-  name a verdict; it names *the specification* somebody re-read a mapping against, and
-  changing an `init` value, a `constant`'s default or a variable's `type:` produced the
-  identical version — so a mapping stayed fresh across a new variable its `abstract/1` could
-  not produce, which is the exact staleness the stamp exists to catch.
+  `variable`, `constant`, `init` and `fairness` carry no verdict of their own, but they are in.
+  A stamp does not name a verdict; it names *the specification* somebody re-read a mapping
+  against. Changing an `init` value, a `constant`'s default or a variable's `type:` changes the
+  reachable states a mapping must handle, so each moves the version — otherwise a mapping
+  would stay fresh across a new variable its `abstract/1` cannot produce.
 
-  `fairness` is in for the same reason, and it was the one worth arguing: it changes liveness
-  verdicts and nothing a mapping reads. But the version is one number naming one
-  specification, and a spec under strong fairness admits a different set of behaviours from
-  the same spec under weak. Keeping fairness out would mean a "mapping-relevant" version
-  distinct from a "liveness-relevant" one — two stamps, where the second would be maintained
-  by nobody — and the ledger's `Fresh` column, which sits beside temporal rows, rests on this
-  same number.
+  `fairness` changes liveness verdicts and nothing a mapping reads, but the version is one
+  number naming one specification, and a spec under strong fairness admits a different set of
+  behaviours from the same spec under weak. Leaving it out would need a second,
+  "liveness-relevant" version beside the "mapping-relevant" one.
 
   What is *not* in: `@moduledoc`, `@doc`, `use ExTLA.Spec`, and any ordinary `def` in the
   module. A helper function called from an action body would change meaning without moving
-  the version; no spec in the project has one, and hashing the whole module body instead
-  would restamp every mapping on a documentation edit, which teaches authors to restamp
-  without reading.
+  the version; hashing the whole module body instead would restamp every mapping on a
+  documentation edit, which teaches authors to restamp without reading.
 
   Derived from declaration hashes rather than the file's bytes, so it inherits their
   position-insensitivity: reformatting a spec does not invalidate every mapping written against
@@ -157,9 +136,9 @@ defmodule ExTLA.Spec.Hash do
   @doc """
   The version of `module` as declared in `source`, or `nil` when `source` does not define it.
 
-  `Mix.Tasks.Extla.Stamp` reads specs from disk by path rather than through the loaded module,
-  and used to derive the version by its own copy of the formula. One formula, here, is what
-  keeps the compile-time check and the stamp task from disagreeing about a spec's version.
+  `mix extla.stamp` reads specs from disk by path rather than through the loaded module; it
+  uses this function, so the compile-time check and the stamp task always agree about a spec's
+  version.
   """
   def module_version(source, module) when is_binary(source) do
     case source |> Code.string_to_quoted!() |> module_body(Module.split(module), []) do
@@ -202,15 +181,14 @@ defmodule ExTLA.Spec.Hash do
     lines
   end
 
-  @doc "The kinds of item that carry a version of their own — the ledger's rows."
+  @doc "The kinds of item that carry a version of their own, each with a verdict of its own."
   def kinds, do: @kinds
 
   @doc """
   The declarations that carry no verdict but are part of the module version.
 
-  Together with `kinds/0`, every declaration form the DSL has. A macro added to the DSL and
-  to neither list would leave the module version blind to it, which is the defect #194
-  closed; `ExTLA.Spec.HashTest` compares the union against the DSL's own macros.
+  Together with `kinds/0`, every declaration form the DSL has. A declaration form in neither
+  list would leave the module version blind to edits of it.
   """
   def declarations, do: @named_declarations ++ @anonymous_declarations
 

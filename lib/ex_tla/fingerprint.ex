@@ -7,8 +7,9 @@ defmodule ExTLA.Fingerprint do
   This module decides whether the checker's answers can be trusted. A fingerprint
   collision silently drops an unexplored state, and the run then reports success
   over a state space it never visited — the worst failure mode a verification tool
-  has. See `01-foundation.md` §`ExTLA.Fingerprint` for why `:erlang.phash2/1` is not
-  used.
+  has. That is why `:erlang.phash2/1` is not used despite its speed: its default range is
+  2^27, and by the birthday bound a million distinct states would already collide
+  thousands of times (over a hundred even at 2^32, the most it allows). At 64 bits ten million states expect about 3 x 10^-6 collisions.
   """
 
   @type t :: <<_::64>> | <<_::128>>
@@ -19,7 +20,7 @@ defmodule ExTLA.Fingerprint do
   @doc """
   The widths a fingerprint may be computed at.
 
-  Asked for rather than restated by callers (#180). `mix extla.check --fingerprint-bits`
+  Asked for rather than restated by callers. `mix extla.check --fingerprint-bits`
   validates its flag against this, so a second list cannot fall out of step with the one
   `compute/2` actually enforces.
   """

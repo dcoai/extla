@@ -27,8 +27,8 @@ defmodule Mix.Tasks.Extla.Replay do
   `--trace` needs `concrete_message/2` on the refinement module: it starts from *abstract*
   actions and has to produce the message that causes each. `--captured` needs only
   `abstract/1` and `abstract_action/1`, and starts nothing — it is a pure check over
-  recorded data, which is what makes it usable in CI against a fixture or offline against
-  an incident.
+  recorded data, which is what makes it usable in a test suite against a fixture or offline
+  against an incident.
 
   ## The file formats
 

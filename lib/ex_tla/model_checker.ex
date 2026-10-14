@@ -688,10 +688,8 @@ defmodule ExTLA.ModelChecker do
   `successors/3` answers the same question and applies the transitions, which is what the
   search needs and what a caller choosing ONE of them does not: `ExTLA.Simulation.Generator`
   picks a candidate and asks the refinement for a message, and
-  `ExTLA.PropertyTest.action_sequences/3` picks one and walks. Both had their own `for`
-  comprehension over `spec.actions` and `enabled_bindings/3` before this existed, which is
-  two implementations of "what may happen next" that could disagree — and only one of them
-  is what the differential corpus compares against TLC.
+  `ExTLA.PropertyTest.action_sequences/3` picks one and walks. Both use this, so a
+  simulation, a property test and the checker agree on what may happen next.
 
   Actions are taken in declaration order and bindings in generator order, so the list is
   the same on every run.

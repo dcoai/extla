@@ -91,8 +91,8 @@ defmodule ExTLA.Temporal.Fairness do
   `:inconclusive` without a lasso: a prefix cannot establish that anything happens
   infinitely often, nor that it stops.
 
-  `enabled` is passed separately rather than derived from `action`, and this is where
-  `01-foundation.md`'s signature had to give. `ENABLED <A>_v` quantifies over every state
+  `enabled` is passed separately rather than derived from `action`. `ENABLED <A>_v`
+  quantifies over every state
   A could lead to, and a behaviour contains only the states that happened — so no
   function of the observed steps can answer it. `constraint_predicates/3` builds both from
   a spec, which is where the answer actually lives.

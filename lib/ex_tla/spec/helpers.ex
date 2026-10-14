@@ -4,7 +4,7 @@ defmodule ExTLA.Spec.Helpers do
   `action_property` blocks. `use ExTLA.Spec` imports this module whole, so this list
   **is** a spec body's vocabulary.
 
-  Two kinds of name live here, and the difference is the point (D-38).
+  Two kinds of name live here, and the difference is the point.
 
   **Thin wrappers over a standard Elixir function.** `set/1`, `put/2`, `union/2`,
   `len/1`, `sum/1` and the rest are one-line covers over `MapSet` and `Enum`.
@@ -13,13 +13,10 @@ defmodule ExTLA.Spec.Helpers do
   writing `MapSet.size/1` directly gets the same result.
 
   **Delegations to the foundation.** Every set-theoretic and function operator
-  `01-foundation.md` specifies is reachable from a spec body *unqualified*, and
-  every one of them is a `defdelegate` to `ExTLA.Set` or `ExTLA.Function`. This
-  module holds no second implementation of any of them. Until #319 it held four,
-  and two had already drifted from their counterparts — `for_each/2` refused a
-  sequence where `ExTLA.Function.construct/2` deduplicated one, and `domain/1` read
-  a sequence as `1..Len(s)` where `ExTLA.Function.domain/1` answered a set with the
-  struct's own field names. #318 is the measurement; D-38 is the decision.
+  ExTLA provides is reachable from a spec body *unqualified*, and every one of
+  them is a `defdelegate` to `ExTLA.Set` or `ExTLA.Function`. This module holds no
+  second implementation of any of them, so a spec body and code calling those
+  modules directly cannot get different answers.
 
   Every one of these is total and deterministic, which is the whole design: an
   action body must be a pure deterministic function of `(pre_state, params)`
@@ -27,15 +24,16 @@ defmodule ExTLA.Spec.Helpers do
   clock, or depend on anything but its arguments.
 
   Where a name would silently produce a wrong answer on a missing key, it
-  raises instead: `update/3`, `head/1` and `tail/1` all fail loudly, for the
-  reason set out in `01-foundation.md` §Reading a variable that is not there.
+  raises instead: `update/3`, `head/1` and `tail/1` all fail loudly. A `nil`
+  standing in for a value that is not there would flow into guards and states
+  and let the checker explore states the spec does not describe.
   """
 
   # ── Function application ──
 
   @doc """
   TLA+: `f[x]` — function application, which is what `f[x]` compiles to inside
-  every spec block (`02-dsl-semantics.md` §1.6, D-20).
+  every spec block (`02-dsl-semantics.md` §1.6).
 
   A TLA+ function is undefined outside its domain, and a sequence is a function
   on `1..Len(s)`, so both raise here rather than returning `nil`:
@@ -180,12 +178,11 @@ defmodule ExTLA.Spec.Helpers do
 
   `n < m` is the empty sequence, whatever `m` and `n` are — TLC's `SubSeq(s, 2, 0)` is `<<>>`
   even for an empty `s`. Otherwise both bounds must lie in `1..Len(s)`, and one outside raises
-  `ExTLA.Spec.DomainError` the way `at/2` does for the same off-by-one (#197).
+  `ExTLA.Spec.DomainError` the way `at/2` does for the same off-by-one.
 
-  This was `Enum.slice(seq, m - 1, n - m + 1)`, which has Elixir's index semantics rather than
-  TLA+'s: `subseq([1, 2, 3], 0, 1)` returned `[3]`, a zero index wrapping to the end, and a
-  negative `m` counted from the end. An off-by-one in a spec then produced a valid sequence
-  that was not the one the author wrote, silently — the exact shape `at/2` refuses.
+  The indices are TLA+'s, not Elixir's: a zero or negative `m` does not wrap or count from the
+  end. Elixir's slice semantics would turn an off-by-one in a spec into a valid sequence that
+  is not the one the author wrote, silently — the exact shape `at/2` refuses.
 
       iex> ExTLA.Spec.Helpers.subseq([:a, :b, :c], 3, 2)
       []
@@ -216,8 +213,8 @@ defmodule ExTLA.Spec.Helpers do
       iex> ExTLA.Spec.Helpers.for_each(MapSet.new([:a, :b]), fn _ -> 0 end)
       %{a: 0, b: 0}
 
-  `S` is a set: a list is a sequence, and building a function over one
-  deduplicated it silently (#211), so it is refused by name.
+  `S` is a set: a list is a sequence, and building a function over one would
+  silently deduplicate it, so it is refused by name.
   """
   defdelegate for_each(domain, f), to: ExTLA.Function, as: :construct
 
@@ -252,7 +249,7 @@ defmodule ExTLA.Spec.Helpers do
   TLA+: `DOMAIN f`, as a set.
 
   A sequence is a function on `1..Len(s)` — that is what `at/2` applies it as — so its
-  domain is that range (#211).
+  domain is that range.
 
       iex> ExTLA.Spec.Helpers.domain(%{a: 1, b: 2})
       MapSet.new([:a, :b])
@@ -283,10 +280,8 @@ defmodule ExTLA.Spec.Helpers do
   none satisfies it.
 
   It does NOT branch. Nondeterminism comes from `params:` only
-  (`02-dsl-semantics.md` §3) — an earlier draft gave this function branching
-  semantics, which both contradicts the TLA+ operator it is named for and cannot
-  be implemented: a function returning one element cannot produce several
-  successors.
+  (`02-dsl-semantics.md` §3): `CHOOSE` in TLA+ is a function of its arguments,
+  and a function returning one element cannot produce several successors.
 
   Delegates to `ExTLA.Set.choose/2`, which fixes the choice as the least satisfying
   element in Erlang term order.

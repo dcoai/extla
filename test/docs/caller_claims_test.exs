@@ -50,8 +50,9 @@ defmodule ExTLA.CallerClaimsTest do
 
   # How many caller-claim references lib/ holds now. The test is not vacuous: a parser
   # that stopped finding claims would pass every claim it found. A new claim updates this
-  # number, which is the moment to check that the claim is true.
-  @expected_references 9
+  # number, which is the moment to check that the claim is true. #408 removed three, with
+  # the history they sat in.
+  @expected_references 6
 
   # A claim that something CALLS: the named caller must reach the documented function.
   @calls ~r/\b(called (from|by)|used by|relied on by)\b/i

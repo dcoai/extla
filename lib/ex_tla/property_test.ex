@@ -2,8 +2,7 @@ defmodule ExTLA.PropertyTest do
   @moduledoc """
   StreamData generators derived from a specification, for a consumer's own property tests.
 
-  `05-layer3-conformance.md` §`ExTLA.PropertyTest` specifies these. They are the piece of
-  Layer 3 that ExTLA does *not* drive: `ExTLA.Replay` checks an implementation against a
+  They are the piece of Layer 3 that ExTLA does *not* drive: `ExTLA.Replay` checks an implementation against a
   trace and `ExTLA.Simulation` walks it randomly, both under ExTLA's control, while these
   hand the spec's own state space to a `check all` the consumer writes.
 
@@ -19,14 +18,12 @@ defmodule ExTLA.PropertyTest do
   unconditionally. Each function below is compiled behind `Code.ensure_loaded?(StreamData)`
   — the shape `ExTLA.Invariant.Test` already uses — with an `else` clause that says so
   rather than failing as an undefined function. A consumer who wants generators declares
-  `stream_data` themselves; ExTLA keeps zero runtime dependencies (§06 §Dependencies).
+  `stream_data` themselves; ExTLA keeps zero runtime dependencies.
 
-  ## What is deferred
+  ## No generated test files
 
-  `generate_test_module/3`, which §05 also specifies. `06-architecture.md` §Deferred
-  removes generated test *files* from v1: "`mix extla.gen.test` writes code someone then has
-  to maintain; the property helpers give most of the value without that". These are those
-  helpers.
+  ExTLA does not write test modules for you. Generated test code is code someone then has
+  to maintain; these property helpers give most of the value without that.
   """
 
   # `ExTLA.ModelChecker` is deliberately NOT aliased. Its only use is inside the
@@ -58,7 +55,7 @@ defmodule ExTLA.PropertyTest do
 
     ## What it refuses
 
-    A state outside §6's permitted terms raises, and so does one outside the variables'
+    A state outside the permitted state terms (`02-dsl-semantics.md` §6) raises, and so does one outside the variables'
     declared types — both naming the `init` block and the variable. A spec whose `init`
     produces such a state is one `mix extla.check` would refute at depth 1, and a generator
     that quietly filtered it away would hide the same defect behind a property that
@@ -77,16 +74,16 @@ defmodule ExTLA.PropertyTest do
 
     ## Where the choices come from
 
-    `ExTLA.ModelChecker.enabled_steps/3` — the checker's own enumeration, the one the
-    differential corpus compares against TLC. A second implementation of "what may happen
-    next" could disagree with it, and only one of the two is measured.
+    `ExTLA.ModelChecker.enabled_steps/3` — the checker's own enumeration. A second
+    implementation of "what may happen next" could disagree with the checker, and then a
+    generated behaviour would not be one the checker explored.
 
     ## Why there is no refinement argument
 
     `ExTLA.Simulation.Generator` takes one and returns a concrete message; this returns
     `{action_name, params}` and stops there. A sequence of actions is *spec-level*, and
-    mapping it to messages is the consumer's own `check all` body — §05's usage example
-    calls `concrete_message/2` there itself. The two signatures differ on purpose.
+    mapping it to messages is the consumer's own `check all` body, which calls
+    `c:ExTLA.Refinement.concrete_message/2` itself. The two signatures differ on purpose.
 
     ## Shrinking
 

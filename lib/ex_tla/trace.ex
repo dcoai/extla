@@ -59,8 +59,8 @@ defmodule ExTLA.Trace do
 
   Accepts a lasso too, which round-trips as `%{prefix:, cycle:}`. States and bindings go
   through `ExTLA.State.Json`, because `inspect/1` produces something a person can read and a
-  machine cannot parse — and `05-layer3-conformance.md`'s pipeline runs
-  `mix extla.check --format json` into `mix extla.replay --trace`, which needs the second.
+  machine cannot parse — and the conformance pipeline runs `mix extla.check --format json`
+  into `mix extla.replay --trace`, which needs the second.
   """
   def to_json(%__MODULE__{} = trace) do
     %{
@@ -233,18 +233,17 @@ defmodule ExTLA.Trace do
        actions, and a pairing between them that is a lie.
     4. For a lasso, additionally: the cycle starts where the prefix ends, its steps are
        legal, and it **closes** — applying them returns to its own first state.
-    5. A **stutter is final** (§5.3). A one-state cycle with no actions claims the behaviour
-       stays there forever, which is only so where nothing is enabled; a deadlock trace
-       likewise has to end at a successor-less state. Both used to pass at a live state
-       (#203), and `format/1` rendered the stutter "has no successors" — an oracle that
-       agreed with a liveness pass putting a stutter in the wrong place.
+    5. A **stutter is final** (`02-dsl-semantics.md` §5.3). A one-state cycle with no
+       actions claims the behaviour stays there forever, which is only so where nothing is
+       enabled; a deadlock trace likewise has to end at a successor-less state. A stutter
+       at a live state is refused, because `format/1` would render it as "has no
+       successors" and so confirm a stutter placed in the wrong spot.
 
   ## A safety trace must also refute the property it names
 
-  A legal path from an initial state is not yet a counterexample. #112 was exactly that
-  distinction going unmade: an action-property trace built from the wrong end described a
-  perfectly legal route to a state whose final step *satisfied* the property it was
-  offered as a refutation of, and every check above passed it. So a safety trace is
+  A legal path from an initial state is not yet a counterexample: a trace can describe a
+  perfectly legal route to a state whose final step *satisfies* the property it is offered
+  as a refutation of, and every check above would pass it. So a safety trace is
   additionally required to fail where it says it fails — a named invariant false in the
   final state, a named action property false over the final step. Neither needs a second
   implementation of anything: both predicates are already compiled on the spec.
@@ -481,20 +480,17 @@ defmodule ExTLA.Trace do
   it by zipping the three lists, so a trace that breaks this describes no behaviour at all
   — and `Enum.zip/2` does not say so, it silently stops at the shortest list.
 
-  ## Why this is public, and asserted at the producers
+  ## Why it is asserted where a trace is built
 
-  It was already written down — as a private `misaligned?/1`, checked at three **consumers**:
-  `from_json!/1`, `to_diffs/1` and `legal_steps/4`. `to_diffs/1`'s own comment records what
-  that cost: "the shape the simulation's restart branch produced was exactly that", found
-  when `Trace.Explore` and `format/1` disagreed about one trace. The producer that broke it
-  was three modules away and the trace had already been rendered wrong by then (#204, #260).
+  Checking only where a trace is read (`from_json!/1`, `to_diffs/1`, `validate/3`) catches a
+  malformed trace after it has left the code that broke it, often a few modules away and
+  sometimes after it has already been rendered. So every producer in this library asserts
+  it too, through `well_formed!/2`: a producer that breaks the invariant fails naming
+  itself, which is where the fix goes.
 
-  So the same predicate is now asserted where a trace is **built**. A producer that breaks
-  it fails naming itself, which is where the fix goes.
-
-  `length` is checked too, and it is the field most easily left behind: it counts STATES
-  (#212), so an edit that changes the lists and not the count produces a trace that reads
-  as one shape and reports another.
+  `length` is checked too, and it is the field most easily left behind: it counts STATES,
+  so an edit that changes the lists and not the count produces a trace that reads as one
+  shape and reports another.
 
   Returns `:ok` or `{:error, message}`.
   """
@@ -558,11 +554,9 @@ defmodule ExTLA.Trace do
   Export a trace as a sequence of state diffs, for programmatic consumption.
 
   A misaligned trace — one whose actions, bindings and states cannot describe one behaviour —
-  is refused rather than zipped (#204). `Enum.zip/1` stops at the shortest list, so a trace
-  one action short rendered three states of four and marked the wrong one `[VIOLATION]`; the
-  state that actually violated was never shown. The shape the simulation's restart branch
-  produced was exactly that, and `Trace.Explore`, which renders every column, disagreed with
-  `format/1` about the same trace.
+  is refused with an `ArgumentError` rather than zipped. `Enum.zip/1` stops at the shortest
+  list, so a trace one action short would render three states of four and mark the wrong
+  one `[VIOLATION]`, never showing the state that actually violated.
   """
   def to_diffs(%__MODULE__{states: [_ | _]} = trace) do
     if misaligned?(trace) do

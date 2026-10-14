@@ -24,15 +24,12 @@ defmodule ExTLA.GenServer.Driver do
 
   **Every shape is the pid path.** The server is resolved once with `GenServer.whereis/1`
   and the monitor and the send both take the pid; a name that resolves to nothing is
-  `{:stopped, :noproc}` with nothing sent. Two defects lived in treating the shapes
-  separately. The `:DOWN` was matched on `^server`, and a monitor on a registered name
-  delivers `{name, node}` there, so a violation raised under a name sat unread until the
-  timeout and `Replay` reported `:not_followed` (#207). Then `send/2` to a name whose process
-  had just died raised `invalid destination`, where the same send to a dead pid is a no-op
-  answered by the monitor's `:noproc` — one shape raising and the other reporting, for one
-  situation (#254). Resolving first removes the second by construction; the reference-only
-  `:DOWN` match below removes the first. A process that dies between the lookup and the send
-  is the dead-pid case: a no-op send and a `:noproc` `:DOWN`.
+  `{:stopped, :noproc}` with nothing sent. So every shape behaves the same: a violation
+  raised under a registered name is reported as a violation (the `:DOWN` is matched on the
+  monitor reference alone, not on the name), and a server that has just died is
+  `{:stopped, :noproc}` rather than an `invalid destination` raise from `send/2`. A process
+  that dies between the lookup and the send is the dead-pid case: a no-op send and a
+  `:noproc` `:DOWN`.
   """
   def call(server, message, timeout \\ 5_000), do: deliver(server, {:call, message}, timeout)
 
@@ -44,19 +41,17 @@ defmodule ExTLA.GenServer.Driver do
       {:info, msg}   msg                         handle_info/2
       msg            a call
 
-  D-36 has the reasoning. The short of it: a term is a message and a message does not carry
-  how it arrives, so the mapping has to say — and a bare term keeps meaning a call, so no
-  mapping written before this changes. `05-layer3-conformance.md`'s own canonical refinement
-  maps two actions to `handle_cast/2` clauses, and until this existed they were delivered as
-  calls, reached a `handle_call/3` with no matching clause, and replay reported
-  `:not_followed` about a server that was correct (#172).
+  A term is a message and a message does not carry how it arrives, so the mapping has to
+  say. A bare term means a call. A mapping whose actions are handled by `handle_cast/2` or
+  `handle_info/2` clauses must name that route: delivered as a call, the message would reach
+  `handle_call/3`, find no matching clause, and a correct server would be reported as not
+  following the trace.
 
   ## When a cast is done
 
   A call hands back "answered, refused, or died" as a value. A cast has no reply, and a
   driver that moved on before it was handled would compare the next action against a stale
-  state — the defect class of #168, which must not come back through the fix for a different
-  one.
+  state.
 
   The completion signal is a **`:get_state` system message sent straight after**. It goes
   through the same mailbox, so it is ordered behind the cast: when its reply arrives, the

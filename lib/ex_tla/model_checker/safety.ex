@@ -56,7 +56,7 @@ defmodule ExTLA.ModelChecker.Safety do
   The names of every `terminal` whose predicate admits `state`. Empty means a deadlock.
 
   `classify_stuck/3` is this with the names thrown away; the checker asks for the names so
-  coverage can count which terminal ended which behaviour (#202) from one evaluation.
+  coverage can count which terminal ended which behaviour from one evaluation.
   """
   def admitting_terminals(spec, constants, state) do
     for terminal <- spec.terminals, terminal.predicate.(constants, state), do: terminal.name
@@ -65,9 +65,9 @@ defmodule ExTLA.ModelChecker.Safety do
   @doc """
   The declarations a run with `only` will actually check.
 
-  Selection exists for the differential corpus: TLC halts at the first violation
-  and so does ExTLA, so reproducing TLC's per-invariant report means one run per
-  invariant — and a run measuring the state count has to check nothing at all.
+  Selection exists because a run halts at the first violation, as TLC's does: getting a
+  verdict for each invariant separately means one run per invariant, and a run that only
+  measures the state count has to check nothing at all.
   """
   def selected(declarations, :all), do: declarations
 
@@ -79,19 +79,18 @@ defmodule ExTLA.ModelChecker.Safety do
   @doc """
   Refuse a selection naming something the spec does not declare.
 
-  Without this, a typo checks **nothing** and the run reports `:ok` (#166):
+  Without this, a typo checks **nothing** and the run reports `:ok`:
 
       invariants: [:cap]         status=:violation
       invariants: [:capp] (typo) status=:ok  warnings=[]
 
   The filter matched no declaration, the coverage table came out empty, and the search had
-  nothing to evaluate — so the run is green because it verified nothing, which is the one
-  outcome Design Principle 6 exists to make impossible.
+  nothing to evaluate — so the run would be green because it verified nothing. A checker
+  must never report success for a check it did not perform.
 
-  It matters beyond a hand-typed config. `ExTLA.DifferentialCase` drives the whole TLC corpus
-  through these selections using names read from `expected.json`, and D-9 makes agreement
-  with TLC the Phase 1 acceptance gate. A misspelled name in a fixture makes
-  `assert result.status == :ok` pass having compared nothing at all.
+  It matters beyond a hand-typed config: a test that selects invariants by names read from
+  a file would, on a misspelled name, make `assert result.status == :ok` pass having checked
+  nothing at all.
   """
   def reject_unmatched!(declarations, names) do
     declared = MapSet.new(declarations, & &1.name)

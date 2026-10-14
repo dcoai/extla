@@ -9,11 +9,11 @@ defmodule ExTLA.Simulation.Generator do
 
   ## Why the refinement is an argument
 
-  `05-layer3-conformance.md` typed these `from_spec(spec_module, constants)`. A
-  specification has no notion of a message — that is the whole reason
-  `concrete_message/2` exists — so a generator returning one needs the mapping as well.
-  Taking it explicitly is the smallest fix; the alternative, returning `{action, params}`
-  and mapping later, would put half the generator in its caller.
+  A specification has no notion of a message — that is the whole reason
+  `c:ExTLA.Refinement.concrete_message/2` exists — so a generator returning one needs the
+  mapping as well. The alternative, returning `{action, params}` and mapping later, would
+  put half the generator in its caller; `ExTLA.PropertyTest.action_sequences/3` is that
+  spec-level form, for a consumer's own property tests.
   """
 
   alias ExTLA.{ModelChecker, Spec}
@@ -24,7 +24,7 @@ defmodule ExTLA.Simulation.Generator do
   Returns `(abstract_state -> {action, params, message}) | nil`, `nil` when nothing can be
   generated in that state. Messages for disabled actions are the point rather than waste:
   an implementation that accepts a message the spec forbids in that state is exactly what
-  `check_step!/5` reports as `:not_enabled`, and a generator that never sends one can
+  `ExTLA.GenServer.Runtime.check_step!/5` reports as `:not_enabled`, and a generator that never sends one can
   never find it.
   """
   def from_spec(spec_module, refinement, constants) do

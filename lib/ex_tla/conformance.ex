@@ -1,6 +1,7 @@
 defmodule ExTLA.Conformance do
   @moduledoc """
-  Layer 2 and Layer 3, checked against each other (#49).
+  Layer 2 and Layer 3, checked against each other. See "What conformance checks" in
+  `guides/reference.md`.
 
   They compute over the same specification and never look at one another. Layer 2 says
   which states are reachable. Layer 3 runs a real GenServer and observes behaviour through
@@ -12,10 +13,10 @@ defmodule ExTLA.Conformance do
        refinement mapping that is wrong in a state no test happened to reach";
     3. **the search missed a state** — a checker defect, found by running code.
 
-  Only the first two are ever considered today, and the third is indistinguishable from
-  them. It is also the only one no other gate can find: TLC agreement covers six models,
-  and a running server explores paths driven by real OTP scheduling rather than by the
-  traversal code under test.
+  A simulation alone considers only the first two, and the third is indistinguishable from
+  them. It is also the one nothing else finds: a running server explores paths driven by
+  real OTP scheduling rather than by the checker's own traversal code, so it can reach a
+  state the search missed.
 
   ## What is decidable here, and what is not
 
@@ -27,11 +28,10 @@ defmodule ExTLA.Conformance do
     * **it does not** — the implementation did something the spec forbids, *or* the
       mapping described the step wrongly. `:not_a_step_of_the_spec`.
 
-  That last pair is not split, and not because it is hard.
-  `test/conformance/README.md` already states the position for `:not_followed`: "one of
-  the two is wrong, and which one is not something the checker can decide." The same
-  argument runs in this direction, and a confident split would be precisely the kind of
-  self-consistent wrong answer the rest of this work exists to remove. Layer 3's own
+  That last pair is not split, and not because it is hard: one of the two is wrong, and
+  which one is not something the checker can decide from the step. The same holds for a
+  `ExTLA.Replay`'s `:not_followed`, and a confident split would be a self-consistent wrong
+  answer. Layer 3's own
   `check_step/5` runs during the simulation and reports its reading; this adds the
   containment view beside it rather than overruling it.
 

@@ -27,12 +27,11 @@ defmodule ExTLA.Invariant do
   ## `defoverridable` and `super`, not renaming
 
   The `@before_compile` hook wraps each callback the module defines by marking it
-  overridable and defining a new one that calls `super`. An earlier draft of
-  `03-layer1-invariants.md` called a generated `__original_handle_call__/3`, which breaks
-  on the thing every real GenServer has: several `handle_call/3` clauses with guards.
-  Renaming would have to reproduce every clause head and its guards exactly, and any
-  mistake silently changes dispatch. `super` keeps the original clauses intact and
-  dispatches to them with their own pattern matching.
+  overridable and defining a new one that calls `super`, rather than renaming the
+  original. Every real GenServer has several `handle_call/3` clauses with guards; renaming
+  would have to reproduce every clause head and its guards exactly, and any mistake
+  silently changes dispatch. `super` keeps the original clauses intact and dispatches to
+  them with their own pattern matching.
 
   `use ExTLA.Invariant` goes directly **after** `use GenServer` and **before** the
   callbacks, and the order is load-bearing rather than stylistic. Only the callbacks the
@@ -43,7 +42,7 @@ defmodule ExTLA.Invariant do
   `super` on them is deprecated, and wrapping a default that exists to stop the server
   with a `:bad_call` is checking a transition nobody wrote.
 
-  **`init/1` is the exception, and it needed a second guard** (#171). GenServer injects it
+  **`init/1` is the exception, and it needs a second guard.** GenServer injects it
   from its own `@before_compile`, which runs *after* the hook is installed rather than
   before — so `@on_definition` does see it, and `{:init, 1}` lands in the wrapped set for a
   module whose author wrote no `init/1`. By then GenServer's `defoverridable init: 1` has
@@ -51,8 +50,8 @@ defmodule ExTLA.Invariant do
 
       ** (ArgumentError) cannot make function init/1 overridable because it was not defined
 
-  naming neither this library nor the cause. The example at the top of this moduledoc
-  produced exactly that. So the wrapper is emitted only for a callback still in the
+  naming neither this library nor the cause — for a module as plain as the example at the
+  top of this moduledoc. So the wrapper is emitted only for a callback still in the
   definitions table when `__before_compile__/1` runs — which is precisely what
   `make_overridable/2` requires, asked as a question rather than assumed.
 
