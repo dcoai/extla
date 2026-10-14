@@ -10,6 +10,11 @@ CI, test tooling, internal refactors — is left to the commit history. Entries 
 condensed to that rule; the full text is
 [the CHANGELOG at v0.5.0](https://github.com/dcoai/extla/blob/v0.5.0/CHANGELOG.md).
 
+## [Unreleased]
+
+`mix.exs` reads `0.6.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
+release it merely follows.
+
 ## [0.6.0] — 2026-10-14
 
 **A minor line, opened by Layer 1's predicate rule.** A Layer 1 `invariant`,
@@ -637,6 +642,7 @@ public surface may still move, and this tag is a reference point, not a compatib
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view abstraction
   are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
+[Unreleased]: https://github.com/dcoai/extla/compare/v0.6.0...main
 [0.6.0]: https://github.com/dcoai/extla/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dcoai/extla/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dcoai/extla/releases/tag/v0.4.0
