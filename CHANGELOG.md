@@ -36,6 +36,9 @@ release it merely follows.
   read the coverage report, the JSON result schema, what conformance checks, Layer 1's
   test helpers, telemetry and overhead, and what ExTLA is not. The `ExTLA` module docs and
   this file now agree that the changelog is the record of what is built.
+- **The API docs group modules by what you do with them** (#405, for #397): specifications,
+  model checking, Layer 1, Layer 3, and Internals last for the engine modules a user never
+  calls, such as `ExTLA.Invariant.Runtime`. `ExTLA` heads the list.
 
 ## [0.5.0] — 2026-10-13
 
