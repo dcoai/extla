@@ -42,7 +42,7 @@ defmodule ExTLA.Set do
 
   This is the independent product, a fixed list of sets.
   `ExTLA.ModelChecker.bindings/3` is a different operation: each parameter's
-  values may depend on the state and on the parameters bound before it (#324).
+  values may depend on the state and on the parameters bound before it.
 
       iex> ExTLA.Set.cross_many([MapSet.new([1, 2]), MapSet.new([:a, :b])]) |> MapSet.size()
       4
@@ -98,8 +98,7 @@ defmodule ExTLA.Set do
   element, so any total order will do — but it must be an order that does not
   depend on how the set was built or which OTP release is running. Enumeration
   order is not such an order, and a `CHOOSE` that varied between runs would make
-  the reachable state graph vary between runs, which would defeat the differential
-  corpus before it detected anything.
+  the reachable state graph, and every result read from it, vary between runs.
 
   Raises `ArgumentError` if no element satisfies the predicate; `CHOOSE` over an
   empty set is undefined in TLA+ and silently returning `nil` would put an

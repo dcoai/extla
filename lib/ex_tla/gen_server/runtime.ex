@@ -5,8 +5,8 @@ defmodule ExTLA.GenServer.Runtime do
   `check_step!/5` is the refinement check, and it is what makes the layer a conformance
   check rather than an invariant check on a projection: an implementation can reach a
   state every invariant admits by a route the specification forbids, and only comparing
-  the *step* against the spec's action catches that (`05-layer3-conformance.md` §What
-  conformance means here).
+  the *step* against the spec's action catches that (see "What conformance checks" in
+  `guides/reference.md`).
 
   ## The compiled spec and the constants are memoized per process
 
@@ -63,13 +63,11 @@ defmodule ExTLA.GenServer.Runtime do
   at it: a temporal property over a behaviour that begins at the second state is a property
   of a different behaviour.
 
-  **It SEEDS the trace rather than recording a transition into it (#168).** It used to call
-  `record_transition!(spec, :init, abstract, abstract)`, and `record_transition!/4` seeds an
-  empty trace with its own `pre` — so the initial state landed in the buffer twice and every
-  recorded behaviour opened with a step from a state to itself. That is a step that never
-  happened, and `ExTLA.Conformance.against_graph/3` classifies it as **forbidden** unless the
-  spec happens to carry a self-loop at its initial state. The layer's two behaviour sources
-  therefore disagreed with each other about the same server.
+  **It SEEDS the trace rather than recording a transition into it.** Recording the initial
+  state as a transition would put it in the buffer twice, and every recorded behaviour would
+  open with a step from a state to itself. That step never happened, and
+  `ExTLA.Conformance.against_graph/3` would classify it as **forbidden** unless the spec
+  happens to carry a self-loop at its initial state.
   """
   def record_initial!(spec_module, refinement, result) do
     case ExTLA.Invariant.Runtime.initial_state(result) do
@@ -134,7 +132,7 @@ defmodule ExTLA.GenServer.Runtime do
 
   The dispatch is here rather than in the emitted wrapper for the same reason the `init/1`
   tag test is. In a module whose messages the compiler can enumerate — a server with one
-  callback clause, which is most mutants and some real servers —
+  callback clause —
   `refinement.abstract_action(msg)` has a known return, and one arm of the `case` is then
   provably unreachable. That is a warning in the user's module about code the user did not
   write. Behind a `module()` argument there is nothing to infer.
@@ -232,10 +230,8 @@ defmodule ExTLA.GenServer.Runtime do
   @doc """
   Record a transition in the CALLING process's behaviour trace.
 
-  There is no pid argument. A process dictionary is writable only by its own process, so a
-  signature taking one could not be implemented as `05-layer3-conformance.md` first
-  described it; the wrapper runs inside the GenServer, so recording is always a
-  self-write.
+  There is no pid argument. A process dictionary is writable only by its own process, and
+  the wrapper runs inside the GenServer, so recording is always a self-write.
 
   The buffer is bounded (`config :extla, trace_buffer: n`, default #{@default_trace_buffer})
   and drops oldest-first: an unbounded per-process trace is a memory leak in any long-lived
@@ -256,12 +252,12 @@ defmodule ExTLA.GenServer.Runtime do
   The behaviour recorded by THIS process: `%{states: [...], dropped: n}`, oldest state
   first.
 
-  **`dropped` is part of the value because the states alone cannot carry it.** This
-  returned a bare list until #278, and `check_temporal_properties/2` read its head as "the
-  first state of the behaviour" — true until the buffer dropped it, after which a bare
-  predicate was settled against an arbitrary mid-behaviour state. A server that had taken
-  1,200 transitions reported `n == 0` **violated** when the behaviour did start at zero:
-  not a missing verdict, the opposite one, as a settled fact.
+  **`dropped` is part of the value because the states alone cannot carry it.** A truncated
+  list looks exactly like a short one. Once the buffer has dropped the behaviour's first
+  state, the head of `states` is an arbitrary mid-behaviour state, and a bare predicate
+  settled against it could report **violated** for a behaviour that did start where the
+  property says. `check_temporal_properties/2` reads `dropped` and answers `:inconclusive`
+  for such a predicate instead.
   """
   def trace do
     %{
@@ -298,8 +294,8 @@ defmodule ExTLA.GenServer.Runtime do
   a simulation run, not per transition.
 
   A finite trace can refute `always(P)` and can satisfy `eventually(P)`, and can do
-  neither the other way round, so the verdicts are `:holds | :violated | :inconclusive`
-  (`08-decisions.md` D-23). A real trace has no lasso — nothing says the process would
+  neither the other way round, so the verdicts are `:holds | :violated | :inconclusive`.
+  A real trace has no lasso — nothing says the process would
   have repeated that cycle forever — so the properties that need one are `:inconclusive`
   by construction rather than by accident.
   """

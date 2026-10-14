@@ -1,6 +1,6 @@
 defmodule ExTLA.Profile do
   @moduledoc """
-  What each of *your* declarations cost, measured in reductions (#116).
+  What each of *your* declarations cost, measured in reductions.
 
   `ExTLA.Coverage` answers how often the checker asked a declaration. This answers how expensive
   the answer was — the other half of the question a spec author has when a run is slow, and the
@@ -10,15 +10,13 @@ defmodule ExTLA.Profile do
 
   ## Why reductions and not milliseconds
 
-  Every performance number this project had before this module was caveated by a CPU model and a
-  load average — `bench/search_profile.baseline.md` states the rule ("A number without the machine
-  it was taken on is not a measurement") and records a `raft` run swinging from 23.4 s to 30.5 s
-  on machine load alone.
+  A wall-clock number means nothing without the CPU model and the load average it was taken
+  under: the same model-checking run can swing by a quarter or more on machine load alone.
 
   A reduction is the BEAM's own unit of work. The counter is incremented on function calls and
   BIF work and consults neither the clock nor the CPU, so the count is a function of
-  `(OTP version, code, data)` and of nothing else. Measured on the machine in that baseline, the
-  same fixed workload under 32 competing processes:
+  `(OTP version, code, data)` and of nothing else. The same fixed workload under 32 competing
+  processes:
 
       wall       2,512 -> 5,032 µs, a 100.3% spread
       reductions 225,017 -> 225,017
@@ -62,21 +60,20 @@ defmodule ExTLA.Profile do
   is slightly undercharged — measured at ~2% of wall on an allocation-heavy loop, against the 30%
   the wall clock swings on load. The trade is worth it and is stated rather than hidden.
 
-  **The checker's own machinery.** `bench/search_profile.exs` profiles that, in milliseconds, and
-  keeps doing so: its phases are ETS and NIF work rather than user code, and whether reductions
-  describe *those* well is a separate question nobody has measured. This module wraps the closures
-  `ExTLA.Spec.Compiled` holds and nothing else.
+  **The checker's own machinery.** Its phases are ETS and NIF work rather than user code, and
+  whether reductions describe those well is a question nobody has measured. This module wraps
+  the closures `ExTLA.Spec.Compiled` holds and nothing else.
 
   ## Where the window opens and closes, and why there is no `bounded_by` here
 
-  The window is the **search**, and only the search. It opens where `search_and_finish/2`
-  instruments a copy of the spec and closes where that copy stops being called; the graph keeps
-  the *uninstrumented* spec, because everything that consults `graph.spec` runs after the search
-  has stopped. `ExTLA.StateGraph`'s moduledoc says what it is for: replay — turning a `path_to/2`
-  back into states means applying transitions. Regenerating a counterexample, or materializing
-  every state so a liveness predicate can be evaluated over it, is not work the spec's transitions
-  did while exploring, and #133 is what it cost when the two were one value: a refuted run charged
-  each trace step twice, and a `check_liveness: true` run charged roughly a whole second search.
+  The window is the **search**, and only the search. The checker instruments a copy of the spec
+  for the search and stops counting when that copy stops being called; the state graph keeps the
+  *uninstrumented* spec, because everything that consults it runs after the search has stopped —
+  replay, which turns an `ExTLA.StateGraph.path_to/2` result back into states by applying
+  transitions. Regenerating a counterexample, or materializing every state so a liveness
+  predicate can be evaluated over it, is not work the spec's transitions did while exploring.
+  Counting it would charge a refuted run each trace step twice, and a `check_liveness: true` run
+  roughly a whole second search.
 
   That boundary is what lets this module say something `ExTLA.Coverage` cannot. Coverage's
   `bounded_by` exists because a halted search leaves the **state space** incompletely described:
@@ -91,17 +88,16 @@ defmodule ExTLA.Profile do
 
   ## Why the process dictionary
 
-  The closures are called from inside `ExTLA.ModelChecker.Safety.check_invariants/4`, and
-  from `ExTLA.ModelChecker`'s `enabled_bindings/3` and private `take_action/6`, and they
-  return only their value — there is nothing to thread an accumulator back through, short of
-  changing the signature of every call site in the hot path to carry one.
+  The closures are called from deep inside the checker's hot path — invariant checking, guard
+  evaluation, action application — and they return only their value. There is nothing to thread
+  an accumulator back through, short of changing the signature of every call site in the hot
+  path to carry one.
 
   The dictionary is not merely the convenient answer, it is the *correct* boundary: it is
-  per-process, which is exactly what `ExTLA.ModelChecker.Parallel` already calls a worker's
-  "contribution" (`parallel.ex:160`, which starts each worker's `ExTLA.Coverage` from zero for the
-  same reason). A worker reads its own dictionary at the end of its slice and hands back a struct,
-  so `merge/2` composes the way `ExTLA.Coverage.merge/2` does and no shared mutable state touches
-  the expansion path.
+  per-process, which is exactly what a worker's contribution is under `workers:` (each worker's
+  `ExTLA.Coverage` starts from zero for the same reason). A worker reads its own dictionary at
+  the end of its slice and hands back a struct, so `merge/2` composes the way
+  `ExTLA.Coverage.merge/2` does and no shared mutable state touches the expansion path.
 
   Writes are confined to `bump/2` and reads to `collect/1`. Nothing else in the project reads
   these keys.
@@ -230,7 +226,7 @@ defmodule ExTLA.Profile do
 
   @doc """
   Remove this process's counters from its dictionary. `zero/1` does this on a worker's way
-  in; the coordinator calls it on its way out (#212), so the keys do not outlive the run in
+  in; the coordinator calls it on its way out, so the keys do not outlive the run in
   a long-lived process.
   """
   def clear(%__MODULE__{} = profile) do
@@ -258,8 +254,8 @@ defmodule ExTLA.Profile do
 
   @doc """
   Sum two contributions. Both come from one `init/1`, so their key sets are identical and a key in
-  one and not the other would be a bug rather than a case to handle — the same argument
-  the private `merge_with/3` in `ExTLA.Coverage` makes.
+  one and not the other would be a bug rather than a case to handle, as in
+  `ExTLA.Coverage.merge/2`.
   """
   def merge(%__MODULE__{} = into, %__MODULE__{} = from) do
     %{
@@ -302,10 +298,10 @@ defmodule ExTLA.Profile do
   whole run spent.
 
   `run_reductions` is the CALLER's bracket — the coordinator's — and is ADDED to whatever the
-  merged contributions already carry, which is every worker's own bracket (#199). Overwriting
-  it, as this once did, made the denominator the coordinator alone: on a single worker that is
-  the whole run, on eight it is the scheduling and the seed, and the same spec read 12% at one
-  worker and 91% at eight.
+  merged contributions already carry, which is every worker's own bracket. Overwriting it would
+  make the denominator the coordinator alone: on a single worker that is the whole run, but on
+  eight it is only the scheduling and the seed, and the same spec's shares would change with the
+  worker count.
 
   **Called once, after any merging.** It is not idempotent — a second call would subtract the
   calibration a second time — and that is why `collect/1` and `merge/2` leave the raw floor

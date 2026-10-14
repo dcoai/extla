@@ -33,7 +33,8 @@ defmodule ExTLA.ModelChecker.Liveness do
   which stutters there. So a stuck state is a self-loop here, and it is always fair —
   nothing is enabled in it, so no constraint can require anything to be taken. A
   leads-to whose consequent has not held by then is violated there, which is the correct
-  verdict and the one that refutes `raft_election`'s `eventually_elect_leader`.
+  verdict and the one that refutes the Raft election example's `eventually_elect_leader`
+  (`07-examples.md`).
 
   ## The supported fragment
 
@@ -56,13 +57,13 @@ defmodule ExTLA.ModelChecker.Liveness do
 
   A nesting outside this table raises rather than being approximated. §5.1's grammar is
   recursive and admits shapes like `always(eventually(always(p)))`; evaluating one of
-  those as though it were something simpler is the silently-weaker check this project
-  exists to avoid.
+  those as though it were something simpler would be a silently weaker check.
 
   ## What it costs
 
   One pass materializing every state to evaluate the properties' predicates — the states
-  are not kept (`08-decisions.md` D-5), so they are regenerated, one transition each,
+  are not kept — the graph stores parent pointers rather than states, so that memory stays
+  a small fixed record per state — so they are regenerated, one transition each,
   holding only the states that still have children to generate. Then Tarjan per property,
   which is linear in the graph.
   """
@@ -76,8 +77,8 @@ defmodule ExTLA.ModelChecker.Liveness do
   Check a spec's temporal properties against a completed liveness graph.
 
   `selected` is `:all` or a list of property names, the way `invariants:` selects
-  invariants — the differential corpus asks one property at a time, because that is how
-  TLC reports them.
+  invariants. A run reports only the first violation, so asking one property at a time is
+  how to get a verdict for each.
 
   Returns the first violation in declaration order, with the lasso that refutes it.
   """
@@ -116,10 +117,10 @@ defmodule ExTLA.ModelChecker.Liveness do
   Whether this graph can carry a liveness verdict at all.
 
   The non-raising counterpart to the check below, so a caller can decline to ask rather than
-  crash after the search (#167). A `state_constraint:` holds states back without expanding
-  them, so a constrained run reaches the end with a graph that has fewer edge entries than
-  states — and `check_liveness: true` alongside it used to die with `ArgumentError` there,
-  taking the valid safety result with it.
+  crash after the search. A `state_constraint:` holds states back without expanding them,
+  so a constrained run reaches the end with a graph that has fewer edge entries than
+  states, and the check would raise `ArgumentError` there, taking the valid safety result
+  with it.
 
   The pairing is only *conditionally* bad: a constraint that never actually holds a state
   back leaves a complete graph and liveness works. That is why this is a predicate the

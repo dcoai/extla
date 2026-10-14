@@ -11,10 +11,8 @@ defmodule ExTLA.Function do
 
   This module holds the **only** implementation of each of these operators.
   `ExTLA.Spec.Helpers`, which a spec body imports, delegates to it and defines
-  nothing of its own (D-38). Until #319 it carried a second copy, and the two had
-  already drifted: `construct/2` deduplicated a sequence where `for_each/2`
-  refused one, and `domain/1` answered a `MapSet` with the struct's own field
-  names. #318 has the measurement.
+  nothing of its own, so a spec body and direct callers always get the same
+  answer.
   """
 
   @doc """
@@ -24,10 +22,10 @@ defmodule ExTLA.Function do
       %{1 => 10, 2 => 20}
 
   `S` is a **set** — a `MapSet` or a range. A list is a *sequence*, which is a
-  function on `1..Len(s)` already, and building a function over one deduplicated
-  it silently (#211); a map is a function already. Both are refused by name, the
-  way `ExTLA.Spec.Helpers.at/2` refuses a term that is neither. A spec body spells
-  this operator `for_each/2`, which is the name the message uses.
+  function on `1..Len(s)` already, and building a function over one would
+  silently deduplicate it; a map is a function already. Both are refused by name,
+  the way `ExTLA.Spec.Helpers.at/2` refuses a term that is neither. A spec body
+  spells this operator `for_each/2`, which is the name the message uses.
   """
   def construct(domain, mapping) when is_struct(domain, MapSet) or is_struct(domain, Range),
     do: Map.new(domain, &{&1, mapping.(&1)})
@@ -65,15 +63,14 @@ defmodule ExTLA.Function do
       MapSet.new([:a, :b])
 
   A sequence is a function on `1..Len(s)` — that is what `ExTLA.Spec.Helpers.at/2`
-  applies it as — so its domain is that range (#211):
+  applies it as — so its domain is that range:
 
       iex> ExTLA.Function.domain([:x, :y, :z])
       MapSet.new([1, 2, 3])
 
-  Anything else is refused by name. This was `Map.keys |> MapSet.new`, which
-  raised `BadMapError` on a sequence and — because a `MapSet` is a struct and
-  therefore a map — answered a **set** with the struct's own field names (#318).
-  A wrong answer that looks like an answer is the failure D-20 exists to refuse.
+  Anything else is refused by name rather than answered. A `MapSet` is a struct
+  and therefore a map, so taking its keys would answer a **set** with the struct's
+  own field names — a wrong answer that looks like an answer.
   """
   def domain(f) when is_map(f) and not is_struct(f), do: MapSet.new(Map.keys(f))
   def domain(seq) when is_list(seq), do: MapSet.new(1..length(seq)//1)

@@ -390,12 +390,11 @@ defmodule ExTLA.Spec.Block do
   Wrap a compiled predicate body so a non-boolean result is refused at run time.
 
   Elixir's `and`/`or` return their last operand, so `n >= 0 and status`
-  evaluates to `status`. Every consumer of a predicate used to test the result
-  for truthiness, so that predicate counted as holding whenever `status` was
-  anything but `nil` or `false` — a run in which it never took the value the
-  author had in mind reported `:ok` (#192). Wrapping the body once, here, gives
-  the checker, trace replay, coverage and the ledger the same refusal without
-  each of them re-deriving it; see `ExTLA.Spec.PredicateError`.
+  evaluates to `status`. Tested for truthiness, that predicate would count as
+  holding whenever `status` was anything but `nil` or `false` — a run in which it
+  never took the value the author had in mind would report `:ok`. Wrapping the
+  body once, here, gives the checker, trace replay and coverage the same refusal
+  without each of them re-deriving it; see `ExTLA.Spec.PredicateError`.
   """
   def boolean!(body, module, declaration) do
     quote generated: true do
@@ -410,36 +409,31 @@ defmodule ExTLA.Spec.Block do
   @doc """
   Reject `=` on a declared variable, where there is no post-state for it to mean.
 
-  §1.2 permits assignment only in `init` and `action`. In a predicate or a
-  temporal formula there is no post-state, so `=` on a declared variable is
-  almost always a mistyped `==`.
+  `02-dsl-semantics.md` §1.2 permits assignment only in `init` and `action`. In a
+  predicate or a temporal formula there is no post-state, so `=` on a declared
+  variable is almost always a mistyped `==`.
 
-  **Public because two paths need the same rule, and one of them did not have
-  it.** The check used to live only inside `desugar_statement!/2`, which is
-  reached from `desugar_predicate!/2` — so `invariant`, `terminal` and
-  `action_property` were guarded and `temporal` was not: `dsl.ex` routes a
-  temporal block to `ExTLA.Spec.Temporal.parse!/2`, which never desugars.
+  Public because two paths need the same rule: predicate blocks reach it through
+  `desugar_predicate!/2`, and a `temporal` block, which is parsed by
+  `ExTLA.Spec.Temporal.parse!/2` and never desugared, calls it directly.
 
-  A `temporal` whose body was an assignment therefore compiled, and the result
-  is the worst shape a missing check can have (#150). An invariant that never
-  fires is visible in the coverage report; a temporal formula built from an
-  assignment is not refutable, so the run reports that the property **holds**.
-  The reader gets a green verdict for a property that checked nothing, which is
-  Design Principle 6 defeated by one character.
+  Without it a `temporal` built from an assignment would compile, and that is the
+  worst shape a missing check can have. An invariant that never fires is visible
+  in the coverage report; a temporal formula built from an assignment is not
+  refutable, so the run would report that the property **holds** — a green
+  verdict for a property that checked nothing.
 
   Returns `:ok`, or raises `ExTLA.Spec.CompileError`. Anything that is not an
   assignment to a declared variable passes through.
 
   ## Scope
 
-  The whole expression is walked, not just its top-level statements. The first
-  version stopped at the statement level, which caught `temporal :t do x = 1 end`
-  and nothing else — in a temporal the top level is nearly always `always`,
-  `eventually` or `~>`, so `always(x = 1)` compiled and reported that the
-  property holds (#192). The reason given for stopping there was that a nested
-  `=` is legal Elixir an author could mean; but the check fires only for `=` on a
-  *declared variable*, which §1.2 forbids everywhere outside `init`/`action`,
-  nested or not. There is no legitimate case the walk could reject.
+  The whole expression is walked, not just its top-level statements. In a
+  temporal the top level is nearly always `always`, `eventually` or `~>`, so a
+  statement-level check would let `always(x = 1)` through. A nested `=` is legal
+  Elixir, but the check fires only for `=` on a *declared variable*, which §1.2
+  forbids everywhere outside `init`/`action`, nested or not, so there is no
+  legitimate case the walk could reject.
   """
   def reject_assignment!(ast, ctx) do
     Macro.prewalk(ast, fn
@@ -477,9 +471,7 @@ defmodule ExTLA.Spec.Block do
   Only the top-level `or` shape is derived here. For an invariant without one,
   `nil` means *not measured* — which the coverage report must render differently
   from zero, since zero is the finding and "not measured" is not. The
-  atomic-bound shape that would measure a bare `count <= max` is deferred rather
-  than rejected (`06-architecture.md` §Deferred past v1), and these two outcomes
-  are pinned so that adding it has to update the test recording its absence:
+  atomic-bound shape that would measure a bare `count <= max` is not derived:
 
       # An implication gets a probe: the negated left disjunct.
       iex> ExTLA.Spec.Block.near_miss(quote(do: a or b)) |> Macro.to_string()
@@ -523,11 +515,11 @@ defmodule ExTLA.Spec.Block do
   same bare name mean two things in one spec. `binder` names the construct for the message —
   "`let`" or "the quantifier".
 
-  Public because the temporal quantifier needed it and did not have it (#195). `Enum.all?(
-  ^procs, fn p -> … end)` with `variable :p` declared compiled, and the body's `p` resolved
-  to the *state variable*: the rewriter consults `ctx.variables` before `ctx.bound`, so every
-  instance read `state.p` and the bound value was never used. Only an "unused variable"
-  compiler warning marked it, and the formula reported a verdict about the wrong thing.
+  Public because the temporal quantifier needs the same rule. Without it,
+  `Enum.all?(^procs, fn p -> … end)` with `variable :p` declared would resolve the body's `p`
+  to the *state variable* — the rewriter consults declared variables before bound names — so
+  every instance would read `state.p`, the bound value would never be used, and the formula
+  would report a verdict about the wrong thing.
   """
   def check_no_shadow!(pattern, meta, ctx, binder \\ "`let`") do
     pattern

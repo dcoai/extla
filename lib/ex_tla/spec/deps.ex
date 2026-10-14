@@ -1,6 +1,6 @@
 defmodule ExTLA.Spec.Deps do
   @moduledoc """
-  Which spec variables each block reads and writes, computed at compile time (#87, #91).
+  Which spec variables each block reads and writes, computed at compile time.
 
   This is the foundation of property-directed slicing: a run that checks only some properties
   need not distinguish states that differ outside those properties' cone of influence. That
@@ -8,9 +8,9 @@ defmodule ExTLA.Spec.Deps do
 
   ## Why this has to happen in the macro
 
-  `ExTLA.Spec.Block` compiles an action body "into the guard and transition functions", so by the
-  time the checker runs there is no AST left — actions are closures, which is exactly what
-  `02-dsl-semantics.md` §3 and D-5 require of them. The dependency sets can only be derived
+  `ExTLA.Spec.Block` compiles an action body into guard and transition functions, so by the
+  time the checker runs there is no AST left — actions are closures, pure functions of the
+  pre-state and params (`02-dsl-semantics.md` §3). The dependency sets can only be derived
   while the quoted body is still in hand. `ExTLA.Spec.Compiled` already keeps
   `variable_def.type_expr` quoted for resolution at model-check time, so retaining compile-time
   structure is an established pattern here rather than a new one.

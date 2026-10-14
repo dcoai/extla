@@ -12,14 +12,12 @@ defmodule ExTLA.Spec.Compiled do
 
   ## Why constants are an argument
 
-  An earlier draft of this type gave `init_fn` and the param generators the
-  constants but gave guards, transitions and predicates only the state. Every
-  block may reference `^constants` (§1.1) — the worked example's
-  `conservation_of_money` compares against `^max_balance` — so those functions
-  had no way to evaluate what the DSL lets an author write. Threading constants
-  uniformly is the smallest fix that keeps them out of the state, where they
-  would be fingerprinted and would inflate the state space by a value that never
-  changes.
+  Every block may reference `^constants` (`02-dsl-semantics.md` §1.1) — the worked
+  example's `conservation_of_money` compares against `^max_balance` — so guards,
+  transitions and predicates need them as much as `init_fn` and the param
+  generators do. Passing constants uniformly keeps them out of the state, where
+  they would be fingerprinted and would inflate the state space by a value that
+  never changes.
   """
 
   @type t :: %__MODULE__{
@@ -180,13 +178,12 @@ defmodule ExTLA.Spec.Compiled do
   different specifications, and a verdict from each is not a verdict about the same thing.
 
   A configured key the spec does not declare **raises** rather than being merged and
-  ignored. `constants: %{maxx: 100}` against `constant :max, default: 3` used to resolve
-  to `%{max: 3, maxx: 100}`: the override the author wrote was dropped, the run used the
-  default, and nothing said so (#193) — the same defect as a selection naming a
-  declaration that does not exist, through the one door that fix did not cover. It is a
-  raise and not a second `{:error, _}` shape because a missing assignment is a legitimate
-  state of a spec (one meant to be configured per run), while a key naming nothing is a
-  defect in the configuration, and every caller should refuse it the same way.
+  ignored. Merged, `constants: %{maxx: 100}` against `constant :max, default: 3` would
+  resolve to `%{max: 3, maxx: 100}`: the override the author wrote would be dropped, the
+  run would use the default, and nothing would say so. It is a raise and not a second
+  `{:error, _}` shape because a missing assignment is a legitimate state of a spec (one
+  meant to be configured per run), while a key naming nothing is a defect in the
+  configuration, and every caller should refuse it the same way.
   """
   def resolve_constants(%__MODULE__{} = spec) do
     configured =
@@ -230,11 +227,10 @@ defmodule ExTLA.Spec.Compiled do
   — and `[]` for a property with no quantifier.
 
   **The one expansion, for both consumers.** The liveness checker and `ExTLA.Coverage`'s vacuity
-  probes each need the instance set, and coverage used to rebuild it with a walk of its own
-  that kept only the innermost binding (#200): a nested quantifier's outer instances all
-  landed on one key, so an outer instance whose antecedent never held was reported by nothing
-  while the checker, expanding correctly, checked it. Two derivations of "what is an
-  instance" cannot be kept in agreement by inspection; one derivation can.
+  probes both take the instance set from here, so they always agree on what an instance is. A
+  separate derivation that, say, kept only the innermost binding would land a nested
+  quantifier's outer instances on one key, and an outer instance whose antecedent never held
+  would be reported by nothing while the checker checked it.
   """
   @spec temporal_instances(map(), constants()) :: [
           %{name: atom(), bound: [term()], formula: temporal_formula()}

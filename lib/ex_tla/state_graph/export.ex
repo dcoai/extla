@@ -1,8 +1,7 @@
 defmodule ExTLA.StateGraph.Export do
   @moduledoc """
   DOT and JSON renderings of a state graph — the bodies of
-  `ExTLA.StateGraph.to_dot/2` and `ExTLA.StateGraph.to_json/1`, which
-  `04-layer2-model-checker.md` §State Graph specifies.
+  `ExTLA.StateGraph.to_dot/2` and `ExTLA.StateGraph.to_json/1`.
 
   A separate module because the graph itself is about *building* and querying the search
   structure, and rendering it needs the spec, the constants and `ExTLA.Trace` — the replay
@@ -10,22 +9,24 @@ defmodule ExTLA.StateGraph.Export do
 
   ## Three things the graph's memory model forces
 
-  **1. The edges come from the edge table, and there is no substitute.** `add_state/5`
-  records one parent pointer per state, which is a spanning *tree*: every state appears
-  once with one in-edge, and no cycle of the real graph is visible in it. That is the
-  structure `successors/2` refuses to answer from, and drawing it while calling it the
+  **1. The edges come from the edge table, and there is no substitute.**
+  `ExTLA.StateGraph.add_state/5` records one parent pointer per state, which is a spanning
+  *tree*: every state appears once with one in-edge, and no cycle of the real graph is
+  visible in it. That is the structure `ExTLA.StateGraph.successors/2` refuses to answer
+  from, and drawing it while calling it the
   state graph would be a picture that is wrong in exactly the way the tool exists to
   prevent. So both exports require a graph built with `check_liveness: true` or
   `liveness_graph: true`, and raise otherwise rather than under-draw.
 
-  **2. Node labels are replayed, not stored.** "The state itself is not retained" — a
-  label costs a `path_to/2` walk and one action application per step (D-5). That is
-  affordable for a graph a person reads and absurd for 58,359 states, which is why
-  `to_dot/2` refuses past a cap rather than working for a very long time.
+  **2. Node labels are replayed, not stored.** The graph does not retain states, so a
+  label costs an `ExTLA.StateGraph.path_to/2` walk and one action application per step.
+  That is affordable for a graph a person reads and absurd for tens of thousands of
+  states, which is why `to_dot/2` refuses past a cap rather than working for a very long
+  time.
 
   **3. The refusal names the true count.** Over the cap, the caller is told how many
   states there are, in the spirit of `:max_states_reached`: a tool that quietly rendered
-  the first 500 of 58,359 would hand back a picture that looks complete.
+  the first 500 of 50,000 would hand back a picture that looks complete.
   """
 
   alias ExTLA.{StateGraph, Trace}

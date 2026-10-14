@@ -55,9 +55,7 @@ defmodule ExTLA do
 
   [The reference](guides/reference.md) holds what a user looks up: the checker's options and
   their costs, the coverage report, the JSON result, conformance, and what ExTLA is not. The
-  full design is [the specification](https://github.com/dcoai/extla/blob/main/spec/README.md),
-  and [the decision log](https://github.com/dcoai/extla/blob/main/spec/08-decisions.md)
-  records why the tool is shaped the way it is.
+  full design is [the specification](https://github.com/dcoai/extla/blob/main/spec/README.md).
 
   **What is built** is in [the changelog](CHANGELOG.md) and nowhere else, this moduledoc
   included.

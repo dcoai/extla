@@ -17,15 +17,14 @@ defmodule ExTLA.Symmetry do
   *n*! encodings per state for one symmetric set of size *n*, and the product for several.
   Three processes and two resources is twelve encodings per state to explore up to twelve
   times fewer states — a wash at best in wall-clock, a clear win at four or five elements.
-  It is a lever to be benchmarked, not assumed, and `bench/symmetry.exs` is where the
-  numbers come from.
+  It is a lever to be measured on your model, not assumed.
 
   ## What it assumes, and who checks it
 
   Symmetry is sound only if nothing in the spec can tell the elements apart: no
   `Enum.at(^accounts, 0)`, no `Enum.sort`, no `<` on process names, no dependence on list
-  position. **Nothing verifies this**, and `08-decisions.md` D-17 is the decision not to
-  pretend otherwise: a constant flows into arbitrary Elixir, so the check is undecidable,
+  position. **Nothing verifies this statically**, and ExTLA does not pretend otherwise: a
+  constant flows into arbitrary Elixir, so the check is undecidable,
   and any conservative approximation rejects the `Enum.all?(^processes, …)` every real
   spec is built from. Soundness is the author's obligation, exactly as it is in TLC.
 

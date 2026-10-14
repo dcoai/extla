@@ -5,7 +5,7 @@ defmodule ExTLA.Spec.Type do
   Type expressions are a small language of their own, distinct from the block
   DSL, and they are **stored quoted**: nearly every useful type mentions a
   constant (`0..^max_val`, `[^servers ~> :set]`) that has no value when the
-  module compiles (D-19). This module checks the shape at compile time so an
+  module compiles. This module checks the shape at compile time so an
   ill-formed type is a diagnostic rather than a crash halfway through a
   model-checking run; resolution against the constant assignments happens later,
   in the checker, where the implicit `:type_ok` invariant is evaluated.
@@ -274,8 +274,8 @@ defmodule ExTLA.Spec.Type do
   Resolve a stored type expression against the constant assignments.
 
   This happens at model-check time, not at compile time, because nearly every
-  useful type mentions a constant that has no value until a run assigns one
-  (D-19). `where` names the variable, for the error message.
+  useful type mentions a constant that has no value until a run assigns
+  one. `where` names the variable, for the error message.
   """
   def resolve!(type, constants, where)
 
@@ -459,7 +459,7 @@ defmodule ExTLA.Spec.Type do
   Check a state against the resolved variable types.
 
   Types are checked as an invariant rather than used to prune, so a state outside
-  its type is a reported violation and not a silently narrower search (D-19).
+  its type is a reported violation and not a silently narrower search.
   """
   def check_state(resolved, state) do
     Enum.find_value(resolved, :ok, fn {name, type} ->

@@ -28,10 +28,10 @@ defmodule ExTLA.GenServer do
 
   Step 1 is the point. Without it the layer verifies that a projection of the state
   satisfies some predicates, which passes every implementation bug that reaches a
-  legal-looking state by an illegal route (`05-layer3-conformance.md` §What conformance
-  means here). §07's Example 4 is exactly that bug: an `increment` that also does `done`'s
-  work leaves `count` in bounds, so every invariant holds and only the step check refuses
-  it.
+  legal-looking state by an illegal route (see "What conformance checks" in
+  `guides/reference.md`). Example 4 in `07-examples.md` is exactly that bug: an `increment`
+  that also does `done`'s work leaves `count` in bounds, so every invariant holds and only
+  the step check refuses it.
 
   ## Layer 1 comes with it
 

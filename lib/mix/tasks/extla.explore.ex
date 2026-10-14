@@ -7,7 +7,7 @@ defmodule Mix.Tasks.Extla.Explore do
 
   > #### Not state-space exploration {: .neutral}
   >
-  > `explore` means searching the state space everywhere else in this project
+  > `explore` means searching the state space everywhere else in ExTLA
   > (`ExTLA.ModelChecker.explore/2`). This task does not search anything. It reads a
   > counterexample off disk and evaluates expressions over the states already in it — the
   > TLA+ Toolbox's *Trace Explorer*, not TLC. `mix extla.check` is the task that searches.
@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Extla.Explore do
         --expr "quorum?: map_size(state.votes) * 2 > 3" \\
         --changed-only
 
-      # from a CI run or an incident, months later, with no checker in the loop
+      # from an earlier run or an incident, months later, with no checker in the loop
       mix extla.check Specs.DistributedLock --format json > ce.json
       mix extla.explore Specs.DistributedLock --trace ce.json --expr "len: length(state.log)"
 

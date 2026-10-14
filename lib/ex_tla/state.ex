@@ -15,9 +15,9 @@ defmodule ExTLA.State do
   and a wrong answer. A misspelled variable read through `Map.get/2` returns
   `nil`, `nil` compares unequal to whatever the guard expected, the action looks
   disabled, and the checker explores a smaller state space and reports success.
-  Nothing in the output distinguishes that run from a sound one, which is the
-  failure mode `01-foundation.md` §`ExTLA.Fingerprint` exists to prevent at the
-  level below.
+  Nothing in the output distinguishes that run from a sound one — the same
+  failure mode, a success reported over states never visited, that
+  `ExTLA.Fingerprint` prevents at the level below.
   """
 
   @type variable_name :: atom()

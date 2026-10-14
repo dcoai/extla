@@ -8,12 +8,10 @@ defmodule ExTLA.Spec.Temporal do
                  | always(eventually(pred)) | eventually(always(pred))
                  | pred ~> pred | always(pred ~> pred)
 
-  **The nesting is bounded, and the grammar says so.** It used to read
-  `always(formula) | eventually(formula) | …`, which is recursive — so
-  `always(always(P))` was inside the grammar, compiled, and then met a checker
-  that evaluates seven shapes and no others. The bound was enforced three
-  frames further on, at run time, by an `ArgumentError` carrying no module,
-  declaration or line (#277).
+  **The nesting is bounded, and the grammar says so.** `always`, `eventually`
+  and `~>` take a `pred`, not a `formula`, so `always(always(P))` is outside the
+  grammar and fails to compile with the module, declaration and line — the
+  checker evaluates these seven shapes and no others.
 
   There is no negation, conjunction or disjunction **of formulas**. A `pred` may
   of course contain `not`/`and`/`or`; the restriction is on combining formulas.

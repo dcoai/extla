@@ -10,9 +10,9 @@ defmodule ExTLA.Replay do
     that makes the three layers one tool rather than three: Layer 2 finds a design bug
     before any code exists, and this runs that exact trace against the code.
   - `trace/3` checks a **captured** behaviour — from staging, from production, from a
-    recorded test run — with the same `check_step!/5` the runtime wrapper uses. Nothing
-    needs to be running: it is a pure function over recorded data, so it runs in CI
-    against a fixture or offline against an incident.
+    recorded test run — with the same `ExTLA.GenServer.Runtime.check_step!/5` the runtime
+    wrapper uses. Nothing needs to be running: it is a pure function over recorded data, so
+    it runs in a test suite against a fixture or offline against an incident.
 
   ## A counterexample the implementation cannot follow is itself a finding
 
@@ -24,9 +24,9 @@ defmodule ExTLA.Replay do
   ## What drives the server
 
   `c:ExTLA.Refinement.concrete_message/2` — the inverse of
-  `c:ExTLA.Refinement.abstract_action/1`, and the callback `validate!/3` round-trips at
-  compile time. A refinement that does not define it
-  can be *checked* as it runs and cannot be *driven*, which is most of what this module is
+  `c:ExTLA.Refinement.abstract_action/1`, and the callback `ExTLA.Refinement.validate!/3`
+  round-trips at compile time. A refinement that does not define it can be *checked* as it
+  runs and cannot be *driven*, which is most of what this module is
   for; `counterexample/3` says so by name rather than failing with an undefined function.
   """
 
