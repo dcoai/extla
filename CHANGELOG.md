@@ -10,20 +10,31 @@ CI, test tooling, internal refactors — is left to the commit history. Entries 
 condensed to that rule; the full text is
 [the CHANGELOG at v0.5.0](https://github.com/dcoai/extla/blob/v0.5.0/CHANGELOG.md).
 
-## [Unreleased]
+## [0.6.0] — 2026-10-14
 
-`mix.exs` reads `0.5.1-dev`: the `-dev` suffix is what keeps a commit from claiming to be the
-release it merely follows.
+**A minor line, opened by Layer 1's predicate rule.** A Layer 1 `invariant`,
+`action_property`, `precondition` or `postcondition` that returns a non-boolean is now
+reported rather than counted as holding (#418). The model checker already refused the same
+predicate. Code whose check returned a truthy non-boolean passed under 0.5.0 and is now
+reported, which is why this is 0.6.0. To upgrade, change the requirement, then make any such
+check return `true` or `false`. `ExTLA.ModelChecker.run/2` and `assert_spec/2` now honour a
+constant's `default:`, as the Mix tasks always did (#417). ExTLA installs from Hex as
+`{:extla, "~> 0.6.0"}`.
+
+The rest is the documentation, made fit for a public reader and checked against the code:
+- a short README;
+- HexDocs that publish the DSL reference, the examples and a new reference page, and group
+  the modules by use;
+- module docs that list `run/2`'s options and no longer narrate the project's history;
+- a changelog written for users;
+- guides whose output blocks are compared with what the tool really prints.
 
 ### Changed
 
 - **The repository's public home is GitHub, and everything that ships says so** (#402, for
-  #396). The install instruction reads `git: "https://github.com/dcoai/extla.git"`, so a
-  reader who can't reach the GitLab instance where work happens can still install. `mix.exs`
-  declares `source_url` and `homepage_url`, so the docs' "View source" links work and point
-  at the release tag, and the package declares its links (GitHub, Changelog). The version
-  links at the end of this file point at GitHub. The guide harness's `tla:deps` check now
-  holds the install URL to `source_url`, as it already held the tag to the release record.
+  #396). `mix.exs` declares `source_url` and `homepage_url`, so the docs' "View source"
+  links work and point at the release tag, and the package declares its links (GitHub,
+  Changelog). The version links at the end of this file point at GitHub.
 - **The README is a short front door** (#403, for #395). It says what ExTLA does in one
   line, then why it matters when an LLM writes your concurrent code, then installation, one
   example, the task list and links to everything else. The package description and the
@@ -626,7 +637,7 @@ public surface may still move, and this tag is a reference point, not a compatib
 - `Mix.Tasks.Tla.Gen.Test`, HTML/D3 visualisation, `TLA.Supervisor.Spec` and view abstraction
   are deferred past v1 — see `spec/06-architecture.md` §Deferred for why each.
 
-[Unreleased]: https://github.com/dcoai/extla/compare/v0.5.0...main
+[0.6.0]: https://github.com/dcoai/extla/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dcoai/extla/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dcoai/extla/releases/tag/v0.4.0
 [0.3.20]: https://github.com/dcoai/extla/releases/tag/v0.3.20

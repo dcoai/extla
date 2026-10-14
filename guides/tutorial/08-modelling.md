@@ -163,16 +163,16 @@ invariant :count_agrees does not hold in this state
 
 State 1 (Init):
   queued_count = 2
-  status       = %{j1: :queued, j2: :queued}
-
-── start(j: :j1) ────────────────────
-
+…
 State 2 [VIOLATION]:
   queued_count = 2
-  status       = %{j1: :running, j2: :queued}   ← changed
-
+…
 ════════════════════════════════════════════════════════════════════
 ```
+
+The elided lines show one job started and both still counted as queued. Which job, `:j1` or
+`:j2`, can differ between runs: the two are interchangeable, and either one gives a shortest
+counterexample.
 
 That counterexample is about **the model's bookkeeping**, not about the job runner. It is time
 spent debugging a specification for a defect the system does not have — and the specification is

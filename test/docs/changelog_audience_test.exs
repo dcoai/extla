@@ -37,14 +37,15 @@ defmodule ExTLA.ChangelogAudienceTest do
     ~r{\btest/[\w/]+_test\.exs\b}
   ]
 
-  # The entries: everything from the first release heading on. The preamble above it explains
+  # The entries: everything from the first section heading on — `## [Unreleased]` between
+  # releases, `## [X.Y.Z]` in a release commit, which has none. The preamble above it explains
   # the rule, and so has to name what the rule leaves out.
   defp entries do
     [_preamble, entries] =
       @root
       |> Path.join("CHANGELOG.md")
       |> File.read!()
-      |> String.split("## [Unreleased]", parts: 2)
+      |> String.split(~r/^## \[/m, parts: 2)
 
     entries
   end
@@ -54,7 +55,7 @@ defmodule ExTLA.ChangelogAudienceTest do
       for {line, number} <- entries() |> String.split("\n") |> Enum.with_index(1),
           pattern <- @internal,
           Regex.match?(pattern, line),
-          do: "  line #{number} after [Unreleased]: #{String.trim(line)}"
+          do: "  line #{number} of the entries: #{String.trim(line)}"
 
     assert found == [], """
     The CHANGELOG mentions this repository's own tooling:

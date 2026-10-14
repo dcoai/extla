@@ -25,7 +25,7 @@ Add `extla` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:extla, "~> 0.5.0"}
+    {:extla, "~> 0.6.0"}
   ]
 end
 ```
