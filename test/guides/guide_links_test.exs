@@ -67,6 +67,43 @@ defmodule ExTLA.GuideCheck.LinksTest do
     end
   end
 
+  # A published page links a maintainer document on GitHub (#404, for #397). The URL names a path
+  # in this repository, so it is resolved against the checkout rather than waved through.
+  describe "a link to this repository on GitHub" do
+    @blob "https://github.com/dcoai/extla/blob/main/"
+
+    test "resolves when the file and GitHub's anchor exist", %{tmp_dir: tmp} do
+      path =
+        guide(tmp, "source.md", """
+        # Source
+
+        [index](#{@blob}spec/README.md),
+        [D-17](#{@blob}spec/08-decisions.md#d-17--symmetry-soundness-is-the-authors-obligation-verified-dynamically)
+        """)
+
+      assert Links.check(path) == []
+    end
+
+    test "is rejected when the file is not in the repository", %{tmp_dir: tmp} do
+      path = guide(tmp, "source.md", "# Source\n\n[gone](#{@blob}spec/99-gone.md)\n")
+
+      assert [failure] = Links.check(path)
+      assert failure =~ "spec/99-gone.md does not exist in this repository"
+    end
+
+    test "is rejected when the anchor is ExDoc's rather than GitHub's", %{tmp_dir: tmp} do
+      path =
+        guide(tmp, "source.md", """
+        # Source
+
+        [D-17](#{@blob}spec/08-decisions.md#d-17-symmetry-soundness-is-the-author-s-obligation-verified-dynamically)
+        """)
+
+      assert [failure] = Links.check(path)
+      assert failure =~ "no heading whose GitHub anchor is"
+    end
+  end
+
   describe "a link that goes nowhere — the tests this gate exists for" do
     test "a file that does not exist is rejected, and named", %{tmp_dir: tmp} do
       path = guide(tmp, "source.md", "# Source\n\n[gone](no-such-page.md)\n")

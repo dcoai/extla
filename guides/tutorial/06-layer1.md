@@ -107,8 +107,7 @@ end
 
 The blocks are bare boolean expressions, the same shape as a spec's, with one difference: `state`
 is written explicitly. A spec has `variable` declarations to resolve a bare name against, and an
-arbitrary GenServer has none, so Layer 1 does not guess
-([`03-layer1-invariants.md`](../../spec/03-layer1-invariants.md)). An `invariant` is checked after
+arbitrary GenServer has none, so Layer 1 does not guess. An `invariant` is checked after
 every callback; a `precondition` is matched against the incoming message — its pattern binds `c` —
 and checked before the callback runs; a `postcondition` sees `old`, `new` and the pattern's
 bindings after it returns. `action_property` is there too, with `old` and `new`.
@@ -253,8 +252,7 @@ is that an invariant over a large collection on a hot `handle_info` is the shape
 
 ## Beyond GenServer
 
-The same declarations work for the other OTP shapes, with one exception worth knowing
-([`03-layer1-invariants.md`](../../spec/03-layer1-invariants.md) §Supported OTP Behaviors):
+The same declarations work for the other OTP shapes, with one exception worth knowing:
 
 - **`GenServer`**, `:gen_statem` and `GenStateMachine` are wrapped the same way. For a state
   machine the specification is explicit about what `state` and the message *are*, since both are
@@ -265,7 +263,7 @@ The same declarations work for the other OTP shapes, with one exception worth kn
   declaring module as an argument on every call — `Checked.update(Counter, pid, &…)` — which also
   means an `Agent`'s checks **cannot be compiled away**.
 - **Supervision trees** are not modelled at Layer 1 at all; `ExTLA.Supervisor.Spec` is deferred past
-  v1 ([`06-architecture.md`](../../spec/06-architecture.md#deferred-past-v1-deliberately)).
+  v1 ([§What ExTLA is not](../reference.md#what-extla-is-not)).
 
 ## What Layer 1 cannot tell you
 

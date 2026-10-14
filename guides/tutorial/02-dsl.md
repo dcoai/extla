@@ -96,9 +96,8 @@ means.
 `type: set(t)` says a variable **is** a set. This says what you can do with one.
 
 All of TLA+'s set theory is in scope inside a spec block, unqualified. It is `ExTLA.Set` and
-`ExTLA.Function`, which [§Foundation](../../spec/01-foundation.md) specifies, reached through the
-helper module every spec imports — and that module holds no second implementation of any of
-them ([D-38](../../spec/08-decisions.md)).
+`ExTLA.Function`, reached through `ExTLA.Spec.Helpers`, the module every spec imports — and that
+module holds no second implementation of any of them.
 
 | TLA+ | In a spec block |
 |---|---|

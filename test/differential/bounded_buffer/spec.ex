@@ -105,7 +105,7 @@ defmodule ExTLA.Differential.BoundedBuffer do
   # Legitimate end state (`02-dsl-semantics.md` §5.3): everything produced and
   # consumed, producers idle, consumers parked. Without this the checker reports
   # a deadlock — and it would be right to, since the spec had not said this
-  # state was intended. TLC does report one, which is what the corpus compares.
+  # state was intended.
   terminal :all_items_consumed do
     produced_count == ^max_items and consumed_count == ^max_items and
       Enum.all?(^producers, fn p -> producer_pc[p] == :ready end) and

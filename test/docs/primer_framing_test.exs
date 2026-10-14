@@ -14,7 +14,7 @@ defmodule ExTLA.PrimerFramingTest do
   #181 says "no test for the primer header; it is prose", and the header is. But it makes
   two claims that are **not** prose: that ExTLA is not a theorem prover, and that this is a
   stated non-goal rather than an omission. Those live in `spec/06-architecture.md`
-  §Non-goals, and a page asserting them should fail when they stop being true — a non-goal
+  §Non-goals, published for users as `guides/reference.md` §What ExTLA is not, and a page asserting them should fail when they stop being true — a non-goal
   becoming a goal would otherwise leave this page contradicting the architecture with
   nothing to notice.
 
@@ -64,8 +64,23 @@ defmodule ExTLA.PrimerFramingTest do
       assert non_goals =~ "ExTLA is not a theorem prover"
       assert non_goals =~ "TLAPS proves; ExTLA checks"
 
-      # And the primer's header cites that section by anchor, so the claim is followable.
-      assert squeeze(primer()) =~ "spec/06-architecture.md#non-goals"
+      # The primer's header cites the published statement of them by anchor, so the claim is
+      # followable from HexDocs, where spec/06 is not published (#404, for #397).
+      assert squeeze(primer()) =~ "guides/reference.md#what-extla-is-not"
+    end
+
+    # The published statement is a user's copy of spec/06's, so it is held to the same claim.
+    test "and the reference page states the same one" do
+      not_list =
+        @root
+        |> Path.join("guides/reference.md")
+        |> File.read!()
+        |> then(&Regex.run(~r/## What ExTLA is not\n(.*?)\n## /s, &1))
+        |> Enum.at(1)
+        |> squeeze()
+
+      assert not_list =~ "Not a theorem prover"
+      assert not_list =~ "TLAPS proves; ExTLA checks"
     end
 
     # Anti-vacuity: every assertion above is a substring match on a file read from disk, so

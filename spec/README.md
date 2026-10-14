@@ -41,9 +41,10 @@ The layers describe **verification power**, not build order. Build order is
 | [00-prior-art.md](00-prior-art.md) | Survey of existing tools and the gap ExTLA fills | Specified |
 
 "Specified" above describes the **document**, not the code: it means the design is written
-down. What is built is recorded in
-[06-architecture.md §Implementation Phases](06-architecture.md#implementation-phases), and
-deliberately nowhere else — a second copy of build status is what let this page claim the
+down. What is built is recorded in [`CHANGELOG.md`](../CHANGELOG.md), which
+`bin/changelog_guard.exs` gates, and deliberately nowhere else
+([06-architecture.md §Implementation Phases](06-architecture.md#implementation-phases) is the
+record of the plan and its completion) — a second copy of build status is what let this page claim the
 project was unbuilt for four phases after it shipped.
 
 ### File naming

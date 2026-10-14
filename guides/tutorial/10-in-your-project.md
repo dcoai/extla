@@ -167,5 +167,7 @@ can rely on and a document that once described the system.
 
 ---
 
-That is the tutorial. [`spec/README.md`](../../spec/README.md) is the specification itself, and
-[`08-decisions.md`](../../spec/08-decisions.md) is why the tool is shaped the way it is.
+That is the tutorial. [The reference](../reference.md) holds what you will look up from here on,
+[the specification](https://github.com/dcoai/extla/blob/main/spec/README.md) is the full design,
+and [the decision log](https://github.com/dcoai/extla/blob/main/spec/08-decisions.md) is why the
+tool is shaped the way it is.

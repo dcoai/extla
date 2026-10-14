@@ -296,7 +296,7 @@ found; nothing was established either.
   tell you a design is correct and nothing about whether it is fast.
 - **Real-time deadlines and probabilities.** Timed and probabilistic model checking are different
   disciplines with different tools, and both are
-  [non-goals](../../spec/06-architecture.md#non-goals) — no clocks, no distributions.
+  [non-goals](../reference.md#what-extla-is-not) — no clocks, no distributions.
 - **Verifying the implementation itself.** Layer 3 checks that a GenServer refines the spec on the
   behaviours it is driven through — real evidence, but sampled, not exhaustive. A proof about the
   code would need a different tool entirely.

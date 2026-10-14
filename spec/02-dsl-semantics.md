@@ -140,19 +140,13 @@ at the top level of a type. Inside a list there is nothing to be ambiguous with,
 
 `set(t)` and `seq(t)` are call forms rather than `{:set, t}` because the tuple form
 collides: `{:set, :nat}` is already a legal tuple type of the literal atom `:set` and a
-natural. They arrived when the differential corpus found four entries typing a variable
-*weaker* than the TLA+ they are checked against — `msgs`, `messages`, `votes_granted`
-and `buffer` were all `:set` or `:seq` where TLC checked `msgs \subseteq Message`. An
-entry that checks less than its oracle can agree with it for the wrong reason. The
-record form arrived with them, because a set of records is what a message set is, and
-`set(t)` had nothing useful to say without it.
+natural. A bare `:set` or `:seq` says only that a variable is a collection; `set(t)` and
+`seq(t)` say what it holds, which is what lets the implicit `type_ok` invariant catch a
+message of the wrong shape. The record form exists for the same reason: a set of records
+is what a message set is.
 
-`:int` and `:nat` were added after the implicit `type_ok` invariant refuted §8's own
-worked example: `balances` was typed `[^accounts ~> 0..^max_balance]`, but every account
-starts at `^max_balance` and a transfer pushes the recipient above it. The grammar had
-no way to say "an integer", so the only expressible types for that variable were all
-false. A type language in which the documented example cannot be typed correctly is a
-gap in the language, not a mistake in the example.
+`:int` and `:nat` are there for a value with no useful upper bound — a balance that starts
+at its maximum and is pushed above it by a transfer, as §8's worked example is.
 
 Types are checked as an implicit invariant named `:type_ok` in every reachable state
 — which is why the coverage report lists one without the spec declaring it — and
@@ -331,7 +325,7 @@ end
 
 The payoff is that **an action body is now a pure deterministic function of
 `(pre_state, params)`**. That single property is what makes successor generation,
-enabling checks, symmetry canonicalization (`04-layer2-model-checker.md` §Symmetry) and
+enabling checks, symmetry canonicalization ([§Symmetry](../guides/reference.md#symmetry)) and
 Layer 3's refinement check (`05-layer3-conformance.md` §1) all straightforward. Any
 construct that reintroduces in-body branching must be rejected for the same reason.
 
@@ -411,15 +405,9 @@ temporal ::= pred | always(pred) | eventually(pred)
 pred     ::= any boolean expression over variables and constants
 ```
 
-**The nesting is bounded, and the grammar has to say so.** It read
-`always(formula) | eventually(formula) | …` until #277 — recursive, and therefore a
-promise that `always(always(P))` is in the fragment. It is not: the checker evaluates the
-seven shapes above by SCC analysis and no others. A formula the grammar admitted and the
-checker could not evaluate compiled, and then died three frames into a run — as an
-`ArgumentError` with no module, declaration or line, only under `check_liveness: true`,
-and under the default configuration never at all. The bound is now enforced where this
-document says every rule is enforced: at compile time, by
-`ExTLA.Spec.Temporal`'s nesting table.
+**The nesting is bounded.** The grammar is not recursive: the checker evaluates the seven
+shapes above and no others, and a `temporal` written in any other shape is refused when
+the spec compiles, naming the declaration and the shape.
 
 `always(always(P))` is `always(P)` and `eventually(eventually(P))` is `eventually(P)`, so
 nothing expressible is lost by refusing them; what is gained is that the reader is told so
@@ -437,9 +425,7 @@ the state.
 **A quantifier under a temporal operator is a predicate, not that form.**
 `always(Enum.all?(^procs, fn p -> done[p] end))` is `always(pred)`: an `Enum.all?` over a
 constant with a *boolean* body is an ordinary state predicate, and an `invariant` has
-accepted one all along. Read as the formula-level `\A` it produced `always(\A x : F(x))`,
-a shape no consumer evaluates — it died in the coverage probes, under the default
-configuration, on a formula that means exactly what it looks like (#277). Only at the
+accepted one all along. Only at the
 formula position is `Enum.all?` the quantifier; everywhere else it is part of the
 predicate, and a *temporal operator* inside its body is `temporal_operator_in_state_predicate`.
 
@@ -537,13 +523,8 @@ Every rule above is checked when the spec module compiles, because the DSL alrea
 accumulates every declaration it needs. A spec either means something precise or does
 not compile.
 
-**The first column is the diagnostic's `kind`** — the identifier `ExTLA.Spec.CompileError`
-carries, `DIAGNOSTICS.md` lists and `test/docs/spec_diagnostics_test.exs` holds this table
-to. Before #273 the column was a name chosen per row and the code carried nothing to match
-it against, so the table could not be checked and was not: it was twenty-eight rows short,
-and one row described a check that runs at runtime (§6's forbidden terms, D-26), which the
-preamble above would have made a false claim about. A row here is a kind; a kind may be
-raised from more than one place, and `DIAGNOSTICS.md` lists the sites.
+**The first column is the diagnostic's `kind`**, the identifier `ExTLA.Spec.CompileError`
+carries, so a test can match on it.
 
 ### Names and declarations
 
@@ -637,9 +618,7 @@ they bounce off; they are a deliverable, not a nicety.
 
 **Not here, and deliberately: the §6 term check.** A pid, reference, port, fun, float or
 non-byte-aligned bitstring assigned to a variable is a *runtime* error from the checker, as
-§6 and D-26 both say — the value is not known until a state is computed. It was a row in
-this table until #273, under a preamble promising a compile error, which made the preamble
-false for exactly one row.
+§6 says — the value is not known until a state is computed.
 
 ---
 
@@ -724,22 +703,16 @@ end
 **This example is deliberately refutable, and that is the one thing about it a reader
 must not have to guess.** `fail_transfer` discards `pending` without refunding it, so
 `conservation_of_money` is violated — at depth 3, by `begin_transfer` then
-`fail_transfer`, which is exactly the counterexample `04-layer2-model-checker.md`
-§Example Trace Output prints, down to the `⚠ money lost!` on `pending`.
+`fail_transfer`.
 
 So do not copy this spec expecting it to verify: it is a worked example of a checker
 finding a bug, and the bug is the point. The `action` blocks, the `params:` and the
 `invariant` syntax above are what to copy.
 
-**Pinned by:** `test/ex_tla/model_checker_test.exs` "and the worked example is refuted
-exactly as §04's trace output shows". Until #280 nothing asserted it, and the one test
-that ran this spec passed `invariants: []` — so "fixing" `fail_transfer` would have left
-§04's printed trace describing a run that no longer happens, with the whole suite green.
-
 Note also that this spec's state space is **infinite**: `complete_transfer` appends to
 `log` and `reset` returns to `:idle`, so the log grows without bound. Checking it
 exhaustively is impossible, and checking it at all needs a `state_constraint` bounding
-`len(log)` (`04-layer2-model-checker.md` §State constraints) — for which the result
+`len(log)` ([§State constraints](../guides/reference.md#state-constraints)) — for which the result
 reports `:constrained` rather than `:ok`. A worked example that cannot be run as
 written would be a poor advertisement for the tool, so it is said here rather than
 discovered.
