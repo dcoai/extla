@@ -76,6 +76,9 @@ release it merely follows.
   driving flags, the `:state_functions` limit of Layer 1, and
   `ExTLA.PropertyTest.action_sequences/3`. Passages about how ExTLA itself is tested are
   gone.
+- **Install from Hex** (#424, for #423). The README and getting-started install ExTLA as
+  `{:extla, "~> X.Y.0"}`. Use the three-part requirement: before 1.0 a new minor version can
+  change the interface, and `~> X.Y` would take it.
 - **This changelog is written for users** (#406, for #397). Entries for CI, test tooling and
   other work only the repository sees are gone, and the remaining entries are shorter.
 

@@ -9,20 +9,20 @@ prints. If the page says a spec verifies, it does; if it says a trace is seven s
 
 ## 1. Add ExTLA to a project
 
-ExTLA is not on Hex. Point a Mix project at the repository and its tag:
+Add `extla` to the project's dependencies in `mix.exs`:
 
 <!-- tla:deps -->
 ```elixir
 def deps do
   [
-    {:extla, git: "https://github.com/dcoai/extla.git", tag: "v0.5.0"}
+    {:extla, "~> 0.5.0"}
   ]
 end
 ```
 
-Name a release tag rather than a branch: `branch: "main"` would install unreleased work. ExTLA
-is not yet published on Hex, so there is no version requirement such as `{:extla, "~> 0.5"}` to
-write; to upgrade, change the tag.
+Write the requirement with three parts. `~> 0.5.0` takes fixes within the 0.5 line and stops
+there: until 1.0, a new minor version can change the interface, and its changelog entry says
+how to upgrade.
 
 ```sh
 mix deps.get

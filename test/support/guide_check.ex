@@ -418,11 +418,20 @@ defmodule ExTLA.GuideCheck do
   # The `git:` URL is held to `mix.exs`'s `source_url`, the repository the package names as
   # its public home (#402). An install line pointing anywhere else, such as the private
   # instance where day-to-day work happens, is one a public reader can't follow.
+  #
+  # Since #424 the install is from Hex, `{:extla, "~> X.Y.Z"}`, and the requirement is held to
+  # the same record: it must admit the newest release and name its minor line. The `git:` form
+  # stays checkable for a page that shows it.
   defp verify(%{kind: :deps}, code) do
-    with {:ok, opts} <- documented_dep(code),
-         {:ok, release} <- newest_release(),
-         :ok <- deps_tag(opts[:tag], release) do
-      deps_url(opts[:git])
+    with {:ok, dep} <- documented_dep(code),
+         {:ok, release} <- newest_release() do
+      case dep do
+        {:hex, requirement} ->
+          deps_requirement(requirement, release)
+
+        {:git, opts} ->
+          with :ok <- deps_tag(opts[:tag], release), do: deps_url(opts[:git])
+      end
     end
   end
 
@@ -860,27 +869,57 @@ defmodule ExTLA.GuideCheck do
     end
   end
 
-  # The `:extla` dependency's options, wherever in the snippet it sits.
+  # A Hex requirement is `~> X.Y.Z`, three parts. Before 1.0 a minor version may change the
+  # interface (0.4.0 renamed every module), and `~> 0.6` admits 0.7, so the install line a
+  # reader copies would take the next breaking release unasked.
+  defp deps_requirement(requirement, release) do
+    version = Version.parse!(release)
+
+    with {:ok, parsed} <- Version.parse_requirement(requirement),
+         [_, major, minor, _patch] <- Regex.run(~r/^~>\s*(\d+)\.(\d+)\.(\d+)$/, requirement),
+         true <-
+           {String.to_integer(major), String.to_integer(minor)} == {version.major, version.minor},
+         true <- Version.match?(version, parsed) do
+      :ok
+    else
+      _ ->
+        {:error,
+         "tla:deps requires #{inspect(requirement)}, and the newest release in CHANGELOG.md " <>
+           "is v#{release}. The requirement must be `~> #{version.major}.#{version.minor}.0`-" <>
+           "shaped: three parts, naming the newest release's minor line, so the reader " <>
+           "installs the release the page describes and not the next breaking one."}
+    end
+  end
+
+  # The `:extla` dependency, wherever in the snippet it sits: `{:hex, requirement}` for
+  # `{:extla, "~> …"}`, or `{:git, opts}` for `{:extla, git: …, tag: …}`.
   defp documented_dep(code) do
     with {:ok, ast} <- Code.string_to_quoted(code),
-         {_ast, opts} when is_list(opts) <- Macro.prewalk(ast, nil, &extla_dep/2) |> elem_pair(),
-         tag when is_binary(tag) <- Keyword.get(opts, :tag) do
-      {:ok, opts}
+         {_ast, dep} when dep != nil <- Macro.prewalk(ast, nil, &extla_dep/2) |> elem_pair(),
+         :ok <- pinned(dep) do
+      {:ok, dep}
     else
       {:error, {meta, message, token}} ->
         {:error, "tla:deps does not parse: #{message}#{token} (line #{meta[:line]})"}
 
-      _no_tag ->
+      _none ->
         {:error,
-         "tla:deps has no `{:extla, …, tag: \"…\"}` entry. The directive exists to hold " <>
-           "that tag to the release record; a block without one is either a different " <>
-           "kind of snippet (use tla:skip with a reason) or is missing its pin."}
+         "tla:deps has no `{:extla, \"~> …\"}` or `{:extla, …, tag: \"…\"}` entry. The " <>
+           "directive exists to hold the install line to the release record; a block " <>
+           "without one is either a different kind of snippet (use tla:skip with a reason) " <>
+           "or is missing its pin."}
     end
   end
 
+  defp pinned({:hex, _requirement}), do: :ok
+  defp pinned({:git, opts}), do: if(is_binary(opts[:tag]), do: :ok, else: :unpinned)
+
   defp elem_pair({ast, acc}), do: {ast, acc}
 
-  defp extla_dep({:extla, opts} = node, nil) when is_list(opts), do: {node, opts}
+  defp extla_dep({:extla, requirement} = node, nil) when is_binary(requirement),
+    do: {node, {:hex, requirement}}
+
+  defp extla_dep({:extla, opts} = node, nil) when is_list(opts), do: {node, {:git, opts}}
   defp extla_dep(node, acc), do: {node, acc}
 
   # The newest `## [x.y.z] — date` heading. `[Unreleased]` is deliberately not a release:
