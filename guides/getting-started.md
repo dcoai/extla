@@ -4,10 +4,8 @@ One sitting, one spec, one green run — and then one red one, because a model c
 abstraction until it hands you a concrete sequence of steps that reaches a state you said was
 impossible. That moment is the point of this guide, and everything before it is setup.
 
-Every code block on this page is compiled and run by ExTLA's own test suite, and every verdict
-the prose quotes is asserted against the run — including the dependency snippet below, whose
-tag is held to the release record. If the page says a spec verifies, it does; if it says a
-trace is seven states long, it is.
+Every spec on this page compiles, and every verdict and output block is what the tool really
+prints. If the page says a spec verifies, it does; if it says a trace is seven states long, it is.
 
 ## 1. Add ExTLA to a project
 
@@ -22,28 +20,22 @@ def deps do
 end
 ```
 
-A **tag**, named here, rather than a branch or a pointer at "the latest release". Three
-things were weighed (#154):
-
-- `branch: "main"` would install unreleased work, which is the wrong advice from a library
-  whose subject is verification — and it is not checkable either, because every branch
-  state is equally valid.
-- Prose directing you to the newest tag without naming one cannot go stale, and cannot be
-  followed without leaving the page. Uncheckable in the same breath.
-- A literal tag **does** go stale — it is how this block came to say `v0.1.0` while the
-  release was v0.3.20 — and it is the only one of the three a gate can hold to the release
-  record. So it is named, and `tla:deps` fails the build when it stops matching
-  `CHANGELOG.md`'s newest release.
-
-A version requirement is not available: publishing to Hex is undecided, so there is no
-`{:extla, "~> 0.3"}` to write.
+Name a release tag rather than a branch: `branch: "main"` would install unreleased work. ExTLA
+is not yet published on Hex, so there is no version requirement such as `{:extla, "~> 0.5"}` to
+write; to upgrade, change the tag.
 
 ```sh
 mix deps.get
 ```
 
-ExTLA has no runtime dependencies of its own, so it goes in as a plain dependency: there is
-nothing to keep out of production with `only:` or `runtime: false`.
+ExTLA has no required runtime dependencies, so it goes in as a plain dependency: there is
+nothing to keep out of production with `only:` or `runtime: false`. Two dependencies are
+optional, and ExTLA uses them when your project includes them:
+
+- `{:jason, "~> 1.4"}` for JSON — `--format json` (on `mix extla.check`, `extla.simulate` and
+  `extla.replay`), `mix extla.explore --trace`, and `mix extla.replay --trace` / `--captured`.
+- `{:telemetry, "~> 1.0"}` for the events Layer 1 emits when a running process breaks an
+  invariant (see "Layer 1 in tests and in production" in [the reference](reference.md)).
 
 ## 2. Write a spec
 
@@ -144,9 +136,11 @@ found, until nothing new appeared. Then it said what it saw. (The time is the on
 differ on your machine.)
 
 **`verified`** means every reachable state satisfied every invariant, and the exploration was
-complete: there is no `--max-states` cap and no state constraint that stopped it early. A run that
-*was* cut short reports `INCOMPLETE` and exits 2 instead of 0, because "we ran out of budget" is
-not "it holds".
+complete: no `--max-states` cap stopped it early. A run that *was* cut short reports `INCOMPLETE`
+and exits 2 instead of 0, because "we ran out of budget" is not "it holds". (From the
+`ExTLA.ModelChecker.run/2` API, a `state_constraint:` can also bound a run, and the result is
+reported with status `:constrained` rather than `:ok`; `mix extla.check` has no flag for it. See "State
+constraints" in [the reference](reference.md).)
 
 **`8 distinct states`** is the size of the whole state space for two clients. Every configuration
 of `free` and `pc` the system can ever be in is one of those eight. **`14 transitions`** are the
@@ -347,5 +341,4 @@ code, and it is the question the tool exists to make you answer.
   classes, what an action body means, where nondeterminism comes from, types.
 - [The reference](reference.md) — the checker's options and their costs, the coverage report,
   the JSON result, conformance, and what ExTLA is not.
-- [The examples](../spec/07-examples.md) — the acceptance corpus: whole specs with
-  implementations checked against them.
+- [The examples](../spec/07-examples.md) — whole specs with implementations checked against them.

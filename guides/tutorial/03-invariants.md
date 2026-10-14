@@ -29,8 +29,11 @@ queue: nothing is delivered twice, nothing is lost. For an allocator: no two cli
 resource. These are usually few, short, and about *relationships between variables* rather than
 about any one of them.
 
-**Say what an invariant is for when the name will not carry it.** `desc:` is not decoration — it
-is printed with the violation:
+**Say what an invariant is for when the name will not carry it.** `desc:` is where that goes. The
+checker's counterexample names the invariant (`invariant :mutual_exclusion does not hold in this
+state`) and does not print its `desc:`, so the sentence is for whoever opens the spec to find out
+what that name was protecting. (A `temporal` property's `desc:` *is* printed with its refutation,
+and so is a Layer 1 invariant's with its violation — see [Layer 1](06-layer1.md).)
 
 <!-- tla:skip reason=an invariant declaration on its own, not a compilable module -->
 ```elixir
@@ -151,7 +154,7 @@ warning: action :cancel was never enabled
 the spec **verifies**, with the same twenty states as before. Every invariant holds in a system that
 has no cancellation in it. Nothing about the verdict is wrong; what is wrong is what it is a
 verdict about. The coverage table is the only place that shows, and `--strict-coverage` is how you
-make it exit 3 rather than print a warning.
+make a never-enabled action exit 3 rather than print a warning.
 
 ## `action_property` — a property of a *step*
 
@@ -550,9 +553,11 @@ and it is worth being clear about what it does *not* do
 - **For liveness it stutters forever**, so a `p ~> q` whose `q` has not happened by then is
   violated there — which is the correct verdict, because it never will happen.
 
-There is also `check_deadlock: false`, which turns the whole check off. Prefer the declaration: it
-says *which* states are meant to be final and leaves deadlock detection on for every other state,
-which is where you want it.
+There is also `check_deadlock: false`, which turns the whole check off. It is a key in the
+config you pass to `ExTLA.ModelChecker.run/2` or `assert_spec/2`, not a `mix extla.check`
+flag: from the command line, the way to accept an end state is to declare it. Prefer the
+declaration anyway: it says *which* states are meant to be final and leaves deadlock detection on
+for every other state, which is where you want it.
 
 ### A `terminal` that is too generous
 
@@ -603,7 +608,8 @@ defmodule Tutorial.OneShotLockLoose do
 end
 ```
 
-It still verifies, and the coverage report is where it shows up:
+It still verifies, and the coverage report is where it shows up — not in the tables, which are
+the same fifteen states as before, but in the warning under them:
 
 <!-- tla:check module=Tutorial.OneShotLockLoose expect=ok states=15 -->
 ```
@@ -629,7 +635,9 @@ warning: terminal :someone_done admitted a live state
 **`terminal_but_live`**: a state the predicate called final still had an enabled action. It is not
 an error — a system may legitimately be allowed to stop early — but it almost always means the
 predicate is broader than the end state it was written for, and a broad `terminal` is how a real
-deadlock gets admitted as an ending. `--strict-coverage` makes it exit 3.
+deadlock gets admitted as an ending. It stays a warning even under `--strict-coverage`, which fails
+the build only on a never-enabled action or a vacuous property: an early stop can be legitimate,
+so the checker reports it and leaves the judgement to you.
 
 ---
 

@@ -272,10 +272,20 @@ mix extla.check Tutorial.NamedLock --format json > counterexample.json
 mix extla.replay Tutorial.CheckedLockServer --trace counterexample.json
 ```
 
+With `--trace` the task starts the server itself, with `[]` as its init argument. `--init-arg`
+passes a different one (a literal term such as `[start: 0]`; an expression is refused, never run),
+`--server` drives a process that is already running and registered (`MyApp.Server` or `:name`)
+instead of starting one, and `--timeout` sets how many milliseconds to wait for each reply (default
+5000). They are `ExTLA.Replay.counterexample/3`'s `:init_arg`, `:server` and `:timeout`. All three
+are refused with `--captured`, which checks a recorded trace and drives nothing.
+
 `mix extla.replay` exits 0 when the behaviour was reproduced, 1 on a conformance violation, and 2
 when the implementation *could not follow* the trace — which is not a conformance failure: the spec
 permits a behaviour the code does not take, and which of the two is wrong is not something the tool
-can decide. It says so, rather than guessing.
+can decide. It says so, rather than guessing. It exits 3 when the trace names a step it cannot
+reproduce: a `:restart` (a crash injected by `mix extla.simulate --inject-failures`) against a
+server it was handed with `--server`, which it does not own and will not kill. That is a limit of
+the replay, not a claim about the implementation.
 
 That is the whole pipeline
 ([§The verification pipeline](../reference.md#the-verification-pipeline)): model
@@ -300,8 +310,7 @@ is [Putting a specification in your project](10-in-your-project.md).
 
 ---
 
-The four documents above are the normative reference, and they are where to go when this
-tutorial has stopped answering a question. The tutorial itself continues: the next three
+The pages above are where to go when this tutorial has stopped answering a question. The tutorial itself continues: the next three
 pages are the ones about using this on a system you did not write for it.
 
 Next: [From a system you have to a specification you can check](08-modelling.md).

@@ -326,8 +326,7 @@ you discover later when the verdict turns out to have been about less than you t
 
 ---
 
-That is the derivation. The specification it produced is checked on every run of ExTLA's own
-suite, like every other block in this tutorial — and it is a model of a design, whose verdict is
+That is the derivation. The specification it produced is a model of a design, and its verdict is
 about the model.
 
 Next: [When it explodes](09-when-it-explodes.md).

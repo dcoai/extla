@@ -18,10 +18,12 @@ are the operators, and the fragment they may form is bounded and stated
 ([§5.1](../../spec/02-dsl-semantics.md#5-1-the-supported-temporal-fragment-is-bounded-say-so)); a
 formula outside it is a compile error, never a silently weaker check.
 
-A temporal property is checked when the spec declares one; `--safety-only` turns it off. And the
-first thing you learn on checking one is that a leads-to is refuted by a system that is merely
-*allowed* to stop — so a spec with a temporal property needs to say which actions the system can be
-relied on to take. That is **fairness**, and there are two strengths of it.
+`mix extla.check` checks a temporal property whenever the spec declares one; `--safety-only`
+turns it off, and under symmetry or `--workers` above 1 it is skipped with a warning. From code it
+is the other way round: `ExTLA.ModelChecker.run/2` and `assert_spec/2` check liveness only when
+the config says `check_liveness: true`. And the first thing you learn on checking one is that a
+leads-to is refuted by a system that is merely *allowed* to stop — so a spec with a temporal
+property needs to say which actions the system can be relied on to take. That is **fairness**, and there are two strengths of it.
 
 ## Weak fairness, refuted
 
@@ -139,11 +141,13 @@ Invariants                  evaluated   near-miss
 ```
 
 A liveness counterexample is not a trace that ends in a bad state; it is a **lasso** — a prefix,
-then a cycle the system can repeat forever, along which the property never comes true. Read the
-last line first: from state 5 the system is back in state 2, and states 2 to 4 repeat. Alice asks
-for the lock in state 2 and is still waiting when the cycle closes. Bob requests, acquires and
-releases, forever, and every step of that is one the fairness constraints permit — because
-`acquire(c: :alice)` is *not continuously enabled*. It is disabled every time Bob holds the lock.
+then a cycle the system can repeat forever, along which the property never comes true. The
+header says which instance of the `Enum.all?` it refutes — `at :alice`. Then read the end: state 5
+is marked `(= state 2, the cycle head)`, so the system is back where the cycle began, and the line
+under the trace says states 2 to 4 repeat forever. Alice asks for the lock in state 2 and is still
+waiting when the cycle closes. Bob requests, acquires and releases, forever, and every step of
+that is one the fairness constraints permit — because `acquire(c: :alice)` is *not continuously
+enabled*. It is disabled every time Bob holds the lock.
 Weak fairness obliges nothing about an action that keeps being switched off, and this is exactly
 the behaviour it does not rule out.
 

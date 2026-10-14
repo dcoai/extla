@@ -37,7 +37,10 @@ defmodule ExTLA.RenderedDocsTest do
     {~r/\bcorpus\b/i, "this repository's differential corpus"},
     {~r/\bmutation (test|sweep|harness|catalogue|score)|\bmutants?\b/i,
      "this repository's mutation testing"},
-    {~r/\b0[0134568]-[a-z0-9-]+\.md\b/, "a specification file the docs do not publish"},
+    # By name, so a tutorial page (`00-introduction.md`) is not mistaken for one, and not
+    # inside a link to the file on GitHub, which is where a maintainer page is meant to be read.
+    {~r/(?<!blob\/main\/spec\/)\b0[0134568]-(prior-art|foundation|layer1-invariants|layer2-model-checker|layer3-conformance|architecture|decisions)\.md\b/,
+     "a specification file the docs do not publish"},
     {~r/\bD-\d+\b/, "a decision-log number; the log is not published"}
   ]
 
@@ -94,6 +97,38 @@ defmodule ExTLA.RenderedDocsTest do
     found = findings("usage-rules.md", text)
 
     assert found == [], "usage-rules.md:\n  " <> Enum.join(found, "\n  ")
+  end
+
+  # The guides ship too, and #398 found the same narrative in them (#410). Two marks are left
+  # out, because the guides teach putting a specification in the reader's own project: `CI`
+  # is the reader's pipeline and `test/test_helper.exs` the reader's file, not this
+  # repository's.
+  test "and neither do the guides" do
+    marks =
+      Enum.reject(@marks, fn {_pattern, why} ->
+        why in ["this repository's CI", "a path into this repository's tests"]
+      end)
+
+    # A bare ``` block is the tool's own output, held to what the tool prints by the guide
+    # harness (#409); what it says is the tool's to fix, so it is not the prose's mark.
+    #
+    # Every fence is matched, language or not, so fences pair up in order; only the bare ones
+    # are dropped. Matching bare fences alone paired a language block's closing fence with the
+    # next opener.
+    prose = fn path ->
+      Regex.replace(~r/^```(\w*)\n.*?^```$/ms, File.read!(path), fn whole, lang ->
+        if lang == "", do: "", else: whole
+      end)
+    end
+
+    found =
+      for path <- Path.wildcard(Path.join(@root, "guides/**/*.md")),
+          relative = Path.relative_to(path, @root),
+          {pattern, why} <- marks,
+          [match | _] <- Regex.scan(pattern, prose.(path)),
+          do: "#{relative}: #{inspect(match)} — #{why}"
+
+    assert found == [], "the guides carry maintainer narrative:\n  " <> Enum.join(found, "\n  ")
   end
 
   # Anti-vacuity: the modules and their docs are really read, and each mark fires on what it

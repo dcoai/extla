@@ -207,9 +207,11 @@ defmodule ExTLA.Symmetry do
   end
 
   defp unsound_message(names, with_reduction, without) do
+    # A fixed order, not `Map.keys/1`: since OTP 26 a small map's atom keys come back in
+    # atom-table order, which depends on which modules happened to create those atoms first,
+    # so the same verdict printed its lines in a different order from one VM to the next.
     differences =
-      with_reduction
-      |> Map.keys()
+      [:status, :deadlock, :refuted, :never_enabled]
       |> Enum.filter(&(Map.get(with_reduction, &1) != Map.get(without, &1)))
       |> Enum.map_join("\n", fn key ->
         "  #{key}: #{inspect(Map.get(with_reduction, key))} with the reduction, " <>

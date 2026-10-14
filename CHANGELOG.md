@@ -65,6 +65,17 @@ release it merely follows.
   drifted are regenerated. They were missing trace banners, used an old lasso rendering,
   had a coverage count one off, and dropped transition counts. Page 10's DOT example now
   comes from a spec shown on the page.
+- **Getting started and the tutorial say what the tool does, and where each option applies**
+  (#410, for #398). The pages now say which options are for `ExTLA.ModelChecker.run/2` and
+  `assert_spec/2` only (`state_constraint:`, `check_deadlock:`, `check_liveness:`). They
+  say that `mix extla.check` checks liveness on its own, and where the CLI reads constants
+  and symmetry from. Wrong claims are corrected: an invariant's `desc:` is not printed in a
+  counterexample, `--strict-coverage` never fails on a live terminal, and
+  `mix extla.visualize` refuses with "more than N". The pages gain the optional `jason` and
+  `telemetry` dependencies, the sequence operations, `mix extla.replay`'s exit code 3 and
+  driving flags, the `:state_functions` limit of Layer 1, and
+  `ExTLA.PropertyTest.action_sequences/3`. Passages about how ExTLA itself is tested are
+  gone.
 - **This changelog is written for users** (#406, for #397). Entries for CI, test tooling and
   other work only the repository sees are gone, and the remaining entries are shorter.
 
@@ -76,6 +87,10 @@ release it merely follows.
   refers to ^max, which this run did not assign". Declared defaults now fill in what
   `constants:` leaves out, and an explicit constant still wins. Application config is still
   read only by the Mix tasks.
+- **`--verify-symmetry`'s report lists its differences in a fixed order** (#410). The
+  lines naming what differed with and without the reduction came out in an order that
+  could change from one run to the next. They now always read status, deadlock, refuted,
+  never enabled.
 
 ## [0.5.0] — 2026-10-13
 
