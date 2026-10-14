@@ -665,7 +665,45 @@ defmodule ExTLA.GuideCheckTest do
         )
 
       assert [failure] = GuideCheck.check(path)
-      assert failure =~ "no `{:extla, …, tag:"
+      assert failure =~ ~s(no `{:extla, "~> …"}` or `{:extla, …, tag:)
+    end
+
+    # The install is from Hex since #424, and the requirement is held to the same record.
+    defp hex_block(requirement),
+      do: block("tla:deps", "def deps do\n  [{:extla, #{inspect(requirement)}}]\nend\n")
+
+    defp newest_line do
+      version = Version.parse!(newest_release())
+      "#{version.major}.#{version.minor}"
+    end
+
+    test "accepts a Hex requirement on the newest release's line", %{tmp_dir: tmp} do
+      path = guide(tmp, hex_block("~> #{newest_line()}.0"))
+
+      assert GuideCheck.check(path) == []
+    end
+
+    test "rejects a requirement on an older line", %{tmp_dir: tmp} do
+      path = guide(tmp, hex_block("~> 0.1.0"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ ~s(requires "~> 0.1.0")
+      assert failure =~ "newest release in CHANGELOG.md is v#{newest_release()}"
+    end
+
+    # `~> 0.6` admits 0.7, and before 1.0 a minor may break the interface.
+    test "rejects a two-part requirement, which would admit the next minor", %{tmp_dir: tmp} do
+      path = guide(tmp, hex_block("~> #{newest_line()}"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "three parts"
+    end
+
+    test "rejects a requirement the newest release does not satisfy", %{tmp_dir: tmp} do
+      path = guide(tmp, hex_block("~> #{newest_line()}.99"))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ ~s(requires "~> #{newest_line()}.99")
     end
 
     test "and one that does not parse is a finding, not a crash", %{tmp_dir: tmp} do

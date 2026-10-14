@@ -210,12 +210,14 @@ Work branches stay on GitLab. Between releases GitHub's `main` lags GitLab's, wh
 accepted: the public install pins a tag. The GitLab release page is created by `--tag`.
 GitHub shows the tag, and has no release page unless one is made there.
 
-**The `--prepare` commit also moves the install tag.** `guides/getting-started.md`'s
-`tla:deps` block names a literal tag, and the guide harness fails the build once it stops
-matching `CHANGELOG.md`'s newest release. `--prepare` closes the section that makes it stale,
-so the same commit edits the tag to the version being cut. `release.exs` is project-agnostic
-and doesn't know the page exists. v0.4.0's release MR found this the slow way: its pipeline
-went red on the gate.
+**The `--prepare` commit also moves the install requirement.** The `tla:deps` blocks in
+`README.md` and `guides/getting-started.md` install from Hex with `{:extla, "~> X.Y.0"}`, and
+the guide harness fails the build unless that requirement admits `CHANGELOG.md`'s newest
+release and names its minor line (#424; before that, a `tag:` held to the same record).
+`--prepare` closes the section that makes it stale, so on a minor release the same commit
+edits the requirement to the line being cut. A patch release leaves it alone, because
+`~> X.Y.0` already admits it. `release.exs` is project-agnostic and doesn't know the pages
+exist. v0.4.0's release MR found this the slow way: its pipeline went red on the gate.
 
 Opening a new minor line is the same sequence with `--minor` on the dry run, `--prepare` and
 `--tag`, but **not** on `--post-bump`. Once `vX.Y.0` exists, `--minor` names the *next* line,

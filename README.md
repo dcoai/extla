@@ -19,13 +19,13 @@ says what it covered, so a green run, whether you or an agent reads it, means wh
 
 ## Installation
 
-ExTLA isn't on Hex yet. Add it from GitHub, pinned to a release:
+Add `extla` to your dependencies in `mix.exs`:
 
 <!-- tla:deps -->
 ```elixir
 def deps do
   [
-    {:extla, git: "https://github.com/dcoai/extla.git", tag: "v0.5.0"}
+    {:extla, "~> 0.5.0"}
   ]
 end
 ```
