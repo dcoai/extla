@@ -148,18 +148,18 @@ key whose value is a union of atoms; any other type is shown as written.
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
-| `check_action_properties!/4` | `:def` | (module, names, old_state, new_state) | `9b362610` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_action_properties!/5` | `:def` | (module, names, old_state, new_state) | `9b362610` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_action_properties!/4` | `:def` | (module, names, old_state, new_state) | `c7b7daa6` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_action_properties!/5` | `:def` | (module, names, old_state, new_state) | `c7b7daa6` | `lib/ex_tla/invariant/runtime.ex` |
 | `check_agent_state!/2` | `:def` | (module, state) | `4f983c1c` | `lib/ex_tla/invariant/runtime.ex` |
 | `check_agent_step!/3` | `:def` | (module, old_state, new_state) | `03e8c519` | `lib/ex_tla/invariant/runtime.ex` |
 | `check_initial_invariants!/4` | `:def` | (module, names, result, shape) | `c5e2979a` | `lib/ex_tla/invariant/runtime.ex` |
 | `check_initial_invariants!/5` | `:def` | (module, names, result, shape) | `c5e2979a` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_invariants!/3` | `:def` | (module, names, state) | `e30c8891` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_invariants!/4` | `:def` | (module, names, state) | `e30c8891` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_postconditions!/5` | `:def` | (module, callback, message, old_state, new_state) | `987aa7ce` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_postconditions!/6` | `:def` | (module, callback, message, old_state, new_state) | `987aa7ce` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_preconditions!/4` | `:def` | (module, callback, message, state) | `d88e0c99` | `lib/ex_tla/invariant/runtime.ex` |
-| `check_preconditions!/5` | `:def` | (module, callback, message, state) | `d88e0c99` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_invariants!/3` | `:def` | (module, names, state) | `10972bac` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_invariants!/4` | `:def` | (module, names, state) | `10972bac` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_postconditions!/5` | `:def` | (module, callback, message, old_state, new_state) | `920a3cda` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_postconditions!/6` | `:def` | (module, callback, message, old_state, new_state) | `920a3cda` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_preconditions!/4` | `:def` | (module, callback, message, state) | `e4724328` | `lib/ex_tla/invariant/runtime.ex` |
+| `check_preconditions!/5` | `:def` | (module, callback, message, state) | `e4724328` | `lib/ex_tla/invariant/runtime.ex` |
 | `extract_state/2` | `:def` | (result, pre_state) | `7ddbd8b1` | `lib/ex_tla/invariant/runtime.ex` |
 | `extract_statem_state/2` | `:def` | (result, pre) | `98d0a560` | `lib/ex_tla/invariant/runtime.ex` |
 | `initial_state/1` | `:def` | (result) | `d80258d7` | `lib/ex_tla/invariant/runtime.ex` |

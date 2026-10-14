@@ -35,14 +35,14 @@ defmodule ExTLA.Invariant.Runtime do
   """
   def check_invariants!(module, names, state) do
     Enum.each(names, fn name ->
-      unless_ok(module.__tla_invariant__(name, state), fn ->
-        report(module, %Violation{
+      unless_ok(module.__tla_invariant__(name, state), module, fn ->
+        %Violation{
           type: :invariant,
           name: name,
           module: module,
           message: module.__tla_describe__(:invariant, name),
           state: state
-        })
+        }
       end)
     end)
   end
@@ -54,14 +54,14 @@ defmodule ExTLA.Invariant.Runtime do
   def check_invariants!(module, names, state, :verbose) do
     Enum.each(names, fn name ->
       measured(:invariant, module, name, fn -> module.__tla_invariant__(name, state) end)
-      |> unless_ok(fn ->
-        report(module, %Violation{
+      |> unless_ok(module, fn ->
+        %Violation{
           type: :invariant,
           name: name,
           module: module,
           message: module.__tla_describe__(:invariant, name),
           state: state
-        })
+        }
       end)
     end)
   end
@@ -71,15 +71,15 @@ defmodule ExTLA.Invariant.Runtime do
   """
   def check_action_properties!(module, names, old_state, new_state) do
     Enum.each(names, fn name ->
-      unless_ok(module.__tla_action_property__(name, old_state, new_state), fn ->
-        report(module, %Violation{
+      unless_ok(module.__tla_action_property__(name, old_state, new_state), module, fn ->
+        %Violation{
           type: :action_property,
           name: name,
           module: module,
           message: module.__tla_describe__(:action_property, name),
           state: new_state,
           old_state: old_state
-        })
+        }
       end)
     end)
   end
@@ -92,15 +92,15 @@ defmodule ExTLA.Invariant.Runtime do
       measured(:action_property, module, name, fn ->
         module.__tla_action_property__(name, old_state, new_state)
       end)
-      |> unless_ok(fn ->
-        report(module, %Violation{
+      |> unless_ok(module, fn ->
+        %Violation{
           type: :action_property,
           name: name,
           module: module,
           message: module.__tla_describe__(:action_property, name),
           state: new_state,
           old_state: old_state
-        })
+        }
       end)
     end)
   end
@@ -119,15 +119,15 @@ defmodule ExTLA.Invariant.Runtime do
           :ok
 
         held ->
-          unless_ok(held, fn ->
-            report(module, %Violation{
+          unless_ok(held, module, fn ->
+            %Violation{
               type: :precondition,
               name: callback,
               module: module,
               message: description,
               state: state,
               args: message
-            })
+            }
           end)
       end
     end)
@@ -151,15 +151,15 @@ defmodule ExTLA.Invariant.Runtime do
           :ok
 
         held ->
-          unless_ok(held, fn ->
-            report(module, %Violation{
+          unless_ok(held, module, fn ->
+            %Violation{
               type: :precondition,
               name: callback,
               module: module,
               message: description,
               state: state,
               args: message
-            })
+            }
           end)
       end
     end)
@@ -175,8 +175,8 @@ defmodule ExTLA.Invariant.Runtime do
           :ok
 
         held ->
-          unless_ok(held, fn ->
-            report(module, %Violation{
+          unless_ok(held, module, fn ->
+            %Violation{
               type: :postcondition,
               name: callback,
               module: module,
@@ -184,7 +184,7 @@ defmodule ExTLA.Invariant.Runtime do
               state: new_state,
               old_state: old_state,
               args: message
-            })
+            }
           end)
       end
     end)
@@ -203,8 +203,8 @@ defmodule ExTLA.Invariant.Runtime do
           :ok
 
         held ->
-          unless_ok(held, fn ->
-            report(module, %Violation{
+          unless_ok(held, module, fn ->
+            %Violation{
               type: :postcondition,
               name: callback,
               module: module,
@@ -212,7 +212,7 @@ defmodule ExTLA.Invariant.Runtime do
               state: new_state,
               old_state: old_state,
               args: message
-            })
+            }
           end)
       end
     end)
@@ -417,27 +417,41 @@ defmodule ExTLA.Invariant.Runtime do
     end
   end
 
-  # One reading of a predicate's result, shared by all six check paths (#317).
+  # One reading of a predicate's result, shared by all six check paths and both telemetry
+  # settings (#317): `true` holds, `false` is a violation, and anything else is a predicate
+  # that did not answer the question (#418, for #401).
   #
-  # **Elixir's own truthiness**, which is what the INVARIANT path always did (`unless`). The
-  # condition paths matched `true` and `false` exactly, so a precondition returning `nil` —
-  # `Map.get/2` on a key that is not there is the ordinary way to get one — killed the server
-  # with a `CaseClauseError` naming a generated function, while the same `nil` returned by an
-  # invariant was reported as a violation of the declaration the user wrote. The
-  # specification says "a boolean expression" for both and notes no difference between them
-  # (02-dsl-semantics.md §4.2), so this was one path diverging from the other silently
-  # rather than a documented choice.
+  # 02-dsl-semantics.md §5 says every predicate refuses a non-boolean result, and that
+  # `invariant` and `action_property` mean the same thing in Layer 1 as in Layer 2. Layer 2
+  # raises `ExTLA.Spec.PredicateError`. This read Elixir truthiness instead — #317 chose it
+  # to make the six paths agree with each other, not to make Layer 1 differ — so
+  # `n >= 0 and status`, which evaluates to `status`, held here while the checker refused
+  # the same predicate. A truthy non-boolean counted as holding is how a broken invariant
+  # passes forever.
   #
-  # The `:verbose` paths diverged a second way, in the opposite direction: this used to
-  # report unless the value was exactly `true`, so a truthy non-boolean held under the
-  # default and was a violation under `config :extla, telemetry: :verbose`. Telemetry may
-  # not change a verdict.
+  # A non-boolean is not RAISED here, though, because a raise in a running server is not
+  # the configured response: it is reported through the same path as a violation, with the
+  # value named, so `:log_only` logs it and `:enabled` raises the usual
+  # `ExTLA.Invariant.Violation`. A `nil` — `Map.get/2` on a missing key is the ordinary
+  # source — was a violation before and is one still, now saying why.
   #
   # `:no_match` never reaches here. It is the generated clause's way of saying "this
   # declaration is not about this message", which only preconditions and postconditions can
-  # produce, and their callers answer it before asking this — so a predicate that genuinely
-  # returns the atom `:no_match` is still read as truthy rather than as a non-answer.
-  defp unless_ok(held, report), do: if(held, do: :ok, else: report.())
+  # produce, and their callers answer it before asking this.
+  defp unless_ok(true, _module, _violation), do: :ok
+  defp unless_ok(false, module, violation), do: report(module, violation.())
+
+  defp unless_ok(other, module, violation),
+    do: report(module, not_a_boolean(violation.(), other))
+
+  defp not_a_boolean(%Violation{message: description} = violation, value) do
+    note = "returned #{inspect(value)}, which is not a boolean: a predicate must be true or false"
+
+    %{
+      violation
+      | message: Enum.join(Enum.reject([description, note], &(&1 in [nil, ""])), "\n  ")
+    }
+  end
 
   defp report(module, violation) do
     emit([:extla, violation.type, :violated], %{

@@ -8,7 +8,7 @@ never reached; `Never called` names the functions it never entered, compiler-gen
 ones excluded. A module never loaded by any test reads `—`. A row that grows is coverage
 lost; one that shrinks is coverage gained, recorded so it cannot be lost again quietly.
 
-**60 modules · 3895 lines** · unhit 296 · modules with an unhit line 45 · never loaded 0
+**60 modules · 3899 lines** · unhit 295 · modules with an unhit line 45 · never loaded 0
 
 | Module | Lines | Unhit | Never called |
 |---|---|---|---|
@@ -23,7 +23,7 @@ lost; one that shrinks is coverage gained, recorded so it cannot be lost again q
 | `ExTLA.GenServer.Violation` | 27 | 6 | `exception/1` |
 | `ExTLA.Invariant` | 140 | 11 | — |
 | `ExTLA.Invariant.Agent` | 11 | 0 | — |
-| `ExTLA.Invariant.Runtime` | 91 | 7 | `telemetry?/0` |
+| `ExTLA.Invariant.Runtime` | 95 | 6 | `telemetry?/0` |
 | `ExTLA.Invariant.Test` | 36 | 1 | — |
 | `ExTLA.Invariant.Violation` | 32 | 5 | `exception/1`, `report!/1` |
 | `ExTLA.Mix.SpecTarget` | 14 | 1 | — |
