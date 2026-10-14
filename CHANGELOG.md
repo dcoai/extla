@@ -58,6 +58,13 @@ release it merely follows.
   specification files the docs no longer publish. Each is rewritten to say what the code
   does and why. Where a doc pointed at an unpublished reason, it now states the reason or
   links the reference guide.
+- **The output shown in the guides is the output the tool prints** (#409, for #398). Every
+  block of `mix extla.*` output in getting-started and the tutorial is now compared with the
+  command's real output when the guides are tested. A block that shows only part of the
+  output says so, and its lines must still appear in order. Twenty-five blocks that had
+  drifted are regenerated. They were missing trace banners, used an old lasso rendering,
+  had a coverage count one off, and dropped transition counts. Page 10's DOT example now
+  comes from a spec shown on the page.
 - **This changelog is written for users** (#406, for #397). Entries for CI, test tooling and
   other work only the repository sees are gone, and the remaining entries are shorter.
 

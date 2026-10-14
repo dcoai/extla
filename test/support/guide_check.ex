@@ -73,7 +73,7 @@ defmodule ExTLA.GuideCheck do
   asserting more than the design promises.
   """
 
-  alias ExTLA.GuideCheck.Links
+  alias ExTLA.GuideCheck.{Links, Output}
   alias ExTLA.{ModelChecker, Simulation, Spec}
 
   # An optional `<!-- tla:... -->` on the line IMMEDIATELY before a ```elixir fence, then the
@@ -83,7 +83,14 @@ defmodule ExTLA.GuideCheck do
   # A run-claim with no fence under it. It claims a run, not code, so it stands beside the
   # command whose output the page quotes rather than above an empty block — which `mix docs`
   # would render as an empty grey box.
-  @bare_claim ~r/^[ \t]*<!--[ \t]*(tla:(?:check|liveness|simulate)[^\n]*?)[ \t]*-->[ \t]*$(?!\n```elixir)/m
+  #
+  # A bare fence directly under it is the output of that run, and is compared with what the
+  # command prints (`ExTLA.GuideCheck.Output`, #409).
+  @bare_claim ~r/^[ \t]*<!--[ \t]*(tla:(?:check|liveness|simulate)[^\n]*?)[ \t]*-->[ \t]*$(?!\n```elixir)(?:\n```\n(.*?)^```[ \t]*$)?/ms
+
+  # Output that is not a claim's: the result of the `tla:run` block above it, or with
+  # `command="mix …"` the output of that command.
+  @output ~r/^[ \t]*<!--[ \t]*(tla:output[^\n]*?)[ \t]*-->[ \t]*\n```\n(.*?)^```[ \t]*$/ms
 
   # `mix extla.simulate`'s own defaults, and a fixed seed: a claim about a random walk is only a
   # claim if the walk is the same one every time — and with these, it is the walk the page
@@ -109,11 +116,22 @@ defmodule ExTLA.GuideCheck do
     bare =
       @bare_claim
       |> Regex.scan(source, return: :index)
-      |> Enum.map(fn [{start, _}, annotation] ->
-        {start, parse_tla(part(source, annotation)), ""}
+      |> Enum.map(fn
+        [{start, _}, annotation] ->
+          {start, parse_tla(part(source, annotation)), ""}
+
+        [{start, _}, annotation, shown] ->
+          {start, Map.put(parse_tla(part(source, annotation)), :shown, part(source, shown)), ""}
       end)
 
-    (fences ++ bare)
+    outputs =
+      @output
+      |> Regex.scan(source, return: :index)
+      |> Enum.map(fn [{start, _}, annotation, shown] ->
+        {start, parse_tla(part(source, annotation)), part(source, shown)}
+      end)
+
+    (fences ++ bare ++ outputs)
     |> Enum.sort()
     |> Enum.map(fn {start, annotation, code} -> {annotation, code, line_of(source, start)} end)
   end
@@ -148,7 +166,7 @@ defmodule ExTLA.GuideCheck do
   @doc """
   Check one guide. Returns a list of failure strings — empty when the guide tells the truth.
   """
-  def check(path) do
+  def check(path, opts \\ []) do
     # A guide that shows the tool refusing something crashes a process on purpose — a
     # `compile_error` block, a Layer 1 precondition, a leaky server under simulation — and the
     # emulator's crash report for each would land in the test output as though something had gone
@@ -157,21 +175,206 @@ defmodule ExTLA.GuideCheck do
     level = Logger.level()
     Logger.configure(level: :none)
 
-    claims =
-      Enum.flat_map(blocks(path), fn {annotation, code, line} ->
-        case verify(annotation, code) do
-          :ok -> []
-          {:error, why} -> ["#{path}:#{line}: #{why}"]
+    # The last `tla:run` block's outcome travels to a `tla:output` block under it.
+    {claims, _last_run} =
+      Enum.flat_map_reduce(blocks(path), nil, fn {annotation, code, line}, last_run ->
+        {result, last_run} = verify_block(annotation, code, last_run, opts)
+
+        case result do
+          :ok -> {[], last_run}
+          {:error, why} -> {["#{path}:#{line}: #{why}"], last_run}
         end
       end)
 
-    failures = claims ++ Links.check(path)
+    failures = claims ++ unchecked_output(path) ++ Links.check(path)
 
     # The emulator delivers a crash report asynchronously; without the flush it would arrive
     # after the level is restored and print anyway.
     Logger.flush()
     Logger.configure(level: level)
     failures
+  end
+
+  # --- the blocks -----------------------------------------------------------------------
+
+  # A `tla:run` block is evaluated once, and its outcome is both checked and kept for the
+  # `tla:output` block that may follow.
+  defp verify_block(%{kind: :run} = annotation, code, _last_run, _opts) do
+    outcome = evaluate_run(code)
+    {verify_run(annotation, outcome), outcome}
+  end
+
+  defp verify_block(%{kind: :output} = annotation, shown, last_run, opts) do
+    {verify_output(annotation, shown, last_run, opts), last_run}
+  end
+
+  defp verify_block(annotation, code, last_run, opts) do
+    result =
+      with :ok <- verify(annotation, code) do
+        claimed_output(annotation, opts)
+      end
+
+    {result, last_run}
+  end
+
+  # --- output blocks (#409) ---------------------------------------------------------------
+
+  # A claim with no block under it shows no output, and there is nothing to compare.
+  defp claimed_output(%{shown: shown} = annotation, opts) when is_binary(shown) do
+    case cli_argv(annotation) do
+      {:ok, argv, env} ->
+        real = with_env(env, opts, fn -> Output.task(argv) end)
+        compare_output(shown, real, annotation, opts)
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp claimed_output(_annotation, _opts), do: :ok
+
+  defp verify_output(%{command: command} = annotation, shown, _last_run, opts) do
+    case OptionParser.split(command) do
+      ["mix" | argv] ->
+        compare_output(shown, with_env([], opts, fn -> Output.task(argv) end), annotation, opts)
+
+      _other ->
+        {:error, "tla:output command=#{inspect(command)} is not a `mix` command"}
+    end
+  end
+
+  defp verify_output(annotation, shown, {:ok, value}, opts) when is_binary(value),
+    do: compare_output(shown, value, annotation, opts)
+
+  defp verify_output(annotation, shown, {:raised_exception, exception}, opts),
+    do: compare_output(shown, raised_text(exception), annotation, opts)
+
+  defp verify_output(_annotation, _shown, nil, _opts),
+    do:
+      {:error,
+       "tla:output with no command= follows no tla:run block, so it shows nothing's output"}
+
+  defp verify_output(_annotation, _shown, outcome, _opts),
+    do:
+      {:error,
+       "tla:output shows the result of the tla:run block above it, which produced " <>
+         "#{inspect(outcome)} rather than text or an exception"}
+
+  # `collect:` names a process that is sent `{:guide_output, shown, real, mode}` for every block
+  # compared, which is how the blocks are regenerated from real output rather than retyped.
+  defp compare_output(shown, real, annotation, opts) do
+    if pid = opts[:collect], do: send(pid, {:guide_output, shown, real, mode(annotation)})
+    Output.compare(shown, real, mode(annotation))
+  end
+
+  # How a raised exception reads where it is not caught: `** (Module) message`.
+  defp raised_text(exception),
+    do: "** (#{inspect(exception.__struct__)}) " <> Exception.message(exception)
+
+  defp mode(%{output: "abridged"}), do: :abridged
+  defp mode(_annotation), do: :exact
+
+  # The command a claim's output came from. It is derived from the claim rather than read from
+  # the page's ```sh block, because the claim is what the harness runs: a block quoting the
+  # output of one command under the shell line of another would otherwise pass.
+  #
+  # Symmetry is not a flag. A reader declares it in config, `config :extla, Spec, symmetry:`,
+  # and so does this: `env` is that config, applied around the run by the caller's `with_env`.
+  defp cli_argv(%{kind: kind, module: module} = annotation) when kind in [:check, :liveness] do
+    flags =
+      Enum.concat([
+        if(limit = annotation[:max_states], do: ["--max-states", limit], else: []),
+        if(annotation[:verify_symmetry] == "true" or annotation[:expect] == "unsound_symmetry",
+          do: ["--verify-symmetry"],
+          else: []
+        )
+      ])
+
+    env =
+      case annotation[:symmetry] do
+        nil ->
+          []
+
+        names ->
+          [
+            {Module.concat([module]),
+             symmetry: names |> String.split(",") |> Enum.map(&String.to_atom/1)}
+          ]
+      end
+
+    {:ok, ["extla.check", module | flags], env}
+  end
+
+  defp cli_argv(%{kind: :simulate, module: module} = annotation) do
+    flags =
+      Enum.flat_map([traces: "--traces", steps: "--steps"], fn {key, flag} ->
+        if value = annotation[key], do: [flag, value], else: []
+      end)
+
+    {:ok, ["extla.simulate", module, "--seed", annotation[:seed] || "1" | flags], []}
+  end
+
+  defp cli_argv(%{kind: kind}),
+    do: {:error, "a #{kind} claim has no command whose output a block could show"}
+
+  # Config the command reads, such as a spec's `symmetry:`, is application env, which this
+  # module may not write (`test/docs/async_isolation_test.exs`): the caller supplies
+  # `with_env:`, a function `(env, fun) -> result` that applies `env` around `fun`. A test that
+  # passes one is a test that may write global state, and says so where it is written.
+  defp with_env([], _opts, fun), do: fun.()
+
+  defp with_env(env, opts, fun) do
+    case opts[:with_env] do
+      nil ->
+        "** this output needs config (#{inspect(env)}) and the check was given no `with_env:`\n"
+
+      apply_env ->
+        apply_env.(env, fun)
+    end
+  end
+
+  # A bare fence in a guide renders as output. One that is neither a claim's output nor a
+  # `tla:output` block is output nothing checks, which is how the blocks drifted (#409); text
+  # that is not output says what it is with a language, ```text or ```sh.
+  defp unchecked_output(path) do
+    if String.starts_with?(path, "guides/") or String.contains?(path, "/guides/"),
+      do: bare_fences(path),
+      else: []
+  end
+
+  defp bare_fences(path) do
+    path
+    |> File.read!()
+    |> String.split("\n")
+    |> Enum.with_index(1)
+    |> Enum.reduce({[], false, nil}, fn {line, number}, {found, in_fence, previous} ->
+      cond do
+        in_fence ->
+          {found, not String.starts_with?(line, "```"), line}
+
+        String.trim_trailing(line) == "```" ->
+          checked =
+            previous &&
+              Regex.match?(~r/^\s*<!--\s*tla:(check|liveness|simulate|output)\b/, previous)
+
+          found = if checked, do: found, else: [number | found]
+          {found, true, line}
+
+        String.starts_with?(line, "```") ->
+          {found, true, line}
+
+        true ->
+          {found, false, line}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+    |> Enum.map(fn number ->
+      "#{path}:#{number}: a bare ``` block renders as output, and nothing checks it. Put the " <>
+        "claim whose output it is on the line above (tla:check, tla:liveness, tla:simulate), or " <>
+        "<!-- tla:output --> for a tla:run block's result or command=\"mix …\"; text that is " <>
+        "not output takes a language (```text, ```sh)"
+    end)
   end
 
   # --- the annotations ------------------------------------------------------------------
@@ -254,28 +457,6 @@ defmodule ExTLA.GuideCheck do
     end
   end
 
-  # A block that runs — a GenServer driven by hand, a replay — and either returns or raises.
-  # `expect=raise` is how a guide shows Layer 1 refusing a call: the server's exception arrives
-  # here as the caller's exit, and `describe/1` digs it out.
-  defp verify(%{kind: :run} = annotation, code) do
-    case {annotation[:expect], evaluate(code)} do
-      {"ok", {:ok, _value}} ->
-        :ok
-
-      {"ok", {:raised, message}} ->
-        {:error, "the guide claims this runs, but it raised: #{message}"}
-
-      {"raise", {:raised, message}} ->
-        matched(message, annotation[:match], "the exception")
-
-      {"raise", {:ok, value}} ->
-        {:error, "the guide claims this raises, but it returned #{inspect(value)}"}
-
-      {other, _} ->
-        {:error, "unknown expect=#{inspect(other)} for tla:run (ok or raise)"}
-    end
-  end
-
   defp verify(%{kind: :simulate} = annotation, _code) do
     module = Module.concat([annotation.module])
 
@@ -334,6 +515,31 @@ defmodule ExTLA.GuideCheck do
 
       {_, {:ok, result}} ->
         with :ok <- compare(result, annotation), do: census(result, annotation)
+    end
+  end
+
+  # A block that runs — a GenServer driven by hand, a replay — and either returns or raises.
+  # `expect=raise` is how a guide shows Layer 1 refusing a call: the server's exception arrives
+  # here as the caller's exit, and `describe/1` digs it out.
+  defp verify_run(annotation, {:raised_exception, exception}),
+    do: verify_run(annotation, {:raised, Exception.message(exception)})
+
+  defp verify_run(annotation, outcome) do
+    case {annotation[:expect], outcome} do
+      {"ok", {:ok, _value}} ->
+        :ok
+
+      {"ok", {:raised, message}} ->
+        {:error, "the guide claims this runs, but it raised: #{message}"}
+
+      {"raise", {:raised, message}} ->
+        matched(message, annotation[:match], "the exception")
+
+      {"raise", {:ok, value}} ->
+        {:error, "the guide claims this raises, but it returned #{inspect(value)}"}
+
+      {other, _} ->
+        {:error, "unknown expect=#{inspect(other)} for tla:run (ok or raise)"}
     end
   end
 
@@ -495,8 +701,20 @@ defmodule ExTLA.GuideCheck do
   # expected still surfaces as one.
   defp compile(code), do: isolated(fn -> Code.compile_string(code, "guide") end)
 
-  defp evaluate(code),
-    do: isolated(fn -> code |> Code.eval_string([], file: "guide") |> elem(0) end)
+  # The exception itself is kept, not only its message, so a `tla:output` block can show it the
+  # way it reads uncaught.
+  defp evaluate_run(code) do
+    case isolated_reason(fn -> code |> Code.eval_string([], file: "guide") |> elem(0) end) do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:down, reason} ->
+        case find_exception(reason) do
+          nil -> {:raised, describe(reason)}
+          exception -> {:raised_exception, exception}
+        end
+    end
+  end
 
   defp simulate(module, config), do: isolated(fn -> Simulation.run(module, config) end)
 
@@ -521,6 +739,13 @@ defmodule ExTLA.GuideCheck do
   end
 
   defp isolated(fun) do
+    case isolated_reason(fun) do
+      {:down, reason} -> {:raised, describe(reason)}
+      other -> other
+    end
+  end
+
+  defp isolated_reason(fun) do
     parent = self()
 
     # Two guide blocks may define the same module name, and redefinition warns rather than
@@ -541,9 +766,9 @@ defmodule ExTLA.GuideCheck do
         {:ok, value}
 
       {:DOWN, ^ref, :process, _pid, reason} ->
-        {:raised, describe(reason)}
+        {:down, reason}
     after
-      60_000 -> {:raised, "timed out after 60s"}
+      60_000 -> {:down, "timed out after 60s"}
     end
   end
 

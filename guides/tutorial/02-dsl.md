@@ -176,10 +176,10 @@ defmodule Tutorial.Quorum do
 end
 ```
 
-<!-- tla:check module=Tutorial.Quorum expect=ok states=12 depth=5 -->
+<!-- tla:check module=Tutorial.Quorum expect=ok states=12 depth=5 output=abridged -->
 ```
-mix extla.check Tutorial.Quorum
-✓ verified · 12 distinct states · depth 5
+Tutorial.Quorum — verified
+  12 distinct states, 23 transitions, depth 5, 1ms
 ```
 
 `committed_needs_quorum` states the same fact as `commit`'s guard the *other* way — by

@@ -27,7 +27,7 @@ mix extla.check Tutorial.StrongLock --verify-symmetry
 <!-- tla:check module=Tutorial.StrongLock expect=ok symmetry=clients verify_symmetry=true states=7 depth=5 -->
 ```
 Tutorial.StrongLock — verified
-  7 distinct states, 18 transitions, depth 5, 4ms
+  7 distinct states, 18 transitions, depth 5, 1ms
 
 --- COVERAGE: Tutorial.StrongLock ----------------------------------
 
@@ -42,6 +42,7 @@ Invariants                  evaluated   near-miss
   mutual_exclusion                   7           -
   type_ok                            7           -
 --------------------------------------------------------------------
+
 warning: 1 temporal property was declared and not checked: pass `check_liveness: true`.
 warning: liveness was not checked: symmetry reduction and liveness are not sound together — the quotient graph can have cycles the real state space does not. Check the temporal properties in a run without `symmetry:`.
 ```
@@ -114,7 +115,7 @@ end
 
 Without any reduction, that invariant is simply false — Carol requests, Carol acquires, two steps:
 
-<!-- tla:check module=Tutorial.NamedLock expect=violation property=carol_never_holds length=3 -->
+<!-- tla:check module=Tutorial.NamedLock expect=violation property=carol_never_holds length=3 output=abridged -->
 ```
 Tutorial.NamedLock — VIOLATION: carol_never_holds
   10 distinct states, 12 transitions, depth 3, 0ms
@@ -131,9 +132,11 @@ Tutorial.NamedLock — UNSOUND SYMMETRY
 
 symmetry: [:clients] is not sound for this spec. The same model gives different
 answers with and without the reduction:
+
   status: :ok with the reduction, :violation without
   never_enabled: [] with the reduction, [:release] without
   refuted: nil with the reduction, :carol_never_holds without
+
 Something in the spec can tell the elements of [:clients] apart — an
 `Enum.at`, a sort, a comparison on names, a dependence on list position — so
 collapsing them dropped a state whose verdict mattered. Nothing can check this

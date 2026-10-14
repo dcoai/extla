@@ -98,14 +98,50 @@ mix extla.visualize Specs.Lock --output lock.dot && dot -Tsvg lock.dot -o lock.s
 
 For a two-client lock with no waiting state, the whole graph is small enough to read:
 
+<!-- tla:spec -->
+```elixir
+defmodule Viz.Lock do
+  use ExTLA.Spec
+
+  constant :clients, default: set([:alice, :bob])
+
+  variable :free, type: [true, false]
+  variable :pc,   type: [^clients ~> [:idle, :holding]]
+
+  init do
+    free = true
+    pc   = for_each(^clients, fn _ -> :idle end)
+  end
+
+  action :acquire, params: [c: ^clients] do
+    require free and pc[c] == :idle
+    free = false
+    pc   = update(pc, c, fn _ -> :holding end)
+  end
+
+  action :release, params: [c: ^clients] do
+    require pc[c] == :holding
+    free = true
+    pc   = update(pc, c, fn _ -> :idle end)
+  end
+end
+```
+
+```sh
+mix extla.visualize Viz.Lock
+```
+
+<!-- tla:output command="mix extla.visualize Viz.Lock" -->
 ```
 digraph "Viz.Lock" {
   rankdir=LR;
   node [shape=box, fontname="monospace", fontsize=10];
   edge [fontname="monospace", fontsize=9];
+
   0 [label="0\nfree = true\npc = %{alice: :idle, bob: :idle}", peripheries=2];
   1 [label="1\nfree = false\npc = %{alice: :holding, bob: :idle}"];
   2 [label="2\nfree = false\npc = %{alice: :idle, bob: :holding}"];
+
   0 -> 1 [label="acquire(c=:alice)"];
   0 -> 2 [label="acquire(c=:bob)"];
   1 -> 0 [label="release(c=:alice)"];

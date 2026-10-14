@@ -52,7 +52,7 @@ states the rule; this is why it holds.
 
 A complete TLA+ specification is one formula:
 
-```
+```text
 Spec == Init ∧ □[Next]_vars ∧ Fairness
 ```
 
@@ -154,7 +154,7 @@ An implementation conforms to a specification when **every behaviour it can exhi
 behaviour the specification allows.** With a mapping from concrete states to abstract ones, that is
 just implication between formulas:
 
-```
+```text
 Impl ⇒ Spec
 ```
 
@@ -234,10 +234,10 @@ end
 mix extla.check Math.Lock
 ```
 
-<!-- tla:check module=Math.Lock expect=ok states=256 depth=8 -->
+<!-- tla:check module=Math.Lock expect=ok states=256 depth=8 output=abridged -->
 ```
 Math.Lock — verified
-  256 distinct states, 1056 transitions, depth 8, 41ms
+  256 distinct states, 1056 transitions, depth 8, 10ms
 ```
 
 ### What that verdict claims, exactly
@@ -266,10 +266,10 @@ specification, given a state limit smaller than its state space:
 mix extla.check Math.Lock --max-states 100
 ```
 
-<!-- tla:check module=Math.Lock expect=incomplete max_states=100 states=101 -->
+<!-- tla:check module=Math.Lock expect=incomplete max_states=100 states=101 output=abridged -->
 ```
 Math.Lock — INCOMPLETE (state limit)
-  101 distinct states, 208 transitions, depth 5, 12ms
+  101 distinct states, 208 transitions, depth 5, 3ms
 ```
 
 Exit code **2**, not 0 — a separate code from both success and violation, because "we ran out of

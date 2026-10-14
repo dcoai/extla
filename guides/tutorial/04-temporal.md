@@ -85,9 +85,10 @@ mix extla.check Tutorial.WeakLock
 <!-- tla:liveness module=Tutorial.WeakLock expect=violation property=no_starvation -->
 ```
 Tutorial.WeakLock — LIVENESS: no_starvation
-  20 distinct states, 48 transitions, depth 5, 19ms
+  20 distinct states, 48 transitions, depth 5, 1ms
 
 ═══ LIVENESS: no_starvation ════════════════════════════════════════
+temporal property :no_starvation, at :alice, is refuted by this behaviour
 
 State 1 (Init):
   free = true
@@ -113,12 +114,28 @@ State 4:
 
 ── release(c: :bob) ────────────────────
 
-State 5 [VIOLATION]:
+State 5 (= state 2, the cycle head):
   free = true   ← changed
   pc   = %{alice: :waiting, bob: :idle, carol: :idle}   ← changed
 
 ════════════════════════════════════════════════════════════════════
+
 ↺ back to state 2 — states 2-4 repeat forever.
+
+
+--- COVERAGE: Tutorial.WeakLock ------------------------------------
+
+Actions                   enabled in      states     distinct
+  acquire                            7          12          12
+  release                           12          12           0
+  request                           16          24           7
+
+
+Invariants                  evaluated   near-miss
+  holding_means_taken               20          12
+  mutual_exclusion                  20           -
+  type_ok                           20           -
+--------------------------------------------------------------------
 ```
 
 A liveness counterexample is not a trace that ends in a bad state; it is a **lasso** — a prefix,
@@ -190,10 +207,10 @@ end
 mix extla.check Tutorial.StrongLock
 ```
 
-<!-- tla:liveness module=Tutorial.StrongLock expect=ok -->
+<!-- tla:liveness module=Tutorial.StrongLock expect=ok output=abridged -->
 ```
 Tutorial.StrongLock — verified
-  20 distinct states, 48 transitions, depth 5, 3ms
+  20 distinct states, 48 transitions, depth 5, 2ms
 ```
 
 The same twenty states, the same transitions, the same property — and it holds. Nothing changed
@@ -261,6 +278,57 @@ end
 <!-- tla:liveness module=Tutorial.WholeActionLock expect=violation property=no_starvation -->
 ```
 Tutorial.WholeActionLock — LIVENESS: no_starvation
+  20 distinct states, 48 transitions, depth 5, 1ms
+
+═══ LIVENESS: no_starvation ════════════════════════════════════════
+temporal property :no_starvation, at :alice, is refuted by this behaviour
+
+State 1 (Init):
+  free = true
+  pc   = %{alice: :idle, bob: :idle, carol: :idle}
+
+── request(c: :alice) ────────────────────
+
+State 2:
+  free = true
+  pc   = %{alice: :waiting, bob: :idle, carol: :idle}   ← changed
+
+── request(c: :bob) ────────────────────
+
+State 3:
+  free = true
+  pc   = %{alice: :waiting, bob: :waiting, carol: :idle}   ← changed
+
+── acquire(c: :bob) ────────────────────
+
+State 4:
+  free = false   ← changed
+  pc   = %{alice: :waiting, bob: :holding, carol: :idle}   ← changed
+
+── release(c: :bob) ────────────────────
+
+State 5 (= state 2, the cycle head):
+  free = true   ← changed
+  pc   = %{alice: :waiting, bob: :idle, carol: :idle}   ← changed
+
+════════════════════════════════════════════════════════════════════
+
+↺ back to state 2 — states 2-4 repeat forever.
+
+
+--- COVERAGE: Tutorial.WholeActionLock -----------------------------
+
+Actions                   enabled in      states     distinct
+  acquire                            7          12          12
+  release                           12          12           0
+  request                           16          24           7
+
+
+Invariants                  evaluated   near-miss
+  holding_means_taken               20          12
+  mutual_exclusion                  20           -
+  type_ok                           20           -
+--------------------------------------------------------------------
 ```
 
 Same lasso as the weak one. TLA+ writes `\A c \in Clients : SF_vars(Acquire(c))`, and so does

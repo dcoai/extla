@@ -240,9 +240,10 @@ mix extla.check Specs.SplitLock
 <!-- tla:check module=Specs.SplitLock expect=violation invariant=mutual_exclusion length=7 -->
 ```
 Specs.SplitLock — VIOLATION: mutual_exclusion
-  16 distinct states, 25 transitions, depth 7, 11ms
+  16 distinct states, 25 transitions, depth 7, 1ms
 
 ═══ VIOLATION: mutual_exclusion ════════════════════════════════════
+invariant :mutual_exclusion does not hold in this state
 
 State 1 (Init):
   free = true
@@ -293,7 +294,7 @@ Actions                   enabled in      states     distinct
   release                            4           4           0
   request                            7           8           3
   see_free                           5           6           5
-  take                               5           6           6
+  take                               6           6           6
 
 
 Invariants                  evaluated   near-miss

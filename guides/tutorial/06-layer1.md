@@ -49,10 +49,14 @@ and if the property holds the server behaves exactly as it did before. This one 
 GenServer.call(pid, {:acquire, :alice})
 ```
 
+<!-- tla:output -->
 ```
-** (ExTLA.Invariant.Violation) ═══ INVARIANT VIOLATED: holder_is_not_waiting ══════════
+** (ExTLA.Invariant.Violation) ═══ INVARIANT VIOLATED: holder_is_not_waiting ══════════════════════
+
   the client holding the lock is not also queued for it
+
   module: Tutorial.FirstTry
+
   state:
     holder  = :alice
     waiting = [:alice]
@@ -136,11 +140,16 @@ Bob releasing a lock Alice holds:
 GenServer.call(pid, {:release, :bob})
 ```
 
+<!-- tla:output -->
 ```
 ** (ExTLA.Invariant.Violation) ═══ PRECONDITION VIOLATED: handle_call ═════════════════════════════
+
   only the holder releases
+
   module: Tutorial.LockServer
+
   message: {:release, :bob}
+
   state:
     holder  = :alice
     waiting = []
