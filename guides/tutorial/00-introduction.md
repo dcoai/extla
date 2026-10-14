@@ -11,17 +11,17 @@ The pages after it are the long path, and they are meant to be read in order: th
 the DSL is a notation for, the DSL as it is used, what the coverage report tells you about a
 verdict, temporal properties and the difference fairness makes to them, symmetry and who is
 responsible for it, and then the two layers that connect a specification to running code.
-**One system runs through all of it** — a lock with three clients — and each page adds something
-to it.
+**One system runs through all of it** — a lock shared by a few clients, two or three depending
+on what a page needs to show — and each page adds something to it.
 
 The last three pages are the ones about your own code rather than this tutorial's: how to get
 from a system you already have to a specification worth checking, what to do when the state
 space explodes, and how to keep a specification in a project so it stays true. They are where
 the tutorial stops being a worked example.
 
-Every code block in this tutorial is compiled and run by ExTLA's own test suite, and every verdict
-the prose quotes is asserted against the run: if a page says a spec verifies, it does, and if it
-says a counterexample is seven states long, it is. The
+Every spec in this tutorial compiles, and every verdict and output it shows is what the tool
+really prints: if a page says a spec verifies, it does, and if it says a counterexample is seven
+states long, it is. The
 [DSL reference](../../spec/02-dsl-semantics.md) remains the authority on what a specification
 means, and these pages link to it rather than restating it.
 
@@ -140,8 +140,8 @@ Beside these sit the tools that work on the implementation rather than a model: 
 explorers** like Concuerror, which run real code under a controlled scheduler, and **runtime
 verification**, which checks properties as the system executes. ExTLA's Layer 1 is of the second
 kind, and Layer 3 drives a real GenServer against the specification — but neither controls the
-scheduler, so neither replaces Concuerror. `00-prior-art.md` treats it as a complement
-deliberately: it finds implementation bugs where ExTLA finds design bugs.
+scheduler, so neither replaces Concuerror. Concuerror is a complement, deliberately: it finds
+implementation bugs where ExTLA finds design bugs.
 
 ## In Elixir and Erlang
 
@@ -201,8 +201,9 @@ actually refines it.
   checked against the implementation.
 
 None of these replaces another. The one gap ExTLA fills is the design-level, exhaustive,
-temporal-property-bearing one — and it is the gap `00-prior-art.md` was written to establish is
-real.
+temporal-property-bearing one — and
+[the prior-art survey](https://github.com/dcoai/extla/blob/main/spec/00-prior-art.md#gap-analysis)
+was written to establish that the gap is real.
 
 **Where to start** depends on what you have. A running GenServer and a property you are nervous
 about: [Layer 1](06-layer1.md), invariants checked on every callback, no specification needed. A

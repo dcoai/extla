@@ -48,24 +48,31 @@ warning: liveness was not checked: symmetry reduction and liveness are not sound
 ```
 
 Seven states instead of twenty, and the same verdict on every invariant. Two things in that output
-deserve a closer look.
+deserve a closer look: the warnings, and the flag on the command line.
+
+The first warning is the checker's general one for any run that declares a `temporal` and does
+not check it. The `check_liveness: true` it suggests is a key in the config you pass to
+`ExTLA.ModelChecker.run/2` or `assert_spec/2`; `mix extla.check` has no such flag, because it
+checks liveness by itself whenever it can. The second warning is the one that says why it could
+not here.
 
 ## Why liveness is refused alongside it
 
-The second warning is that symmetry and liveness are refused together. The reduced graph identifies states, so a path that leaves an orbit and one that returns
-to it look alike, and the quotient can contain cycles the real system does not have — and a cycle
-is exactly what a liveness verdict is read off. Rather than answer with something it cannot stand
+The second warning is that symmetry and liveness are refused together. The reduced graph
+identifies states, so a path that leaves an orbit and one that returns to it look alike, and the
+quotient can contain cycles the real system does not have — and a cycle is exactly what a liveness
+verdict is read off. Rather than answer with something it cannot stand
 behind, the checker checks safety under the reduction and tells you to check the temporal
 properties in a run without it. (`--workers` is refused alongside liveness for a neighbouring
 reason, [§Parallel exploration](../reference.md#parallel-exploration).)
 
 ## Soundness is yours, and the flag is what makes a mistake visible
 
-The first thing is the flag on the command line. **Nothing can establish that a `symmetry:`
+The other thing is the flag on the command line. **Nothing can establish that a `symmetry:`
 declaration is sound.** A constant flows into arbitrary Elixir, and whether some invariant or
-guard treats Alice differently from Carol is not a question a compiler can answer — an earlier
-draft of this project promised to, and was promising the undecidable
-([§Symmetry](../reference.md#symmetry)). Soundness is the author's obligation, exactly as it is in TLC.
+guard treats Alice differently from Carol is not a question a compiler can answer
+([§Symmetry](../reference.md#symmetry)). Soundness is the author's obligation, exactly as it is in
+TLC.
 What `--verify-symmetry` does is make a wrong declaration **detectable**: it runs the model both
 ways and fails if any verdict differs — the status, what was refuted, which actions never fired.
 Not the counts; a sound reduction changes those on purpose.
@@ -134,8 +141,8 @@ symmetry: [:clients] is not sound for this spec. The same model gives different
 answers with and without the reduction:
 
   status: :ok with the reduction, :violation without
-  never_enabled: [] with the reduction, [:release] without
   refuted: nil with the reduction, :carol_never_holds without
+  never_enabled: [] with the reduction, [:release] without
 
 Something in the spec can tell the elements of [:clients] apart — an
 `Enum.at`, a sort, a comparison on names, a dependence on list position — so

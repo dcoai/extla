@@ -95,9 +95,12 @@ means.
 
 `type: set(t)` says a variable **is** a set. This says what you can do with one.
 
-All of TLA+'s set theory is in scope inside a spec block, unqualified. It is `ExTLA.Set` and
-`ExTLA.Function`, reached through `ExTLA.Spec.Helpers`, the module every spec imports — and that
-module holds no second implementation of any of them.
+All of TLA+'s set theory is in scope inside a spec block, unqualified, through
+`ExTLA.Spec.Helpers`, the module every spec imports. The simple set operations — `set`, `put`,
+`delete`, `member?`, `size`, `union`, `intersection`, `difference`, `subset?` — are one-line
+wrappers over `MapSet`, there for readability. The rest are delegations to `ExTLA.Set` and
+`ExTLA.Function`, and the helper module holds no second implementation of them, so a spec block
+and code calling those modules directly get the same answers.
 
 | TLA+ | In a spec block |
 |---|---|
@@ -124,10 +127,12 @@ module holds no second implementation of any of them.
 | `[S -> T]` | `function_set(s, t)` |
 | `[a: S, b: T]` | `record_set(a: s, b: t)` |
 
-Two names differ from the module they come from, and only two: `set_map/2` and `set_filter/2`
-are `ExTLA.Set.map/2` and `ExTLA.Set.filter/2`, because an unqualified `map(xs, f)` in a spec block
-reads as `Enum.map/2` to every Elixir programmer who opens the file, and these return a **set**
-— possibly a smaller one, since a non-injective function collapses elements, exactly as in TLA+.
+Four of the delegated names differ from the module they come from. `set_map/2` and
+`set_filter/2` are `ExTLA.Set.map/2` and `ExTLA.Set.filter/2`, because an unqualified `map(xs, f)`
+in a spec block reads as `Enum.map/2` to every Elixir programmer who opens the file, and these
+return a **set** — possibly a smaller one, since a non-injective function collapses elements,
+exactly as in TLA+. `for_each/2` is `ExTLA.Function.construct/2`, and `update/3` is
+`ExTLA.Function.except_with/3`.
 
 Here is a spec that uses them. A node acknowledges once; the value commits when some quorum has
 acknowledged. The guard says *"there exists a subset of the nodes which is a majority and all of
@@ -187,10 +192,6 @@ cardinality rather than by quantifying over subsets. Writing a property twice in
 letting the checker reconcile them is a good habit: if the two ever disagree, one of them is
 what you meant.
 
-This same model is the differential corpus entry `set_vocabulary`, where TLC checks it and the
-two must agree on the state count — so these operators are held to what TLA+ *means* by them,
-not only to what they return.
-
 ### Two traps
 
 **`for_each/2` takes a set, not a sequence.** `[x \in S |-> e]` ranges over a set, and a list is
@@ -205,6 +206,29 @@ ExTLA.Spec.Helpers.for_each([:alice, :alice, :bob], fn c -> c end)
 **`domain/1` of a sequence is `1..Len(s)`, not its elements.** A sequence *is* a function on
 its indices — that is how `s[i]` applies one — so `domain([:a, :b, :c])` is
 `MapSet.new([1, 2, 3])`. A set is neither a function nor a sequence and is refused by name.
+
+## Operations on sequences
+
+`type: seq(t)` says a variable is a sequence: an Elixir list, read the TLA+ way, **1-indexed**.
+These are thin wrappers over list operations, written as the TLA+ they translate:
+
+| TLA+ | In a spec block |
+|---|---|
+| `<<>>`, `<<a, b, c>>` | `seq()`, `seq([a, b, c])` |
+| `Append(s, e)` | `append(s, e)` |
+| `Head(s)`, `Tail(s)` | `head(s)`, `tail(s)` |
+| `Len(s)` | `len(s)` |
+| `SubSeq(s, m, n)` | `subseq(s, m, n)` |
+| `s[i]` | `s[i]`, or `at(s, i)` |
+
+`head/1` and `tail/1` raise on the empty sequence, where TLA+ leaves them undefined, and `s[i]`
+and `subseq/3` raise on an index outside `1..len(s)` rather than wrapping or returning `nil`
+(`subseq(s, m, n)` with `n < m` is the empty sequence). The
+same `s[i]` applies a function: `pc[c]` is `at(pc, c)`, and a key outside the domain raises too.
+
+Three more help with arithmetic over a function: `values(f)` and `keys(f)` are its values and
+keys as lists, and `sum(xs)` (or `sum(xs, fn x -> … end)`) adds them up — `sum(values(balances))`
+is the total of a map of balances.
 
 ## Nondeterminism is `params:`, and only `params:`
 

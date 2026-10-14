@@ -15,6 +15,11 @@ Take a server you already have — here the lock this tutorial has been specifyi
 ordinary GenServer. Add `use ExTLA.Invariant` and one property you believe about its state: the one
 you would be embarrassed to be wrong about.
 
+Where the `use` goes matters. Put it directly after `use GenServer` and before your callbacks:
+only callbacks defined after it are wrapped, which is how it tells the ones you wrote from the
+defaults `use GenServer` injects. A callback written above it is not checked
+(`ExTLA.Invariant` explains the mechanism).
+
 <!-- tla:spec -->
 ```elixir
 defmodule Tutorial.FirstTry do
@@ -109,12 +114,12 @@ end
 
 ## What they mean
 
-The blocks are bare boolean expressions, the same shape as a spec's, with one difference: `state`
-is written explicitly. A spec has `variable` declarations to resolve a bare name against, and an
-arbitrary GenServer has none, so Layer 1 does not guess. An `invariant` is checked after
-every callback; a `precondition` is matched against the incoming message — its pattern binds `c` —
-and checked before the callback runs; a `postcondition` sees `old`, `new` and the pattern's
-bindings after it returns. `action_property` is there too, with `old` and `new`.
+The blocks are boolean expressions — they must evaluate to `true` or `false` — the same shape as a
+spec's, with one difference: `state` is written explicitly. A spec has `variable` declarations to
+resolve a bare name against, and an arbitrary GenServer has none, so Layer 1 does not guess. An
+`invariant` is checked after every callback; a `precondition` is matched against the incoming
+message — its pattern binds `c` — and checked before the callback runs; a `postcondition` sees
+`old`, `new` and the pattern's bindings after it returns. `action_property` is there too, with `old` and `new`.
 
 ## Used correctly, nothing changes
 
@@ -255,17 +260,23 @@ invariant :within_capacity, callbacks: [:handle_call] do
 end
 ```
 
-`03-layer1-invariants.md` §Performance Considerations is the fuller treatment; the short version
-is that an invariant over a large collection on a hot `handle_info` is the shape to watch, and
-`callbacks:` is usually the answer before `enabled:` is.
+[§Performance](../reference.md#performance) in the reference is the fuller treatment; the short
+version is that an invariant over a large collection on a hot `handle_info` is the shape to
+watch, and `callbacks:` is usually the answer before `enabled:` is.
 
 ## Beyond GenServer
 
-The same declarations work for the other OTP shapes, with one exception worth knowing:
+The same declarations work for the other OTP shapes, with two exceptions worth knowing:
 
 - **`GenServer`**, `:gen_statem` and `GenStateMachine` are wrapped the same way. For a state
-  machine the specification is explicit about what `state` and the message *are*, since both are
-  shaped differently there.
+  machine `state` is the `{state_name, data}` pair, and the message a `precondition` matches is
+  the event content — not `{event_type, content}` — so the same declaration reads the same
+  whichever behaviour carries it.
+- **`:gen_statem` in `:state_functions` callback mode is not instrumented.** What is wrapped is
+  `handle_event/4`, the `:handle_event_function` mode. In `:state_functions` mode the transitions
+  live in functions named after the states, which the wrapper cannot recognise as callbacks, so
+  the module's transitions are not checked (only `init/1`, if it defines one). Use
+  `:handle_event_function` for a state machine you want Layer 1 to check.
 - **`Agent`** cannot be wrapped, and the reason is structural: `Agent.start_link/2` takes a
   function, not a behaviour module, so there is no callback module for `@before_compile` to
   instrument and nothing to carry the declarations. `ExTLA.Invariant.Agent` handles it by taking the

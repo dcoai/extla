@@ -84,8 +84,9 @@ Exit code **2**, and the coverage footer records `bounded_by: :max_states`. Noth
 established. This is the flag to reach for when you want to know whether a spec *starts* correctly
 before committing an hour to it — a bounded run that finds a violation has still found a real one.
 
-**A state constraint** reports the same way and for the same reason, with
-`bounded_by: :state_constraint` — §Constrain the space below.
+**A state constraint**, an option of `ExTLA.ModelChecker.run/2`, is not exhaustive for the same
+reason: the result's status is `:constrained`, with `bounded_by: :state_constraint` — §Constrain
+the space below.
 
 **Still running** is the third, and the only one with no output to read. `--max-states` is how you
 convert it into one of the first two.
@@ -95,7 +96,7 @@ convert it into one of the first two.
 ### Shrink the constants
 
 Almost always the right answer, and the one people resist because it feels like giving up. The
-same specification at three jobs and two attempts:
+same specification at two jobs and two attempts:
 
 <!-- tla:check module=Modelling.Runner expect=ok states=64 depth=11 output=abridged -->
 ```
@@ -131,10 +132,10 @@ beats every other lever combined.
 mix extla.check Boom.Runner --workers 4
 ```
 
-On this model that is **slower** — 90 ms against 55 ms — and the reason is worth knowing: the
-coordination costs more than the work saved when there is barely any work. `--workers` pays on a
-model large enough to need it, and this project's own benchmark is the honest advertisement:
-`raft_election` goes from 23.4 s to 1.65 s at eight workers, a 5.4x speedup on 58,359 states.
+On a model this size that is usually **slower** than one worker, and the reason is worth knowing:
+each breadth-first level waits for every worker before the next begins, and that coordination costs
+more than the work saved when there is barely any work. `--workers` pays on a model large enough
+to need it — tens of thousands of states and up, where each level has real work to divide.
 
 What it never buys is tractability. It explores the identical space, so a run that would never
 finish still never finishes — reach for it after the levers above, not instead of them. It also
@@ -172,11 +173,11 @@ Measured on this specification, three constraints and what each bought:
 | at most 2 jobs not queued | 1,304 | 46 ms |
 | no job past its first retry | **112** | 5 ms |
 
-Those four rows are measured, and — unlike every other number on this page — they are **not**
-machine-checked: a `state_constraint` is a function, and the harness's claims are declarative, so
-there is nothing for it to assert here. Said out loud rather than left to look like the rest.
+Those four rows were measured with `ExTLA.ModelChecker.run/2`, since `state_constraint:` is a
+function and can only be passed there — `mix extla.check` has no flag for it. The times are one
+machine's; the state counts are the specification's.
 
-The first row is the lesson people do not expect: **a constraint can buy nothing at all.**
+The first constraint is the lesson people do not expect: **a constraint can buy nothing at all.**
 Limiting concurrency to two removed *not one state* — with three jobs there is no reachable state
 with three running, so the constraint excludes nothing that existed. The second removed 2%. Both
 are guesses about where the states are, and this model's states differ in their attempt counts
@@ -185,8 +186,8 @@ rather than in how many jobs run at once. Measure rather than assume.
 And the last row is the trap. It is a twelvefold reduction, it runs in 5 ms, and it is
 **exactly the wrong constraint for this specification**: the property being checked is
 `attempts_bounded`, and the constraint excludes every state where a job has attempted more than
-once — which is where a violation of that property could possibly live. The run comes back
-`constrained`, exit 2, with `bounded_by: :state_constraint`, and that is the tool telling you it
+once — which is where a violation of that property could possibly live. The run comes back with
+status `:constrained` and `bounded_by: :state_constraint`, and that is the tool telling you it
 answered a smaller question than you asked. It is not a verdict, and the danger is reading it as
 one.
 

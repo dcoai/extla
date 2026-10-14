@@ -187,9 +187,7 @@ violating state found is the *nearest* one, which is why a counterexample is the
 
 Here is the lock this tutorial is built around — the same three actions and the same invariant
 the [next page](02-dsl.md) develops, with six clients rather than three so that its state space is
-large enough for a bound to bite. It is declared here rather than borrowed because this page is
-read *before* that one, and every code block in these guides is compiled from the page it appears
-on.
+large enough for a bound to bite.
 
 <!-- tla:spec -->
 ```elixir
@@ -273,8 +271,9 @@ Math.Lock — INCOMPLETE (state limit)
 ```
 
 Exit code **2**, not 0 — a separate code from both success and violation, because "we ran out of
-budget" is not "it holds". A run cut short by a state constraint reports the same way. Nothing was
-found; nothing was established either.
+budget" is not "it holds". Nothing was found; nothing was established either. (A run bounded by a
+`state_constraint:` — an option of the `ExTLA.ModelChecker.run/2` API, not of `mix extla.check` —
+likewise reports status `:constrained`, not `:ok`.)
 
 ## What the method is useful for
 
