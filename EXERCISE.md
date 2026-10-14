@@ -8,7 +8,7 @@ never reached; `Never called` names the functions it never entered, compiler-gen
 ones excluded. A module never loaded by any test reads `—`. A row that grows is coverage
 lost; one that shrinks is coverage gained, recorded so it cannot be lost again quietly.
 
-**60 modules · 3894 lines** · unhit 298 · modules with an unhit line 45 · never loaded 0
+**60 modules · 3895 lines** · unhit 296 · modules with an unhit line 45 · never loaded 0
 
 | Module | Lines | Unhit | Never called |
 |---|---|---|---|
@@ -28,7 +28,7 @@ lost; one that shrinks is coverage gained, recorded so it cannot be lost again q
 | `ExTLA.Invariant.Violation` | 32 | 5 | `exception/1`, `report!/1` |
 | `ExTLA.Mix.SpecTarget` | 14 | 1 | — |
 | `ExTLA.Mix.TraceFile` | 28 | 5 | — |
-| `ExTLA.ModelChecker` | 260 | 11 | `check_safety/1`, `check_safety/2`, `explore/1`, `run/1` |
+| `ExTLA.ModelChecker` | 261 | 11 | `check_safety/1`, `check_safety/2`, `explore/1`, `run/1` |
 | `ExTLA.ModelChecker.Liveness` | 209 | 12 | `taking_edge/4` |
 | `ExTLA.ModelChecker.Parallel` | 53 | 1 | — |
 | `ExTLA.ModelChecker.Run` | 0 | 0 | — |
@@ -55,7 +55,7 @@ lost; one that shrinks is coverage gained, recorded so it cannot be lost again q
 | `ExTLA.Spec.Rewriter` | 61 | 3 | — |
 | `ExTLA.Spec.Temporal` | 57 | 2 | — |
 | `ExTLA.Spec.Test` | 20 | 1 | — |
-| `ExTLA.Spec.Type` | 145 | 35 | `bad!/4` |
+| `ExTLA.Spec.Type` | 145 | 33 | `bad!/4` |
 | `ExTLA.State` | 25 | 1 | — |
 | `ExTLA.State.InvalidTermError` | 4 | 0 | — |
 | `ExTLA.State.Json` | 26 | 0 | — |

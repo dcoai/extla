@@ -134,9 +134,10 @@ defmodule ExTLA.ModelChecker do
 
   ## Options
 
-    * `constants:` — a map assigning the spec's constants. Default `%{}`. `run/2` reads no
-      application config and applies no `default:`; `mix extla.check` resolves both, with
-      `ExTLA.Spec.Compiled.resolve_constants/1`, and passes the result here.
+    * `constants:` — a map assigning the spec's constants. Default `%{}`. Each constant's
+      `default:` fills in what this leaves out, and an explicit value wins. `run/2` reads no
+      application config: `mix extla.check` adds `config :extla, Spec, constants: %{…}` with
+      `ExTLA.Spec.Compiled.resolve_constants/1` and passes the result here.
     * `max_states:` — the state budget. Default `1_000_000`. The search stops once the graph
       has passed it, so the count reported with `:max_states_reached` exceeds the limit.
     * `workers:` — processes exploring each breadth-first level. Default `1`;
@@ -225,7 +226,9 @@ defmodule ExTLA.ModelChecker do
     do: explore(Spec.Compiled.from_module(module), config)
 
   def explore(%Spec.Compiled{} = spec, config) do
-    config = @defaults |> Map.merge(config) |> imply_liveness_graph()
+    config =
+      @defaults |> Map.merge(config) |> with_default_constants(spec) |> imply_liveness_graph()
+
     reject_unimplemented!(config)
 
     if config.verify_symmetry,
@@ -791,6 +794,12 @@ defmodule ExTLA.ModelChecker do
         end
     end
   end
+
+  # A spec's `default:` is part of the spec, so it holds wherever the spec is checked: declared
+  # defaults fill what `constants:` leaves out, and an explicit constant wins (#415). Application
+  # config is not read here; that is the command line's, through `resolve_constants/1`.
+  defp with_default_constants(config, spec),
+    do: %{config | constants: Map.merge(Spec.Compiled.default_constants(spec), config.constants)}
 
   defp imply_liveness_graph(%{check_liveness: true} = config),
     do: %{config | liveness_graph: true}

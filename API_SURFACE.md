@@ -214,8 +214,8 @@ key whose value is a union of atoms; any other type is shown as written.
 | `enabled_bindings/3` | `:def` | (action, constants, state) | `a8c85a12` | `lib/ex_tla/model_checker.ex` |
 | `enabled_steps/3` | `:def` | (spec, constants, state) | `d90a536f` | `lib/ex_tla/model_checker.ex` |
 | `expand_one/3` | `:def` | (run, id, state) | `3a14e039` | `lib/ex_tla/model_checker.ex` |
-| `explore/1` | `:def` | (spec, config \\ …) | `cf202624` | `lib/ex_tla/model_checker.ex` |
-| `explore/2` | `:def` | (spec, config \\ …) | `cf202624` | `lib/ex_tla/model_checker.ex` |
+| `explore/1` | `:def` | (spec, config \\ …) | `c1d8ccba` | `lib/ex_tla/model_checker.ex` |
+| `explore/2` | `:def` | (spec, config \\ …) | `c1d8ccba` | `lib/ex_tla/model_checker.ex` |
 | `result()` | `:type` | status: :constrained \| :deadlock \| :max_states_reached \| :ok \| :violation, states_found, distinct_states, transitions, diameter, deadlock, duration_ms, violation, coverage, profile, warnings, fingerprint_bits, collision_estimate | `9c37ddd0` | `lib/ex_tla/model_checker.ex` |
 | `run/1` | `:def` | (spec, config \\ …) | `d37154b4` | `lib/ex_tla/model_checker.ex` |
 | `run/2` | `:def` | (spec, config \\ …) | `d37154b4` | `lib/ex_tla/model_checker.ex` |

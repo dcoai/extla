@@ -68,6 +68,15 @@ release it merely follows.
 - **This changelog is written for users** (#406, for #397). Entries for CI, test tooling and
   other work only the repository sees are gone, and the remaining entries are shorter.
 
+### Fixed
+
+- **`ExTLA.ModelChecker.run/2` honours a constant's `default:`** (#417, for #415). A spec
+  that declares `constant :max, default: 3` checked under `mix extla.check` but raised from
+  `run/2`, `check_safety/2`, `explore/2` and `ExTLA.Spec.Test.assert_spec/2`: "the type of :n
+  refers to ^max, which this run did not assign". Declared defaults now fill in what
+  `constants:` leaves out, and an explicit constant still wins. Application config is still
+  read only by the Mix tasks.
+
 ## [0.5.0] — 2026-10-13
 
 **A minor line, opened by `mix extla.replay`.** It gains `--server` and `--timeout`, and
