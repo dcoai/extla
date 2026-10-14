@@ -26,6 +26,17 @@ defmodule ExTLA.GuideCheckTest do
   # `mix extla.check` command.
   defp claim(annotation), do: "\n<!-- #{annotation} -->\n"
 
+  # A page whose output came from `config :extla, Spec, symmetry: […]` is checked under that
+  # config, the way the reader ran it (#409). The harness may not write application env, so it
+  # is written here, in a file that is `async: false` for exactly this; each key is a guide's
+  # own spec module, which nothing else configures, and it is removed again after the run.
+  defp with_env(env, fun) do
+    for {key, value} <- env, do: Application.put_env(:extla, key, value)
+    result = fun.()
+    for {key, _value} <- env, do: Application.delete_env(:extla, key)
+    result
+  end
+
   # A spec with an invariant a reachable state refutes, at a known depth.
   defp broken_spec(name) do
     block("tla:spec", """
@@ -78,6 +89,138 @@ defmodule ExTLA.GuideCheckTest do
       end
     end
     """)
+  end
+
+  # A claim with the block of output a page shows under it (#409).
+  defp claim_with_output(annotation, output),
+    do: "\n<!-- #{annotation} -->\n```\n#{output}\n```\n"
+
+  describe "an output block (#409)" do
+    test "that is what the tool prints passes", %{tmp_dir: tmp} do
+      m = "GuideOutput.Exact#{System.unique_integer([:positive])}"
+
+      [_, real] =
+        guide(tmp, working_spec(m) <> claim("tla:check module=#{m} expect=ok"))
+        |> then(fn path ->
+          GuideCheck.check(path)
+          {:ok, ExTLA.GuideCheck.Output.task(["extla.check", m])}
+        end)
+        |> Tuple.to_list()
+
+      path =
+        guide(tmp, working_spec(m) <> claim_with_output("tla:check module=#{m} expect=ok", real))
+
+      assert GuideCheck.check(path) == []
+    end
+
+    test "that has drifted from it is rejected, naming the line and carrying the real output",
+         %{tmp_dir: tmp} do
+      m = "GuideOutput.Drift#{System.unique_integer([:positive])}"
+
+      shown = "#{m} — verified\n  4 distinct states, 2 transitions, depth 3, 1ms"
+
+      path =
+        guide(tmp, working_spec(m) <> claim_with_output("tla:check module=#{m} expect=ok", shown))
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "the output shown differs from what the tool prints"
+      assert failure =~ ~s(shown: "  4 distinct states)
+      assert failure =~ "| #{m} — verified"
+    end
+
+    test "that is abridged passes when its lines appear in order, durations normalised",
+         %{tmp_dir: tmp} do
+      m = "GuideOutput.Abridged#{System.unique_integer([:positive])}"
+
+      shown = "#{m} — verified\n  3 distinct states, 2 transitions, depth 3, 999ms\n…\n  type_ok"
+
+      path =
+        guide(
+          tmp,
+          working_spec(m) <>
+            claim_with_output("tla:check module=#{m} expect=ok output=abridged", shown)
+        )
+
+      assert [] = GuideCheck.check(path) |> Enum.reject(&(&1 =~ "type_ok")),
+             "the abridged lines appear in the real output"
+    end
+
+    test "that is abridged is still rejected for a line the tool does not print",
+         %{tmp_dir: tmp} do
+      m = "GuideOutput.AbridgedWrong#{System.unique_integer([:positive])}"
+
+      shown = "#{m} — verified\n…\n  a line nothing prints"
+
+      path =
+        guide(
+          tmp,
+          working_spec(m) <>
+            claim_with_output("tla:check module=#{m} expect=ok output=abridged", shown)
+        )
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ ~s(shows "  a line nothing prints")
+    end
+
+    test "tla:output holds a tla:run block's exception to what it raised", %{tmp_dir: tmp} do
+      run = block(~s(tla:run expect=raise match="boom"), ~s|raise ArgumentError, "boom"\n|)
+
+      ok = guide(tmp, run <> "\n<!-- tla:output -->\n```\n** (ArgumentError) boom\n```\n")
+      assert GuideCheck.check(ok) == []
+
+      wrong = guide(tmp, run <> "\n<!-- tla:output -->\n```\n** (ArgumentError) bang\n```\n")
+      assert [failure] = GuideCheck.check(wrong)
+      assert failure =~ "the output shown differs"
+    end
+
+    test "output that needs config is not compared without a with_env:", %{tmp_dir: tmp} do
+      m = "GuideOutput.Config#{System.unique_integer([:positive])}"
+
+      symmetric =
+        block("tla:spec", """
+        defmodule #{m} do
+          use ExTLA.Spec
+
+          constant :ids, default: set([:a, :b])
+          variable :seen, type: set(^ids)
+
+          init do
+            seen = set()
+          end
+
+          action :see, params: [i: ^ids] do
+            require not member?(seen, i)
+            seen = put(seen, i)
+          end
+
+          terminal :all_seen do
+            size(seen) == 2
+          end
+        end
+        """)
+
+      path =
+        guide(
+          tmp,
+          symmetric <>
+            claim_with_output(
+              "tla:check module=#{m} expect=ok symmetry=ids output=abridged",
+              "#{m}"
+            )
+        )
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "given no `with_env:`"
+    end
+
+    test "a bare fence in a guide that nothing checks is rejected", %{tmp_dir: tmp} do
+      File.mkdir_p!(Path.join(tmp, "guides"))
+      path = Path.join(tmp, "guides/page.md")
+      File.write!(path, "# Page\n\n```\nsome output\n```\n\n```text\nnot output\n```\n")
+
+      assert [failure] = GuideCheck.check(path)
+      assert failure =~ "page.md:3: a bare ``` block renders as output, and nothing checks it"
+    end
   end
 
   describe "a guide that tells the truth" do
@@ -261,7 +404,8 @@ defmodule ExTLA.GuideCheckTest do
     test "every page tells the truth" do
       pages = GuideCheck.pages()
 
-      failures = Enum.flat_map(pages, &GuideCheck.check/1)
+      failures =
+        Enum.flat_map(pages, fn page -> GuideCheck.check(page, with_env: &with_env/2) end)
 
       assert failures == [],
              "pages make claims the code does not support:\n\n" <> Enum.join(failures, "\n")

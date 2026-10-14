@@ -58,10 +58,10 @@ defmodule Boom.Runner do
 end
 ```
 
-<!-- tla:check module=Boom.Runner expect=ok states=1331 depth=22 -->
+<!-- tla:check module=Boom.Runner expect=ok states=1331 depth=22 output=abridged -->
 ```
 Boom.Runner — verified
-  1,331 distinct states, depth 22, 55ms
+  1331 distinct states, 3630 transitions, depth 22, 46ms
 ```
 
 Eleven reachable combinations per job, three jobs, `11^3`. Each job you add multiplies the space
@@ -74,10 +74,10 @@ Three outcomes look similar in a terminal and are not the same fact.
 
 **A state limit.** `--max-states` stops the search:
 
-<!-- tla:check module=Boom.Runner expect=incomplete max_states=500 -->
+<!-- tla:check module=Boom.Runner expect=incomplete max_states=500 output=abridged -->
 ```
 Boom.Runner — INCOMPLETE (state limit)
-  502 distinct states
+  502 distinct states, 1199 transitions, depth 11, 16ms
 ```
 
 Exit code **2**, and the coverage footer records `bounded_by: :max_states`. Nothing was
@@ -97,10 +97,10 @@ convert it into one of the first two.
 Almost always the right answer, and the one people resist because it feels like giving up. The
 same specification at three jobs and two attempts:
 
-<!-- tla:check module=Modelling.Runner expect=ok states=64 depth=11 -->
+<!-- tla:check module=Modelling.Runner expect=ok states=64 depth=11 output=abridged -->
 ```
 Modelling.Runner — verified
-  64 distinct states, depth 11
+  64 distinct states, 112 transitions, depth 11, 2ms
 ```
 
 1,331 states become 64. What is lost is nothing you were relying on: an interleaving bug that
@@ -113,10 +113,10 @@ page.
 The largest single win available here, because `jobs` is exactly the kind of constant the
 reduction is for:
 
-<!-- tla:check module=Boom.Runner expect=ok symmetry=jobs verify_symmetry=true states=286 depth=22 -->
+<!-- tla:check module=Boom.Runner expect=ok symmetry=jobs verify_symmetry=true states=286 depth=22 output=abridged -->
 ```
 Boom.Runner — verified
-  286 distinct states, depth 22
+  286 distinct states, 780 transitions, depth 22, 22ms
 ```
 
 **1,331 to 286** — a factor of nearly five, with the same depth and the same verdict, and

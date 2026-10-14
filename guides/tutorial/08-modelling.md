@@ -67,10 +67,10 @@ defmodule Modelling.WithCount do
 end
 ```
 
-<!-- tla:check module=Modelling.WithCount expect=ok states=9 depth=5 -->
+<!-- tla:check module=Modelling.WithCount expect=ok states=9 depth=5 output=abridged -->
 ```
 Modelling.WithCount — verified
-  9 distinct states, depth 5
+  9 distinct states, 12 transitions, depth 5, 0ms
 ```
 
 Now the same model with `queued_count` deleted, and nothing else changed:
@@ -104,10 +104,10 @@ defmodule Modelling.Lean do
 end
 ```
 
-<!-- tla:check module=Modelling.Lean expect=ok states=9 depth=5 -->
+<!-- tla:check module=Modelling.Lean expect=ok states=9 depth=5 output=abridged -->
 ```
 Modelling.Lean — verified
-  9 distinct states, depth 5
+  9 distinct states, 12 transitions, depth 5, 1ms
 ```
 
 **The same nine states, the same depth.** This is worth being precise about, because the usual
@@ -153,9 +153,25 @@ defmodule Modelling.ForgotToCount do
 end
 ```
 
-<!-- tla:check module=Modelling.ForgotToCount expect=violation property=count_agrees -->
+<!-- tla:check module=Modelling.ForgotToCount expect=violation property=count_agrees output=abridged -->
 ```
 Modelling.ForgotToCount — VIOLATION: count_agrees
+  2 distinct states, 1 transitions, depth 2, 0ms
+
+═══ VIOLATION: count_agrees ════════════════════════════════════════
+invariant :count_agrees does not hold in this state
+
+State 1 (Init):
+  queued_count = 2
+  status       = %{j1: :queued, j2: :queued}
+
+── start(j: :j1) ────────────────────
+
+State 2 [VIOLATION]:
+  queued_count = 2
+  status       = %{j1: :running, j2: :queued}   ← changed
+
+════════════════════════════════════════════════════════════════════
 ```
 
 That counterexample is about **the model's bookkeeping**, not about the job runner. It is time
@@ -264,10 +280,10 @@ defmodule Modelling.Runner do
 end
 ```
 
-<!-- tla:check module=Modelling.Runner expect=ok states=64 depth=11 -->
+<!-- tla:check module=Modelling.Runner expect=ok states=64 depth=11 output=abridged -->
 ```
 Modelling.Runner — verified
-  64 distinct states, depth 11
+  64 distinct states, 112 transitions, depth 11, 2ms
 ```
 
 Two jobs and two attempts: sixty-four states, and every interleaving of starting, crashing,

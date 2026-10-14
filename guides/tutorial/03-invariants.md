@@ -133,7 +133,7 @@ Actions                   enabled in      states     distinct
   acquire                            7          12          12
   cancel                             0           0           0   <-- NEVER ENABLED
   release                           12          12           0
-  request                            16          24           7
+  request                           16          24           7
 
 
 Invariants                  evaluated   near-miss
@@ -143,6 +143,7 @@ Invariants                  evaluated   near-miss
 
 1 warning. Re-run with --strict-coverage to fail on these.
 --------------------------------------------------------------------
+
 warning: action :cancel was never enabled
 ```
 
@@ -212,9 +213,10 @@ none, a log of some length, and `holder_is_logged` holds throughout. There is no
 <!-- tla:check module=Tutorial.AuditedLock expect=violation property=log_only_grows length=5 -->
 ```
 Tutorial.AuditedLock — VIOLATION: log_only_grows
-  10 distinct states, 10 transitions, depth 5, 7ms
+  10 distinct states, 10 transitions, depth 5, 1ms
 
 ═══ VIOLATION: log_only_grows ══════════════════════════════════════
+action property :log_only_grows does not hold over the last step
 
 State 1 (Init):
   holder = :none
@@ -245,6 +247,22 @@ State 5 [VIOLATION]:
   log    = [:alice]   ← changed
 
 ════════════════════════════════════════════════════════════════════
+
+
+--- COVERAGE: Tutorial.AuditedLock ---------------------------------
+
+Actions                   enabled in      states     distinct
+  acquire                            3           6           6
+  compact                            1           0           0
+  release                            3           3           3
+
+
+Invariants                  evaluated   near-miss
+  holder_is_logged                  10           6
+  type_ok                           10           -
+
+This run stopped at a counterexample, mid-expansion: the numbers are a lower bound, not a census.
+--------------------------------------------------------------------
 ```
 
 Read the last step, because that is where the whole finding is: the log holds two entries, and
@@ -286,6 +304,7 @@ ExTLA.Trace.explore(trace,
 )
 ```
 
+<!-- tla:output -->
 ```
 ═══ EXPLORE: log_only_grows ════════════════════════════════════════
 
@@ -323,7 +342,7 @@ Three things worth knowing:
 
 A counterexample from a CI run or an incident months ago can be explored from the file:
 
-```
+```sh
 mix extla.check Tutorial.AuditedLock --format json > ce.json
 
 mix extla.explore Tutorial.AuditedLock --trace ce.json \
@@ -399,23 +418,66 @@ mix extla.check Tutorial.OneShotLock
 <!-- tla:check module=Tutorial.OneShotLock expect=deadlock states=15 depth=7 -->
 ```
 Tutorial.OneShotLock — DEADLOCK
-  15 distinct states, 20 transitions, depth 7, 10ms
+  15 distinct states, 20 transitions, depth 7, 0ms
 
 ═══ DEADLOCK ═══════════════════════════════════════════════════════
+this state has no successors and no `terminal` predicate admits it. If it is a legitimate end state, declare it: `terminal :name do … end` (02-dsl-semantics.md §5.3).
 
 State 1 (Init):
   free = true
   pc   = %{alice: :idle, bob: :idle}
 
 ── request(c: :alice) ────────────────────
-…
+
+State 2:
+  free = true
+  pc   = %{alice: :waiting, bob: :idle}   ← changed
+
+── request(c: :bob) ────────────────────
+
+State 3:
+  free = true
+  pc   = %{alice: :waiting, bob: :waiting}   ← changed
+
+── acquire(c: :alice) ────────────────────
+
+State 4:
+  free = false   ← changed
+  pc   = %{alice: :holding, bob: :waiting}   ← changed
+
+── finish(c: :alice) ────────────────────
+
+State 5:
+  free = true   ← changed
+  pc   = %{alice: :done, bob: :waiting}   ← changed
+
+── acquire(c: :bob) ────────────────────
+
+State 6:
+  free = false   ← changed
+  pc   = %{alice: :done, bob: :holding}   ← changed
+
 ── finish(c: :bob) ────────────────────
 
 State 7 [VIOLATION]:
-  free = true
+  free = true   ← changed
   pc   = %{alice: :done, bob: :done}   ← changed
 
 ════════════════════════════════════════════════════════════════════
+
+
+--- COVERAGE: Tutorial.OneShotLock ---------------------------------
+
+Actions                   enabled in      states     distinct
+  acquire                            5           6           6
+  finish                             6           6           5
+  request                            7           8           3
+
+
+Invariants                  evaluated   near-miss
+  mutual_exclusion                  15           -
+  type_ok                           15           -
+--------------------------------------------------------------------
 ```
 
 Read the last state: both clients are `done`, the lock is free, and **no action is enabled**
@@ -472,10 +534,10 @@ defmodule Tutorial.OneShotLockDone do
 end
 ```
 
-<!-- tla:check module=Tutorial.OneShotLockDone expect=ok states=15 depth=7 -->
+<!-- tla:check module=Tutorial.OneShotLockDone expect=ok states=15 depth=7 output=abridged -->
 ```
 Tutorial.OneShotLockDone — verified
-  15 distinct states, 20 transitions, depth 7, 1ms
+  15 distinct states, 20 transitions, depth 7, 0ms
 ```
 
 **The same fifteen states, the same twenty transitions** — the search did not change at all. What
@@ -546,10 +608,21 @@ It still verifies, and the coverage report is where it shows up:
 <!-- tla:check module=Tutorial.OneShotLockLoose expect=ok states=15 -->
 ```
 Tutorial.OneShotLockLoose — verified
-  15 distinct states, 20 transitions, depth 7, 1ms
-…
-1 warning. Re-run with --strict-coverage to fail on these.
+  15 distinct states, 20 transitions, depth 7, 0ms
+
+--- COVERAGE: Tutorial.OneShotLockLoose ----------------------------
+
+Actions                   enabled in      states     distinct
+  acquire                            5           6           6
+  finish                             6           6           5
+  request                            7           8           3
+
+
+Invariants                  evaluated   near-miss
+  mutual_exclusion                  15           -
+  type_ok                           15           -
 --------------------------------------------------------------------
+
 warning: terminal :someone_done admitted a live state
 ```
 

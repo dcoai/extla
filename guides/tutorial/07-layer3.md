@@ -81,13 +81,19 @@ Acquire without having requested, which the code is perfectly willing to do and 
 GenServer.call(pid, {:acquire, :alice})
 ```
 
+<!-- tla:output -->
 ```
-═══ CONFORMANCE: NOT ENABLED ═════════════════════════════════════════════════
+** (ExTLA.GenServer.Violation) ═══ CONFORMANCE: NOT ENABLED ═════════════════════════════════════════════════
+
   The implementation took :acquire, which the spec does not permit here.
+
   The guard is false in this state for every binding the mapping admits.
+
   abstract pre-state:
         free = true
         pc = %{alice: :idle, bob: :idle, carol: :idle}
+
+
   spec:   Tutorial.Lock
 ```
 
@@ -146,29 +152,79 @@ mix extla.simulate Tutorial.LeakyLockServer --seed 1
 <!-- tla:simulate module=Tutorial.LeakyLockServer expect=violation match="DIVERGED" -->
 ```
 Tutorial.LeakyLockServer — CONFORMANCE VIOLATION: diverged
-  100 traces, 447 steps, 0 restarts, 32ms, seed 1
-  covered 100% of the spec's actions: acquire x100, release x100, request x247
-  20 distinct abstract states
+  1 traces, 5 steps, 0 restarts, 0ms, seed 1
+  covered 100% of the spec's actions: acquire x1, release x1, request x3
+  6 distinct abstract states
 
 ═══ CONFORMANCE: DIVERGED ════════════════════════════════════════════════════
+
   :release is enabled, but the spec's transition does not produce what the
   implementation produced. Closest candidate binding: %{c: :alice}
+
   variables that differ:
         pc:
           spec:           %{alice: :idle, bob: :waiting, carol: :waiting}
           implementation: %{alice: :waiting, bob: :waiting, carol: :waiting}
+
   abstract pre-state:
         free = false
         pc = %{alice: :holding, bob: :waiting, carol: :waiting}
+
+
   spec:   Tutorial.Lock
 
 ═══ VIOLATION: diverged ════════════════════════════════════════════
-…
+═══ CONFORMANCE: DIVERGED ════════════════════════════════════════════════════
+
+  :release is enabled, but the spec's transition does not produce what the
+  implementation produced. Closest candidate binding: %{c: :alice}
+
+  variables that differ:
+        pc:
+          spec:           %{alice: :idle, bob: :waiting, carol: :waiting}
+          implementation: %{alice: :waiting, bob: :waiting, carol: :waiting}
+
+  abstract pre-state:
+        free = false
+        pc = %{alice: :holding, bob: :waiting, carol: :waiting}
+
+
+  spec:   Tutorial.Lock
+
+State 1 (Init):
+  free = true
+  pc   = %{alice: :idle, bob: :idle, carol: :idle}
+
+── request(c: :alice) ────────────────────
+
+State 2:
+  free = true
+  pc   = %{alice: :waiting, bob: :idle, carol: :idle}   ← changed
+
+── request(c: :bob) ────────────────────
+
+State 3:
+  free = true
+  pc   = %{alice: :waiting, bob: :waiting, carol: :idle}   ← changed
+
+── acquire(c: :alice) ────────────────────
+
+State 4:
+  free = false   ← changed
+  pc   = %{alice: :holding, bob: :waiting, carol: :idle}   ← changed
+
+── request(c: :carol) ────────────────────
+
+State 5:
+  free = false
+  pc   = %{alice: :holding, bob: :waiting, carol: :waiting}   ← changed
+
 ── release(c: :alice) ────────────────────
 
 State 6 [VIOLATION]:
   free = true   ← changed
   pc   = %{alice: :waiting, bob: :waiting, carol: :waiting}   ← changed
+
 ════════════════════════════════════════════════════════════════════
 ```
 
