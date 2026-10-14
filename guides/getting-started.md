@@ -15,12 +15,12 @@ Add `extla` to the project's dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:extla, "~> 0.5.0"}
+    {:extla, "~> 0.6.0"}
   ]
 end
 ```
 
-Write the requirement with three parts. `~> 0.5.0` takes fixes within the 0.5 line and stops
+Write the requirement with three parts. `~> 0.6.0` takes fixes within the 0.6 line and stops
 there: until 1.0, a new minor version can change the interface, and its changelog entry says
 how to upgrade.
 
