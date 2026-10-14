@@ -103,6 +103,76 @@ defmodule ExTLA.MixProject do
         # `Guides` matches only the TOP level of `guides/`, so the list can be in reading order
         # -- getting-started, then the tutorial -- rather than in the order the patterns have to
         # be tried in. A bare `^guides\//` here would swallow every tutorial page.
+        # Modules by what a user does with them, and the engine last (#405, for #397). Grouped
+        # rather than `@moduledoc false`: a hidden module drops out of the relation log's reach
+        # (surfex#219), and an engine module is still worth reading for someone debugging one.
+        # `module_groups_test.exs` fails on a published module in no group, so a new module is
+        # placed on purpose.
+        groups_for_modules: [
+          Specifications: [
+            ExTLA.Spec,
+            ExTLA.Spec.DSL,
+            ExTLA.Spec.Helpers,
+            ExTLA.Spec.Type,
+            ExTLA.Set,
+            ExTLA.Function,
+            ExTLA.Temporal,
+            ExTLA.Spec.Test,
+            ExTLA.Spec.CompileError,
+            ExTLA.Spec.DomainError,
+            ExTLA.Spec.PredicateError
+          ],
+          "Model checking": [
+            ExTLA.ModelChecker,
+            ExTLA.Config,
+            ExTLA.Coverage,
+            ExTLA.Profile,
+            ExTLA.Trace,
+            ExTLA.State,
+            ExTLA.StateGraph,
+            ExTLA.Spec.Compiled,
+            ExTLA.State.InvalidTermError,
+            ExTLA.Symmetry.UnsoundError
+          ],
+          "Layer 1: runtime invariants": [
+            ExTLA.Invariant,
+            ExTLA.Invariant.Agent,
+            ExTLA.Invariant.Test,
+            ExTLA.Invariant.Violation
+          ],
+          "Layer 3: conformance": [
+            ExTLA.GenServer,
+            ExTLA.Refinement,
+            ExTLA.Simulation,
+            ExTLA.Replay,
+            ExTLA.PropertyTest,
+            ExTLA.Conformance,
+            ExTLA.GenServer.Violation,
+            ExTLA.State.Json,
+            ExTLA.State.Json.Error,
+            ExTLA.Refinement.Error
+          ],
+          Internals: [
+            ExTLA.Spec.Block,
+            ExTLA.Spec.Deps,
+            ExTLA.Spec.Hash,
+            ExTLA.Spec.Params,
+            ExTLA.Spec.Rewriter,
+            ExTLA.Spec.Temporal,
+            ExTLA.ModelChecker.Safety,
+            ExTLA.ModelChecker.Liveness,
+            ExTLA.ModelChecker.Parallel,
+            ExTLA.Fingerprint,
+            ExTLA.Symmetry,
+            ExTLA.Temporal.Fairness,
+            ExTLA.StateGraph.Export,
+            ExTLA.Trace.Explore,
+            ExTLA.Simulation.Generator,
+            ExTLA.Invariant.Runtime,
+            ExTLA.GenServer.Runtime,
+            ExTLA.GenServer.Driver
+          ]
+        ],
         groups_for_extras: [
           Guides: ~r/^guides\/[^\/]+\.md$/,
           Tutorial: ~r/^guides\/tutorial\//,
