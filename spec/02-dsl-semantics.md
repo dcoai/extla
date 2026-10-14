@@ -393,6 +393,13 @@ returned `:idle` was not violated; it was broken, and a "violation" would send t
 author looking for the wrong bug. The check is on the compiled function, so every
 consumer — the checker, trace replay, coverage, the ledger — gets the same refusal.
 
+Layer 1 holds `invariant`, `action_property`, `precondition` and `postcondition` to the same
+rule: `true` holds, `false` is a violation, and anything else is refused. In a running
+process, the refusal is reported the way a violation is, through the configured `mode`, with
+the value named ("returned :idle, which is not a boolean"). So `:log_only` logs it and
+`:enabled` raises `ExTLA.Invariant.Violation`, rather than raising into a server outside the
+response its author chose.
+
 ### 5.1 The supported temporal fragment is bounded — say so
 
 ExTLA does **not** implement full LTL. The supported fragment is:

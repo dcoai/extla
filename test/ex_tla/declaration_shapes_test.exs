@@ -65,14 +65,73 @@ defmodule ExTLA.DeclarationShapesTest do
       """
     end
 
-    # `Runtime` is where the reading lives, so it is also where it can be asked directly —
-    # including for the truthy non-boolean that used to hold under the default and violate
-    # under `telemetry: :verbose`.
-    test "a truthy non-boolean holds, under both telemetry settings" do
+    # `Runtime` is where the reading lives, so it is also where it can be asked directly.
+    #
+    # A truthy non-boolean used to HOLD here, while Layer 2 refused the same predicate with a
+    # `PredicateError` — one predicate, two verdicts, against 02-dsl-semantics.md §5 (#418,
+    # for #401). It is now a finding under both telemetry settings, and the report names the
+    # value, so the reader learns the predicate is malformed rather than that it was false.
+    test "a truthy non-boolean is reported, naming the value, under both telemetry settings" do
       module = compile!([:invariant], "TruthyInvariant", ~s|invariant :i do\n  :yes\nend|)
 
-      assert Runtime.check_invariants!(module, [:i], %{}) == :ok
-      assert Runtime.check_invariants!(module, [:i], %{}, :verbose) == :ok
+      for verbose <- [[], [:verbose]] do
+        violation =
+          assert_raise ExTLA.Invariant.Violation, fn ->
+            apply(Runtime, :check_invariants!, [module, [:i], %{}] ++ verbose)
+          end
+
+        assert Exception.message(violation) =~ "returned :yes, which is not a boolean"
+      end
+    end
+
+    test "and `nil` says it is not a boolean, while `false` is an ordinary violation" do
+      module =
+        compile!([:invariant], "NilOrFalse", ~s|invariant :i do\n  state[:answer]\nend|)
+
+      nil_report =
+        assert_raise ExTLA.Invariant.Violation, fn ->
+          Runtime.check_invariants!(module, [:i], %{answer: nil})
+        end
+
+      false_report =
+        assert_raise ExTLA.Invariant.Violation, fn ->
+          Runtime.check_invariants!(module, [:i], %{answer: false})
+        end
+
+      assert Exception.message(nil_report) =~ "returned nil, which is not a boolean"
+      refute Exception.message(false_report) =~ "not a boolean"
+      assert Runtime.check_invariants!(module, [:i], %{answer: true}) == :ok
+    end
+  end
+
+  # The guard against the two layers drifting apart again: one predicate body, declared once
+  # as a Layer 1 invariant and once as a Layer 2 invariant, and both refuse it (#418).
+  describe "Layer 1 and Layer 2 on the same non-boolean predicate" do
+    test "both refuse it" do
+      layer1 = compile!([:invariant], "SharedLayer1", ~s|invariant :i do\n  :yes\nend|)
+
+      assert_raise ExTLA.Invariant.Violation, ~r/not a boolean/, fn ->
+        Runtime.check_invariants!(layer1, [:i], %{})
+      end
+
+      layer2 = Module.concat(__MODULE__, "SharedLayer2#{System.unique_integer([:positive])}")
+
+      Code.compile_string("""
+      defmodule #{inspect(layer2)} do
+        use ExTLA.Spec
+        variable :n, type: 0..0
+        init do
+          n = 0
+        end
+        invariant :i do
+          :yes
+        end
+      end
+      """)
+
+      assert_raise ExTLA.Spec.PredicateError, ~r/:yes/, fn ->
+        ExTLA.ModelChecker.run(layer2, %{})
+      end
     end
   end
 

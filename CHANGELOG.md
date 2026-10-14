@@ -91,6 +91,14 @@ release it merely follows.
   lines naming what differed with and without the reduction came out in an order that
   could change from one run to the next. They now always read status, deadlock, refuted,
   never enabled.
+- **Layer 1 refuses a predicate that returns a non-boolean, as Layer 2 does** (#418, for
+  #401). An `invariant`, `action_property`, `precondition` or `postcondition` returning a
+  truthy non-boolean used to count as holding. A common way to get one is
+  `n >= 0 and status`, which evaluates to `status`. The model checker already refused the
+  same predicate. It is now reported through the configured mode, naming the value
+  ("returned :ok, which is not a boolean"): `:enabled` raises `ExTLA.Invariant.Violation`
+  and `:log_only` logs it. **This can surface reports in code that passed before.** Add the
+  missing comparison so the predicate returns `true` or `false`.
 
 ## [0.5.0] — 2026-10-13
 
