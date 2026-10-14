@@ -6,10 +6,8 @@ difference is the point: these blocks describe a *specification*, which a model 
 enumerates, not a program that runs.
 
 Every rule below is enforced at compile time and names a diagnostic you will see if you
-break it. The full table, keyed by kind, is
-[`spec/02-dsl-semantics.md` §7](spec/02-dsl-semantics.md), which is also the normative
-semantics. (This repository generates `DIAGNOSTICS.md` from the raise sites and holds §7's
-table to it, but that golden is not part of the package — the specification is.)
+break it. The full table, keyed by the diagnostic's `kind`, is §7 of
+[the DSL reference](spec/02-dsl-semantics.md), which is also the normative semantics.
 
 ## The nine things that look like Elixir and are not
 
@@ -27,7 +25,7 @@ end
 A bare name on the right reads the **pre-state**; a name on the left names the **post-state**.
 So `x = x + 1` is not a mutation, it is a relation between two states, and the order of the
 assignments in the block does not matter. Assigning the same variable twice is
-`:duplicate_declaration` — not last-write-wins, because there is no "last" in a conjunction.
+`:variable_assigned_twice` — not last-write-wins, because there is no "last" in a conjunction.
 
 Outside `init` and `action`, assignment is `:assignment_outside_init_or_action`. Assigning a
 name that no `variable` declares is `:assignment_to_undeclared_variable`.
@@ -74,7 +72,7 @@ end
 ```
 
 Order decides between a **disabled action** and a **raised `ExTLA.Spec.DomainError`**. `f[x]`
-outside the domain of `f` raises (D-20) rather than answering `nil`, so a `let` that reads
+outside the domain of `f` raises rather than answering `nil`, so a `let` that reads
 before its guard has run turns a state the action should skip into a crash. Put the guard
 above the read.
 
@@ -87,20 +85,28 @@ with one of those names is refused.
 `:type_ok` is reserved: it is the implicit invariant compiled from your `type:` annotations,
 and declaring it yourself is `:implicit_invariant_redeclared`.
 
-### 6. Liveness is refused alongside symmetry and alongside `workers:`
+### 6. Liveness is skipped under symmetry and `--workers`, and refused by the API
 
-<!-- tla:skip reason=shell invocations, not Elixir; the refusal they describe is asserted by parallel_test -->
+`mix extla.check` checks every `temporal` the spec declares, and skips liveness, with a
+warning that names the reason, in three cases: `--safety-only`, a `symmetry:` in the spec's
+configuration, and `--workers` above one. The safety properties are still checked.
+
+<!-- tla:skip reason=shell invocations, not Elixir -->
 ```elixir
-mix extla.check MySpec --workers 8           # fine
-mix extla.check MySpec --workers 8 --check-liveness   # REFUSED, with the reason
+mix extla.check MySpec               # safety and liveness
+mix extla.check MySpec --workers 8   # safety in parallel; warns that liveness was skipped
 ```
 
-Not weakened, not silently ignored — refused, because the combination is unsound. Symmetry
-reduction collapses states that a temporal property may distinguish (D-22), and the liveness
-edge table and ENABLED bits are per-struct maps, so under workers each process would hold a
-fragment and a cycle spanning two of them would not exist to be found (D-27).
+`ExTLA.ModelChecker.run/2` infers nothing: `check_liveness:` defaults to `false`, and
+`check_liveness: true` together with `symmetry:` or `workers:` above one **raises**, because
+neither combination gives a sound answer. Symmetry reduction merges states a temporal
+property can tell apart, so the reduced graph can hold cycles the real one does not; and
+under workers each process holds only part of the graph, so a cycle spanning two of them
+cannot be found.
 
-A refusal you can act on is the point. If you need both, run them as two checks.
+If you need both, run two checks: one with the reduction or the workers, one without.
+`ExTLA.Spec.Test.assert_spec/2` passes its config straight to `run/2`, so a test that should
+check a temporal property says `check_liveness: true`.
 
 ### 7. `mode` and `telemetry` are compile-time
 
@@ -136,7 +142,7 @@ All of TLA+'s set theory is callable **unqualified** inside a spec block — `po
 `for_each`, `update`, `except`, `domain`, `function_set`, `record_set`, plus `union`,
 `intersection`, `difference`, `subset?`, `member?`, `size` and the sequence operators. There
 is nothing to import and nothing to qualify: `ExTLA.Set` and `ExTLA.Function` hold the one
-implementation of each, and the helper module every spec imports delegates to them (D-38).
+implementation of each, and `ExTLA.Spec.Helpers`, which every spec imports, delegates to them.
 
 **Two are renamed, and only two.** `{f(x) : x \in S}` is `set_map/2` and `{x \in S : P(x)}`
 is `set_filter/2`, not `map/2` and `filter/2` — an unqualified `map(xs, f)` in a spec block
@@ -174,25 +180,44 @@ write `{:call, {:cast, 5}}`.
 
 A cast completes when a `:sys.get_state/2` behind it replies, which both drivers already
 make, so this costs no extra round-trip. A cast that never completes is a named finding,
-not a silent pass (D-36).
+not a silent pass.
+
+## Wiring it into a project
+
+- **`use ExTLA.Invariant` goes directly after `use GenServer`, before the callbacks.** The
+  order is load-bearing: only callbacks defined after it are wrapped, which is what keeps the
+  defaults `use GenServer` injects unwrapped.
+- **`use ExTLA.GenServer, spec: Specs.Counter, refinement: __MODULE__.Refinement`** puts a
+  server under Layer 3: `spec:` is the specification it claims to refine, `refinement:` the
+  module that maps its state and messages onto the spec's.
+- **Configuration.** `config :extla, mode: :enabled | :log_only | :disabled` and
+  `telemetry: :quiet | :verbose` are compile-time (§7 above). `config :extla, workers: n`
+  is what `ExTLA.Config.workers/0` answers, and `trace_buffer: n` bounds the trace a Layer 3
+  server records. Per spec, `config :extla, Specs.Counter, constants: %{max: 3}` assigns
+  constants for `mix extla.check`, `mix extla.simulate` and Layer 3, and `symmetry:
+  [:procs]` there turns on the reduction for `mix extla.check`.
+- **`jason` is optional.** Add `{:jason, "~> 1.4"}` for `--format json` and for the saved
+  counterexamples `mix extla.explore` and `mix extla.replay --trace` read.
 
 ## What a verdict does and does not say
 
 `mix extla.check` exits **2** when the run was bounded — `max_states` was hit, or a
 `state_constraint` held states back. That is not a pass. A bounded run has verified
-*nothing* about the states it did not reach, and the exit code says so; `allow_incomplete:
-true` turns it into a pass when you have decided a partial answer is worth having (D-10).
+*nothing* about the states it did not reach, and the exit code says so. `--allow-incomplete`
+(`allow_incomplete: true` for `assert_spec/2`) turns it into a pass when you have decided a
+partial answer is worth having.
 
-A temporal property is `:inconclusive` rather than `:holds` where the run could not settle
-it. Three verdicts, not two, and the third is the honest one (D-23).
+Checking a recorded trace is different from model checking. Over a finite trace, a temporal
+property can be `:inconclusive` rather than `:holds` or `:violated`: a prefix can refute
+`always P` but cannot prove it. `ExTLA.Temporal` returns three verdicts for that reason, and
+a lasso (a prefix plus a repeating cycle) is what lets every operator answer definitely.
 
 ## Writing specifications with an agent
 
 The rules above are the ones an agent gets wrong, because each looks like ordinary Elixir
 and compiles to something else. Two more that are worth stating outright:
 
-- **Do not add `@spec` annotations to a spec module.** They are not checked and they drift
-  (D-31); the DSL's `type:` annotations are the checked ones.
+- **Do not add `@spec` annotations to a spec module.** They are not checked and they drift; the DSL's `type:` annotations are the checked ones.
 - **A specification that verifies is not a specification that is right.** The coverage report
   is where a spec that checks nothing announces itself — a never-enabled action, a vacuous
   `~>`, an invariant never at risk. Read it.

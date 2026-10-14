@@ -40,7 +40,7 @@ defmodule ExTLA.GenServer do
   the spec's on its abstract one. The two hooks wrap the same callbacks independently and
   nest: neither renames anything, both use `defoverridable` and `super`.
 
-  ## `validate!/2` runs at compile time
+  ## `validate!/3` runs at compile time
 
   A mapping that does not cover the spec's variables or actions fails the build rather
   than producing misleading passes at runtime. What it cannot decide — the two rules that
@@ -222,8 +222,8 @@ defmodule ExTLA.GenServer do
             #{Enum.join(rules, "\n  ")}
 
           These are limits of what a compile can decide, not findings. `ExTLA.Coverage`
-          reports what a run actually exercised (05-layer3-conformance.md §What
-          `validate!/2` establishes).
+          reports what a run actually exercised (`ExTLA.Refinement`, "What `validate!/3`
+          establishes").
           """
         )
 

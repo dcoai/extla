@@ -21,9 +21,9 @@ defmodule ExTLA.UsageRulesTest do
   by `surface-drift`. A rule citing a kind the compiler cannot raise would be advice about a
   tool that does not exist.
 
-  The decisions it cites are held to `spec/08-decisions.md` for the same reason: D-20's
-  guard-order rule and D-22's refusal are the *reasons* the advice is what it is, and a
-  citation that resolves to nothing is worse than none — it reads as checkable and is not.
+  It once cited decisions by number and held each to `spec/08-decisions.md`. That log no
+  longer ships with the docs, so the reasons are now stated beside the rules, and the file is
+  held to citing none.
   """
   use ExUnit.Case, async: true
 
@@ -95,24 +95,16 @@ defmodule ExTLA.UsageRulesTest do
     end
   end
 
-  describe "every decision it cites" do
-    test "is a decision that exists" do
-      log = @root |> Path.join("spec/08-decisions.md") |> File.read!()
+  # The decision log is not published (#404), so a bare `D-22` in a page that ships is a
+  # reference its reader cannot follow. The reason a rule exists is stated beside the rule
+  # instead (#407, for #399).
+  describe "decisions" do
+    test "are explained where they apply, not cited by number" do
+      cited = cited(~r/\b(D-\d+)\b/)
 
-      numbers =
-        ~r/^## D-(\d+) —/m |> Regex.scan(log) |> Enum.map(&Enum.at(&1, 1)) |> MapSet.new()
-
-      assert MapSet.size(numbers) > 25
-
-      cited = cited(~r/\(D-(\d+)\)/)
-
-      assert cited != [], "usage-rules.md cites no decision, so this gate is reading nothing"
-
-      missing = for n <- cited, not MapSet.member?(numbers, n), do: "D-#{n}"
-
-      assert missing == [], """
-      usage-rules.md cites #{Enum.join(missing, ", ")}, which `spec/08-decisions.md` does not
-      contain. A citation that resolves to nothing reads as checkable and is not.
+      assert cited == [], """
+      usage-rules.md cites #{Enum.join(cited, ", ")}. The decision log does not ship, so a
+      reader cannot follow the number; say the reason beside the rule instead.
       """
     end
   end

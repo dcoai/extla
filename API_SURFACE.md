@@ -9,7 +9,7 @@ clause of the item, so a changed body moves it and a moved definition does not. 
 struct type's `Shape` is its key set, `key?` marking an optional key, and `key: :a | :b` a
 key whose value is a union of atoms; any other type is shown as written.
 
-**60 modules · 408 items** · functions 346 · arities 426 · types 62
+**60 modules · 410 items** · functions 348 · arities 428 · types 62
 
 ## ExTLA.Config — 3 items
 
@@ -201,10 +201,11 @@ key whose value is a union of atoms; any other type is shown as written.
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
 | `read!/2` | `:def` | (path, spec) | `f1dc2ba1` | `lib/ex_tla/mix/trace_file.ex` |
-## ExTLA.ModelChecker — 12 items
+## ExTLA.ModelChecker — 13 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
+| `__defaults__/0` | `:def` | () | `9385b342` | `lib/ex_tla/model_checker.ex` |
 | `bindings/3` | `:def` | (action, constants, state) | `ba4f750c` | `lib/ex_tla/model_checker.ex` |
 | `check_safety/1` | `:def` | (spec, config \\ …) | `0b2dcc10` | `lib/ex_tla/model_checker.ex` |
 | `check_safety/2` | `:def` | (spec, config \\ …) | `0b2dcc10` | `lib/ex_tla/model_checker.ex` |
@@ -319,10 +320,11 @@ key whose value is a union of atoms; any other type is shown as written.
 | `map/2` | `:def` | (set, fun) | `e3a7dc4c` | `lib/ex_tla/set.ex` |
 | `powerset/1` | `:def` | (set) | `5daa8f2c` | `lib/ex_tla/set.ex` |
 | `range/2` | `:def` | (a, b) | `1e1d2c4c` | `lib/ex_tla/set.ex` |
-## ExTLA.Simulation — 6 items
+## ExTLA.Simulation — 7 items
 
 | Item | Kind | Shape | Version | Locus |
 |---|---|---|---|---|
+| `__defaults__/0` | `:def` | () | `9385b342` | `lib/ex_tla/simulation.ex` |
 | `config()` | `:type` | traces?, max_steps?, message_generator?, inject_failures?, failure_rate?, seed?, concurrency?, init_arg?, timeout?, against_graph? | `306c31ac` | `lib/ex_tla/simulation.ex` |
 | `coverage_report()` | `:type` | actions_hit, states_visited, invariants_checked, actions_covered | `0ebb20be` | `lib/ex_tla/simulation.ex` |
 | `replay/2` | `:def` | (module, messages, config \\ …) | `46bdc611` | `lib/ex_tla/simulation.ex` |

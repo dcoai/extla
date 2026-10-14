@@ -3,25 +3,24 @@ defmodule ExTLA.ModelChecker do
   Exhaustive state-space model checker for `ExTLA.Spec` modules. Analogous to TLC
   for TLA+.
 
-  Phase 1 is the single-threaded, breadth-first safety checker
-  (`spec/06-architecture.md` §Phase 1). Breadth-first is not an implementation
-  detail: an invariant is evaluated when a state is first discovered, so the
-  first violation found is at minimal distance from `init` and the trace is the
-  shortest counterexample. A depth-first search would report *a* counterexample,
-  which is a much less useful thing to hand someone.
+  The search is breadth-first, and that is not an implementation detail: an invariant is
+  evaluated when a state is first discovered, so the first violation found is at minimal
+  distance from `init` and the trace is the shortest counterexample. A depth-first search
+  would report *a* counterexample, which is a much less useful thing to hand someone.
 
-  `check_liveness: true` adds Phase 2's temporal checking: the search also builds the
-  liveness graph, and `ExTLA.ModelChecker.Liveness` looks for the fair cycle that refutes a
-  temporal property. It is off by default because the graph is not free
-  (`bench/liveness_graph.exs`), and because a spec that declares no `temporal` has nothing
-  to gain from it.
+  `check_liveness: true` adds temporal checking: the search also builds the liveness graph,
+  and `ExTLA.ModelChecker.Liveness` looks for the fair cycle that refutes a temporal
+  property. It is off by default, because the graph costs memory and time and a spec that
+  declares no `temporal` has nothing to gain from it. `mix extla.check` turns it on for a
+  spec that declares one.
 
   `symmetry: [:processes]` collapses states that differ only by a permutation of an
-  interchangeable constant, and `verify_symmetry: true` checks the declaration was sound
-  by running the model both ways (`ExTLA.Symmetry`, `08-decisions.md` D-17).
+  interchangeable constant, and `verify_symmetry: true` checks the declaration was sound by
+  running the model both ways (`ExTLA.Symmetry`). `workers: n` explores each level across
+  `n` processes (`ExTLA.ModelChecker.Parallel`). Either one together with
+  `check_liveness: true` raises, because neither combination gives a sound liveness answer.
 
-  Parallel exploration arrives in a later phase; asking for it raises rather than quietly
-  checking something weaker.
+  `run/2` lists every option.
   """
 
   alias ExTLA.ModelChecker.{Liveness, Parallel, Safety}
@@ -124,24 +123,45 @@ defmodule ExTLA.ModelChecker do
     temporals: :all
   }
 
+  # `run/2`'s `## Options` lists these, and `options_doc_test.exs` holds the two together.
+  @doc false
+  def __defaults__, do: @defaults
+
   @doc """
   Run the model checker on a spec module.
 
       ExTLA.ModelChecker.run(Specs.Counter, %{constants: %{max: 3}})
 
-  Returns the verdict and **keeps nothing**. `explore/2` builds the graph in two ETS
-  tables, and an ETS table is owned by a process rather than reachable from a term, so
-  discarding the graph does not free them — they hold one record per distinct state for as
-  long as the calling process lives. Twenty `run/2` calls left forty tables behind (#316).
+  ## Options
 
-  So the search happens in a process of its own and the verdict is copied back. The tables
-  are created there, which makes the child's exit the thing that frees them — on the normal
-  path and on a raise alike, with no `try/after` and no delete to forget at a call site.
-  An exception is re-raised in the caller with the stack it was raised on, so nothing is
-  swallowed; this is the same isolate-and-observe shape as `ExTLA.Ledger`'s own check.
+    * `constants:` — a map assigning the spec's constants. Default `%{}`. `run/2` reads no
+      application config and applies no `default:`; `mix extla.check` resolves both, with
+      `ExTLA.Spec.Compiled.resolve_constants/1`, and passes the result here.
+    * `max_states:` — the state budget. Default `1_000_000`. The search stops once the graph
+      has passed it, so the count reported with `:max_states_reached` exceeds the limit.
+    * `workers:` — processes exploring each breadth-first level. Default `1`;
+      `ExTLA.Config.workers/0` returns the machine's answer if you want it. Raises together
+      with `check_liveness: true`.
+    * `check_deadlock:` — report a reachable state with no enabled action and no `terminal`
+      admitting it. Default `true`.
+    * `check_liveness:` — check the spec's `temporal` properties. Default `false`. Raises
+      together with `symmetry:` or `workers:` above one.
+    * `liveness_graph:` — build the liveness graph without checking anything with it, for
+      measuring it. Default `false`; `check_liveness: true` implies it.
+    * `symmetry:` — constants whose elements are interchangeable. Default `nil`.
+    * `verify_symmetry:` — run the model with and without `symmetry:` and raise
+      `ExTLA.Symmetry.UnsoundError` if any verdict differs. Default `false`.
+    * `state_constraint:` — a predicate on states; a state that fails it is not expanded,
+      and the run's status is `:constrained`. Default `nil`.
+    * `fingerprint_bits:` — `64` or `128`. Default `64`.
+    * `profile:` — measure what each declaration costs, in reductions (`ExTLA.Profile`).
+      Default `false`, and free when off.
+    * `invariants:`, `action_properties:`, `temporals:` — `:all` (the default) or a list of
+      declaration names to check. A name the spec does not declare is refused.
 
-  It is invisible under ExUnit, where every test is its own process. It accumulates in
-  `mix extla.check A B C`, in `ExTLA.Spec.Test`, and in any long-lived caller.
+  Returns the verdict and keeps nothing: the search runs in a process of its own, so the
+  graph's ETS tables are freed when it ends, and an exception is re-raised in the caller
+  with its original stack. `explore/2` returns the graph instead.
   """
   def run(spec, config \\ %{}) do
     parent = self()
@@ -183,8 +203,7 @@ defmodule ExTLA.ModelChecker do
     do: Enum.all?(entries, &(is_tuple(&1) and tuple_size(&1) in 3..4))
 
   @doc """
-  Run only safety checking. In Phase 1 this is what `run/2` does; the separate
-  name is the one that stays correct once liveness exists.
+  Run only safety checking: `run/2` with `check_liveness: false`, whatever the config says.
   """
   def check_safety(spec, config \\ %{}), do: run(spec, Map.put(config, :check_liveness, false))
 
