@@ -8,7 +8,7 @@ the checker explores both. **Symmetry reduction** declares a constant whose elem
 apart, and the checker then keeps one representative of each set of states that differ only by a
 permutation of them. For *n* interchangeable elements the state space shrinks by up to *n*!, and
 that is the difference between tractable and not for exactly the systems this tool is for
-([§Symmetry](../../spec/04-layer2-model-checker.md#symmetry)).
+([§Symmetry](../reference.md#symmetry)).
 
 ## Declaring it
 
@@ -51,13 +51,12 @@ deserve a closer look.
 
 ## Why liveness is refused alongside it
 
-The second warning is [D-22](../../spec/08-decisions.md): symmetry and liveness are refused
-together. The reduced graph identifies states, so a path that leaves an orbit and one that returns
+The second warning is that symmetry and liveness are refused together. The reduced graph identifies states, so a path that leaves an orbit and one that returns
 to it look alike, and the quotient can contain cycles the real system does not have — and a cycle
 is exactly what a liveness verdict is read off. Rather than answer with something it cannot stand
 behind, the checker checks safety under the reduction and tells you to check the temporal
 properties in a run without it. (`--workers` is refused alongside liveness for a neighbouring
-reason, [D-27](../../spec/08-decisions.md).)
+reason, [§Parallel exploration](../reference.md#parallel-exploration).)
 
 ## Soundness is yours, and the flag is what makes a mistake visible
 
@@ -65,7 +64,7 @@ The first thing is the flag on the command line. **Nothing can establish that a 
 declaration is sound.** A constant flows into arbitrary Elixir, and whether some invariant or
 guard treats Alice differently from Carol is not a question a compiler can answer — an earlier
 draft of this project promised to, and was promising the undecidable
-([D-17](../../spec/08-decisions.md)). Soundness is the author's obligation, exactly as it is in TLC.
+([§Symmetry](../reference.md#symmetry)). Soundness is the author's obligation, exactly as it is in TLC.
 What `--verify-symmetry` does is make a wrong declaration **detectable**: it runs the model both
 ways and fails if any verdict differs — the status, what was refuted, which actions never fired.
 Not the counts; a sound reduction changes those on purpose.

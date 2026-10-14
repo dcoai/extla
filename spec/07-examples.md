@@ -229,11 +229,6 @@ end
 > (`08-decisions.md` D-39). Declining the optional callback is the honest position while
 > the design decision above is open: this server can be **checked** as it runs, which is
 > what the `:diverged` above is, and it cannot be **driven** from the spec.
->
-> That this mapping named two of four actions went unsaid until #321. The rule was
-> answered by probing `concrete_message/2` with a sample binding, and `processes` and
-> `resources` have no `default:` — the assignment belongs to a run — so there was no
-> binding to probe with and the two unnamed actions were never reached.
 
 ### Tests (All Layers)
 
@@ -497,7 +492,7 @@ defmodule Specs.RaftElection do
 end
 ```
 
-Two notes on this spec:
+Notes on this spec:
 
 - `state` was renamed to `srv_state`. `state` is bound implicitly in Layer 1 blocks
   (`03-layer1-invariants.md`), and a spec variable that shadows a reserved binding is a
@@ -511,11 +506,8 @@ Two notes on this spec:
   spec has the same property only under a constraint. The test below checks safety
   exhaustively and asserts that the liveness counterexample ends in that terminal state,
   which is more useful than deleting a property the model refutes.
-- Both of the notes above are here because the differential corpus put them here. At
-  `servers = {s1, s2, s3}, max_term = 2` this model has 58,359 reachable states and a
-  diameter of 19, TLC and ExTLA agree on both, and the two bugs the entry found — the
-  missing term check and the unreachable terminal predicate — are recorded in
-  `test/differential/raft_election/`.
+- At `servers = {s1, s2, s3}, max_term = 2` this model has 58,359 reachable states and a
+  diameter of 19, and TLC agrees on both.
 
 ### Tests
 
@@ -660,7 +652,7 @@ defmodule Specs.BoundedBuffer do
   # Legitimate end state (`02-dsl-semantics.md` §5.3): everything produced and
   # consumed, producers idle, consumers parked. Without this the checker reports
   # a deadlock — and it would be right to, since the spec had not said this
-  # state was intended. TLC does report one, which is what the corpus compares.
+  # state was intended.
   terminal :all_items_consumed do
     produced_count == ^max_items and consumed_count == ^max_items and
       Enum.all?(^producers, fn p -> producer_pc[p] == :ready end) and

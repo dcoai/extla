@@ -4,10 +4,8 @@ All notable changes to ExTLA are recorded here, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**What is built** — module by module, phase by phase — lives in
-[`spec/06-architecture.md` §Implementation Phases](spec/06-architecture.md#implementation-phases),
-which is the single source of truth for that. This file records what *changed* and when, and
-does not restate it.
+This file is the record of what is built: each release's entry says what changed, and nothing
+else restates it.
 
 ## [Unreleased]
 
@@ -29,6 +27,15 @@ release it merely follows.
   `ExTLA` module docs open with the same line. The TLC agreement tables and benchmarks that
   filled half the old README now sit beside the corpus they measure, in
   `test/differential/README.md`.
+- **The docs publish only what a user needs** (#404, for #397). Of `spec/`, HexDocs now
+  carries the DSL reference and the examples, and both have lost their history paragraphs.
+  The rest of the specification is design material, linked on GitHub where a page needs it.
+  A new guide page, `guides/reference.md`, holds the user-facing facts that lived only in
+  the departing files: how `mix extla.check` and `ExTLA.ModelChecker.run/2` differ on
+  liveness, what state constraints, symmetry and `--workers` each cost and refuse, how to
+  read the coverage report, the JSON result schema, what conformance checks, Layer 1's
+  test helpers, telemetry and overhead, and what ExTLA is not. The `ExTLA` module docs and
+  this file now agree that the changelog is the record of what is built.
 
 ## [0.5.0] — 2026-10-13
 

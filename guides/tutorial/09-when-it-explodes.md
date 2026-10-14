@@ -138,7 +138,7 @@ model large enough to need it, and this project's own benchmark is the honest ad
 
 What it never buys is tractability. It explores the identical space, so a run that would never
 finish still never finishes — reach for it after the levers above, not instead of them. It also
-refuses to check liveness ([D-27](../../spec/08-decisions.md)), so a spec with a `temporal` has
+refuses to check liveness ([§Parallel exploration](../reference.md#parallel-exploration)), so a spec with a `temporal` has
 its safety checked in parallel and says so.
 
 ### Skip liveness while you are iterating

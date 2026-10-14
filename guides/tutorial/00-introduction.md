@@ -21,9 +21,9 @@ the tutorial stops being a worked example.
 
 Every code block in this tutorial is compiled and run by ExTLA's own test suite, and every verdict
 the prose quotes is asserted against the run: if a page says a spec verifies, it does, and if it
-says a counterexample is seven states long, it is. The specification in
-[`spec/`](../../spec/README.md) remains the authority on what the tool means, and these pages link
-to it rather than restating it.
+says a counterexample is seven states long, it is. The
+[DSL reference](../../spec/02-dsl-semantics.md) remains the authority on what a specification
+means, and these pages link to it rather than restating it.
 
 ## Why verify a design at all
 
@@ -145,9 +145,11 @@ deliberately: it finds implementation bugs where ExTLA finds design bugs.
 
 ## In Elixir and Erlang
 
-`spec/00-prior-art.md` is the project's survey of this ground — every tool below with its authors,
-status, and how it relates to ExTLA, plus the [gap analysis](../../spec/00-prior-art.md#gap-analysis)
-that defines what ExTLA is for. It is the authority; this is the summary.
+[The prior-art survey](https://github.com/dcoai/extla/blob/main/spec/00-prior-art.md) is the
+project's survey of this ground — every tool below with its authors, status, and how it relates to
+ExTLA, plus the
+[gap analysis](https://github.com/dcoai/extla/blob/main/spec/00-prior-art.md#gap-analysis) that
+defines what ExTLA is for. It is the authority; this is the summary.
 
 **Working from a formal spec.** [Erla+](https://github.com/mmhristov/Erlaplus) (Hristov and
 Bieniusa, Erlang Workshop 2024) translates PlusCal specifications into executable Erlang —
@@ -211,7 +213,8 @@ connected: [Layer 3](07-layer3.md).
 ## Sources
 
 The two documents this page draws on both carry their own references:
-[`00-prior-art.md` §Sources](../../spec/00-prior-art.md#sources) for the Elixir and Erlang work,
+[the survey's §Sources](https://github.com/dcoai/extla/blob/main/spec/00-prior-art.md#sources)
+for the Elixir and Erlang work,
 and [the primer's §Resources](../../research/tla-plus-primer.md#resources) for TLA+ itself —
 Lamport's *Specifying Systems*, Hillel Wayne's *Practical TLA+* and Learn TLA+, Ron Pressler's
 series, and the AWS paper.

@@ -29,10 +29,14 @@ defmodule ExTLA.MixProject do
         },
         files: packaged_files()
       ],
-      # `guides/` ships and renders beside `spec/` (#94): the guides teach, the spec is the
-      # authority they link to. Every code block in a guide is compiled and its claimed verdict
+      # `guides/` teaches (#94). Every code block in a guide is compiled and its claimed verdict
       # asserted by `test/guides/`, so a guide that drifts from the code it teaches fails the
       # build rather than teaching an API that does not exist.
+      #
+      # The docs hold only what a user needs (#397): of `spec/`, the DSL reference and the
+      # examples. The rest of `spec/` is the design, for maintainers, and is linked on GitHub
+      # where a page needs it; `guides/reference.md` holds the user-facing facts that used to
+      # live only there.
       docs: [
         main: "readme",
         # "View source" links resolve at the release the docs describe. A `-dev` version has
@@ -80,11 +84,8 @@ defmodule ExTLA.MixProject do
         # Concatenated rather than one brace wildcard: `filelib` rejects a `/` inside braces,
         # and the order here is the order the sidebar lists them in.
         #
-        # `filename:` rather than title alone, because the id -- and so the output filename -- is
-        # what `main:` and every generated link name. `README.md` and `spec/README.md` both derive
-        # `readme`, ExDoc disambiguates them to `readme-1`/`readme-2`, and `main: "readme"` then
-        # named a page no build produced: the sidebar's home link 404'd on every page (#102).
-        # Naming the spec index explicitly leaves `readme` to the one page that should own it.
+        # The two `spec/` pages keep their filenames, because their ids are what the tutorial's
+        # anchors and `slug_model_test.exs` name; only the sidebar title is a user's word.
         #
         # LICENSE is here because README.md links it. ExDoc renders an extension-less file as
         # preformatted text; without it that link is a 404 in the published docs, which is the
@@ -93,14 +94,9 @@ defmodule ExTLA.MixProject do
           ["README.md", "usage-rules.md", "CHANGELOG.md"] ++
             Path.wildcard("guides/*.md") ++
             Path.wildcard("guides/tutorial/*.md") ++
-            Enum.map(Path.wildcard("spec/*.md"), fn
-              "spec/README.md" ->
-                {:"spec/README.md", filename: "spec-readme", title: "Specification index"}
-
-              path ->
-                path
-            end) ++
             [
+              {:"spec/02-dsl-semantics.md", title: "DSL reference"},
+              {:"spec/07-examples.md", title: "Examples"},
               "research/tla-plus-primer.md",
               {:LICENSE, filename: "license", title: "License"}
             ],
@@ -110,7 +106,7 @@ defmodule ExTLA.MixProject do
         groups_for_extras: [
           Guides: ~r/^guides\/[^\/]+\.md$/,
           Tutorial: ~r/^guides\/tutorial\//,
-          Specification: ~r/^spec\//,
+          Reference: ~r/^spec\//,
           # The primer ships so that the introduction's links into it resolve for a reader of the
           # published docs. It is background on TLA+ itself rather than an ExTLA specification,
           # which is why it has a group of its own and lives outside `spec/`.

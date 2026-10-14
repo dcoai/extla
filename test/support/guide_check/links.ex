@@ -17,11 +17,21 @@ defmodule ExTLA.GuideCheck.Links do
   `slug/1` reproduces what ExDoc generates for a heading, because that is what the published docs
   will contain: lowercase, every run of non-alphanumerics to a single `-`, ends trimmed. Checking
   against anything else would pass links the reader cannot follow.
+
+  ## A link to this repository on GitHub is still checked
+
+  The published docs hold only what a user needs (#397), so a page that points at a maintainer
+  document — the full specification, the decision log — links it on GitHub rather than relatively.
+  Such a URL is resolved back to the path it names, so the file and its anchor stay checked; a
+  scheme alone would otherwise make it somebody else's link. Its anchor is held to GitHub's slug
+  rule, `github_slug/1`, because GitHub renders that page.
   """
 
   # `[text](target)`, where target is relative — anything with a scheme, and any bare `mailto:`
   # or protocol-relative URL, is somebody else's to resolve.
   @link ~r/\[(?:[^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/
+
+  @github "https://github.com/dcoai/extla/blob/main/"
 
   @heading ~r/^\#{1,6}[ \t]+(.+?)[ \t]*\#*$/m
 
@@ -46,6 +56,9 @@ defmodule ExTLA.GuideCheck.Links do
 
   defp resolve(path, target) do
     cond do
+      String.starts_with?(target, @github) ->
+        github(target)
+
       # Someone else's to resolve: an absolute URL, a protocol-relative one, a mailto.
       Regex.match?(~r{^[a-z][a-z0-9+.-]*:}i, target) or String.starts_with?(target, "//") ->
         :ok
@@ -75,6 +88,30 @@ defmodule ExTLA.GuideCheck.Links do
     end
   end
 
+  defp github(target) do
+    {file, fragment} =
+      case target |> String.replace_prefix(@github, "") |> String.split("#", parts: 2) do
+        [file] -> {file, nil}
+        [file, fragment] -> {file, fragment}
+      end
+
+    cond do
+      not File.regular?(file) ->
+        {:error, "link to #{inspect(target)}: #{file} does not exist in this repository"}
+
+      fragment == nil or Path.extname(file) != ".md" ->
+        :ok
+
+      fragment in Enum.map(headings(file), &github_slug/1) ->
+        :ok
+
+      true ->
+        {:error,
+         "link to #{inspect(target)}: #{Path.basename(file)} has no heading whose GitHub " <>
+           "anchor is #{inspect(fragment)}"}
+    end
+  end
+
   # A link into a document that is not markdown (an .ex, an image) cannot be checked for an
   # anchor, and saying so is better than pretending either way.
   defp anchor(from, file, fragment) do
@@ -95,10 +132,12 @@ defmodule ExTLA.GuideCheck.Links do
     if from == file, do: "##{fragment}", else: "#{Path.basename(file)}##{fragment}"
   end
 
-  defp anchors(file) do
+  defp anchors(file), do: file |> headings() |> Enum.map(&slug/1)
+
+  defp headings(file) do
     @heading
     |> Regex.scan(File.read!(file))
-    |> Enum.map(fn [_, heading] -> slug(heading) end)
+    |> Enum.map(fn [_, heading] -> heading end)
   end
 
   @doc """
@@ -128,6 +167,27 @@ defmodule ExTLA.GuideCheck.Links do
     |> String.downcase()
     |> String.replace(~r/[^a-z0-9_]+/u, "-")
     |> String.trim("-")
+  end
+
+  @doc """
+  A heading's anchor as GitHub renders it: downcased, every character that is not a letter, a
+  digit, a space, a hyphen or an underscore dropped, each space then a `-`. Unlike ExDoc's, runs
+  are not collapsed, so `1.5 Type annotations` is `15-type-annotations` there.
+
+      iex> ExTLA.GuideCheck.Links.github_slug("1.5 Type annotations")
+      "15-type-annotations"
+
+      iex> ExTLA.GuideCheck.Links.github_slug("Gap Analysis")
+      "gap-analysis"
+
+      iex> ExTLA.GuideCheck.Links.github_slug("D-17 — Symmetry soundness")
+      "d-17--symmetry-soundness"
+  """
+  def github_slug(heading) do
+    heading
+    |> String.downcase()
+    |> String.replace(~r/[^\p{L}\p{N}_ -]/u, "")
+    |> String.replace(" ", "-")
   end
 
   defp relative(absolute), do: Path.relative_to(absolute, File.cwd!())

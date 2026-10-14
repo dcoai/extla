@@ -53,14 +53,13 @@ defmodule ExTLA do
 
   ## Where things are written down
 
-  The specification lives under `spec/`, indexed by
-  [the specification index](spec/README.md), and
-  [`08-decisions.md`](spec/08-decisions.md) records why the tool is shaped the way it is.
+  [The reference](guides/reference.md) holds what a user looks up: the checker's options and
+  their costs, the coverage report, the JSON result, conformance, and what ExTLA is not. The
+  full design is [the specification](https://github.com/dcoai/extla/blob/main/spec/README.md),
+  and [the decision log](https://github.com/dcoai/extla/blob/main/spec/08-decisions.md)
+  records why the tool is shaped the way it is.
 
-  **What is built** is in
-  [`06-architecture.md` §Implementation Phases](spec/06-architecture.md#implementation-phases)
-  and nowhere else, this moduledoc included. That is not tidiness: this page carried its own
-  copy of the build status from the third commit of the project until #148, and by then it
-  was four phases out of date on the first page of the API reference.
+  **What is built** is in [the changelog](CHANGELOG.md) and nowhere else, this moduledoc
+  included.
   """
 end

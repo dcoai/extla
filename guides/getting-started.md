@@ -342,9 +342,9 @@ code, and it is the question the tool exists to make you answer.
   [what to do when the state space explodes](tutorial/09-when-it-explodes.md), and
   [keeping a specification in a project](tutorial/10-in-your-project.md).
 - `mix help extla.check` — the flags, and the exit codes.
-- [`02-dsl-semantics.md`](../spec/02-dsl-semantics.md) — the DSL, normatively: the three name
+- [The DSL reference](../spec/02-dsl-semantics.md) — the DSL, normatively: the three name
   classes, what an action body means, where nondeterminism comes from, types.
-- [`04-layer2-model-checker.md`](../spec/04-layer2-model-checker.md) — the checker: what a run
-  computes, the coverage report in full, liveness and fairness, symmetry.
-- [`07-examples.md`](../spec/07-examples.md) — the acceptance corpus: whole specs with
+- [The reference](reference.md) — the checker's options and their costs, the coverage report,
+  the JSON result, conformance, and what ExTLA is not.
+- [The examples](../spec/07-examples.md) — the acceptance corpus: whole specs with
   implementations checked against them.

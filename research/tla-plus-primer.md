@@ -19,7 +19,7 @@ A comprehensive guide to TLA+, a formal specification language for designing, mo
 > those chapters describe a notation this library does not use. TLAPS is a theorem prover,
 > and **ExTLA is not one** — it checks bounded models exhaustively and observed behaviours
 > concretely, which is the first entry in
-> [§Non-goals](../spec/06-architecture.md#non-goals). The distributed-TLC material is
+> [§What ExTLA is not](../guides/reference.md#what-extla-is-not). The distributed-TLC material is
 > likewise about a tool this project does not build.
 
 ---

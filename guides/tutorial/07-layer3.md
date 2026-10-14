@@ -72,7 +72,7 @@ post-states go through `abstract/1`, the message through `abstract_action/1`, an
 checked for **legality**: the named action's guard must have held in the abstract pre-state, and
 the spec's transition from that state must produce exactly the abstract post-state. That second
 half is the refinement check, and it is what makes this conformance rather than a projection with
-some predicates on it ([§What conformance means here](../../spec/05-layer3-conformance.md#what-conformance-means-here)).
+some predicates on it ([§What conformance checks](../reference.md#what-conformance-checks)).
 Acquire without having requested, which the code is perfectly willing to do and the spec is not:
 
 <!-- tla:run expect=raise match="NOT ENABLED" -->
@@ -222,7 +222,7 @@ permits a behaviour the code does not take, and which of the two is wrong is not
 can decide. It says so, rather than guessing.
 
 That is the whole pipeline
-([§Full verification pipeline](../../spec/05-layer3-conformance.md#full-verification-pipeline)): model
+([§The verification pipeline](../reference.md#the-verification-pipeline)): model
 check the spec, so design bugs are found before the code exists; simulate the implementation against
 it, so the code is held to the design; replay any counterexample against the code, so a finding at
 either level is a fact about both. Running all of that from your own suite, and keeping it running,
@@ -230,17 +230,17 @@ is [Putting a specification in your project](10-in-your-project.md).
 
 ## Where to next
 
-- [`02-dsl-semantics.md`](../../spec/02-dsl-semantics.md) — the DSL, normatively. Every rule this
+- [The DSL reference](../../spec/02-dsl-semantics.md) — the DSL, normatively. Every rule this
   page leaned on is stated there with its reason.
-- [`04-layer2-model-checker.md`](../../spec/04-layer2-model-checker.md) — the checker: what a run
-  computes, the JSON result schema, state constraints, symmetry, parallel exploration.
-- [`05-layer3-conformance.md`](../../spec/05-layer3-conformance.md) — `ExTLA.GenServer`,
-  `ExTLA.Refinement`, `ExTLA.Simulation`, `ExTLA.Replay`, and `--against-graph`, which checks Layers 2
-  and 3 against each other.
-- [`07-examples.md`](../../spec/07-examples.md) — whole specifications with implementations, including
+- [The reference](../reference.md) — the checker's options and what each costs, the JSON result
+  schema, state constraints, symmetry, parallel exploration, and what conformance checks.
+- `ExTLA.GenServer`, `ExTLA.Refinement`, `ExTLA.Simulation` and `ExTLA.Replay` — the conformance
+  layer, module by module, and `mix help extla.simulate` for `--against-graph`, which checks
+  Layers 2 and 3 against each other.
+- [The examples](../../spec/07-examples.md) — whole specifications with implementations, including
   the distributed lock this tutorial's is a small cousin of.
-- [`08-decisions.md`](../../spec/08-decisions.md) — why the tool is shaped the way it is, decision by
-  decision.
+- [Design decisions](https://github.com/dcoai/extla/blob/main/spec/08-decisions.md) — why the tool
+  is shaped the way it is, decision by decision.
 
 ---
 
